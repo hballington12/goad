@@ -29,7 +29,7 @@ impl PolygonExtensions for Polygon<f32> {
             vertices.push(Point3::new(coord.x, coord.y, z));
         }
 
-        Face::new(&vertices)
+        Face::new(vertices)
     }
 }
 
@@ -39,7 +39,6 @@ fn clip_polygons(clip_in: &Face, subjects_in: &Vec<Face>) -> Vec<Face> {
     }
 
     let clip = clip_in.polygon();
-
     let mut intersections: Vec<Face> = Vec::new(); // the final remapped
     let mut remaining_clips = vec![clip];
 
@@ -70,6 +69,7 @@ fn clip_polygons(clip_in: &Face, subjects_in: &Vec<Face>) -> Vec<Face> {
     intersections
 }
 
+/// Transforms a Face using `nalgebra` matrix transformation
 fn project_face(face: &Face, model_view: &Matrix4<f32>) -> Face {
     let projected_vertices: Vec<Point3<f32>> = face
         .vertices

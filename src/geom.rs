@@ -117,7 +117,7 @@ pub struct Face {
 }
 
 impl Face {
-    pub fn new(vertices: &Vec<Point3<f32>>) -> Self {
+    pub fn new(vertices: Vec<Point3<f32>>) -> Self {
         let vertices = vertices.clone();
         let normal = Self::compute_normal(&vertices);
         let midpoint = Self::compute_midpoint(&vertices);
@@ -293,7 +293,7 @@ impl Shape {
                     .map(|&i| geom.vertices[i as usize])
                     .collect();
 
-                geom.add_face(Face::new(&vertices));
+                geom.add_face(Face::new(vertices));
 
                 next_face = end;
             }
@@ -355,7 +355,7 @@ impl Geom {
                     vertices.push(v);
                 }
 
-                shape.add_face(Face::new(&vertices));
+                shape.add_face(Face::new(vertices));
 
                 next_face = end;
             }
