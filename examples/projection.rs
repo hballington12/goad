@@ -1,136 +1,44 @@
-use std::time::Duration;
-
-use geo::{HasDimensions, MultiPolygon};
-use geo_clipper::Clipper;
-use geo_types::{Coord, LineString, Polygon};
 use macroquad::prelude::*;
-use nalgebra::Perspective3;
-use nalgebra::{self as na, Matrix4, Vector4};
-use nalgebra::{Isometry3, Point3, Vector3};
-use pbt::geom::{self, Face, Plane};
+use nalgebra::{self as na, Isometry3, Point3, Vector3};
+use pbt::clip::clip_faces;
+use pbt::geom;
 use pbt::helpers::draw_face;
-use pbt::helpers::{self, draw_multipolygon};
-
-trait PolygonExtensions {
-    fn project(&self, plane: &Plane) -> Face;
-}
-
-impl PolygonExtensions for Polygon<f32> {
-    /// Projects the xy coordinates of a polygon onto a plane in 3D
-    /// Ignores the last vertex, which is a duplicate of the first
-    fn project(&self, plane: &Plane) -> Face {
-        let mut vertices = Vec::new();
-
-        #[cfg(debug_assertions)]
-        {
-            assert!(
-                !self.interiors().len() != 0,
-                "hold detected, please fix: {:?}",
-                self.interiors()
-            );
-
-            assert!(
-                plane.normal.z != 0.0,
-                "plane normal cannot have 0 z-component: {:?}",
-                plane.normal
-            );
-        }
-
-        for coord in self.exterior().0.iter().take(self.exterior().0.len() - 1) {
-            // compute z intersection via z = -(ax + by + d)/c
-            let z = -(plane.normal.x * coord.x + plane.normal.y * coord.y + plane.offset)
-                / plane.normal.z;
-
-            vertices.push(Point3::new(coord.x, coord.y, z));
-        }
-
-        Face::new(vertices)
-    }
-}
-
-fn clip_polygons(clip_in: &Face, subjects_in: &Vec<Face>) -> Vec<Face> {
-    if subjects_in.is_empty() {
-        return Vec::new();
-    }
-
-    let clip = clip_in.polygon();
-    let mut intersections: Vec<Face> = Vec::new(); // the final remapped
-    let mut remaining_clips = vec![clip];
-
-    // for subject in subjects {
-    for subject_in in subjects_in {
-        let subject = subject_in.polygon();
-        let mut next_clips = Vec::new();
-
-        for clip in remaining_clips {
-            let mut remapped: Vec<Face> = Vec::new();
-            let intersection = subject.intersection(&clip, 100000.0);
-            let difference = clip.difference(&subject, 100000.0);
-
-            for intsn in intersection {
-                let face = intsn.project(&subject_in.plane());
-                remapped.push(face);
-            }
-
-            intersections.extend(remapped);
-            next_clips.extend(difference);
-        }
-        remaining_clips = next_clips; // Update clips for the next subject
-        if remaining_clips.is_empty() {
-            break;
-        }
-    }
-
-    intersections
-}
-
-/// Transforms a Face using `nalgebra` matrix transformation
-fn project_face(face: &Face, model_view: &Matrix4<f32>) -> Face {
-    let projected_vertices: Vec<Point3<f32>> = face
-        .vertices
-        .iter()
-        .map(|point| {
-            let vertex4 = Vector4::new(point.x, point.y, point.z, 1.0);
-            let projected_vertex = model_view * vertex4;
-            Point3::new(projected_vertex.x, projected_vertex.y, projected_vertex.z)
-        })
-        .collect();
-
-    Face::new(projected_vertices) // note coordinate system
-}
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let shape = &geom::Geom::from_file("./hex3.obj").shapes[0];
+    let mut shape = geom::Shape::from_file("./octo2.obj");
+    println!("{:?}", shape);
+    let clip_index = 4; // the index of the face to be used as the clip
+    let projection = Vector3::new(-0.3, 0.0, -1.0);
 
-    // do some sort of projection - set to nothing
-    let model = Isometry3::new(Vector3::zeros(), na::zero());
-
+    let model = Isometry3::new(Vector3::zeros(), na::zero()); // do some sort of projection - set to nothing
     let origin = Point3::origin(); // camera location
-    let target = Point3::new(0.5, 0.0, -1.0); // projection direction
-    let view = Isometry3::look_at_rh(&origin, &target, &Vector3::y());
+    let target = Point3::new(projection.x, projection.y, projection.z); // projection direction, defines negative z-axis in new coords
+
+    let up: Vector3<f32> = if projection.cross(&Vector3::y()).norm() < 0.01 {
+        Vector3::x()
+    } else {
+        Vector3::y()
+    };
+
+    let view = Isometry3::look_at_rh(&origin, &target, &up);
 
     let transform = (view * model).to_homogeneous(); // transform to clipping system
     let itransform = transform.try_inverse().unwrap(); // inverse transform
 
-    let mut proj_faces: Vec<Face> = shape
-        .faces
-        .iter()
-        .map(|face| project_face(face, &transform))
-        .collect();
+    shape.transform(&transform); // transform to clipping coordinate system
 
-    // choose a face be the clip
-    let clip = proj_faces.remove(4);
+    let mut clip = shape.faces.remove(clip_index); // choose a face be the clip
 
     // compute remapped intersections
-    let remapped = clip_polygons(&clip, &proj_faces);
+    let mut remapped = clip_faces(&clip, &shape.faces);
 
-    // use inverse transform to get back to original coordinates
-    let reremapped: Vec<Face> = remapped
-        .iter()
-        .map(|face| project_face(face, &itransform))
-        .collect();
-    let reclip = project_face(&clip, &itransform);
+    // transform back to original coordinate system
+    shape.transform(&itransform);
+    remapped
+        .iter_mut()
+        .for_each(|face| face.project(&itransform));
+    clip.project(&itransform);
 
     loop {
         clear_background(BLACK);
@@ -139,14 +47,12 @@ async fn main() {
         for face in &shape.faces {
             draw_face(face, GREEN);
         }
-
         // draw the remapped intersections
-        for face in &reremapped {
+        for face in &remapped {
             draw_face(face, YELLOW);
         }
-
         // draw the original clip
-        draw_face(&reclip, RED);
+        draw_face(&clip, RED);
 
         next_frame().await
     }

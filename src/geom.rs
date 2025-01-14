@@ -1,11 +1,14 @@
 use geo::Point;
 use nalgebra as na;
+use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
+use nalgebra::Vector4;
 use std::env;
 use std::ops::Add;
 use std::ops::Mul;
 use std::ops::Sub;
+use tobj;
 
 use geo::Area;
 use geo_clipper::Clipper;
@@ -119,20 +122,25 @@ pub struct Face {
 impl Face {
     pub fn new(vertices: Vec<Point3<f32>>) -> Self {
         let vertices = vertices.clone();
-        let normal = Self::compute_normal(&vertices);
-        let midpoint = Self::compute_midpoint(&vertices);
         let num_vertices = vertices.len();
 
-        Self {
+        let mut face = Self {
             vertices,
-            normal,
-            midpoint,
             num_vertices,
-        }
+            normal: Vector3::zeros(),
+            midpoint: Point3::origin(),
+        };
+
+        face.set_normal();
+        face.set_midpoint();
+
+        face
     }
 
     /// Compute the normal vector for the face.
-    fn compute_normal(vertices: &[Point3<f32>]) -> Vector3<f32> {
+    fn set_normal(&mut self) {
+        let vertices = &self.vertices;
+
         // Using the first three vertices to compute the normal.
         let v1 = &vertices[0];
         let v2 = &vertices[1];
@@ -153,11 +161,12 @@ impl Face {
             assert!(v.dot(&normal) < 0.01, "value: {}", v.dot(&normal));
         }
 
-        normal
+        self.normal = normal;
     }
 
     /// Compute the midpoint of the facet.
-    fn compute_midpoint(vertices: &[Point3<f32>]) -> Point3<f32> {
+    fn set_midpoint(&mut self) {
+        let vertices = &self.vertices;
         let len = vertices.len() as f32;
         // let mut mid = vertices.iter().copied();
         let mut sum: Point3<f32> = vertices
@@ -166,7 +175,7 @@ impl Face {
 
         sum /= len;
 
-        sum
+        self.midpoint = sum;
     }
 
     /// Returns the Polygon of a face, which it's 2D projection in the xy plane.
@@ -200,12 +209,50 @@ impl Face {
         vec.dot(&proj)
     }
 
+    pub fn vert_min(&self, dim: usize) -> Result<f32, &'static str> {
+        if dim > 2 {
+            return Err("Dimension must be 0, 1, or 2");
+        }
+
+        let min = self
+            .vertices
+            .iter()
+            .map(|v| v[dim])
+            .collect::<Vec<f32>>()
+            .into_iter()
+            .reduce(f32::min);
+
+        match min {
+            Some(val) => Ok(val),
+            None => Err("No vertices found"), // Handle the case where vertices is empty
+        }
+    }
+
+    pub fn vert_max(&self, dim: usize) -> Result<f32, &'static str> {
+        if dim > 2 {
+            return Err("Dimension must be 0, 1, or 2");
+        }
+
+        let min = self
+            .vertices
+            .iter()
+            .map(|v| v[dim])
+            .collect::<Vec<f32>>()
+            .into_iter()
+            .reduce(f32::max);
+
+        match min {
+            Some(val) => Ok(val),
+            None => Err("No vertices found"), // Handle the case where vertices is empty
+        }
+    }
+
     /// Computes the maximum z-distance to the vertices of another.
     /// This is defined as the lowest vertex in the subject to the highest
     /// vertex in the other.
     /// This is used to determine if any part of the other is visible along
     /// the projection direction, in which case the result is positive
-    fn z_max(&self, other: &Face, proj: &Vector3<f32>) -> f32 {
+    pub fn z_max(&self, other: &Face, proj: &Vector3<f32>) -> f32 {
         let lowest = self
             .vertices
             .iter()
@@ -225,6 +272,33 @@ impl Face {
             .unwrap();
 
         highest - lowest
+    }
+    /// Determines if all vertices of a Face are in front of the plane
+    /// of another Face.
+    pub fn is_in_front_of(&self, face: &Face) -> bool {
+        let origin = face.vertices[0]; // choose point in plane of face
+        for point in &self.vertices {
+            let vector = point - origin;
+            if vector.dot(&face.normal) > 0.05 {
+                // if point is not above the plane
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Transforms a Face in place using a `nalgebra` matrix transformation.
+    pub fn project(&mut self, model_view: &Matrix4<f32>) {
+        for point in &mut self.vertices {
+            // Iterate mutably
+            let vertex4 = Vector4::new(point.x, point.y, point.z, 1.0);
+            let projected_vertex = model_view * vertex4;
+            point.x = projected_vertex.x;
+            point.y = projected_vertex.y;
+            point.z = projected_vertex.z;
+        }
+        self.set_midpoint();
+        self.set_normal();
     }
 }
 
@@ -263,12 +337,17 @@ impl Shape {
         let (models, _) = tobj::load_obj(filename, &tobj::LoadOptions::default())
             .expect("Failed to OBJ load file");
 
+        println!("{:?}", models);
+
         let mut geom = Shape::new();
 
         for (i, m) in models.iter().enumerate() {
             assert!(i == 0, "found more than 1 mesh in OBJ file."); // only accept 1 mesh
 
             let mesh = &m.mesh;
+            println!("number of vertices in file: {:?}", mesh.positions.len() / 3);
+            println!("Number of faces in file: {:?}", mesh.face_arities.len());
+
             for vtx in 0..mesh.positions.len() / 3 {
                 geom.add_vertex(Point3::new(
                     mesh.positions[3 * vtx],
@@ -312,6 +391,13 @@ impl Shape {
     pub fn add_face(&mut self, face: Face) {
         self.faces.push(face);
         self.num_faces += 1;
+    }
+
+    pub fn transform(&mut self, transform: &Matrix4<f32>) {
+        for face in &mut self.faces {
+            // Iterate mutably
+            face.project(transform); // Call the in-place project method
+        }
     }
 }
 
