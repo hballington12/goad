@@ -21,6 +21,21 @@ impl PolygonExtensions for Polygon<f32> {
     fn project(&self, plane: &Plane) -> Face {
         let mut vertices = Vec::new();
 
+        #[cfg(debug_assertions)]
+        {
+            assert!(
+                !self.interiors().len() != 0,
+                "hold detected, please fix: {:?}",
+                self.interiors()
+            );
+
+            assert!(
+                plane.normal.z != 0.0,
+                "plane normal cannot have 0 z-component: {:?}",
+                plane.normal
+            );
+        }
+
         for coord in self.exterior().0.iter().take(self.exterior().0.len() - 1) {
             // compute z intersection via z = -(ax + by + d)/c
             let z = -(plane.normal.x * coord.x + plane.normal.y * coord.y + plane.offset)
@@ -81,25 +96,22 @@ fn project_face(face: &Face, model_view: &Matrix4<f32>) -> Face {
         })
         .collect();
 
-    Face::new(&projected_vertices) // note coordinate system
+    Face::new(projected_vertices) // note coordinate system
 }
 
 #[macroquad::main("Testing...")]
 async fn main() {
     let shape = &geom::Geom::from_file("./hex3.obj").shapes[0];
 
-    // do some sort of projection
-
-    // let model = Isometry3::new(Vector3::y(), na::zero());
+    // do some sort of projection - set to nothing
     let model = Isometry3::new(Vector3::zeros(), na::zero());
 
-    let origin = Point3::origin();
-    let target = Point3::new(0.5, 0.0, -1.0);
+    let origin = Point3::origin(); // camera location
+    let target = Point3::new(0.5, 0.0, -1.0); // projection direction
     let view = Isometry3::look_at_rh(&origin, &target, &Vector3::y());
 
-    let transform = (view * model).to_homogeneous();
-
-    let itransform = transform.try_inverse().unwrap();
+    let transform = (view * model).to_homogeneous(); // transform to clipping system
+    let itransform = transform.try_inverse().unwrap(); // inverse transform
 
     let mut proj_faces: Vec<Face> = shape
         .faces
