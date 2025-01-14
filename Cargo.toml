@@ -1,0 +1,12 @@
+[package]
+name = "pbt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+geo = "0.29.3"
+geo-clipper = "0.8.0"
+geo-types = "0.7.14"
+macroquad = "0.4.13"
+nalgebra = "0.33.2"
+tobj = "4.0.2"
