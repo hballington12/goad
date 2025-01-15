@@ -1,23 +1,13 @@
-use geo::Point;
-use nalgebra as na;
+use geo_types::Coord;
+use geo_types::LineString;
+use geo_types::Polygon;
 use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
-use std::env;
-use std::ops::Add;
-use std::ops::Mul;
-use std::ops::Sub;
+use std::path::Path;
 use tobj;
-
-use geo::Area;
-use geo_clipper::Clipper;
-use geo_clipper::ToOwnedPolygon;
-use geo_types::Coord;
-use geo_types::LineString;
-use geo_types::MultiPolygon;
-use geo_types::Polygon;
-use macroquad::camera::Projection;
+use tobj::Model;
 
 #[cfg(test)]
 mod tests {
@@ -28,14 +18,14 @@ mod tests {
 
     #[test]
     fn load_hex_shape() {
-        let shape = Shape::from_file("hex.obj");
+        let shape = &Geom::from_file("./examples/data/hex.obj").unwrap().shapes[0];
         assert_eq!(shape.num_faces, 8);
         assert_eq!(shape.num_vertices, 12);
         assert_eq!(shape.faces[0].vertices[0].x, 5.0);
         assert_eq!(shape.faces[4].vertices[4].z, 5.0);
         assert_eq!(shape.faces[4].num_vertices, 6);
 
-        let geom = Geom::from_file("hex.obj");
+        let geom = Geom::from_file("./examples/data/hex.obj").unwrap();
         assert_eq!(geom.num_shapes, 1);
         assert_eq!(geom.shapes[0].num_faces, 8);
         assert_eq!(geom.shapes[0].num_vertices, 12);
@@ -45,14 +35,8 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
-    fn load_multiple_shape() {
-        let _ = Shape::from_file("multiple.obj");
-    }
-
-    #[test]
     fn load_multiple_geom() {
-        let geom = Geom::from_file("multiple.obj");
+        let geom = Geom::from_file("./examples/data/multiple.obj").unwrap();
         assert_eq!(geom.num_shapes, 2);
         assert_eq!(geom.shapes[0].num_faces, 8);
         assert_eq!(geom.shapes[0].num_vertices, 12);
@@ -69,7 +53,7 @@ mod tests {
 
     #[test]
     fn polygon_clip() {
-        let shape = &Geom::from_file("hex2.obj").shapes[0];
+        let shape = &Geom::from_file("./examples/data/hex2.obj").unwrap().shapes[0];
 
         let face1 = &shape.faces[4];
         let face2 = &shape.faces[7];
@@ -288,7 +272,7 @@ impl Face {
     }
 
     /// Transforms a Face in place using a `nalgebra` matrix transformation.
-    pub fn project(&mut self, model_view: &Matrix4<f32>) {
+    pub fn transform(&mut self, model_view: &Matrix4<f32>) {
         for point in &mut self.vertices {
             // Iterate mutably
             let vertex4 = Vector4::new(point.x, point.y, point.z, 1.0);
@@ -333,52 +317,39 @@ impl Shape {
         }
     }
 
-    pub fn from_file(filename: &str) -> Shape {
-        let (models, _) = tobj::load_obj(filename, &tobj::LoadOptions::default())
-            .expect("Failed to OBJ load file");
+    fn from_model(model: &Model) -> Shape {
+        let mesh = &model.mesh;
 
-        println!("{:?}", models);
+        let vertices = mesh
+            .positions
+            .chunks_exact(3)
+            .map(|v| Point3::new(v[0], v[1], v[2]))
+            .collect::<Vec<_>>();
 
-        let mut geom = Shape::new();
+        let mut shape = Shape::new();
+        shape.num_vertices = vertices.len();
+        shape.vertices = vertices;
 
-        for (i, m) in models.iter().enumerate() {
-            assert!(i == 0, "found more than 1 mesh in OBJ file."); // only accept 1 mesh
+        let face_arities = if mesh.face_arities.is_empty() {
+            vec![3; mesh.indices.len() / 3]
+        } else {
+            mesh.face_arities.clone()
+        };
 
-            let mesh = &m.mesh;
-            println!("number of vertices in file: {:?}", mesh.positions.len() / 3);
-            println!("Number of faces in file: {:?}", mesh.face_arities.len());
+        let mut next_face = 0;
+        for arity in face_arities {
+            let end = next_face + arity as usize;
+            let face_indices = &mesh.indices[next_face..end];
 
-            for vtx in 0..mesh.positions.len() / 3 {
-                geom.add_vertex(Point3::new(
-                    mesh.positions[3 * vtx],
-                    mesh.positions[3 * vtx + 1],
-                    mesh.positions[3 * vtx + 2],
-                ));
-            }
+            let face_vertices: Vec<_> = face_indices
+                .iter()
+                .map(|&i| shape.vertices[i as usize])
+                .collect();
+            shape.add_face(Face::new(face_vertices));
 
-            let mut next_face = 0;
-            for face in 0..mesh.face_arities.len() {
-                let end = next_face + mesh.face_arities[face] as usize;
-                let face_indices = &mesh.indices[next_face..end];
-                let mut vertices = Vec::new();
-
-                for &i in face_indices {
-                    let v = geom.vertices[i as usize].xxx();
-                    vertices.push(v);
-                }
-
-                let vertices = face_indices
-                    .iter()
-                    .map(|&i| geom.vertices[i as usize])
-                    .collect();
-
-                geom.add_face(Face::new(vertices));
-
-                next_face = end;
-            }
+            next_face = end;
         }
-
-        geom
+        shape
     }
 
     /// Adds a vertex to the mesh.
@@ -396,59 +367,53 @@ impl Shape {
     pub fn transform(&mut self, transform: &Matrix4<f32>) {
         for face in &mut self.faces {
             // Iterate mutably
-            face.project(transform); // Call the in-place project method
+            face.transform(transform); // Call the in-place project method
         }
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Geom {
     pub shapes: Vec<Shape>,
     pub num_shapes: usize,
 }
 
 impl Geom {
-    pub fn from_file(filename: &str) -> Geom {
-        match env::current_dir() {
+    pub fn from_file(filename: &str) -> Result<Self, String> {
+        // Log current directory only in debug builds
+        #[cfg(debug_assertions)]
+        match std::env::current_dir() {
             Ok(path) => println!("Current directory: {}", path.display()),
             Err(e) => eprintln!("Error getting current directory: {}", e),
         }
-        let (models, _) = tobj::load_obj(filename, &tobj::LoadOptions::default())
-            .expect("Failed to OBJ load file");
 
-        let mut shapes = Vec::new();
-        let mut num_shapes = 0;
+        let path = Path::new(filename);
+        let resolved_filename = if path.is_absolute() {
+            filename.to_string()
+        } else {
+            std::env::current_dir()
+                .map(|p| p.join(path).display().to_string())
+                .map_err(|e| format!("Could not resolve path: {}", e))?
+        };
 
-        for (_, m) in models.iter().enumerate() {
-            let mut shape = Shape::new();
+        let (models, _) = tobj::load_obj(&resolved_filename, &tobj::LoadOptions::default())
+            .map_err(|e| format!("Failed to load OBJ file '{}': {}", filename, e))?;
 
-            let mesh = &m.mesh;
-            for vtx in 0..mesh.positions.len() / 3 {
-                shape.add_vertex(Point3::new(
-                    mesh.positions[3 * vtx],
-                    mesh.positions[3 * vtx + 1],
-                    mesh.positions[3 * vtx + 2],
-                ));
-            }
-
-            let mut next_face = 0;
-            for face in 0..mesh.face_arities.len() {
-                let end = next_face + mesh.face_arities[face] as usize;
-                let face_indices = &mesh.indices[next_face..end];
-                let mut vertices = Vec::new();
-
-                for &i in face_indices {
-                    let v = shape.vertices[i as usize].clone();
-                    vertices.push(v);
-                }
-
-                shape.add_face(Face::new(vertices));
-
-                next_face = end;
-            }
-            shapes.push(shape);
-            num_shapes += 1;
+        if models.is_empty() {
+            return Err("No models found in OBJ file".to_string());
         }
 
-        Geom { shapes, num_shapes }
+        let shapes: Vec<Shape> = models.iter().map(Shape::from_model).collect();
+
+        Ok(Self {
+            num_shapes: shapes.len(),
+            shapes,
+        })
+    }
+
+    pub fn transform(&mut self, transform: &Matrix4<f32>) {
+        for shape in &mut self.shapes {
+            shape.transform(transform);
+        }
     }
 }

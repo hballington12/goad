@@ -18,7 +18,7 @@ pub fn draw_multipolygon(polygon: &Polygon<f32>, color: Color) {
     // Convert the points into macroquad-compatible coordinates
     let mut screen_points: Vec<(f32, f32)> = Vec::new();
     for coord in points {
-        let screen_x = coord.x as f32 * scale + offset_x; // Scale and center
+        let screen_x = -coord.x as f32 * scale + offset_x; // Scale and center
         let screen_y = coord.y as f32 * scale + offset_y; // Scale and center
         screen_points.push((screen_x, screen_y));
     }
@@ -52,7 +52,7 @@ pub fn draw_face(face: &Face, color: Color) {
     // Convert the points into macroquad-compatible coordinates
     let mut screen_points: Vec<(f32, f32)> = Vec::new();
     for coord in points {
-        let screen_x = coord.x as f32 * scale + offset_x; // Scale and center
+        let screen_x = -coord.x as f32 * scale + offset_x; // Scale and center
         let screen_y = coord.y as f32 * scale + offset_y; // Scale and center
         screen_points.push((screen_x, screen_y));
     }

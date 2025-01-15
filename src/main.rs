@@ -6,7 +6,7 @@ use pbt::helpers::{draw_face, draw_multipolygon};
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let shape = &geom::Geom::from_file("./concave1.obj").shapes[0];
+    let shape = &geom::Geom::from_file("./concave1.obj").unwrap().shapes[0];
 
     let face2 = &shape.faces[0]; // to be the clip
 

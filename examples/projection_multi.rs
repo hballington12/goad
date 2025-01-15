@@ -6,10 +6,10 @@ use pbt::helpers::draw_face;
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/concave1.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/multiple.obj").unwrap();
 
-    let clip_index = 4; // the index of the face to be used as the clip
-    let projection = Vector3::new(-0.3, 0.0, -1.0);
+    let clip_index = 5; // the index of the face to be used as the clip
+    let projection = Vector3::new(-1.0, 0.0, 0.0);
     let mut clip = geom.shapes[0].faces.remove(clip_index); // choose a face be the clip
 
     // start function `do_clip` here:
@@ -20,12 +20,15 @@ async fn main() {
         clear_background(BLACK);
 
         // draw the original
-        for face in &clipping.geom.shapes[0].faces {
-            draw_face(face, GREEN);
+        for shape in &clipping.geom.shapes {
+            for face in &shape.faces {
+                draw_face(face, GREEN);
+            }
         }
         // draw the remapped intersections
         for face in &clipping.intersections {
             draw_face(face, YELLOW);
+            // break;
         }
         // draw the original clip
         draw_face(&clipping.clip, RED);

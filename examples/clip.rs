@@ -1,12 +1,13 @@
 use geo_clipper::Clipper;
-use geo_types::{Coord, LineString, Polygon};
 use macroquad::prelude::*;
 use pbt::geom;
 use pbt::helpers;
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let shape = &geom::Geom::from_file("./concave1.obj").shapes[0];
+    let shape = &geom::Geom::from_file("./examples/data/concave1.obj")
+        .unwrap()
+        .shapes[0];
 
     let face1 = &shape.faces[4];
     let face2 = &shape.faces[7];
