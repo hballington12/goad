@@ -21,14 +21,14 @@ async fn main() {
 
         // draw the original
         for face in &clipping.geom.shapes[0].faces {
-            draw_face(face, GREEN);
+            draw_face(face, GREEN, 2.0);
         }
         // draw the remapped intersections
         for face in &clipping.intersections {
-            draw_face(face, YELLOW);
+            draw_face(face, YELLOW, 2.0);
         }
         // draw the original clip
-        draw_face(&clipping.clip, RED);
+        draw_face(&clipping.clip, RED, 2.0);
 
         next_frame().await
     }

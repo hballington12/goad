@@ -1,3 +1,5 @@
+use std::io::Lines;
+
 use crate::geom::Face;
 use geo_types::{Coord, Polygon};
 use macroquad::prelude::*;
@@ -33,53 +35,61 @@ pub fn draw_multipolygon(polygon: &Polygon<f32>, color: Color) {
 ///
 /// # Arguments
 /// * `face` - A reference to a `Face` containing the polygon to draw.
-pub fn draw_face(face: &Face, color: Color) {
+pub fn draw_face(face: &Face, color: Color, thickness: f32) {
     let scale = 25.0; // modify this depending on widget size
     let offset_x = 400.0;
     let offset_y = 300.0;
 
     // Extract the exterior LineString
-    let mut points = Vec::new();
+    let mut line_strings = Vec::new();
     match face {
         Face::Simple(data) => {
+            let mut line_string = Vec::new();
             for vertex in &data.exterior {
-                points.push(Coord {
+                line_string.push(Coord {
                     x: vertex.x,
                     y: vertex.y,
                 });
             }
+            line_strings.push(line_string);
         }
         Face::Complex { data, interiors } => {
+            let mut line_string = Vec::new();
             for vertex in &data.exterior {
-                points.push(Coord {
+                line_string.push(Coord {
                     x: vertex.x,
                     y: vertex.y,
                 });
             }
+            line_strings.push(line_string);
 
             for interior in interiors {
+                let mut line_string = Vec::new();
                 for vertex in interior {
-                    points.push(Coord {
+                    line_string.push(Coord {
                         x: vertex.x,
                         y: vertex.y,
                     });
                 }
+                line_strings.push(line_string);
             }
         }
     }
 
     // Convert the points into macroquad-compatible coordinates
-    let mut screen_points: Vec<(f32, f32)> = Vec::new();
-    for coord in points {
-        let screen_x = -coord.x as f32 * scale + offset_x; // Scale and center
-        let screen_y = coord.y as f32 * scale + offset_y; // Scale and center
-        screen_points.push((screen_x, screen_y));
-    }
+    for points in line_strings {
+        let mut screen_points: Vec<(f32, f32)> = Vec::new();
+        for coord in points {
+            let screen_x = -coord.x as f32 * scale + offset_x; // Scale and center
+            let screen_y = coord.y as f32 * scale + offset_y; // Scale and center
+            screen_points.push((screen_x, screen_y));
+        }
 
-    // Draw the polygon by connecting the points
-    for i in 0..screen_points.len() {
-        let (x1, y1) = screen_points[i];
-        let (x2, y2) = screen_points[(i + 1) % screen_points.len()]; // Wrap around
-        draw_line(x1, y1, x2, y2, 2.0, color);
+        // Draw the polygon by connecting the points
+        for i in 0..screen_points.len() {
+            let (x1, y1) = screen_points[i];
+            let (x2, y2) = screen_points[(i + 1) % screen_points.len()]; // Wrap around
+            draw_line(x1, y1, x2, y2, thickness, color);
+        }
     }
 }
