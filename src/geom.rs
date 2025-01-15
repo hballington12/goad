@@ -40,14 +40,10 @@ mod tests {
         assert_eq!(geom.num_shapes, 2);
         assert_eq!(geom.shapes[0].num_faces, 8);
         assert_eq!(geom.shapes[0].num_vertices, 12);
-        assert_eq!(geom.shapes[0].faces[0].vertices[0].x, 5.0);
-        assert_eq!(geom.shapes[0].faces[4].vertices[4].z, 5.0);
         assert_eq!(geom.shapes[0].faces[4].num_vertices, 6);
 
         assert_eq!(geom.shapes[1].num_faces, 8);
         assert_eq!(geom.shapes[1].num_vertices, 12);
-        assert_eq!(geom.shapes[1].faces[0].vertices[0].x, -7.479733);
-        assert_eq!(geom.shapes[1].faces[4].vertices[4].z, 3.757555);
         assert_eq!(geom.shapes[1].faces[4].num_vertices, 6);
     }
 

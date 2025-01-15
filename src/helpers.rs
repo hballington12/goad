@@ -1,7 +1,5 @@
 use crate::geom::Face;
-
-use super::geom;
-use geo_types::{Coord, MultiPolygon, Polygon};
+use geo_types::{Coord, Polygon};
 use macroquad::prelude::*;
 
 /// Draws the polygons from a MultiPolygon result onto the screen.

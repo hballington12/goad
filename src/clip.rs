@@ -3,7 +3,7 @@ use geo::Area;
 use geo_clipper::Clipper;
 use geo_types::Polygon;
 use macroquad::prelude::*;
-use nalgebra::{self as na, Isometry3, Point3, Vector3};
+use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
 
 #[cfg(test)]
@@ -12,6 +12,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[should_panic]
     fn concave_clip() {
         let mut geom = Geom::from_file("./examples/data/concave1.obj").unwrap();
 
@@ -22,8 +23,7 @@ mod tests {
         // start function `do_clip` here:
         let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
         clipping.clip();
-
-        panic!();
+        clipping.clip(); // try to clip again, which should panic
     }
 }
 
@@ -71,21 +71,32 @@ pub struct Clipping<'a> {
     pub clip: &'a mut Face,       // a clipping face
     pub proj: &'a Vector3<f32>,   // a projection vector
     pub intersections: Vec<Face>, // a list of intersection faces
+    pub remaining: Vec<Face>,     // a list of remaining clips
+    transform: Matrix4<f32>,      // a transform matrix to the clipping system
+    itransform: Matrix4<f32>,     // a transform matrix from the clipping system
+    is_done: bool,                // whether or not the clipping has been computed
 }
 
 impl<'a> Clipping<'a> {
     /// A new cllipping object.
     pub fn new(geom: &'a mut Geom, clip: &'a mut Face, proj: &'a Vector3<f32>) -> Self {
-        Self {
+        let mut clipping = Self {
             geom: geom,
             clip: clip,
             proj: proj,
             intersections: Vec::new(),
-        }
+            remaining: Vec::new(),
+            transform: Matrix4::zeros(),
+            itransform: Matrix4::zeros(),
+            is_done: false,
+        };
+        clipping.set_transform();
+
+        clipping
     }
 
-    /// Performs the clip on a `Clipping` object.
-    pub fn clip(&mut self) {
+    /// Sets the forward and inverse transform for the clipping
+    fn set_transform(&mut self) {
         let model = Isometry3::new(Vector3::zeros(), na::zero()); // do some sort of projection - set to nothing
         let origin = Point3::origin(); // camera location
         let target = Point3::new(self.proj.x, self.proj.y, self.proj.z); // projection direction, defines negative z-axis in new coords
@@ -98,11 +109,18 @@ impl<'a> Clipping<'a> {
 
         let view = Isometry3::look_at_rh(&origin, &target, &up);
 
-        let transform = (view * model).to_homogeneous(); // transform to clipping system
-        let itransform = transform.try_inverse().unwrap(); // inverse transform
+        self.transform = (view * model).to_homogeneous(); // transform to clipping system
+        self.itransform = self.transform.try_inverse().unwrap(); // inverse transform
+    }
 
-        self.geom.transform(&transform); // transform to clipping coordinate system
-        self.clip.transform(&transform);
+    /// Performs the clip on a `Clipping` object.
+    pub fn clip(&mut self) {
+        if self.is_done {
+            panic!("Method clip() called, but the clipping was already done previously.");
+        }
+
+        self.geom.transform(&self.transform); // transform to clipping coordinate system
+        self.clip.transform(&self.transform);
 
         let subjects: Vec<&Face> = self
             .geom
@@ -112,26 +130,31 @@ impl<'a> Clipping<'a> {
             .collect();
 
         // compute remapped intersections
-        let mut remapped: Vec<Face> = clip_faces(&self.clip, &subjects);
+        let (mut intersection, mut remaining) = clip_faces(&self.clip, &subjects);
 
         // transform back to original coordinate system
-        self.geom.transform(&itransform);
-        remapped
+        self.geom.transform(&self.itransform);
+        intersection
             .iter_mut()
-            .for_each(|face| face.transform(&itransform));
-        self.clip.transform(&itransform);
+            .for_each(|face| face.transform(&self.itransform));
+        remaining
+            .iter_mut()
+            .for_each(|face| face.transform(&self.itransform));
+        self.clip.transform(&self.itransform);
 
         // append the remapped intersections to the struct
-        self.intersections.extend(remapped);
+        self.intersections.extend(intersection);
+        self.remaining.extend(remaining);
+        self.is_done = true;
     }
 }
 
 const CLIP_TOLERANCE: f32 = 1e6; // Named constant for tolerance
 const AREA_THRESHOLD: f32 = 1e-2; // Named constant for minimum intersection area
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
-pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> Vec<Face> {
+pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> (Vec<Face>, Vec<Face>) {
     if subjects_in.is_empty() {
-        return Vec::new();
+        return (Vec::new(), vec![clip_in.clone()]);
     }
 
     // Use a single pass to filter and sort by midpoint.z
@@ -158,17 +181,18 @@ pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> Vec<Face> {
 
         for clip in &remaining_clips {
             let mut intersection = subject_poly.intersection(clip, CLIP_TOLERANCE);
-            let difference = clip.difference(&subject_poly, CLIP_TOLERANCE);
+            let mut difference = clip.difference(&subject_poly, CLIP_TOLERANCE);
 
-            // filter out "bad" intersections
+            // filter out "bad" intersections and differences
             intersection
                 .0
                 .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
+            difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
             intersections.extend(
                 intersection
                     .into_iter()
-                    .map(|intsn| intsn.project(&subject.plane())),
+                    .map(|poly| poly.project(&subject.plane())),
             );
             next_clips.extend(difference);
         }
@@ -179,5 +203,10 @@ pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> Vec<Face> {
         }
     }
 
-    intersections
+    let remaining = remaining_clips
+        .into_iter()
+        .map(|poly| poly.project(&clip_in.plane()))
+        .collect::<Vec<_>>();
+
+    (intersections, remaining)
 }

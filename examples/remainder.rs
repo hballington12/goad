@@ -1,0 +1,45 @@
+use macroquad::prelude::*;
+use nalgebra::{Point3, Vector3};
+use pbt::clip::{self, Clipping};
+use pbt::geom::{self, Face};
+use pbt::helpers::draw_face;
+
+#[macroquad::main("Testing...")]
+async fn main() {
+    let mut geom = geom::Geom::from_file("./examples/data/concave1.obj").unwrap();
+
+    let projection = Vector3::new(0.0, 0.0, -1.0);
+
+    let clip_vertices = vec![
+        Point3::new(-7.0, 7.0, 10.0),
+        Point3::new(-7.0, -7.0, 10.0),
+        Point3::new(7.0, -7.0, 10.0),
+        Point3::new(7.0, 7.0, 10.0),
+    ];
+    let mut clip = Face::new(clip_vertices);
+
+    // start function `do_clip` here:
+    let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
+    clipping.clip();
+
+    loop {
+        clear_background(BLACK);
+
+        // draw the original
+        for face in &clipping.geom.shapes[0].faces {
+            draw_face(face, GREEN);
+        }
+        // draw the remapped intersections
+        for face in &clipping.intersections {
+            draw_face(face, YELLOW);
+        }
+        // draw the original clip
+        // draw_face(&clipping.clip, RED);
+        // draw the remainders
+        for face in &clipping.remaining {
+            draw_face(face, BLUE);
+        }
+
+        next_frame().await
+    }
+}
