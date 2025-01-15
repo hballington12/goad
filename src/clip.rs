@@ -5,6 +5,7 @@ use geo_types::Polygon;
 use macroquad::prelude::*;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
+use std::fmt;
 
 #[cfg(test)]
 mod tests {
@@ -62,6 +63,61 @@ impl PolygonExtensions for Polygon<f32> {
     }
 }
 
+/// Statistics for a `Clipping` object.
+#[derive(Debug, PartialEq, Default)] // Added Default derive
+pub struct Stats {
+    pub clipping_area: f32,     // the total input clipping area
+    pub intersection_area: f32, // the total intersection area
+    pub remaining_area: f32,    // the total remaining area
+    pub consvtn: f32,           // the ratio of intersection to clipping area
+    pub total_consvtn: f32,     // the ratio of (intersection + remaining) to clipping area
+}
+
+impl Stats {
+    pub fn new(clip: &Face, intersection: &Vec<Face>, remaining: &Vec<Face>) -> Self {
+        let clipping_area = clip.polygon().unsigned_area();
+        let intersection_area = intersection
+            .iter()
+            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area());
+        let remaining_area = remaining
+            .iter()
+            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area());
+
+        let consvtn = if clipping_area == 0.0 {
+            0.0 // Avoid division by zero
+        } else {
+            intersection_area / clipping_area
+        };
+
+        let total_consvtn = if clipping_area == 0.0 {
+            0.0 // Avoid division by zero
+        } else {
+            (intersection_area + remaining_area) / clipping_area
+        };
+        Self {
+            clipping_area,
+            intersection_area,
+            remaining_area,
+            consvtn,
+            total_consvtn,
+        }
+    }
+}
+
+impl fmt::Display for Stats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Clipping Area: {}\nIntersection Area: {}\nRemaining Area: {}\nConservation (Intersection/Clipping): {}\nTotal Conservation ((Intersection + Remaining)/Clipping): {}",
+            self.clipping_area,
+            self.intersection_area,
+            self.remaining_area,
+            self.consvtn,
+            self.total_consvtn
+        )
+    }
+}
+
 /// A clipping object
 #[derive(Debug, PartialEq)]
 pub struct Clipping<'a> {
@@ -73,6 +129,7 @@ pub struct Clipping<'a> {
     transform: Matrix4<f32>,      // a transform matrix to the clipping system
     itransform: Matrix4<f32>,     // a transform matrix from the clipping system
     is_done: bool,                // whether or not the clipping has been computed
+    pub stats: Option<Stats>,     // statistics about the clipping result
 }
 
 impl<'a> Clipping<'a> {
@@ -87,6 +144,7 @@ impl<'a> Clipping<'a> {
             transform: Matrix4::zeros(),
             itransform: Matrix4::zeros(),
             is_done: false,
+            stats: None,
         };
         clipping.set_transform();
 
@@ -130,6 +188,9 @@ impl<'a> Clipping<'a> {
         // compute remapped intersections
         let (mut intersection, mut remaining) = clip_faces(&self.clip, &subjects);
 
+        // compute statistics in clipping system
+        self.set_stats(&intersection, &remaining);
+
         // transform back to original coordinate system
         self.geom.transform(&self.itransform);
         intersection
@@ -144,6 +205,31 @@ impl<'a> Clipping<'a> {
         self.intersections.extend(intersection);
         self.remaining.extend(remaining);
         self.is_done = true;
+    }
+
+    fn clip_area(&self) -> f32 {
+        let clip = self.clip.polygon();
+        clip.unsigned_area()
+    }
+
+    fn intersection_area(&self) -> f32 {
+        if !self.is_done {
+            return 0.0;
+        }
+        self.intersections
+            .iter()
+            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area())
+    }
+    fn remaining_area(&self) -> f32 {
+        if !self.is_done {
+            return 0.0;
+        }
+        self.remaining
+            .iter()
+            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area())
+    }
+    fn set_stats(&mut self, intersection: &Vec<Face>, remaining: &Vec<Face>) {
+        self.stats = Some(Stats::new(self.clip, intersection, remaining));
     }
 }
 
