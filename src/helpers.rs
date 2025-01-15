@@ -1,5 +1,3 @@
-use std::io::Lines;
-
 use crate::geom::Face;
 use geo_types::{Coord, Polygon};
 use macroquad::prelude::*;

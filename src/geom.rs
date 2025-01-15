@@ -251,6 +251,7 @@ impl FaceData {
     /// Computes the z-distance from one facet to another.
     /// This is defined as the dot product of the position vector between
     ///     their centroids and a given projection vector.
+    #[allow(dead_code)]
     fn z_distance(&self, other: &FaceData, proj: &Vector3<f32>) -> f32 {
         let vec = &other.midpoint - &self.midpoint;
         vec.dot(&proj)

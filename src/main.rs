@@ -1,8 +1,4 @@
-use geo_clipper::Clipper;
-use geo_types::{Coord, LineString, Polygon};
 use macroquad::prelude::*;
-use pbt::geom::{self, FaceData};
-use pbt::helpers::{draw_face, draw_multipolygon};
 
 #[macroquad::main("Testing...")]
 async fn main() {

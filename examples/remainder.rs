@@ -1,7 +1,7 @@
 use macroquad::prelude::*;
 use nalgebra::{Point3, Vector3};
-use pbt::clip::{self, Clipping};
-use pbt::geom::{self, Face, FaceData};
+use pbt::clip::Clipping;
+use pbt::geom::{self, Face};
 use pbt::helpers::draw_face;
 
 #[macroquad::main("Testing...")]

@@ -1,4 +1,4 @@
-use super::geom::{Face, FaceData, Geom, Plane};
+use super::geom::{Face, Geom, Plane};
 use geo::Area;
 use geo_clipper::Clipper;
 use geo_types::Polygon;
@@ -207,27 +207,6 @@ impl<'a> Clipping<'a> {
         self.is_done = true;
     }
 
-    fn clip_area(&self) -> f32 {
-        let clip = self.clip.polygon();
-        clip.unsigned_area()
-    }
-
-    fn intersection_area(&self) -> f32 {
-        if !self.is_done {
-            return 0.0;
-        }
-        self.intersections
-            .iter()
-            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area())
-    }
-    fn remaining_area(&self) -> f32 {
-        if !self.is_done {
-            return 0.0;
-        }
-        self.remaining
-            .iter()
-            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area())
-    }
     fn set_stats(&mut self, intersection: &Vec<Face>, remaining: &Vec<Face>) {
         self.stats = Some(Stats::new(self.clip, intersection, remaining));
     }
