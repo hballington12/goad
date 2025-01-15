@@ -1,7 +1,7 @@
 use macroquad::prelude::*;
 use nalgebra::{Point3, Vector3};
 use pbt::clip::{self, Clipping};
-use pbt::geom::{self, Face};
+use pbt::geom::{self, Face, FaceData};
 use pbt::helpers::draw_face;
 
 #[macroquad::main("Testing...")]
@@ -16,7 +16,7 @@ async fn main() {
         Point3::new(7.0, -7.0, 10.0),
         Point3::new(7.0, 7.0, 10.0),
     ];
-    let mut clip = Face::new(clip_vertices);
+    let mut clip = Face::new_simple(clip_vertices);
 
     // start function `do_clip` here:
     let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);

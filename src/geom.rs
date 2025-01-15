@@ -21,17 +21,47 @@ mod tests {
         let shape = &Geom::from_file("./examples/data/hex.obj").unwrap().shapes[0];
         assert_eq!(shape.num_faces, 8);
         assert_eq!(shape.num_vertices, 12);
-        assert_eq!(shape.faces[0].vertices[0].x, 5.0);
-        assert_eq!(shape.faces[4].vertices[4].z, 5.0);
-        assert_eq!(shape.faces[4].num_vertices, 6);
+        match &shape.faces[0] {
+            Face::Simple(data) => {
+                assert_eq!(data.exterior[0].x, 5.0);
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
+        }
+        match &shape.faces[4] {
+            Face::Simple(data) => {
+                assert_eq!(data.exterior[0].x, 2.5);
+                assert_eq!(data.exterior[4].z, 5.0);
+                assert_eq!(data.num_vertices, 6);
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
+        }
 
         let geom = Geom::from_file("./examples/data/hex.obj").unwrap();
         assert_eq!(geom.num_shapes, 1);
         assert_eq!(geom.shapes[0].num_faces, 8);
         assert_eq!(geom.shapes[0].num_vertices, 12);
-        assert_eq!(geom.shapes[0].faces[0].vertices[0].x, 5.0);
-        assert_eq!(geom.shapes[0].faces[4].vertices[4].z, 5.0);
-        assert_eq!(geom.shapes[0].faces[4].num_vertices, 6);
+        match &geom.shapes[0].faces[0] {
+            Face::Simple(data) => {
+                assert_eq!(data.exterior[0].x, 5.0);
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
+        }
+        match &geom.shapes[0].faces[4] {
+            Face::Simple(data) => {
+                assert_eq!(data.exterior[0].x, 2.5);
+                assert_eq!(data.exterior[4].z, 5.0);
+                assert_eq!(data.num_vertices, 6);
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
+        }
     }
 
     #[test]
@@ -40,11 +70,25 @@ mod tests {
         assert_eq!(geom.num_shapes, 2);
         assert_eq!(geom.shapes[0].num_faces, 8);
         assert_eq!(geom.shapes[0].num_vertices, 12);
-        assert_eq!(geom.shapes[0].faces[4].num_vertices, 6);
+        match &geom.shapes[0].faces[4] {
+            Face::Simple(data) => {
+                assert_eq!(data.num_vertices, 6);
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
+        }
 
         assert_eq!(geom.shapes[1].num_faces, 8);
         assert_eq!(geom.shapes[1].num_vertices, 12);
-        assert_eq!(geom.shapes[1].faces[4].num_vertices, 6);
+        match &geom.shapes[1].faces[4] {
+            Face::Simple(data) => {
+                assert_eq!(data.num_vertices, 6);
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
+        }
     }
 
     #[test]
@@ -55,21 +99,35 @@ mod tests {
         let face2 = &shape.faces[7];
 
         let mut exterior = Vec::new();
-        for vertex in &face1.vertices {
-            exterior.push(Coord {
-                x: vertex.x,
-                y: vertex.y,
-            });
+        match face1 {
+            Face::Simple(data) => {
+                for vertex in &data.exterior {
+                    exterior.push(Coord {
+                        x: vertex.x,
+                        y: vertex.y,
+                    });
+                }
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
         }
         exterior.reverse();
         let subject = Polygon::new(LineString(exterior), vec![]);
 
         let mut exterior = Vec::new();
-        for vertex in &face2.vertices {
-            exterior.push(Coord {
-                x: vertex.x,
-                y: vertex.y,
-            });
+        match face2 {
+            Face::Simple(data) => {
+                for vertex in &data.exterior {
+                    exterior.push(Coord {
+                        x: vertex.x,
+                        y: vertex.y,
+                    });
+                }
+            }
+            Face::Complex { .. } => {
+                panic!();
+            }
         }
 
         let clip = Polygon::new(LineString(exterior), vec![]);
@@ -77,6 +135,28 @@ mod tests {
         let result = subject.intersection(&clip, 100000.0);
 
         assert!(!result.0.is_empty());
+    }
+}
+
+trait Point3Extensions {
+    fn transform(&mut self, model_view: &Matrix4<f32>);
+    fn to_xy(&self) -> Coord<f32>;
+}
+
+impl Point3Extensions for Point3<f32> {
+    /// Transforms a Point3 type to another coordinate system.
+    fn transform(&mut self, model_view: &Matrix4<f32>) {
+        let vertex4 = Vector4::new(self.x, self.y, self.z, 1.0);
+        let projected_vertex = model_view * vertex4;
+        self.x = projected_vertex.x;
+        self.y = projected_vertex.y;
+        self.z = projected_vertex.z;
+    }
+    fn to_xy(&self) -> Coord<f32> {
+        Coord {
+            x: self.x,
+            y: self.y,
+        }
     }
 }
 
@@ -90,22 +170,22 @@ pub struct Plane {
     pub offset: f32,
 }
 
-/// Represents a facet in a 3D surface mesh.
+/// Represents a closed line of exterior points of a polygon 3D.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Face {
-    pub vertices: Vec<Point3<f32>>, // List of vertices
+pub struct FaceData {
+    pub exterior: Vec<Point3<f32>>, // List of exterior vertices
     pub normal: Vector3<f32>,       // Normal vector of the facet
     pub midpoint: Point3<f32>,      // Midpoint
     pub num_vertices: usize,        // Number of vertices
 }
 
-impl Face {
+impl FaceData {
     pub fn new(vertices: Vec<Point3<f32>>) -> Self {
         let vertices = vertices.clone();
         let num_vertices = vertices.len();
 
         let mut face = Self {
-            vertices,
+            exterior: vertices,
             num_vertices,
             normal: Vector3::zeros(),
             midpoint: Point3::origin(),
@@ -119,7 +199,7 @@ impl Face {
 
     /// Compute the normal vector for the face.
     fn set_normal(&mut self) {
-        let vertices = &self.vertices;
+        let vertices = &self.exterior;
 
         // Using the first three vertices to compute the normal.
         let v1 = &vertices[0];
@@ -146,7 +226,7 @@ impl Face {
 
     /// Compute the midpoint of the facet.
     fn set_midpoint(&mut self) {
-        let vertices = &self.vertices;
+        let vertices = &self.exterior;
         let len = vertices.len() as f32;
         // let mut mid = vertices.iter().copied();
         let mut sum: Point3<f32> = vertices
@@ -158,33 +238,20 @@ impl Face {
         self.midpoint = sum;
     }
 
-    /// Returns the Polygon of a face, which it's 2D projection in the xy plane.
-    pub fn polygon(&self) -> Polygon<f32> {
-        let mut exterior = Vec::new();
-        for vertex in &self.vertices {
-            exterior.push(Coord {
-                x: vertex.x,
-                y: vertex.y,
-            });
-        }
-        // exterior.reverse();
-        Polygon::new(LineString(exterior), vec![])
-    }
-
     /// Computes the plane containing the face.
     /// The components of the normal are a, b, and c, and the offset is d,
     /// such that ax + by + cz + d = 0
     pub fn plane(&self) -> Plane {
         Plane {
             normal: self.normal,
-            offset: -self.normal.dot(&self.vertices[0].coords),
+            offset: -self.normal.dot(&self.exterior[0].coords),
         }
     }
 
     /// Computes the z-distance from one facet to another.
     /// This is defined as the dot product of the position vector between
     ///     their centroids and a given projection vector.
-    fn z_distance(&self, other: &Face, proj: &Vector3<f32>) -> f32 {
+    fn z_distance(&self, other: &FaceData, proj: &Vector3<f32>) -> f32 {
         let vec = &other.midpoint - &self.midpoint;
         vec.dot(&proj)
     }
@@ -195,7 +262,7 @@ impl Face {
         }
 
         let min = self
-            .vertices
+            .exterior
             .iter()
             .map(|v| v[dim])
             .collect::<Vec<f32>>()
@@ -214,7 +281,7 @@ impl Face {
         }
 
         let min = self
-            .vertices
+            .exterior
             .iter()
             .map(|v| v[dim])
             .collect::<Vec<f32>>()
@@ -232,9 +299,9 @@ impl Face {
     /// vertex in the other.
     /// This is used to determine if any part of the other is visible along
     /// the projection direction, in which case the result is positive
-    pub fn z_max(&self, other: &Face, proj: &Vector3<f32>) -> f32 {
+    pub fn z_max(&self, other: &FaceData, proj: &Vector3<f32>) -> f32 {
         let lowest = self
-            .vertices
+            .exterior
             .iter()
             .map(|v| v.coords.dot(&proj))
             .collect::<Vec<f32>>()
@@ -243,7 +310,7 @@ impl Face {
             .unwrap();
 
         let highest = other
-            .vertices
+            .exterior
             .iter()
             .map(|v| v.coords.dot(&proj))
             .collect::<Vec<f32>>()
@@ -255,9 +322,9 @@ impl Face {
     }
     /// Determines if all vertices of a Face are in front of the plane
     /// of another Face.
-    pub fn is_in_front_of(&self, face: &Face) -> bool {
-        let origin = face.vertices[0]; // choose point in plane of face
-        for point in &self.vertices {
+    pub fn is_in_front_of(&self, face: &FaceData) -> bool {
+        let origin = face.exterior[0]; // choose point in plane of face
+        for point in &self.exterior {
             let vector = point - origin;
             if vector.dot(&face.normal) > 0.05 {
                 // if point is not above the plane
@@ -269,16 +336,95 @@ impl Face {
 
     /// Transforms a Face in place using a `nalgebra` matrix transformation.
     pub fn transform(&mut self, model_view: &Matrix4<f32>) {
-        for point in &mut self.vertices {
-            // Iterate mutably
-            let vertex4 = Vector4::new(point.x, point.y, point.z, 1.0);
-            let projected_vertex = model_view * vertex4;
-            point.x = projected_vertex.x;
-            point.y = projected_vertex.y;
-            point.z = projected_vertex.z;
+        for point in &mut self.exterior {
+            point.transform(model_view);
         }
         self.set_midpoint();
         self.set_normal();
+    }
+}
+
+/// An enum for 2 different types of polygon in 3D.
+/// `Face::Simple` represents a polygon with only exterior vertices.
+/// `Face::Complex` represents a polygon that may also contain interior vertices (holes).
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Face {
+    Simple(FaceData),
+    Complex {
+        data: FaceData,
+        interiors: Vec<Vec<Point3<f32>>>,
+    },
+}
+
+impl Face {
+    pub fn new_simple(exterior: Vec<Point3<f32>>) -> Self {
+        Face::Simple(FaceData::new(exterior))
+    }
+
+    pub fn new_complex(exterior: Vec<Point3<f32>>, interiors: Vec<Vec<Point3<f32>>>) -> Self {
+        Face::Complex {
+            data: FaceData::new(exterior),
+            interiors,
+        }
+    }
+
+    /// Transform a `Face` to another coordinate system.
+    pub fn transform(&mut self, model_view: &Matrix4<f32>) {
+        match self {
+            Face::Simple(data) => data.transform(model_view),
+            Face::Complex { data, interiors } => {
+                data.transform(model_view);
+                for interior in interiors {
+                    for point in interior {
+                        point.transform(model_view);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn midpoint(&self) -> Point3<f32> {
+        match self {
+            Face::Simple(data) => data.midpoint,
+            Face::Complex { data, .. } => data.midpoint,
+        }
+    }
+
+    pub fn polygon(&self) -> Polygon<f32> {
+        match self {
+            Face::Simple(data) => {
+                let mut exterior = Vec::new();
+                for vertex in &data.exterior {
+                    exterior.push(vertex.to_xy());
+                }
+                // exterior.reverse();
+                Polygon::new(LineString(exterior), vec![])
+            }
+            Face::Complex { data, interiors } => {
+                let mut exterior = Vec::new();
+                for vertex in &data.exterior {
+                    exterior.push(vertex.to_xy());
+                }
+                // exterior.reverse();
+                let mut holes = Vec::new();
+                for interior in interiors {
+                    let mut hole = Vec::new();
+                    for vertex in interior {
+                        hole.push(vertex.to_xy());
+                    }
+                    holes.push(LineString(hole));
+                }
+                Polygon::new(LineString(exterior), holes)
+            }
+        }
+    }
+
+    pub fn plane(&self) -> Plane {
+        match self {
+            Face::Simple(data) => data.plane(),
+            Face::Complex { data, .. } => data.plane(),
+        }
     }
 }
 
@@ -290,7 +436,7 @@ pub struct RefrIndex {
 }
 
 /// Represents a 3D surface mesh.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Shape {
     pub vertices: Vec<Point3<f32>>, // List of all vertices in the mesh
     pub num_vertices: usize,        // Number of vertices in the mesh
@@ -341,7 +487,7 @@ impl Shape {
                 .iter()
                 .map(|&i| shape.vertices[i as usize])
                 .collect();
-            shape.add_face(Face::new(face_vertices));
+            shape.add_face(Face::new_simple(face_vertices));
 
             next_face = end;
         }
@@ -368,7 +514,7 @@ impl Shape {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Geom {
     pub shapes: Vec<Shape>,
     pub num_shapes: usize,

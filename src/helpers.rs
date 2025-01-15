@@ -40,11 +40,32 @@ pub fn draw_face(face: &Face, color: Color) {
 
     // Extract the exterior LineString
     let mut points = Vec::new();
-    for vertex in &face.vertices {
-        points.push(Coord {
-            x: vertex.x,
-            y: vertex.y,
-        });
+    match face {
+        Face::Simple(data) => {
+            for vertex in &data.exterior {
+                points.push(Coord {
+                    x: vertex.x,
+                    y: vertex.y,
+                });
+            }
+        }
+        Face::Complex { data, interiors } => {
+            for vertex in &data.exterior {
+                points.push(Coord {
+                    x: vertex.x,
+                    y: vertex.y,
+                });
+            }
+
+            for interior in interiors {
+                for vertex in interior {
+                    points.push(Coord {
+                        x: vertex.x,
+                        y: vertex.y,
+                    });
+                }
+            }
+        }
     }
 
     // Convert the points into macroquad-compatible coordinates

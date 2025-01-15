@@ -1,4 +1,4 @@
-use super::geom::{Face, Geom, Plane};
+use super::geom::{Face, FaceData, Geom, Plane};
 use geo::Area;
 use geo_clipper::Clipper;
 use geo_types::Polygon;
@@ -35,32 +35,30 @@ impl PolygonExtensions for Polygon<f32> {
     /// Projects the xy coordinates of a polygon onto a plane in 3D
     /// Ignores the last vertex, which is a duplicate of the first
     fn project(&self, plane: &Plane) -> Face {
-        let mut vertices = Vec::new();
-
-        #[cfg(debug_assertions)]
-        {
-            assert!(
-                !self.interiors().len() != 0,
-                "hold detected, please fix: {:?}",
-                self.interiors()
-            );
-
-            assert!(
-                plane.normal.z != 0.0,
-                "plane normal cannot have 0 z-component: {:?}",
-                plane.normal
-            );
-        }
-
+        // do the exterior
+        let mut exterior = Vec::new();
         for coord in self.exterior().0.iter().take(self.exterior().0.len() - 1) {
             // compute z intersection via z = -(ax + by + d)/c
             let z = -(plane.normal.x * coord.x + plane.normal.y * coord.y + plane.offset)
                 / plane.normal.z;
-
-            vertices.push(Point3::new(coord.x, coord.y, z));
+            exterior.push(Point3::new(coord.x, coord.y, z));
         }
 
-        Face::new(vertices)
+        if self.interiors().is_empty() {
+            Face::new_simple(exterior)
+        } else {
+            let mut interiors = Vec::new();
+            for interior in self.interiors() {
+                let mut vertices = Vec::new();
+                for coord in interior.0.iter().take(interior.0.len() - 1) {
+                    let z = -(plane.normal.x * coord.x + plane.normal.y * coord.y + plane.offset)
+                        / plane.normal.z;
+                    vertices.push(Point3::new(coord.x, coord.y, z));
+                }
+                interiors.push(vertices);
+            }
+            Face::new_complex(exterior, interiors)
+        }
     }
 }
 
@@ -160,13 +158,13 @@ pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> (Vec<Face>, Vec<F
     // Use a single pass to filter and sort by midpoint.z
     let mut subjects = subjects_in
         .iter()
-        .filter(|subj| subj.midpoint.z < clip_in.midpoint.z)
+        .filter(|subj| subj.midpoint().z < clip_in.midpoint().z)
         .copied()
         .collect::<Vec<_>>();
     subjects.sort_by(|a, b| {
-        b.midpoint
+        b.midpoint()
             .z
-            .partial_cmp(&a.midpoint.z)
+            .partial_cmp(&a.midpoint().z)
             .unwrap_or(Ordering::Equal)
     });
 
