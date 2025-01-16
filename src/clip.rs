@@ -1,6 +1,7 @@
 use super::geom::{Face, Geom, Plane};
 use geo::Area;
 use geo_clipper::Clipper;
+use geo_types::Coord;
 use geo_types::Polygon;
 use macroquad::prelude::*;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
@@ -34,31 +35,37 @@ trait PolygonExtensions {
 
 impl PolygonExtensions for Polygon<f32> {
     /// Projects the xy coordinates of a polygon onto a plane in 3D
-    /// Ignores the last vertex, which is a duplicate of the first
+    ///  the last vertex, which is a duplicate of the first
     fn project(&self, plane: &Plane) -> Face {
-        // do the exterior
-        let mut exterior = Vec::new();
-        for coord in self.exterior().0.iter().take(self.exterior().0.len() - 1) {
-            // compute z intersection via z = -(ax + by + d)/c
-            let z = -(plane.normal.x * coord.x + plane.normal.y * coord.y + plane.offset)
-                / plane.normal.z;
-            exterior.push(Point3::new(coord.x, coord.y, z));
-        }
+        let area = self.unsigned_area() / plane.normal.z;
 
-        if self.interiors().is_empty() {
-            Face::new_simple(exterior)
-        } else {
-            let mut interiors = Vec::new();
-            for interior in self.interiors() {
-                let mut vertices = Vec::new();
-                for coord in interior.0.iter().take(interior.0.len() - 1) {
+        let project_coords = |coords: &Vec<Coord<f32>>| -> Vec<Point3<f32>> {
+            coords
+                .iter()
+                .take(coords.len() - 1)
+                .map(|coord| {
                     let z = -(plane.normal.x * coord.x + plane.normal.y * coord.y + plane.offset)
                         / plane.normal.z;
-                    vertices.push(Point3::new(coord.x, coord.y, z));
-                }
-                interiors.push(vertices);
-            }
-            Face::new_complex(exterior, interiors)
+                    Point3::new(coord.x, coord.y, z)
+                })
+                .collect()
+        };
+
+        let exterior = project_coords(&self.exterior().0);
+
+        if self.interiors().is_empty() {
+            let mut face = Face::new_simple(exterior);
+            face.set_area(area);
+            face
+        } else {
+            let interiors = self
+                .interiors()
+                .iter()
+                .map(|interior| project_coords(&interior.0))
+                .collect();
+            let mut face = Face::new_complex(exterior, interiors);
+            face.set_area(area);
+            face
         }
     }
 }
@@ -75,13 +82,13 @@ pub struct Stats {
 
 impl Stats {
     pub fn new(clip: &Face, intersection: &Vec<Face>, remaining: &Vec<Face>) -> Self {
-        let clipping_area = clip.polygon().unsigned_area();
+        let clipping_area = clip.to_polygon().unsigned_area();
         let intersection_area = intersection
             .iter()
-            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area());
+            .fold(0.0, |acc, i| acc + i.to_polygon().unsigned_area());
         let remaining_area = remaining
             .iter()
-            .fold(0.0, |acc, i| acc + i.polygon().unsigned_area());
+            .fold(0.0, |acc, i| acc + i.to_polygon().unsigned_area());
 
         let consvtn = if clipping_area == 0.0 {
             0.0 // Avoid division by zero
@@ -179,13 +186,6 @@ impl<'a> Clipping<'a> {
         self.geom.transform(&self.transform); // transform to clipping coordinate system
         self.clip.transform(&self.transform);
 
-        // l, Vec<(usize,usize)>et subjects: Vec<&Face> = self
-        //     .geom
-        //     .shapes
-        //     .iter()
-        //     .flat_map(|f| f.faces.iter())
-        //     .collect();
-
         let mut subjects = Vec::new();
         let mut mapping = Vec::new();
 
@@ -269,14 +269,14 @@ pub fn clip_faces<'a>(
             .unwrap_or(Ordering::Equal)
     });
 
-    let clip = clip_in.polygon();
+    let clip = clip_in.to_polygon();
     let mut intersections = Vec::new();
     let mut remaining_clips = vec![clip];
     let mut intsn_sources: Vec<usize> = Vec::new(); // maps intersections to the subjects
 
     for (i, subject) in subjects.iter().enumerate() {
         // subject is now &Face
-        let subject_poly = subject.polygon(); // Or better: if Face has a &Polygon field, use that.
+        let subject_poly = subject.to_polygon(); // Or better: if Face has a &Polygon field, use that.
         let mut next_clips = Vec::new();
 
         for clip in &remaining_clips {

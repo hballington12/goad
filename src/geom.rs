@@ -1,3 +1,4 @@
+use geo::Area;
 use geo_types::Coord;
 use geo_types::LineString;
 use geo_types::Polygon;
@@ -5,6 +6,7 @@ use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
+use std::cell::Ref;
 use std::path::Path;
 use tobj;
 use tobj::Model;
@@ -177,6 +179,7 @@ pub struct FaceData {
     pub normal: Vector3<f32>,       // Normal vector of the facet
     pub midpoint: Point3<f32>,      // Midpoint
     pub num_vertices: usize,        // Number of vertices
+    pub area: Option<f32>,          // Unsigned area
 }
 
 impl FaceData {
@@ -189,6 +192,7 @@ impl FaceData {
             num_vertices,
             normal: Vector3::zeros(),
             midpoint: Point3::origin(),
+            area: None, // compute as needed
         };
 
         face.set_normal();
@@ -392,7 +396,7 @@ impl Face {
         }
     }
 
-    pub fn polygon(&self) -> Polygon<f32> {
+    pub fn to_polygon(&self) -> Polygon<f32> {
         match self {
             Face::Simple(data) => {
                 let mut exterior = Vec::new();
@@ -427,6 +431,53 @@ impl Face {
             Face::Complex { data, .. } => data.plane(),
         }
     }
+
+    /// Setter for the area of a `Face`.
+    pub fn set_area(&mut self, area: f32) {
+        match self {
+            Face::Simple(data) => data.area = Some(area),
+            Face::Complex { data, .. } => data.area = Some(area),
+        }
+    }
+
+    /// Creates a `Face` struct from a `Polygon`
+    #[allow(dead_code)]
+    fn from_polygon(polygon: &Polygon<f32>) -> Self {
+        // do the exterior
+        let mut exterior = Vec::new();
+        for coord in polygon
+            .exterior()
+            .0
+            .iter()
+            .take(polygon.exterior().0.len() - 1)
+        {
+            exterior.push(Point3::new(coord.x, coord.y, 0.0));
+        }
+
+        if polygon.interiors().is_empty() {
+            let mut face = Face::new_simple(exterior);
+            match face {
+                Face::Simple(ref mut data) => data.area = Some(polygon.unsigned_area()),
+                Face::Complex { .. } => {}
+            }
+            face
+        } else {
+            let mut interiors = Vec::new();
+            for interior in polygon.interiors() {
+                let mut vertices = Vec::new();
+                for coord in interior.0.iter().take(interior.0.len() - 1) {
+                    vertices.push(Point3::new(coord.x, coord.y, 0.0));
+                }
+                interiors.push(vertices);
+            }
+            let mut face = Face::new_complex(exterior, interiors);
+            match face {
+                Face::Simple { .. } => {}
+                Face::Complex { ref mut data, .. } => data.area = Some(polygon.unsigned_area()),
+            }
+            face
+        }
+    }
 }
 
 /// A refractive index
@@ -434,6 +485,12 @@ impl Face {
 pub struct RefrIndex {
     pub real: f32,
     pub imag: f32,
+}
+
+impl RefrIndex {
+    pub fn new(real: f32, imag: f32) -> Self {
+        Self { real, imag }
+    }
 }
 
 /// Represents a 3D surface mesh.

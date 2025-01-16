@@ -12,8 +12,8 @@ async fn main() {
     let face1 = &shape.faces[4];
     let face2 = &shape.faces[7];
 
-    let subject = face1.polygon();
-    let clip = face2.polygon();
+    let subject = face1.to_polygon();
+    let clip = face2.to_polygon();
 
     let result = subject.intersection(&clip, 100000.0);
 
