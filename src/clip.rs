@@ -5,7 +5,6 @@ use geo_types::Polygon;
 use macroquad::prelude::*;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::fmt;
 
 #[cfg(test)]
