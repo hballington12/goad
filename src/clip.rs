@@ -5,6 +5,7 @@ use geo_types::Polygon;
 use macroquad::prelude::*;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt;
 
 #[cfg(test)]
@@ -125,12 +126,12 @@ pub struct Clipping<'a> {
     pub clip: &'a mut Face,       // a clipping face
     pub proj: &'a Vector3<f32>,   // a projection vector
     pub intersections: Vec<Face>, // a list of intersection faces
-    pub sources: Vec<&'a Face>,   // a list of references to the source of each intersection
-    pub remaining: Vec<Face>,     // a list of remaining clips
-    transform: Matrix4<f32>,      // a transform matrix to the clipping system
-    itransform: Matrix4<f32>,     // a transform matrix from the clipping system
-    is_done: bool,                // whether or not the clipping has been computed
-    pub stats: Option<Stats>,     // statistics about the clipping result
+    pub source_mapping: Vec<(usize, usize)>, // a list of references to the source of each intersection
+    pub remaining: Vec<Face>,                // a list of remaining clips
+    transform: Matrix4<f32>,                 // a transform matrix to the clipping system
+    itransform: Matrix4<f32>,                // a transform matrix from the clipping system
+    is_done: bool,                           // whether or not the clipping has been computed
+    pub stats: Option<Stats>,                // statistics about the clipping result
 }
 
 impl<'a> Clipping<'a> {
@@ -141,7 +142,7 @@ impl<'a> Clipping<'a> {
             clip: clip,
             proj: proj,
             intersections: Vec::new(),
-            sources: Vec::new(),
+            source_mapping: Vec::new(),
             remaining: Vec::new(),
             transform: Matrix4::zeros(),
             itransform: Matrix4::zeros(),
@@ -171,8 +172,7 @@ impl<'a> Clipping<'a> {
         self.itransform = self.transform.try_inverse().unwrap(); // inverse transform
     }
 
-    /// Performs the clip on a `Clipping` object.
-    pub fn clip(&mut self) {
+    pub fn init_clip(&mut self) -> (&Face, Vec<&Face>, Vec<(usize, usize)>) {
         if self.is_done {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
@@ -180,19 +180,32 @@ impl<'a> Clipping<'a> {
         self.geom.transform(&self.transform); // transform to clipping coordinate system
         self.clip.transform(&self.transform);
 
-        let subjects: Vec<&Face> = self
-            .geom
-            .shapes
-            .iter()
-            .flat_map(|f| f.faces.iter())
-            .collect();
+        // l, Vec<(usize,usize)>et subjects: Vec<&Face> = self
+        //     .geom
+        //     .shapes
+        //     .iter()
+        //     .flat_map(|f| f.faces.iter())
+        //     .collect();
 
-        // compute remapped intersections
-        let (mut intersection, mut remaining, sources) = clip_faces(&self.clip, &subjects);
+        let mut subjects = Vec::new();
+        let mut mapping = Vec::new();
 
-        // compute statistics in clipping system
-        self.set_stats(&intersection, &remaining);
+        for (i, shape) in self.geom.shapes.iter().enumerate() {
+            for (j, face) in shape.faces.iter().enumerate() {
+                subjects.push(face);
+                mapping.push((i, j));
+            }
+        }
 
+        (self.clip, subjects, mapping)
+    }
+
+    pub fn finalise_clip(
+        &mut self,
+        mut intersection: Vec<Face>,
+        mut remaining: Vec<Face>,
+        source_mapping: Vec<(usize, usize)>,
+    ) {
         // transform back to original coordinate system
         self.geom.transform(&self.itransform);
         intersection
@@ -206,7 +219,26 @@ impl<'a> Clipping<'a> {
         // append the remapped intersections to the struct
         self.intersections.extend(intersection);
         self.remaining.extend(remaining);
+        self.source_mapping = source_mapping;
         self.is_done = true;
+    }
+
+    /// Performs the clip on a `Clipping` object.
+    pub fn clip(&mut self) {
+        if self.is_done {
+            panic!("Method clip() called, but the clipping was already done previously.");
+        }
+
+        let (clip, subjects, mapping) = self.init_clip();
+
+        // compute remapped intersections
+        let (intersection, remaining, sources) = clip_faces(&clip, &subjects);
+        let source_mapping: Vec<_> = sources.iter().map(|&i| mapping[i]).collect();
+
+        // compute statistics in clipping system
+        self.set_stats(&intersection, &remaining);
+
+        self.finalise_clip(intersection, remaining, source_mapping);
     }
 
     fn set_stats(&mut self, intersection: &Vec<Face>, remaining: &Vec<Face>) {
@@ -220,7 +252,7 @@ const AREA_THRESHOLD: f32 = 1e-2; // Named constant for minimum intersection are
 pub fn clip_faces<'a>(
     clip_in: &Face,
     subjects_in: &Vec<&'a Face>,
-) -> (Vec<Face>, Vec<Face>, Vec<&'a Face>) {
+) -> (Vec<Face>, Vec<Face>, Vec<usize>) {
     if subjects_in.is_empty() {
         return (Vec::new(), vec![clip_in.clone()], Vec::new());
     }
@@ -241,9 +273,9 @@ pub fn clip_faces<'a>(
     let clip = clip_in.polygon();
     let mut intersections = Vec::new();
     let mut remaining_clips = vec![clip];
-    let mut intsn_sources: Vec<&Face> = Vec::new(); // maps intersections to the subjects
+    let mut intsn_sources: Vec<usize> = Vec::new(); // maps intersections to the subjects
 
-    for subject in subjects {
+    for (i, subject) in subjects.iter().enumerate() {
         // subject is now &Face
         let subject_poly = subject.polygon(); // Or better: if Face has a &Polygon field, use that.
         let mut next_clips = Vec::new();
@@ -259,7 +291,7 @@ pub fn clip_faces<'a>(
             difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
             // track the source for each intersection
-            intsn_sources.extend(std::iter::repeat(subject).take(intersection.0.len()));
+            intsn_sources.extend(std::iter::repeat(i).take(intersection.0.len()));
 
             intersections.extend(
                 intersection
