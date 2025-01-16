@@ -186,7 +186,7 @@ impl<'a> Clipping<'a> {
             .collect();
 
         // compute remapped intersections
-        let (mut intersection, mut remaining) = clip_faces(&self.clip, &subjects);
+        let (mut intersection, mut remaining, _) = clip_faces(&self.clip, &subjects);
 
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);
@@ -215,9 +215,12 @@ impl<'a> Clipping<'a> {
 const CLIP_TOLERANCE: f32 = 1e6; // Named constant for tolerance
 const AREA_THRESHOLD: f32 = 1e-2; // Named constant for minimum intersection area
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
-pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> (Vec<Face>, Vec<Face>) {
+pub fn clip_faces<'a>(
+    clip_in: &Face,
+    subjects_in: &Vec<&'a Face>,
+) -> (Vec<Face>, Vec<Face>, Vec<&'a Face>) {
     if subjects_in.is_empty() {
-        return (Vec::new(), vec![clip_in.clone()]);
+        return (Vec::new(), vec![clip_in.clone()], Vec::new());
     }
 
     // Use a single pass to filter and sort by midpoint.z
@@ -236,6 +239,7 @@ pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> (Vec<Face>, Vec<F
     let clip = clip_in.polygon();
     let mut intersections = Vec::new();
     let mut remaining_clips = vec![clip];
+    let mut intsn_sources: Vec<&Face> = Vec::new(); // maps intersections to the subjects
 
     for subject in subjects {
         // subject is now &Face
@@ -252,11 +256,15 @@ pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> (Vec<Face>, Vec<F
                 .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
             difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
+            // track the source for each intersection
+            intsn_sources.extend(std::iter::repeat(subject).take(intersection.0.len()));
+
             intersections.extend(
                 intersection
                     .into_iter()
                     .map(|poly| poly.project(&subject.plane())),
             );
+
             next_clips.extend(difference);
         }
 
@@ -271,5 +279,5 @@ pub fn clip_faces(clip_in: &Face, subjects_in: &Vec<&Face>) -> (Vec<Face>, Vec<F
         .map(|poly| poly.project(&clip_in.plane()))
         .collect::<Vec<_>>();
 
-    (intersections, remaining)
+    (intersections, remaining, intsn_sources)
 }
