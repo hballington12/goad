@@ -125,6 +125,7 @@ pub struct Clipping<'a> {
     pub clip: &'a mut Face,       // a clipping face
     pub proj: &'a Vector3<f32>,   // a projection vector
     pub intersections: Vec<Face>, // a list of intersection faces
+    pub sources: Vec<&'a Face>,   // a list of references to the source of each intersection
     pub remaining: Vec<Face>,     // a list of remaining clips
     transform: Matrix4<f32>,      // a transform matrix to the clipping system
     itransform: Matrix4<f32>,     // a transform matrix from the clipping system
@@ -140,6 +141,7 @@ impl<'a> Clipping<'a> {
             clip: clip,
             proj: proj,
             intersections: Vec::new(),
+            sources: Vec::new(),
             remaining: Vec::new(),
             transform: Matrix4::zeros(),
             itransform: Matrix4::zeros(),
@@ -186,7 +188,7 @@ impl<'a> Clipping<'a> {
             .collect();
 
         // compute remapped intersections
-        let (mut intersection, mut remaining, _) = clip_faces(&self.clip, &subjects);
+        let (mut intersection, mut remaining, sources) = clip_faces(&self.clip, &subjects);
 
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);
