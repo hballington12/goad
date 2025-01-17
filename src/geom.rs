@@ -515,23 +515,27 @@ pub struct Shape {
     pub faces: Vec<Face>,           // List of all facets in the mesh
     pub num_faces: usize,           // Number of facets in the mesh
     pub refr_index: RefrIndex,      // Refractive index of this shape
+    pub id: Option<usize>,          // an id number
+    pub parent_id: Option<usize>,   // An optional parent shape index, which encompasses this one
 }
 
 impl Shape {
-    pub fn new() -> Self {
+    pub fn new(id: Option<usize>, parent_id: Option<usize>) -> Self {
         Self {
             vertices: Vec::new(),
             num_vertices: 0,
             faces: Vec::new(),
             num_faces: 0,
             refr_index: RefrIndex {
-                real: 1.0,
+                real: 1.31, // some default settings, temporary
                 imag: 0.0,
             },
+            id,
+            parent_id,
         }
     }
 
-    fn from_model(model: &Model) -> Shape {
+    fn from_model(model: Model, id: Option<usize>) -> Shape {
         let mesh = &model.mesh;
 
         let vertices = mesh
@@ -540,7 +544,7 @@ impl Shape {
             .map(|v| Point3::new(v[0], v[1], v[2]))
             .collect::<Vec<_>>();
 
-        let mut shape = Shape::new();
+        let mut shape = Shape::new(id, None);
         shape.num_vertices = vertices.len();
         shape.vertices = vertices;
 
@@ -617,7 +621,11 @@ impl Geom {
             return Err("No models found in OBJ file".to_string());
         }
 
-        let shapes: Vec<Shape> = models.iter().map(Shape::from_model).collect();
+        let shapes: Vec<Shape> = models
+            .into_iter()
+            .enumerate()
+            .map(|(i, model)| Shape::from_model(model, Some(i)))
+            .collect();
 
         Ok(Self {
             num_shapes: shapes.len(),

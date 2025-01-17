@@ -1,3 +1,4 @@
+use super::config;
 use super::geom::{Face, Geom, Plane};
 use geo::Area;
 use geo_clipper::Clipper;
@@ -245,7 +246,6 @@ impl<'a> Clipping<'a> {
     }
 }
 
-const CLIP_TOLERANCE: f32 = 1e6; // Named constant for tolerance
 const AREA_THRESHOLD: f32 = 1e-2; // Named constant for minimum intersection area
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
 pub fn clip_faces<'a>(
@@ -280,8 +280,8 @@ pub fn clip_faces<'a>(
         let mut next_clips = Vec::new();
 
         for clip in &remaining_clips {
-            let mut intersection = subject_poly.intersection(clip, CLIP_TOLERANCE);
-            let mut difference = clip.difference(&subject_poly, CLIP_TOLERANCE);
+            let mut intersection = subject_poly.intersection(clip, config::CLIP_TOLERANCE);
+            let mut difference = clip.difference(&subject_poly, config::CLIP_TOLERANCE);
 
             // filter out "bad" intersections and differences
             intersection
