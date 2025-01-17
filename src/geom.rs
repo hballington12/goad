@@ -478,10 +478,24 @@ impl Face {
             face
         }
     }
+
+    pub fn data(&self) -> &FaceData {
+        match self {
+            Face::Simple(data) => data,
+            Face::Complex { data, .. } => data,
+        }
+    }
+
+    pub fn data_mut(&mut self) -> &mut FaceData {
+        match self {
+            Face::Simple(data) => data,
+            Face::Complex { data, .. } => data,
+        }
+    }
 }
 
 /// A refractive index
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RefrIndex {
     pub real: f32,
     pub imag: f32,

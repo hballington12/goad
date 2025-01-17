@@ -71,7 +71,7 @@ impl PolygonExtensions for Polygon<f32> {
 }
 
 /// Statistics for a `Clipping` object.
-#[derive(Debug, PartialEq, Default)] // Added Default derive
+#[derive(Debug, PartialEq, Clone, Default)] // Added Default derive
 pub struct Stats {
     pub clipping_area: f32,     // the total input clipping area
     pub intersection_area: f32, // the total intersection area

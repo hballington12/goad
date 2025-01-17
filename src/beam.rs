@@ -12,7 +12,7 @@ pub enum Beam {
 
 impl Beam {
     pub fn new_initial(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
-        Beam::Default(BeamData::new(face, proj, refr_index))
+        Beam::Initial(BeamData::new(face, proj, refr_index))
     }
     pub fn new_default(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
         Beam::Default(BeamData::new(face, proj, refr_index))
@@ -26,6 +26,13 @@ impl Beam {
             Beam::Initial(_) => {
                 panic!("The initial beam should not be converted to an outgoing beam.")
             }
+        }
+    }
+    pub fn data(&mut self) -> &mut BeamData {
+        match self {
+            Beam::Initial(data) => data,
+            Beam::Default(data) => data,
+            Beam::OutGoing(data) => data,
         }
     }
 }
