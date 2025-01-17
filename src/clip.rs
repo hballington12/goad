@@ -55,7 +55,7 @@ impl PolygonExtensions for Polygon<f32> {
         let exterior = project_coords(&self.exterior().0);
 
         if self.interiors().is_empty() {
-            let mut face = Face::new_simple(exterior);
+            let mut face = Face::new_simple(exterior, None);
             face.set_area(area);
             face
         } else {
@@ -64,7 +64,7 @@ impl PolygonExtensions for Polygon<f32> {
                 .iter()
                 .map(|interior| project_coords(&interior.0))
                 .collect();
-            let mut face = Face::new_complex(exterior, interiors);
+            let mut face = Face::new_complex(exterior, interiors, None);
             face.set_area(area);
             face
         }

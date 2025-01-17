@@ -19,7 +19,7 @@ async fn main() {
         Point3::new(upper_right[0], upper_right[1], 10.0),
     ];
     clip_vertices.reverse();
-    let mut clip = Face::new_simple(clip_vertices);
+    let mut clip = Face::new_simple(clip_vertices, None);
 
     let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
     clipping.clip();

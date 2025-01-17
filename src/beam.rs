@@ -51,6 +51,8 @@ impl BeamPropagation {
                 // total internal reflection -> None
                 // max recursions reached -> None
                 // determine refractive index
+                // if x.
+
                 // determine transmitted propagation direction
                 let proj = self.source.proj;
                 // determine other BeamData values here later...

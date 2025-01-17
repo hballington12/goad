@@ -180,10 +180,11 @@ pub struct FaceData {
     pub midpoint: Point3<f32>,      // Midpoint
     pub num_vertices: usize,        // Number of vertices
     pub area: Option<f32>,          // Unsigned area
+    pub parent_id: Option<usize>,   // An optional parent id number
 }
 
 impl FaceData {
-    pub fn new(vertices: Vec<Point3<f32>>) -> Self {
+    pub fn new(vertices: Vec<Point3<f32>>, parent_id: Option<usize>) -> Self {
         let vertices = vertices.clone();
         let num_vertices = vertices.len();
 
@@ -193,6 +194,7 @@ impl FaceData {
             normal: Vector3::zeros(),
             midpoint: Point3::origin(),
             area: None, // compute as needed
+            parent_id,
         };
 
         face.set_normal();
@@ -363,13 +365,17 @@ pub enum Face {
 }
 
 impl Face {
-    pub fn new_simple(exterior: Vec<Point3<f32>>) -> Self {
-        Face::Simple(FaceData::new(exterior))
+    pub fn new_simple(exterior: Vec<Point3<f32>>, parent_id: Option<usize>) -> Self {
+        Face::Simple(FaceData::new(exterior, parent_id))
     }
 
-    pub fn new_complex(exterior: Vec<Point3<f32>>, interiors: Vec<Vec<Point3<f32>>>) -> Self {
+    pub fn new_complex(
+        exterior: Vec<Point3<f32>>,
+        interiors: Vec<Vec<Point3<f32>>>,
+        parent_id: Option<usize>,
+    ) -> Self {
         Face::Complex {
-            data: FaceData::new(exterior),
+            data: FaceData::new(exterior, parent_id),
             interiors,
         }
     }
@@ -455,7 +461,7 @@ impl Face {
         }
 
         if polygon.interiors().is_empty() {
-            let mut face = Face::new_simple(exterior);
+            let mut face = Face::new_simple(exterior, None);
             match face {
                 Face::Simple(ref mut data) => data.area = Some(polygon.unsigned_area()),
                 Face::Complex { .. } => {}
@@ -470,7 +476,7 @@ impl Face {
                 }
                 interiors.push(vertices);
             }
-            let mut face = Face::new_complex(exterior, interiors);
+            let mut face = Face::new_complex(exterior, interiors, None);
             match face {
                 Face::Simple { .. } => {}
                 Face::Complex { ref mut data, .. } => data.area = Some(polygon.unsigned_area()),
@@ -563,7 +569,7 @@ impl Shape {
                 .iter()
                 .map(|&i| shape.vertices[i as usize])
                 .collect();
-            shape.add_face(Face::new_simple(face_vertices));
+            shape.add_face(Face::new_simple(face_vertices, id));
 
             next_face = end;
         }
