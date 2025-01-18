@@ -279,7 +279,7 @@ const AREA_THRESHOLD: f32 = 1e-2;
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
 pub fn clip_faces<'a>(
     clip_in: &Face,
-    subjects_in: &mut Vec<&'a Face>,
+    subjects_in: &Vec<&'a Face>,
 ) -> (Vec<Face>, Vec<Face>, Vec<usize>) {
     if subjects_in.is_empty() {
         return (Vec::new(), vec![clip_in.clone()], Vec::new());
