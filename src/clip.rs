@@ -303,7 +303,7 @@ pub fn clip_faces<'a>(
     };
 
     for (i, subject) in sorted_subjects
-        .into_iter()
+        .iter()
         .enumerate()
         .filter(|(_, subj)| subj.data().vert_min(2) <= clip_in.data().vert_max(2))
     {
@@ -316,7 +316,7 @@ pub fn clip_faces<'a>(
 
             if intersection.0.iter().any(|poly| {
                 let face = poly.project(&subject.plane());
-                face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.0
+                face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.1
             }) {
                 // Include intersections that are unphysical back into the difference.
                 difference.0.extend(intersection.0);
