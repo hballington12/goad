@@ -51,7 +51,7 @@ impl BeamPropagation {
                 // total internal reflection -> None
                 // max recursions reached -> None
                 // determine refractive index
-                let sink_shape_id = x.face.data().parent_id.unwrap();
+                let sink_shape_id = x.shape_id;
                 // sinks have no parent id at the moment, perhaps we need to make some changes
                 let source_shape_id = self.source.face.data().parent_id.unwrap_or_else(|| 999);
                 println!(

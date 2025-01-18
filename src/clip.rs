@@ -143,6 +143,7 @@ pub struct Clipping<'a> {
 
 impl<'a> Clipping<'a> {
     /// A new clipping object.
+    /// If `clip` exists inside `geom`, it is ommitted from the subjects.
     pub fn new(geom: &'a mut Geom, clip: &'a mut Face, proj: &'a Vector3<f32>) -> Self {
         let mut clipping = Self {
             geom,
@@ -192,6 +193,10 @@ impl<'a> Clipping<'a> {
 
         for (i, shape) in self.geom.shapes.iter().enumerate() {
             for (j, face) in shape.faces.iter().enumerate() {
+                if face == self.clip {
+                    // don't include the clip in the subjects
+                    continue;
+                }
                 subjects.push(face);
                 mapping.push((i, j));
             }

@@ -180,7 +180,7 @@ pub struct FaceData {
     pub midpoint: Point3<f32>,      // Midpoint
     pub num_vertices: usize,        // Number of vertices
     pub area: Option<f32>,          // Unsigned area
-    pub parent_id: Option<usize>,   // An optional parent id number
+    pub parent_id: Option<usize>,   // An optional parent shape id number
 }
 
 impl FaceData {
