@@ -27,8 +27,8 @@ async fn main() {
             }
         }
         // draw the remapped intersections
-        for face in &clipping.intersections {
-            draw_face(face, YELLOW, 2.0);
+        for intsn in &clipping.intersections {
+            draw_face(&intsn.face, YELLOW, 2.0);
             // break;
         }
         // draw the original clip

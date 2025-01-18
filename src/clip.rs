@@ -1,5 +1,5 @@
 use super::config;
-use super::geom::{Face, Geom, Plane};
+use super::geom::{Face, Geom, Intersection, Plane};
 use geo::Area;
 use geo_clipper::Clipper;
 use geo_types::Coord;
@@ -82,11 +82,11 @@ pub struct Stats {
 }
 
 impl Stats {
-    pub fn new(clip: &Face, intersection: &Vec<Face>, remaining: &Vec<Face>) -> Self {
+    pub fn new(clip: &Face, intersection: &Vec<Intersection>, remaining: &Vec<Face>) -> Self {
         let clipping_area = clip.to_polygon().unsigned_area();
         let intersection_area = intersection
             .iter()
-            .fold(0.0, |acc, i| acc + i.to_polygon().unsigned_area());
+            .fold(0.0, |acc, i| acc + i.face.to_polygon().unsigned_area());
         let remaining_area = remaining
             .iter()
             .fold(0.0, |acc, i| acc + i.to_polygon().unsigned_area());
@@ -129,10 +129,10 @@ impl fmt::Display for Stats {
 /// A clipping object
 #[derive(Debug, PartialEq)]
 pub struct Clipping<'a> {
-    pub geom: &'a mut Geom,       // a geometry holding subjects to clip against
-    pub clip: &'a mut Face,       // a clipping face
-    pub proj: &'a Vector3<f32>,   // a projection vector
-    pub intersections: Vec<Face>, // a list of intersection faces
+    pub geom: &'a mut Geom,     // a geometry holding subjects to clip against
+    pub clip: &'a mut Face,     // a clipping face
+    pub proj: &'a Vector3<f32>, // a projection vector
+    pub intersections: Vec<Intersection>, // a list of intersection faces
     pub source_mapping: Vec<(usize, usize)>, // a list of references to the source of each intersection
     pub remaining: Vec<Face>,                // a list of remaining clips
     transform: Matrix4<f32>,                 // a transform matrix to the clipping system
@@ -142,12 +142,12 @@ pub struct Clipping<'a> {
 }
 
 impl<'a> Clipping<'a> {
-    /// A new cllipping object.
+    /// A new clipping object.
     pub fn new(geom: &'a mut Geom, clip: &'a mut Face, proj: &'a Vector3<f32>) -> Self {
         let mut clipping = Self {
-            geom: geom,
-            clip: clip,
-            proj: proj,
+            geom,
+            clip,
+            proj,
             intersections: Vec::new(),
             source_mapping: Vec::new(),
             remaining: Vec::new(),
@@ -202,7 +202,7 @@ impl<'a> Clipping<'a> {
 
     pub fn finalise_clip(
         &mut self,
-        mut intersection: Vec<Face>,
+        mut intersection: Vec<Intersection>,
         mut remaining: Vec<Face>,
         source_mapping: Vec<(usize, usize)>,
     ) {
@@ -210,7 +210,7 @@ impl<'a> Clipping<'a> {
         self.geom.transform(&self.itransform);
         intersection
             .iter_mut()
-            .for_each(|face| face.transform(&self.itransform));
+            .for_each(|x| x.face.transform(&self.itransform));
         remaining
             .iter_mut()
             .for_each(|face| face.transform(&self.itransform));
@@ -231,9 +231,15 @@ impl<'a> Clipping<'a> {
 
         let (clip, subjects, mapping) = self.init_clip();
 
-        // compute remapped intersections
+        // compute remapped intersections, converting to Intersection structs
         let (intersection, remaining, sources) = clip_faces(&clip, &subjects);
+        // get mapping back to geometry
         let source_mapping: Vec<_> = sources.iter().map(|&i| mapping[i]).collect();
+        let intersection: Vec<Intersection> = intersection
+            .into_iter()
+            .enumerate()
+            .map(|f| Intersection::new(f.1, mapping[f.0].0))
+            .collect();
 
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);
@@ -241,7 +247,7 @@ impl<'a> Clipping<'a> {
         self.finalise_clip(intersection, remaining, source_mapping);
     }
 
-    fn set_stats(&mut self, intersection: &Vec<Face>, remaining: &Vec<Face>) {
+    fn set_stats(&mut self, intersection: &Vec<Intersection>, remaining: &Vec<Face>) {
         self.stats = Some(Stats::new(self.clip, intersection, remaining));
     }
 }

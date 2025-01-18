@@ -83,7 +83,7 @@ impl Problem {
         // make clipping object from the beam
         match beam {
             // if default beam, normal
-            Beam::Default(mut data) => {
+            Beam::Default { mut data, .. } => {
                 let mut clipping = Clipping::new(&mut self.geom, &mut data.face, &data.proj);
                 clipping.clip(); // do the clipping -> contains the intersections
                 println!("{}", clipping.stats.unwrap());

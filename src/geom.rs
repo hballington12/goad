@@ -645,3 +645,17 @@ impl Geom {
         }
     }
 }
+
+/// An intersection in the context of a `Geom`.
+#[derive(Debug, PartialEq)]
+pub struct Intersection {
+    pub face: Face,
+    pub shape_id: usize,
+}
+
+impl Intersection {
+    /// A new `Intersection`.
+    pub fn new(face: Face, shape_id: usize) -> Self {
+        Self { face, shape_id }
+    }
+}

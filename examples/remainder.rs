@@ -41,8 +41,8 @@ async fn main() {
         // draw the original clip
         draw_face(&clip, RED, 10.0);
         // draw the remapped intersections
-        for face in &intersections {
-            draw_face(face, YELLOW, 2.0);
+        for intsn in &intersections {
+            draw_face(&intsn.face, YELLOW, 2.0);
         }
         // draw the remainders
         for face in &remaining {

@@ -40,7 +40,7 @@ impl BeamPropagation {
         let intersections: Vec<_> = clipping
             .intersections
             .into_iter()
-            .filter(|x| x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD)
+            .filter(|x| x.face.data().area.unwrap() > config::BEAM_AREA_THRESHOLD)
             .collect();
 
         // create transmitted beams
@@ -51,12 +51,23 @@ impl BeamPropagation {
                 // total internal reflection -> None
                 // max recursions reached -> None
                 // determine refractive index
-                // if x.
+                let sink_shape_id = x.face.data().parent_id.unwrap();
+                // sinks have no parent id at the moment, perhaps we need to make some changes
+                let source_shape_id = self.source.face.data().parent_id.unwrap_or_else(|| 999);
+                println!(
+                    "sink shape id: {}, source shape id: {}",
+                    sink_shape_id, source_shape_id
+                );
 
                 // determine transmitted propagation direction
                 let proj = self.source.proj;
                 // determine other BeamData values here later...
-                Some(Beam::new_default(x.clone(), proj, self.refr_index))
+                Some(Beam::new_default(
+                    x.face.clone(),
+                    proj,
+                    self.refr_index,
+                    x.shape_id,
+                ))
             })
             .collect();
 
@@ -71,7 +82,7 @@ impl BeamPropagation {
                 // determine reflected propagation direction
                 let proj = self.source.proj;
                 // determine other BeamData values here later...
-                Some(Beam::new_default(x, proj, self.refr_index))
+                Some(Beam::new_default(x.face, proj, self.refr_index, x.shape_id))
             })
             .collect();
 
@@ -87,8 +98,11 @@ impl BeamPropagation {
 
 #[derive(Debug, PartialEq)]
 pub enum Beam {
-    Initial(BeamData),  // an initial beam to be traced in the near-field
-    Default(BeamData),  // a beam to be traced in the near-field
+    Initial(BeamData), // an initial beam to be traced in the near-field
+    Default {
+        data: BeamData,  // a beam to be traced in the near-field
+        shape_id: usize, // each default beam should also be associated with a shape in a geometry
+    },
     OutGoing(BeamData), // a beam to be mapped to the far-field
 }
 
@@ -96,12 +110,20 @@ impl Beam {
     pub fn new_initial(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
         Beam::Initial(BeamData::new(face, proj, refr_index))
     }
-    pub fn new_default(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
-        Beam::Default(BeamData::new(face, proj, refr_index))
+    pub fn new_default(
+        face: Face,
+        proj: Vector3<f32>,
+        refr_index: RefrIndex,
+        shape_id: usize,
+    ) -> Self {
+        Beam::Default {
+            data: BeamData::new(face, proj, refr_index),
+            shape_id,
+        }
     }
     pub fn to_outgoing(beam: Beam) -> Beam {
         match beam {
-            Beam::Default(data) => Beam::OutGoing(data),
+            Beam::Default { data, .. } => Beam::OutGoing(data),
             Beam::OutGoing(_) => panic!(
                 "You probably don't want to convert an outgoing beam to another outgoing beam."
             ),
@@ -113,7 +135,7 @@ impl Beam {
     pub fn data(&self) -> &BeamData {
         match self {
             Beam::Initial(data) => data,
-            Beam::Default(data) => data,
+            Beam::Default { data, .. } => data,
             Beam::OutGoing(data) => data,
         }
     }

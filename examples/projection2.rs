@@ -30,8 +30,8 @@ async fn main() {
         //     draw_face(face, MAGENTA, 2.0);
         // }
         // draw the remapped intersections
-        for face in &clipping.intersections {
-            draw_face(face, YELLOW, 2.0);
+        for intsn in &clipping.intersections {
+            draw_face(&intsn.face, YELLOW, 2.0);
         }
         // draw the original clip
         draw_face(&clipping.clip, RED, 2.0);
