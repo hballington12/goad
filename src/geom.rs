@@ -263,6 +263,8 @@ impl FaceData {
         vec.dot(&proj)
     }
 
+    /// Returns the minimum value of the vertices in a `FaceData` along the
+    /// specified dimension.
     pub fn vert_min(&self, dim: usize) -> Result<f32, &'static str> {
         if dim > 2 {
             return Err("Dimension must be 0, 1, or 2");
@@ -282,6 +284,8 @@ impl FaceData {
         }
     }
 
+    /// Returns the maximum value of the vertices in a `FaceData` along the
+    /// specified dimension.
     pub fn vert_max(&self, dim: usize) -> Result<f32, &'static str> {
         if dim > 2 {
             return Err("Dimension must be 0, 1, or 2");

@@ -1,6 +1,6 @@
 use super::config;
 use super::geom::{Face, Geom, Intersection, Plane};
-use geo::Area;
+use geo::{Area, Point};
 use geo_clipper::Clipper;
 use geo_types::Coord;
 use geo_types::Polygon;
@@ -30,6 +30,26 @@ mod tests {
         clipping.clip(); // try to clip again, which should panic
     }
 }
+trait Point3Extensions {
+    fn ray_cast_z(&self, plane: &Plane) -> f32;
+}
+
+impl Point3Extensions for Point3<f32> {
+    /// Returns the ray-cast distance along the -z axis from a point to its intersection with a plane in 3D
+    fn ray_cast_z(&self, plane: &Plane) -> f32 {
+        -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
+            - self.z
+    }
+}
+trait Coord3Extensions {
+    fn projected_z(&self, plane: &Plane) -> f32;
+}
+impl Coord3Extensions for Coord<f32> {
+    /// Returns the z-coordinate of a `Coord` projected onto a plane in 3D
+    fn projected_z(&self, plane: &Plane) -> f32 {
+        -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
+    }
+}
 
 trait PolygonExtensions {
     fn project(&self, plane: &Plane) -> Face;
@@ -45,11 +65,7 @@ impl PolygonExtensions for Polygon<f32> {
             coords
                 .iter()
                 .take(coords.len() - 1)
-                .map(|coord| {
-                    let z = -(plane.normal.x * coord.x + plane.normal.y * coord.y + plane.offset)
-                        / plane.normal.z;
-                    Point3::new(coord.x, coord.y, z)
-                })
+                .map(|coord| Point3::new(coord.x, coord.y, coord.projected_z(plane)))
                 .collect()
         };
 
@@ -273,7 +289,7 @@ pub fn clip_faces<'a>(
     let mut remaining_clips = vec![clip];
     let mut intsn_sources: Vec<usize> = Vec::new(); // maps intersections to the subjects
 
-    // sorting to be modified
+    // sort by midpoint
     subjects_in.sort_by(|a, b| {
         b.midpoint()
             .z
@@ -283,10 +299,17 @@ pub fn clip_faces<'a>(
 
     //
     for (i, subject) in subjects_in.iter().enumerate().filter_map(|(i, subj)| {
-        if subj.midpoint().z < clip_in.midpoint().z {
-            Some((i, subj)) // Include if it passes the filter
+        let point = subj.data().midpoint;
+        let coord = Coord {
+            x: point.x,
+            y: point.y,
+        };
+        // filter by vertex extreme coordinates
+        if subj.data().vert_min(2) > clip_in.data().vert_max(2) {
+            // trivial bounding box exclusion
+            None
         } else {
-            None // Exclude if it doesn't
+            Some((i, subj)) // Include if at least one vertex is visible
         }
     }) {
         // subject is now &Face
@@ -298,18 +321,35 @@ pub fn clip_faces<'a>(
             let mut intersection = subject_poly.intersection(clip, config::CLIP_TOLERANCE);
             let mut difference = clip.difference(&subject_poly, config::CLIP_TOLERANCE);
 
-            intersection
-                .0
-                .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
-            difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
-
-            intsn_sources.extend(repeat(i).take(intersection.0.len()));
-
-            intersections.extend(
+            // use ray-casting method to remove edge cases where the intersection
+            // is behind the clip. these intersections are added back to the clips
+            let mut bool = false;
+            for poly in intersection.0.iter() {
+                let face = poly.project(&subject.plane());
+                let z_distance = face.data().midpoint.ray_cast_z(&clip_in.plane()); // distance from projected intersection to clipping plane in 3D
+                if z_distance < 0.0 {
+                    // negative distances are unphysical
+                    bool = true;
+                    break;
+                }
+            }
+            if bool {
+                // if this subject was actually behind the clip
+                difference.0.extend(intersection.0);
+            } else {
                 intersection
-                    .into_iter()
-                    .map(|poly| poly.project(&subject.plane())),
-            );
+                    .0
+                    .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
+                difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
+
+                intsn_sources.extend(repeat(i).take(intersection.0.len()));
+
+                intersections.extend(
+                    intersection
+                        .into_iter()
+                        .map(|poly| poly.project(&subject.plane())),
+                );
+            }
 
             next_clips.extend(difference);
         }
