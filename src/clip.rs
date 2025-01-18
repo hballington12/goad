@@ -8,6 +8,7 @@ use macroquad::prelude::*;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
 use std::fmt;
+use std::iter::repeat;
 
 #[cfg(test)]
 mod tests {
@@ -272,6 +273,7 @@ pub fn clip_faces<'a>(
     let mut remaining_clips = vec![clip];
     let mut intsn_sources: Vec<usize> = Vec::new(); // maps intersections to the subjects
 
+    // sorting to be modified
     subjects_in.sort_by(|a, b| {
         b.midpoint()
             .z
@@ -279,32 +281,30 @@ pub fn clip_faces<'a>(
             .unwrap_or(Ordering::Equal)
     });
 
-    // Use a single pass to filter and sort by midpoint.z
-    let subjects = subjects_in
-        .iter()
-        .filter(|subj| subj.midpoint().z < clip_in.midpoint().z)
-        .copied()
-        .collect::<Vec<_>>();
-
-    for (i, subject) in subjects.iter().enumerate() {
+    //
+    for (i, subject) in subjects_in.iter().enumerate().filter_map(|(i, subj)| {
+        if subj.midpoint().z < clip_in.midpoint().z {
+            Some((i, subj)) // Include if it passes the filter
+        } else {
+            None // Exclude if it doesn't
+        }
+    }) {
         // subject is now &Face
-        let subject_poly = subject.to_polygon(); // Or better: if Face has a &Polygon field, use that.
+        let subject_poly = subject.to_polygon();
+
         let mut next_clips = Vec::new();
 
         for clip in &remaining_clips {
             let mut intersection = subject_poly.intersection(clip, config::CLIP_TOLERANCE);
             let mut difference = clip.difference(&subject_poly, config::CLIP_TOLERANCE);
 
-            // filter out "bad" intersections and differences
             intersection
                 .0
                 .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
             difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
-            // track the source for each intersection
-            intsn_sources.extend(std::iter::repeat(i).take(intersection.0.len()));
+            intsn_sources.extend(repeat(i).take(intersection.0.len()));
 
-            // project the intersections back onto their respective planes in 3D
             intersections.extend(
                 intersection
                     .into_iter()
