@@ -234,10 +234,10 @@ impl<'a> Clipping<'a> {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
 
-        let (clip, subjects, mapping) = self.init_clip();
+        let (clip, mut subjects, mapping) = self.init_clip();
 
         // compute remapped intersections, converting to Intersection structs
-        let (intersection, remaining, sources) = clip_faces(&clip, &subjects);
+        let (intersection, remaining, sources) = clip_faces(&clip, &mut subjects);
         // get mapping back to geometry
         let source_mapping: Vec<_> = sources.iter().map(|&i| mapping[i]).collect();
         let intersection: Vec<Intersection> = intersection
@@ -261,29 +261,30 @@ const AREA_THRESHOLD: f32 = 1e-2; // Named constant for minimum intersection are
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
 pub fn clip_faces<'a>(
     clip_in: &Face,
-    subjects_in: &Vec<&'a Face>,
+    subjects_in: &mut Vec<&'a Face>,
 ) -> (Vec<Face>, Vec<Face>, Vec<usize>) {
     if subjects_in.is_empty() {
         return (Vec::new(), vec![clip_in.clone()], Vec::new());
     }
 
-    // Use a single pass to filter and sort by midpoint.z
-    let mut subjects = subjects_in
-        .iter()
-        .filter(|subj| subj.midpoint().z < clip_in.midpoint().z)
-        .copied()
-        .collect::<Vec<_>>();
-    subjects.sort_by(|a, b| {
+    let clip = clip_in.to_polygon();
+    let mut intersections = Vec::new();
+    let mut remaining_clips = vec![clip];
+    let mut intsn_sources: Vec<usize> = Vec::new(); // maps intersections to the subjects
+
+    subjects_in.sort_by(|a, b| {
         b.midpoint()
             .z
             .partial_cmp(&a.midpoint().z)
             .unwrap_or(Ordering::Equal)
     });
 
-    let clip = clip_in.to_polygon();
-    let mut intersections = Vec::new();
-    let mut remaining_clips = vec![clip];
-    let mut intsn_sources: Vec<usize> = Vec::new(); // maps intersections to the subjects
+    // Use a single pass to filter and sort by midpoint.z
+    let subjects = subjects_in
+        .iter()
+        .filter(|subj| subj.midpoint().z < clip_in.midpoint().z)
+        .copied()
+        .collect::<Vec<_>>();
 
     for (i, subject) in subjects.iter().enumerate() {
         // subject is now &Face
