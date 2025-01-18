@@ -274,7 +274,8 @@ impl<'a> Clipping<'a> {
     }
 }
 
-const AREA_THRESHOLD: f32 = 1e-2; // Named constant for minimum intersection area
+const AREA_THRESHOLD: f32 = 1e-2;
+
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
 pub fn clip_faces<'a>(
     clip_in: &Face,
@@ -284,68 +285,58 @@ pub fn clip_faces<'a>(
         return (Vec::new(), vec![clip_in.clone()], Vec::new());
     }
 
-    let clip = clip_in.to_polygon();
+    let clip_polygon = clip_in.to_polygon();
     let mut intersections = Vec::new();
-    let mut remaining_clips = vec![clip];
-    let mut intsn_sources: Vec<usize> = Vec::new(); // maps intersections to the subjects
+    let mut remaining_clips = vec![clip_polygon];
+    let mut intsn_sources = Vec::new();
 
-    // sort by midpoint
-    subjects_in.sort_by(|a, b| {
-        b.midpoint()
-            .z
-            .partial_cmp(&a.midpoint().z)
-            .unwrap_or(Ordering::Equal)
-    });
+    // Sort subjects by their Z-coordinate midpoint, descending.
+    let sorted_subjects = {
+        let mut subjects = subjects_in.clone();
+        subjects.sort_by(|a, b| {
+            b.midpoint()
+                .z
+                .partial_cmp(&a.midpoint().z)
+                .unwrap_or(Ordering::Equal)
+        });
+        subjects
+    };
 
-    for (i, subject) in subjects_in.iter().enumerate().filter_map(|(i, subj)| {
-        // filter by vertex extreme coordinates
-        if subj.data().vert_min(2) > clip_in.data().vert_max(2) {
-            // trivial bounding box exclusion
-            None
-        } else {
-            Some((i, subj)) // Include if at least one vertex is visible
-        }
-    }) {
-        // subject is now &Face
+    for (i, subject) in sorted_subjects
+        .into_iter()
+        .enumerate()
+        .filter(|(_, subj)| subj.data().vert_min(2) <= clip_in.data().vert_max(2))
+    {
         let subject_poly = subject.to_polygon();
-
         let mut next_clips = Vec::new();
 
         for clip in &remaining_clips {
             let mut intersection = subject_poly.intersection(clip, config::CLIP_TOLERANCE);
             let mut difference = clip.difference(&subject_poly, config::CLIP_TOLERANCE);
 
-            // use ray-casting method to remove edge cases where the intersection
-            // is behind the clip. these intersections are added back to the clips
-            let mut bool = false;
-            for poly in intersection.0.iter() {
+            if intersection.0.iter().any(|poly| {
                 let face = poly.project(&subject.plane());
-                let z_distance = face.data().midpoint.ray_cast_z(&clip_in.plane()); // distance from projected intersection to clipping plane in 3D
-                if z_distance < 0.0 {
-                    // negative distances are unphysical
-                    bool = true;
-                    break;
-                }
-            }
-            if bool {
-                // if this subject was actually behind the clip
+                face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.0
+            }) {
+                // Include intersections that are unphysical back into the difference.
                 difference.0.extend(intersection.0);
             } else {
+                // Retain only meaningful intersections and differences.
                 intersection
                     .0
                     .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
                 difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
-                intsn_sources.extend(repeat(i).take(intersection.0.len()));
-
+                intsn_sources.extend(std::iter::repeat(i).take(intersection.0.len()));
                 intersections.extend(
                     intersection
+                        .0
                         .into_iter()
                         .map(|poly| poly.project(&subject.plane())),
                 );
             }
 
-            next_clips.extend(difference);
+            next_clips.extend(difference.0);
         }
 
         remaining_clips = next_clips;
@@ -357,7 +348,7 @@ pub fn clip_faces<'a>(
     let remaining = remaining_clips
         .into_iter()
         .map(|poly| poly.project(&clip_in.plane()))
-        .collect::<Vec<_>>();
+        .collect();
 
     (intersections, remaining, intsn_sources)
 }
