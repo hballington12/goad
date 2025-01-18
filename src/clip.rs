@@ -297,13 +297,7 @@ pub fn clip_faces<'a>(
             .unwrap_or(Ordering::Equal)
     });
 
-    //
     for (i, subject) in subjects_in.iter().enumerate().filter_map(|(i, subj)| {
-        let point = subj.data().midpoint;
-        let coord = Coord {
-            x: point.x,
-            y: point.y,
-        };
         // filter by vertex extreme coordinates
         if subj.data().vert_min(2) > clip_in.data().vert_max(2) {
             // trivial bounding box exclusion
