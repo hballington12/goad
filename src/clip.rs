@@ -303,6 +303,7 @@ pub fn clip_faces<'a>(
             // track the source for each intersection
             intsn_sources.extend(std::iter::repeat(i).take(intersection.0.len()));
 
+            // project the intersections back onto their respective planes in 3D
             intersections.extend(
                 intersection
                     .into_iter()
