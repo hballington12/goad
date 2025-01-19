@@ -25,7 +25,7 @@ async fn main() {
 
     let mut problem = Problem::new(
         geom,
-        Beam::new_initial(clip, projection, RefrIndex::new(1.31, 0.1)),
+        Beam::new_initial(clip, projection, RefrIndex::new(1.00, 0.0)),
     );
 
     println!(
