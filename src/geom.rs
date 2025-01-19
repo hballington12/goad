@@ -214,7 +214,7 @@ impl FaceData {
 
         // Compute edge vectors
         let u = v2 - v1;
-        let v = v3 - v1;
+        let v = v3 - v2;
 
         // Compute cross product u × v
         let mut normal = u.cross(&v);
@@ -223,8 +223,22 @@ impl FaceData {
 
         #[cfg(debug_assertions)]
         {
-            assert!(u.dot(&normal) < 0.01, "value: {}", u.dot(&normal));
-            assert!(v.dot(&normal) < 0.01, "value: {}", v.dot(&normal));
+            assert!(
+                u.dot(&normal) < 0.01,
+                "u: {:?}, v: {:?}, dot: {}, verts: {:?}",
+                u,
+                v,
+                u.dot(&normal),
+                vertices
+            );
+            assert!(
+                v.dot(&normal) < 0.01,
+                "u: {:?}, v: {:?}, dot: {}, verts: {:?}",
+                u,
+                v,
+                v.dot(&normal),
+                vertices
+            );
         }
 
         self.normal = normal;

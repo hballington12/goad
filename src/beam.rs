@@ -10,106 +10,26 @@ use crate::helpers::draw_face;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
-    pub input: BeamData,
+    pub input: Beam,
     pub refr_index: RefrIndex,
     pub outputs: Vec<Beam>,
 }
 
 impl BeamPropagation {
-    /// Makes a new `BeamPropagation` struct.
-    pub fn new(source: BeamData) -> Self {
-        let refr_index = source.refr_index.clone();
+    /// Makes a new `BeamPropagation` struct, which represents a beam propagation.
+    pub fn new(input: Beam, outputs: Vec<Beam>) -> Self {
+        let refr_index = input.data().refr_index.clone();
         Self {
-            input: source,
+            input,
             refr_index,
-            outputs: Vec::new(),
+            outputs,
         }
-    }
-
-    /// Computes the propagation of a `BeamPropagation`, yielding the output
-    /// beams which can then be dealt with as needed.
-    pub fn propagate(&mut self, geom: &mut Geom) {
-        // create a clipping to clip the beam against the geometry
-        let mut clipping = Clipping::new(geom, &mut self.input.face, &self.input.proj);
-        clipping.clip(); // do the clipping -> contains the intersections
-
-        assert!(
-            clipping.stats.clone().unwrap().total_consvtn > 0.999,
-            "Error, poor total energy conservation in clipping: {:?}",
-            clipping.stats.clone().unwrap().total_consvtn
-        );
-        println!("{}", clipping.stats.unwrap());
-
-        // remove intersections with very small area
-        let intersections: Vec<_> = clipping
-            .intersections
-            .into_iter()
-            .filter(|x| {
-                println!("{:?}", x.face.data().area.unwrap());
-                x.face.data().area.unwrap() > config::BEAM_AREA_THRESHOLD
-            })
-            .collect();
-
-        println!("number of 'good' intersections: {}", intersections.len());
-
-        // create transmitted beams
-        let transmitted_beams: Vec<_> = intersections
-            .iter()
-            .filter_map(|x| {
-                // apply filtering here -> return None if fail
-                // total internal reflection -> None
-                // max recursions reached -> None
-                // determine refractive index
-                let sink_shape_id = x.shape_id;
-                // sinks have no parent id at the moment, perhaps we need to make some changes
-                let source_shape_id = self.input.face.data().parent_id.unwrap_or_else(|| 999);
-                // println!(
-                //     "sink shape id: {}, source shape id: {}",
-                //     sink_shape_id, source_shape_id
-                // );
-
-                // determine transmitted propagation direction
-                let proj = self.input.proj;
-                // determine other BeamData values here later...
-                Some(Beam::new_default(
-                    x.face.clone(),
-                    proj,
-                    self.refr_index,
-                    x.shape_id,
-                ))
-            })
-            .collect();
-
-        // create reflected beams
-        let reflected_beams: Vec<_> = intersections
-            .into_iter() // can consume the intersections here to avoid cloning
-            .filter_map(|x| {
-                // apply filtering here -> return None if fail
-                // total internal reflection && max tir reached -> None
-                // max recursions reached -> None
-                // refractive index of reflected beam is always the same as the source
-                // determine reflected propagation direction
-                let proj = self.input.proj;
-                // determine other BeamData values here later...
-                Some(Beam::new_default(x.face, proj, self.refr_index, x.shape_id))
-            })
-            .collect();
-
-        // println!("number of reflected beams: {:?}", reflected_beams.len());
-        // println!("number of transmitted beams: {:?}", reflected_beams.len());
-        // println!("reflected beams: {:?}", reflected_beams);
-
-        // add the reflected and transmitted beams to the sinks
-        println!("note: reflected beams are currently omitted");
-        // self.outputs.extend(reflected_beams);
-        println!("adding {} beams to the outputs", transmitted_beams.len());
-        self.outputs.extend(transmitted_beams);
     }
 
     /// Draws a `Beam Propagation`
     pub fn draw(&self) {
         // draw the input
-        draw_face(&self.input.face, YELLOW, 4.0);
+        draw_face(&self.input.data().face, YELLOW, 4.0);
         // draw the outputs
         for beam in &self.outputs {
             draw_face(&beam.data().face, BLUE, 4.0);
@@ -159,6 +79,122 @@ impl Beam {
             Beam::Default { data, .. } => data,
             Beam::OutGoing(data) => data,
         }
+    }
+
+    /// Computes the propagation of a `Beam`, yielding the output
+    /// beams which can then be dealt with as needed.
+    pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
+        let mut outputs = Vec::new();
+        match self {
+            Beam::Initial(data) => {
+                let outputs_beams = Self::process_beam(geom, data);
+                println!("adding {} beams to the outputs", outputs_beams.len());
+                outputs.extend(outputs_beams);
+            }
+            Beam::Default { data, shape_id } => {
+                let output_beams = Self::process_beam(geom, data);
+
+                println!("adding {} beams to the outputs", output_beams.len());
+                outputs.extend(output_beams);
+            }
+            Beam::OutGoing(..) => {
+                panic!("tried to propagate an outgoing beam, which is not yet supported.");
+            }
+        }
+        outputs
+    }
+
+    fn process_beam(geom: &mut Geom, data: &mut BeamData) -> Vec<Beam> {
+        let mut output_beams = Vec::new();
+
+        let mut clipping = Clipping::new(geom, &mut data.face, &data.proj);
+        clipping.clip(); // do the clipping -> contains the intersections
+
+        assert!(
+            clipping.stats.clone().unwrap().total_consvtn > 0.999,
+            "Error, poor total energy conservation in clipping: {:?}",
+            clipping.stats.clone().unwrap().total_consvtn
+        );
+        println!("{}", clipping.stats.unwrap());
+
+        // remove intersections with below threshold area
+        let intersections: Vec<_> = clipping
+            .intersections
+            .into_iter()
+            .filter(|x| {
+                println!("intersection... {:?}", x.face.data().area.unwrap());
+                x.face.data().area.unwrap() > config::BEAM_AREA_THRESHOLD
+            })
+            .collect();
+
+        // remove remainders with below threshold area
+        let remainder_beams: Vec<_> = clipping
+            .remaining
+            .into_iter()
+            .filter_map(|x| {
+                println!("remainder... {:?}", x.data().area.unwrap());
+                if x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD {
+                    None
+                } else {
+                    Some(Beam::OutGoing(BeamData {
+                        face: x,
+                        proj: data.proj,
+                        refr_index: data.refr_index,
+                    }))
+                }
+            })
+            .collect();
+
+        println!("number of 'good' intersections: {}", intersections.len());
+
+        // create transmitted beams
+        let transmitted_beams: Vec<_> = intersections
+            .iter()
+            .filter_map(|x| {
+                // apply filtering here -> return None if fail
+                // total internal reflection -> None
+                // max recursions reached -> None
+                // determine refractive index
+                let sink_shape_id = x.shape_id;
+                // sinks have no parent id at the moment, perhaps we need to make some changes
+                let source_shape_id = data.face.data().parent_id.unwrap_or_else(|| 999);
+                // println!(
+                //     "sink shape id: {}, source shape id: {}",
+                //     sink_shape_id, source_shape_id
+                // );
+
+                // determine transmitted propagation direction
+                let proj = data.proj;
+                // determine other BeamData values here later...
+                Some(Beam::new_default(
+                    x.face.clone(),
+                    proj,
+                    data.refr_index,
+                    x.shape_id,
+                ))
+            })
+            .collect();
+
+        // create reflected beams
+        let reflected_beams: Vec<_> = intersections
+            .into_iter() // can consume the intersections here to avoid cloning
+            .filter_map(|x| {
+                // apply filtering here -> return None if fail
+                // total internal reflection && max tir reached -> None
+                // max recursions reached -> None
+                // refractive index of reflected beam is always the same as the source
+                // determine reflected propagation direction
+                let proj = data.proj;
+                // determine other BeamData values here later...
+                Some(Beam::new_default(x.face, proj, data.refr_index, x.shape_id))
+            })
+            .collect();
+
+        output_beams.extend(reflected_beams);
+        output_beams.extend(transmitted_beams);
+        output_beams.extend(remainder_beams);
+
+        output_beams
     }
 }
 

@@ -72,45 +72,46 @@ impl Problem {
     /// Propagates the next beam in the queue.
     pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
         // try to pop the next beam
-        if let Some(beam) = self.beam_queue.pop() {
-            let propagation = self.propagate(beam);
-            Some(propagation)
+        if let Some(mut beam) = self.beam_queue.pop() {
+            let outputs = beam.propagate(&mut self.geom);
+            self.beam_queue.extend(outputs.clone());
+            Some(BeamPropagation::new(beam, outputs))
         } else {
             panic!("Tried to pop() beam but there were no beams to pop.");
             None
         }
     }
 
-    /// Propagates a beam.
-    fn propagate(&mut self, beam: Beam) -> BeamPropagation {
-        // do beam propagation
+    // /// Propagates a beam.
+    // fn propagate(&mut self, beam: Beam) -> BeamPropagation {
+    //     // do beam propagation
 
-        println!("-------------------");
-        println!("propagating beam...");
+    //     println!("-------------------");
+    //     println!("propagating beam...");
 
-        // make clipping object from the beam
-        match beam {
-            // if default beam, normal
-            Beam::Default { data, .. } => {
-                let mut propagation = BeamPropagation::new(data);
-                propagation.propagate(&mut self.geom);
-                self.beam_queue.extend(propagation.outputs.clone());
-                propagation
-            }
-            // if initial beam, as normal but discard remainders
-            Beam::Initial(data) => {
-                // create a beam propagation
-                let mut propagation = BeamPropagation::new(data);
-                propagation.propagate(&mut self.geom); // propagate the beam
+    //     // make clipping object from the beam
+    //     match beam {
+    //         // if default beam, normal
+    //         Beam::Default { data, .. } => {
+    //             let mut propagation = BeamPropagation::new(data);
+    //             propagation.propagate(&mut self.geom);
+    //             self.beam_queue.extend(propagation.outputs.clone());
+    //             propagation
+    //         }
+    //         // if initial beam, as normal but discard remainders
+    //         Beam::Initial(data) => {
+    //             // create a beam propagation
+    //             let mut propagation = BeamPropagation::new(data);
+    //             propagation.propagate(&mut self.geom); // propagate the beam
 
-                // clone below not strictly needed, but probably acceptable so the propagation can be returned for debugging
-                self.beam_queue.extend(propagation.outputs.clone()); // add outputs to the beam queue
-                propagation // return
-            }
-            // if outgoing, panic
-            Beam::OutGoing(_) => panic!("Outgoing beams cannot be propagated."),
-        }
-    }
+    //             // clone below not strictly needed, but probably acceptable so the propagation can be returned for debugging
+    //             self.beam_queue.extend(propagation.outputs.clone()); // add outputs to the beam queue
+    //             propagation // return
+    //         }
+    //         // if outgoing, panic
+    //         Beam::OutGoing(_) => panic!("Outgoing beams cannot be propagated."),
+    //     }
+    // }
 
     /// Draws a `BeamPropagation` on top of a `Geom`.
     pub fn draw_propagation(&self, propagation: &BeamPropagation) {
