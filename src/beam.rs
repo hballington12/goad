@@ -1,5 +1,6 @@
 use geo::Coord;
 use macroquad::prelude::*;
+use macroquad::ui::Id;
 use nalgebra::Vector3;
 
 use crate::clip::Clipping;
@@ -71,8 +72,7 @@ impl BeamPropagation {
 pub enum Beam {
     Initial(BeamData), // an initial beam to be traced in the near-field
     Default {
-        data: BeamData,  // a beam to be traced in the near-field
-        shape_id: usize, // each default beam should also be associated with a shape in a geometry
+        data: BeamData, // a beam to be traced in the near-field
     },
     OutGoing(BeamData), // a beam to be mapped to the far-field
 }
@@ -81,15 +81,9 @@ impl Beam {
     pub fn new_initial(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
         Beam::Initial(BeamData::new(face, proj, refr_index))
     }
-    pub fn new_default(
-        face: Face,
-        proj: Vector3<f32>,
-        refr_index: RefrIndex,
-        shape_id: usize,
-    ) -> Self {
+    pub fn new_default(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
         Beam::Default {
             data: BeamData::new(face, proj, refr_index),
-            shape_id,
         }
     }
     pub fn to_outgoing(beam: Beam) -> Beam {
@@ -114,6 +108,8 @@ impl Beam {
     /// Computes the propagation of a `Beam`, yielding the output
     /// beams which can then be dealt with as needed.
     pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
+        println!("===================");
+        println!("propagating beam...");
         let mut outputs = Vec::new();
         match self {
             Beam::Initial(data) => {
@@ -121,7 +117,7 @@ impl Beam {
                 println!("adding {} beams to the outputs", outputs_beams.len());
                 outputs.extend(outputs_beams);
             }
-            Beam::Default { data, shape_id } => {
+            Beam::Default { data } => {
                 let output_beams = Self::process_beam(geom, data);
 
                 println!("adding {} beams to the outputs", output_beams.len());
@@ -136,6 +132,15 @@ impl Beam {
 
     fn process_beam(geom: &mut Geom, data: &mut BeamData) -> Vec<Beam> {
         let mut output_beams = Vec::new();
+        let refr_index_in = data.refr_index;
+        match data.face.data().parent_id {
+            Some(id) => {
+                println!("beam in originated from shape #{}", id)
+            }
+            None => {
+                println!("beam did not originate from a shape")
+            }
+        }
 
         let mut clipping = Clipping::new(geom, &mut data.face, &data.proj);
         clipping.clip(); // do the clipping -> contains the intersections
@@ -152,8 +157,8 @@ impl Beam {
             .intersections
             .into_iter()
             .filter(|x| {
-                println!("intersection... {:?}", x.face.data().area.unwrap());
-                x.face.data().area.unwrap() > config::BEAM_AREA_THRESHOLD
+                println!("intersection... {:?}", x.data().area.unwrap());
+                x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD
             })
             .collect();
 
@@ -185,7 +190,12 @@ impl Beam {
                 // total internal reflection -> None
                 // max recursions reached -> None
                 // determine refractive index
-                let sink_shape_id = x.shape_id;
+                let sink_shape_id = x
+                    .data()
+                    .parent_id
+                    .expect("Sink face should always have a parent shape id.");
+
+                println!("intersection was with shape #{}", sink_shape_id);
                 // sinks have no parent id at the moment, perhaps we need to make some changes
                 let source_shape_id = data.face.data().parent_id.unwrap_or_else(|| 999);
                 // println!(
@@ -196,12 +206,7 @@ impl Beam {
                 // determine transmitted propagation direction
                 let proj = data.proj;
                 // determine other BeamData values here later...
-                Some(Beam::new_default(
-                    x.face.clone(),
-                    proj,
-                    data.refr_index,
-                    x.shape_id,
-                ))
+                Some(Beam::new_default(x.clone(), proj, data.refr_index))
             })
             .collect();
 
@@ -216,7 +221,7 @@ impl Beam {
                 // determine reflected propagation direction
                 let proj = data.proj;
                 // determine other BeamData values here later...
-                Some(Beam::new_default(x.face, proj, data.refr_index, x.shape_id))
+                Some(Beam::new_default(x, proj, data.refr_index))
             })
             .collect();
 

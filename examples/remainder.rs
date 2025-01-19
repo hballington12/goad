@@ -42,7 +42,7 @@ async fn main() {
         draw_face(&clip, RED, 10.0);
         // draw the remapped intersections
         for intsn in &intersections {
-            draw_face(&intsn.face, YELLOW, 2.0);
+            draw_face(&intsn, YELLOW, 2.0);
         }
         // draw the remainders
         for face in &remaining {

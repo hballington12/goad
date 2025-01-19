@@ -31,7 +31,7 @@ async fn main() {
         }
         // draw the remapped intersections
         for intsn in &clipping.intersections {
-            draw_face(&intsn.face, YELLOW, 4.0);
+            draw_face(&intsn, YELLOW, 4.0);
         }
         // draw the original clip
         draw_face(&clipping.clip, RED, 4.0);
