@@ -1,3 +1,6 @@
+use crate::containment;
+use crate::containment::ContainmentGraph;
+use crate::containment::AABB;
 use geo::Area;
 use geo_types::Coord;
 use geo_types::LineString;
@@ -531,6 +534,7 @@ pub struct Shape {
     pub refr_index: RefrIndex,      // Refractive index of this shape
     pub id: Option<usize>,          // an id number
     pub parent_id: Option<usize>,   // An optional parent shape index, which encompasses this one
+    pub aabb: Option<AABB>,         // axis-aligned bounding box
 }
 
 impl Shape {
@@ -546,6 +550,7 @@ impl Shape {
             },
             id,
             parent_id,
+            aabb: None,
         }
     }
 
@@ -561,7 +566,6 @@ impl Shape {
         let mut shape = Shape::new(id, None);
         shape.num_vertices = vertices.len();
         shape.vertices = vertices;
-        println!("shape has id: {:?}", id);
 
         let face_arities = if mesh.face_arities.is_empty() {
             vec![3; mesh.indices.len() / 3]
@@ -582,6 +586,31 @@ impl Shape {
 
             next_face = end;
         }
+
+        // compute axis-aligned bounding box
+        let (min, max) = shape.vertices.iter().fold(
+            ([f32::INFINITY; 3], [-f32::INFINITY; 3]),
+            |(min_acc, max_acc), v| {
+                (
+                    [
+                        min_acc[0].min(v[0]),
+                        min_acc[1].min(v[1]),
+                        min_acc[2].min(v[2]),
+                    ],
+                    [
+                        max_acc[0].max(v[0]),
+                        max_acc[1].max(v[1]),
+                        max_acc[2].max(v[2]),
+                    ],
+                )
+            },
+        );
+
+        let min = Point3::from(min);
+        let max = Point3::from(max);
+
+        shape.aabb = Some(AABB { min, max });
+
         shape
     }
 
@@ -603,11 +632,21 @@ impl Shape {
             face.transform(transform); // Call the in-place project method
         }
     }
+
+    /// Determines if the axis-aligned bounding box of this shape contains
+    /// that of another.
+    pub fn contains(&self, other: &Shape) -> bool {
+        match (&self.aabb, &other.aabb) {
+            (Some(a), Some(b)) => (0..3).all(|i| b.min[i] > a.min[i] && a.max[i] > b.max[i]),
+            (_, _) => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Geom {
     pub shapes: Vec<Shape>,
+    pub containment_graph: ContainmentGraph,
     pub num_shapes: usize,
 }
 
@@ -642,9 +681,33 @@ impl Geom {
             .map(|(i, model)| Shape::from_model(model, Some(i)))
             .collect();
 
+        // Create containment graph
+        let mut containment_graph = ContainmentGraph::new(shapes.len());
+
+        // Ensure all shapes have valid IDs upfront
+        let shapes_with_ids: Vec<_> = shapes
+            .iter()
+            .filter_map(|shape| {
+                shape
+                    .id
+                    .map(|id| (id, shape))
+                    .or_else(|| panic!("Shape cannot be added to containment graph without an id"))
+            })
+            .collect();
+
+        // Iterate over distinct pairs of shapes
+        for (id_a, a) in &shapes_with_ids {
+            for (id_b, b) in &shapes_with_ids {
+                if id_a != id_b && a.contains(b) {
+                    containment_graph.set_parent(*id_b, *id_a);
+                }
+            }
+        }
+
         Ok(Self {
             num_shapes: shapes.len(),
             shapes,
+            containment_graph,
         })
     }
 

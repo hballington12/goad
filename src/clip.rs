@@ -10,6 +10,8 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::iter::repeat;
 
+const AREA_THRESHOLD: f32 = 1e-3;
+
 #[cfg(test)]
 mod tests {
 
@@ -270,8 +272,6 @@ impl<'a> Clipping<'a> {
         self.stats = Some(Stats::new(self.clip, intersection, remaining));
     }
 }
-
-const AREA_THRESHOLD: f32 = 1e-2;
 
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
 pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>, Vec<Face>) {

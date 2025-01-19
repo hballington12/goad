@@ -8,7 +8,7 @@ use pbt::problem::Problem;
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let geom = geom::Geom::from_file("./examples/data/cube_inside_cube.obj").unwrap();
+    let geom = geom::Geom::from_file("./examples/data/cubes.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, -0.0);
 
