@@ -1,3 +1,4 @@
+use geo::Coord;
 use macroquad::prelude::*;
 use nalgebra::Vector3;
 
@@ -7,6 +8,7 @@ use crate::geom::Face;
 use crate::geom::Geom;
 use crate::geom::RefrIndex;
 use crate::helpers::draw_face;
+use crate::helpers::lines_to_screen;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
@@ -34,6 +36,34 @@ impl BeamPropagation {
         for beam in &self.outputs {
             draw_face(&beam.data().face, BLUE, 4.0);
         }
+        // draw lines from the outputs to the input
+        let line_strings: Vec<_> = self
+            .outputs
+            .iter()
+            .map(|x| {
+                let output_mid = x.data().face.midpoint();
+                let input_mid = self.input.data().face.midpoint();
+                let vec = input_mid - output_mid;
+                let input_normal = self.input.data().face.data().normal;
+                let norm_dist_to_plane = vec.dot(&input_normal);
+                let dist_to_plane =
+                    norm_dist_to_plane / (input_normal.dot(&self.input.data().proj));
+                // ray cast along propagation direction
+                let intsn = output_mid + dist_to_plane * self.input.data().proj;
+                vec![
+                    Coord {
+                        x: output_mid.coords.x,
+                        y: output_mid.coords.y,
+                    },
+                    Coord {
+                        x: intsn.coords.x,
+                        y: intsn.coords.y,
+                    },
+                ]
+            })
+            .collect();
+
+        lines_to_screen(line_strings, RED, 2.0);
     }
 }
 
