@@ -150,12 +150,11 @@ pub struct Clipping<'a> {
     pub clip: &'a mut Face,       // a clipping face
     pub proj: &'a Vector3<f32>,   // a projection vector
     pub intersections: Vec<Face>, // a list of intersection faces
-    pub source_mapping: Vec<(usize, usize)>, // a list of references to the source of each intersection
-    pub remaining: Vec<Face>,                // a list of remaining clips
-    transform: Matrix4<f32>,                 // a transform matrix to the clipping system
-    itransform: Matrix4<f32>,                // a transform matrix from the clipping system
-    is_done: bool,                           // whether or not the clipping has been computed
-    pub stats: Option<Stats>,                // statistics about the clipping result
+    pub remaining: Vec<Face>,     // a list of remaining clips
+    transform: Matrix4<f32>,      // a transform matrix to the clipping system
+    itransform: Matrix4<f32>,     // a transform matrix from the clipping system
+    is_done: bool,                // whether or not the clipping has been computed
+    pub stats: Option<Stats>,     // statistics about the clipping result
 }
 
 impl<'a> Clipping<'a> {
@@ -167,7 +166,6 @@ impl<'a> Clipping<'a> {
             clip,
             proj,
             intersections: Vec::new(),
-            source_mapping: Vec::new(),
             remaining: Vec::new(),
             transform: Matrix4::zeros(),
             itransform: Matrix4::zeros(),
@@ -210,26 +208,21 @@ impl<'a> Clipping<'a> {
 
         // create a mapping where each element links a subject to its shape and
         // face in the geometry
-        for (i, shape) in self.geom.shapes.iter().enumerate() {
+        for shape in self.geom.shapes.iter() {
             for (j, face) in shape.faces.iter().enumerate() {
                 if face == self.clip {
                     // don't include the clip in the subjects
                     continue;
                 }
                 subjects.push(face);
-                mapping.push((i, j));
+                mapping.push((face.data().parent_id.unwrap(), j));
             }
         }
 
         (self.clip, subjects, mapping)
     }
 
-    pub fn finalise_clip(
-        &mut self,
-        mut intersection: Vec<Face>,
-        mut remaining: Vec<Face>,
-        source_mapping: Vec<(usize, usize)>,
-    ) {
+    pub fn finalise_clip(&mut self, mut intersection: Vec<Face>, mut remaining: Vec<Face>) {
         // transform back to original coordinate system
         self.geom.transform(&self.itransform);
         intersection
@@ -243,7 +236,6 @@ impl<'a> Clipping<'a> {
         // append the remapped intersections to the struct
         self.intersections.extend(intersection);
         self.remaining.extend(remaining);
-        self.source_mapping = source_mapping;
         self.is_done = true;
     }
 
@@ -256,18 +248,22 @@ impl<'a> Clipping<'a> {
         let (clip, mut subjects, mapping) = self.init_clip();
 
         // compute remapped intersections, converting to Intersection structs
-        let (mut intersection, remaining, sources) = clip_faces(&clip, &mut subjects);
-        // get mapping back to geometry
-        let source_mapping: Vec<_> = sources.iter().map(|&i| mapping[i]).collect();
+        let (intersection, remaining) = clip_faces(&clip, &mut subjects);
 
-        for (i, face) in intersection.iter_mut().enumerate() {
-            face.data_mut().parent_id = Some(mapping[i].0);
-        }
+        // println!("intersections: {:?}", intersection);
+        // println!("subjects: {:?}", subjects);
+        // println!("sources: {:?}", sources);
+
+        // // get mapping back to geometry
+        // for (i, face) in intersection.iter_mut().enumerate() {
+        //     face.data_mut().parent_id = Some(mapping[sources[i]].0);
+        //     println!("the intersection parent is: {:?}", mapping[sources[i]].0)
+        // }
 
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);
 
-        self.finalise_clip(intersection, remaining, source_mapping);
+        self.finalise_clip(intersection, remaining);
     }
 
     fn set_stats(&mut self, intersection: &Vec<Face>, remaining: &Vec<Face>) {
@@ -278,18 +274,14 @@ impl<'a> Clipping<'a> {
 const AREA_THRESHOLD: f32 = 1e-2;
 
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
-pub fn clip_faces<'a>(
-    clip_in: &Face,
-    subjects_in: &Vec<&'a Face>,
-) -> (Vec<Face>, Vec<Face>, Vec<usize>) {
+pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>, Vec<Face>) {
     if subjects_in.is_empty() {
-        return (Vec::new(), vec![clip_in.clone()], Vec::new());
+        return (Vec::new(), vec![clip_in.clone()]);
     }
 
     let clip_polygon = clip_in.to_polygon();
     let mut intersections = Vec::new();
     let mut remaining_clips = vec![clip_polygon];
-    let mut intsn_sources = Vec::new();
 
     // Sort subjects by their Z-coordinate midpoint, descending.
     let sorted_subjects = {
@@ -303,10 +295,9 @@ pub fn clip_faces<'a>(
         subjects
     };
 
-    for (i, subject) in sorted_subjects
+    for subject in sorted_subjects
         .iter()
-        .enumerate()
-        .filter(|(_, subj)| subj.data().vert_min(2) <= clip_in.data().vert_max(2))
+        .filter(|subj| subj.data().vert_min(2) <= clip_in.data().vert_max(2))
     {
         let subject_poly = subject.to_polygon();
         let mut next_clips = Vec::new();
@@ -328,13 +319,11 @@ pub fn clip_faces<'a>(
                     .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
                 difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
-                intsn_sources.extend(std::iter::repeat(i).take(intersection.0.len()));
-                intersections.extend(
-                    intersection
-                        .0
-                        .into_iter()
-                        .map(|poly| poly.project(&subject.plane())),
-                );
+                intersections.extend(intersection.0.into_iter().map(|poly| {
+                    let mut face = poly.project(&subject.plane());
+                    face.data_mut().parent_id = subject.data().parent_id;
+                    face
+                }));
             }
 
             next_clips.extend(difference.0);
@@ -351,5 +340,5 @@ pub fn clip_faces<'a>(
         .map(|poly| poly.project(&clip_in.plane()))
         .collect();
 
-    (intersections, remaining, intsn_sources)
+    (intersections, remaining)
 }

@@ -207,41 +207,31 @@ impl FaceData {
     fn set_normal(&mut self) {
         let vertices = &self.exterior;
 
-        // Using the first three vertices to compute the normal.
-        let v1 = &vertices[0];
-        let v2 = &vertices[1];
-        let v3 = &vertices[2];
+        // Iterate to find three non-collinear vertices
+        for i in 0..vertices.len() {
+            for j in i + 1..vertices.len() {
+                for k in j + 1..vertices.len() {
+                    let v1 = &vertices[i];
+                    let v2 = &vertices[j];
+                    let v3 = &vertices[k];
 
-        // Compute edge vectors
-        let u = v2 - v1;
-        let v = v3 - v2;
+                    // Compute edge vectors
+                    let u = v2 - v1;
+                    let v = v3 - v1;
 
-        // Compute cross product u × v
-        let mut normal = u.cross(&v);
+                    // Compute the cross product
+                    let mut normal = u.cross(&v);
 
-        normal.normalize_mut(); // normalise to unit vector
+                    normal.normalize_mut();
 
-        #[cfg(debug_assertions)]
-        {
-            assert!(
-                u.dot(&normal) < 0.01,
-                "u: {:?}, v: {:?}, dot: {}, verts: {:?}",
-                u,
-                v,
-                u.dot(&normal),
-                vertices
-            );
-            assert!(
-                v.dot(&normal) < 0.01,
-                "u: {:?}, v: {:?}, dot: {}, verts: {:?}",
-                u,
-                v,
-                v.dot(&normal),
-                vertices
-            );
+                    if u.dot(&normal) < 0.01 && v.dot(&normal) < 0.01 {
+                        self.normal = normal;
+                        return;
+                    }
+                }
+            }
         }
-
-        self.normal = normal;
+        panic!("couldnt compute normal")
     }
 
     /// Compute the midpoint of the facet.
@@ -571,6 +561,7 @@ impl Shape {
         let mut shape = Shape::new(id, None);
         shape.num_vertices = vertices.len();
         shape.vertices = vertices;
+        println!("shape has id: {:?}", id);
 
         let face_arities = if mesh.face_arities.is_empty() {
             vec![3; mesh.indices.len() / 3]

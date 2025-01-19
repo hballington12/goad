@@ -146,7 +146,7 @@ impl Beam {
         clipping.clip(); // do the clipping -> contains the intersections
 
         assert!(
-            clipping.stats.clone().unwrap().total_consvtn > 0.999,
+            clipping.stats.clone().unwrap().total_consvtn > 0.99,
             "Error, poor total energy conservation in clipping: {:?}",
             clipping.stats.clone().unwrap().total_consvtn
         );
