@@ -59,7 +59,7 @@ impl PolygonExtensions for Polygon<f32> {
     /// Projects the xy coordinates of a polygon onto a plane in 3D
     ///  the last vertex, which is a duplicate of the first
     fn project(&self, plane: &Plane) -> Face {
-        let area = self.unsigned_area() / plane.normal.z;
+        let area = self.unsigned_area() / plane.normal.z.abs();
 
         let project_coords = |coords: &Vec<Coord<f32>>| -> Vec<Point3<f32>> {
             coords

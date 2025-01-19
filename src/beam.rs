@@ -1,3 +1,4 @@
+use macroquad::prelude::*;
 use nalgebra::Vector3;
 
 use crate::clip::Clipping;
@@ -5,12 +6,13 @@ use crate::config;
 use crate::geom::Face;
 use crate::geom::Geom;
 use crate::geom::RefrIndex;
+use crate::helpers::draw_face;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
-    pub source: BeamData,
+    pub input: BeamData,
     pub refr_index: RefrIndex,
-    pub sinks: Vec<Beam>,
+    pub outputs: Vec<Beam>,
 }
 
 impl BeamPropagation {
@@ -18,15 +20,17 @@ impl BeamPropagation {
     pub fn new(source: BeamData) -> Self {
         let refr_index = source.refr_index.clone();
         Self {
-            source,
+            input: source,
             refr_index,
-            sinks: Vec::new(),
+            outputs: Vec::new(),
         }
     }
 
+    /// Computes the propagation of a `BeamPropagation`, yielding the output
+    /// beams which can then be dealt with as needed.
     pub fn propagate(&mut self, geom: &mut Geom) {
         // create a clipping to clip the beam against the geometry
-        let mut clipping = Clipping::new(geom, &mut self.source.face, &self.source.proj);
+        let mut clipping = Clipping::new(geom, &mut self.input.face, &self.input.proj);
         clipping.clip(); // do the clipping -> contains the intersections
 
         assert!(
@@ -40,8 +44,13 @@ impl BeamPropagation {
         let intersections: Vec<_> = clipping
             .intersections
             .into_iter()
-            .filter(|x| x.face.data().area.unwrap() > config::BEAM_AREA_THRESHOLD)
+            .filter(|x| {
+                println!("{:?}", x.face.data().area.unwrap());
+                x.face.data().area.unwrap() > config::BEAM_AREA_THRESHOLD
+            })
             .collect();
+
+        println!("number of 'good' intersections: {}", intersections.len());
 
         // create transmitted beams
         let transmitted_beams: Vec<_> = intersections
@@ -53,14 +62,14 @@ impl BeamPropagation {
                 // determine refractive index
                 let sink_shape_id = x.shape_id;
                 // sinks have no parent id at the moment, perhaps we need to make some changes
-                let source_shape_id = self.source.face.data().parent_id.unwrap_or_else(|| 999);
-                println!(
-                    "sink shape id: {}, source shape id: {}",
-                    sink_shape_id, source_shape_id
-                );
+                let source_shape_id = self.input.face.data().parent_id.unwrap_or_else(|| 999);
+                // println!(
+                //     "sink shape id: {}, source shape id: {}",
+                //     sink_shape_id, source_shape_id
+                // );
 
                 // determine transmitted propagation direction
-                let proj = self.source.proj;
+                let proj = self.input.proj;
                 // determine other BeamData values here later...
                 Some(Beam::new_default(
                     x.face.clone(),
@@ -80,7 +89,7 @@ impl BeamPropagation {
                 // max recursions reached -> None
                 // refractive index of reflected beam is always the same as the source
                 // determine reflected propagation direction
-                let proj = self.source.proj;
+                let proj = self.input.proj;
                 // determine other BeamData values here later...
                 Some(Beam::new_default(x.face, proj, self.refr_index, x.shape_id))
             })
@@ -91,12 +100,24 @@ impl BeamPropagation {
         // println!("reflected beams: {:?}", reflected_beams);
 
         // add the reflected and transmitted beams to the sinks
-        self.sinks.extend(reflected_beams);
-        self.sinks.extend(transmitted_beams);
+        println!("note: reflected beams are currently omitted");
+        // self.outputs.extend(reflected_beams);
+        println!("adding {} beams to the outputs", transmitted_beams.len());
+        self.outputs.extend(transmitted_beams);
+    }
+
+    /// Draws a `Beam Propagation`
+    pub fn draw(&self) {
+        // draw the input
+        draw_face(&self.input.face, YELLOW, 4.0);
+        // draw the outputs
+        for beam in &self.outputs {
+            draw_face(&beam.data().face, BLUE, 4.0);
+        }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Beam {
     Initial(BeamData), // an initial beam to be traced in the near-field
     Default {
@@ -141,7 +162,7 @@ impl Beam {
     }
 }
 
-#[derive(Debug, PartialEq)] // Added Default derive
+#[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct BeamData {
     pub face: Face,
     pub proj: Vector3<f32>,

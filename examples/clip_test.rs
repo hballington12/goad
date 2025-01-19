@@ -26,9 +26,9 @@ async fn main() {
             draw_face(face, GREEN, 4.0);
         }
         // // cube
-        // for face in &clipping.geom.shapes[1].faces {
-        //     draw_face(face, MAGENTA, 2.0);
-        // }
+        for face in &clipping.geom.shapes[1].faces {
+            draw_face(face, MAGENTA, 2.0);
+        }
         // draw the remapped intersections
         for intsn in &clipping.intersections {
             draw_face(&intsn.face, YELLOW, 4.0);

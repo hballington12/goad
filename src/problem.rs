@@ -2,7 +2,9 @@ use crate::{
     beam::{Beam, BeamPropagation},
     clip::Clipping,
     geom::{Face, Geom},
+    helpers::draw_face,
 };
+use macroquad::prelude::*;
 
 #[cfg(test)]
 mod tests {
@@ -68,65 +70,56 @@ impl Problem {
     }
 
     /// Propagates the next beam in the queue.
-    pub fn propagate_next(&mut self) {
+    pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
         // try to pop the next beam
         if let Some(beam) = self.beam_queue.pop() {
-            self.propagate(beam);
+            let propagation = self.propagate(beam);
+            Some(propagation)
         } else {
             panic!("Tried to pop() beam but there were no beams to pop.");
+            None
         }
     }
 
-    fn propagate(&mut self, mut beam: Beam) {
+    /// Propagates a beam.
+    fn propagate(&mut self, beam: Beam) -> BeamPropagation {
         // do beam propagation
+
+        println!("-------------------");
+        println!("propagating beam...");
 
         // make clipping object from the beam
         match beam {
             // if default beam, normal
-            Beam::Default { mut data, .. } => {
-                let mut clipping = Clipping::new(&mut self.geom, &mut data.face, &data.proj);
-                clipping.clip(); // do the clipping -> contains the intersections
-                println!("{}", clipping.stats.unwrap());
+            Beam::Default { data, .. } => {
+                let mut propagation = BeamPropagation::new(data);
+                propagation.propagate(&mut self.geom);
+                self.beam_queue.extend(propagation.outputs.clone());
+                propagation
             }
             // if initial beam, as normal but discard remainders
-            Beam::Initial(mut beam_data) => {
+            Beam::Initial(data) => {
                 // create a beam propagation
-                let mut propagation = BeamPropagation::new(beam_data);
+                let mut propagation = BeamPropagation::new(data);
                 propagation.propagate(&mut self.geom); // propagate the beam
 
-                // // deal with intersections
-                // for (i, intsn) in clipping.intersections.into_iter().enumerate() {
-                //     // for each intersection:
-                //     // filter some conditions to determine if and how new beams should be made
-                //     // ie. area, max recursions, max reflections, energy, total internal reflection
-                //     let area = intsn
-                //         .data()
-                //         .area
-                //         .expect("Face area of intersection should always be Some().");
-
-                //     println!("Intersection face areas: {:?}", area);
-
-                //     if area < THRESHOLD_AREA {
-                //         continue;
-                //     }
-
-                //     let map = clipping.source_mapping[i]; // determined which shape, face in the geometry the intersection was at
-                //                                           // let refr_index = self.geom.shapes[map.0].refr_index; // use the shape in the geometry to retrieve the refractive index
-
-                //     // do some stuff to determine new propagation directions,
-                //     // electric field, amplitude matrix, etc
-                //     // use refractive index tree to determine external refr index when
-                //     // a beam intersects with the same shape from which it originates
-
-                //     // always create reflected beam (sort propagation later)
-                //     // let proj = beam.data().proj.clone(); // use the same propagation vector for now
-
-                //     // let reflected_beam = Beam::new_default(intsn, proj, refr_index);
-                // }
-                // deal with remainders
+                // clone below not strictly needed, but probably acceptable so the propagation can be returned for debugging
+                self.beam_queue.extend(propagation.outputs.clone()); // add outputs to the beam queue
+                propagation // return
             }
             // if outgoing, panic
             Beam::OutGoing(_) => panic!("Outgoing beams cannot be propagated."),
         }
+    }
+
+    /// Draws a `BeamPropagation` on top of a `Geom`.
+    pub fn draw_propagation(&self, propagation: &BeamPropagation) {
+        // draw the geometry
+        for shape in &self.geom.shapes {
+            for face in &shape.faces {
+                draw_face(face, GREEN, 4.0);
+            }
+        }
+        propagation.draw();
     }
 }
