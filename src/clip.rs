@@ -217,7 +217,7 @@ impl<'a> Clipping<'a> {
                     continue;
                 }
                 subjects.push(face);
-                mapping.push((face.data().parent_id.unwrap(), j));
+                mapping.push((face.data().shape_id.unwrap(), j));
             }
         }
 
@@ -321,7 +321,7 @@ pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>
 
                 intersections.extend(intersection.0.into_iter().map(|poly| {
                     let mut face = poly.project(&subject.plane());
-                    face.data_mut().parent_id = subject.data().parent_id;
+                    face.data_mut().shape_id = subject.data().shape_id;
                     face
                 }));
             }

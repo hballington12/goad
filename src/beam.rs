@@ -1,8 +1,12 @@
+use std::cell::Ref;
+
 use geo::Coord;
+use macroquad::conf;
 use macroquad::prelude::*;
 use macroquad::ui::Id;
 use nalgebra::Vector3;
 
+use crate::beam;
 use crate::clip::Clipping;
 use crate::config;
 use crate::geom::Face;
@@ -133,8 +137,9 @@ impl Beam {
     fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
         let mut output_beams = Vec::new();
         let n1 = beam_data.refr_index;
+        let input_shape_id = beam_data.face.data().shape_id; // Option(shape id)
 
-        match beam_data.face.data().parent_id {
+        match input_shape_id {
             Some(id) => {
                 println!("beam in originated from shape #{}", id)
             }
@@ -189,14 +194,14 @@ impl Beam {
                 // total internal reflection -> None
                 // max recursions reached -> None
                 // get refractive index
-                let n2 = geom.shapes[x.data().parent_id.unwrap()].refr_index.clone();
+                let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
 
-                // sinks have no parent id at the moment, perhaps we need to make some changes
+                println!("n1: {:?}, n2: {:?}", n1, n2);
 
                 // determine transmitted propagation direction
                 let proj = beam_data.proj;
                 // determine other BeamData values here later...
-                Some(Beam::new_default(x.clone(), proj, beam_data.refr_index))
+                Some(Beam::new_default(x.clone(), proj, n2))
             })
             .collect();
 
@@ -220,6 +225,30 @@ impl Beam {
         output_beams.extend(remainder_beams);
 
         output_beams
+    }
+
+    // Helper function to get the refractive index n2 based on the conditions
+    fn get_n2(geom: &Geom, output_shape_id: usize, input_shape_id: Option<usize>) -> RefrIndex {
+        let ni = geom.shapes[output_shape_id].refr_index; // refr index inside x
+
+        let no = geom
+            .containment_graph
+            .get_parent(output_shape_id)
+            .map_or(config::MEDIUM_REFR_INDEX, |parent_id| {
+                geom.shapes[parent_id].refr_index
+            });
+
+        let going_into = match input_shape_id {
+            None => true, // If no input shape, it's going into the second medium
+            Some(id) if id == output_shape_id => false, // If input and output shape are the same, it's going out
+            Some(id) => geom.containment_graph.get_parent(output_shape_id) == Some(id), // Check for parent-child relationship
+        };
+
+        if going_into {
+            ni
+        } else {
+            no
+        }
     }
 }
 

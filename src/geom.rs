@@ -183,11 +183,11 @@ pub struct FaceData {
     pub midpoint: Point3<f32>,      // Midpoint
     pub num_vertices: usize,        // Number of vertices
     pub area: Option<f32>,          // Unsigned area
-    pub parent_id: Option<usize>,   // An optional parent shape id number
+    pub shape_id: Option<usize>,    // An optional parent shape id number
 }
 
 impl FaceData {
-    pub fn new(vertices: Vec<Point3<f32>>, parent_id: Option<usize>) -> Self {
+    pub fn new(vertices: Vec<Point3<f32>>, shape_id: Option<usize>) -> Self {
         let vertices = vertices.clone();
         let num_vertices = vertices.len();
 
@@ -197,7 +197,7 @@ impl FaceData {
             normal: Vector3::zeros(),
             midpoint: Point3::origin(),
             area: None, // compute as needed
-            parent_id,
+            shape_id,
         };
 
         face.set_normal();
