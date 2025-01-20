@@ -14,7 +14,7 @@ mod tests {
             imag: 0.0,
         };
         let m2 = m1;
-        let theta_t = get_theta_t(theta_i, m1, m2);
+        let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         assert!(theta_i - theta_t < 0.01)
     }
 
@@ -29,7 +29,7 @@ mod tests {
             real: 1.31,
             imag: 0.0,
         };
-        let theta_t = get_theta_t(theta_i, m1, m2);
+        let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         let abs_difference = (theta_i - theta_t).abs();
         assert!(abs_difference < f32::EPSILON)
     }
@@ -45,7 +45,7 @@ mod tests {
             real: 1.31,
             imag: 0.0,
         };
-        let theta_t = get_theta_t(theta_i, m1, m2);
+        let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         let abs_difference = (theta_t - 0.3916126).abs();
         assert!(abs_difference < 0.001)
     }
@@ -61,16 +61,16 @@ mod tests {
             real: 1.5,
             imag: 0.1,
         };
-        let theta_t = get_theta_t(theta_i, m1, m2);
+        let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         let abs_difference = (theta_t - 0.662387).abs();
         assert!(abs_difference < 0.001)
     }
 }
 
-/// Returns the transmitted angle according to Snell's Law.
+/// Returns the sine of the transmitted angle according to Snell's Law.
 /// Port from Fortran code rt_c.f90, Macke 1996.
 /// All angles are in radians.
-fn get_theta_t(theta_i: f32, m1: RefrIndex, m2: RefrIndex) -> f32 {
+pub fn get_sin_theta_t(theta_i: f32, m1: RefrIndex, m2: RefrIndex) -> f32 {
     let k1 = m1.imag / m1.real; // imag(inc) / real(inc)
     let k2 = m2.imag / m2.real; // imag(trans) / real(trans)
     let krel = (k2 - k1) / (1.0 + k1 * k2);
@@ -95,5 +95,5 @@ fn get_theta_t(theta_i: f32, m1: RefrIndex, m2: RefrIndex) -> f32 {
     let ref7 = (g.cos() - k2 * g.sin()) * (g.cos() - k2 * g.sin());
     let rnstar = (sintiq + ref6 * q2 * ref7).sqrt();
 
-    (theta_i.sin() / rnstar).asin()
+    theta_i.sin() / rnstar
 }
