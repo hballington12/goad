@@ -1,10 +1,10 @@
 use crate::geom::RefrIndex;
-use std::f32::consts::PI;
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    use std::f32::consts::PI;
 
     #[test]
     fn normal_incidence_same_media() {
@@ -81,7 +81,7 @@ fn get_theta_t(theta_i: f32, m1: RefrIndex, m2: RefrIndex) -> f32 {
     let ref3 = (1.0 + ref2) * (1.0 + ref2);
     let ref6 = ref1 * ref3 / ((1.0 + krel * k2) * (1.0 + krel * k2));
 
-    let sintiq = (theta_i).sin().powi(2); // sin²(theta_i)
+    let sintiq = (theta_i).sin().powi(2);
     let ref4 = 1.0 - (1.0 - ref2) / ref1 / ref3 * sintiq;
     let ref5 = 2.0 * krel / ref1 / ref3 * sintiq;
 
@@ -90,9 +90,9 @@ fn get_theta_t(theta_i: f32, m1: RefrIndex, m2: RefrIndex) -> f32 {
 
     let test1 = (ref4 / q2).acos() / 2.0;
 
-    let g = test1; // Picking g from test1 (same as Fortran code logic)
+    let g = test1;
 
-    let ref7 = (g.cos() - k2 * g.sin()).powi(2);
+    let ref7 = (g.cos() - k2 * g.sin()) * (g.cos() - k2 * g.sin());
     let rnstar = (sintiq + ref6 * q2 * ref7).sqrt();
 
     (theta_i.sin() / rnstar).asin()
