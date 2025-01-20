@@ -129,7 +129,8 @@ impl Beam {
                 outputs.extend(output_beams);
             }
             Beam::OutGoing(..) => {
-                panic!("tried to propagate an outgoing beam, which is not yet supported.");
+                println!("beam was outgoing. skipping...");
+                // panic!("tried to propagate an outgoing beam, which is not yet supported.");
             }
         }
         outputs
@@ -192,18 +193,29 @@ impl Beam {
             .iter()
             .filter_map(|x| {
                 // apply filtering here -> return None if fail
-                // total internal reflection -> None
+                let normal = x.data().normal;
+                println!("norm . prop = {:?}", normal.dot(&beam_data.prop));
+                let theta_i = normal.dot(&beam_data.prop).abs().acos();
+                let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
+
+                if theta_i > (n2.real / n1.real).asin() {
+                    // total internal reflection
+                    println!("tir! theta_i: {:?}, n2: {:?}, n1: {:?}", theta_i, n2, n1);
+                    return None;
+                }
 
                 // implement this now
 
                 // max recursions reached -> None
                 // get refractive index
-                let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
-                let normal = x.data().normal;
-                let theta_i = normal.dot(&beam_data.prop).abs().acos();
+                println!("thetai: {:?}", theta_i);
+                println!("n1: {:?}", n1);
+                println!("n2: {:?}", n2);
                 let stt = get_sin_theta_t(theta_i, n1, n2);
                 println!("theta t is {:?}, sin theta t is: {:?}", stt.asin(), stt);
-                let prop = Self::get_trans_prop(&normal, &beam_data.prop, stt);
+                // total internal reflection
+
+                let prop = Self::get_refraction_vector(&normal, &beam_data.prop, stt);
                 // check this derivation
 
                 assert!(beam_data.prop.dot(&prop) > 0.0);
@@ -234,7 +246,7 @@ impl Beam {
 
         // output_beams.extend(reflected_beams);
         output_beams.extend(transmitted_beams);
-        output_beams.extend(remainder_beams);
+        // output_beams.extend(remainder_beams);
 
         output_beams
     }
@@ -264,32 +276,24 @@ impl Beam {
     }
 
     /// Returns a transmitted propagation vector, where `stt` is the sine of the angle of transmission.
-    fn get_trans_prop(norm: &Vector3<f32>, prop: &Vector3<f32>, stt: f32) -> Vector3<f32> {
+    fn get_refraction_vector(norm: &Vector3<f32>, prop: &Vector3<f32>, stt: f32) -> Vector3<f32> {
         if stt < 0.0001 {
             return *prop;
         }
-        println!("norm: {:?}, prop {:?}", norm, prop);
-        println!("dot: {:?}", norm.dot(&prop));
-
         // upward facing normal
         let n = if norm.dot(&prop) > 0.0 {
             *norm
         } else {
             *norm * -1.0
         };
-        println!("n: {:?}, prop {:?}", n, prop);
 
-        // trig functions
-        let cti = n.dot(&prop);
-        let sti = (1.0 - cti.powi(2)).sqrt();
+        // Port from Macke 1996.
+        let w = n.dot(&prop); // cos theta_i
+        let wvz = w / w.abs();
+        let wf = stt;
         let ctt = (1.0 - stt.powi(2)).sqrt();
+        let result = wf * (prop - w * n) + wvz * ctt * n;
 
-        println!("cti {:?}", cti);
-        println!("stt {:?}", stt);
-        println!("sti {:?}", sti);
-
-        let result = (ctt - cti * (stt / sti)) * n + (stt / sti) * prop;
-        println!("result is {:?}", result);
         result
     }
 }
@@ -304,9 +308,10 @@ pub struct BeamData {
 /// Creates a new beam
 impl BeamData {
     pub fn new(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
+        let prop = proj.normalize();
         Self {
             face,
-            prop: proj,
+            prop: prop,
             refr_index,
         }
     }

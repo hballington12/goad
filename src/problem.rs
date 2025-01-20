@@ -76,7 +76,8 @@ impl Problem {
             self.beam_queue.extend(outputs.clone());
             Some(BeamPropagation::new(beam, outputs))
         } else {
-            panic!("Tried to pop() beam but there were no beams to pop.");
+            println!("no beams left to pop!");
+            // panic!("Tried to pop() beam but there were no beams to pop.");
             None
         }
     }
