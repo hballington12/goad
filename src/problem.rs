@@ -49,7 +49,6 @@ mod tests {
         );
 
         problem.propagate_next();
-        assert!(false)
     }
 }
 

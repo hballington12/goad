@@ -5,3 +5,4 @@ pub mod containment;
 pub mod geom;
 pub mod helpers;
 pub mod problem;
+pub mod snell;

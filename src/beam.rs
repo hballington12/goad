@@ -195,6 +195,7 @@ impl Beam {
                 // max recursions reached -> None
                 // get refractive index
                 let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
+                // let prop = Self::get_trans_prop(x, beam_data.proj, n1, n2);
 
                 println!("n1: {:?}, n2: {:?}", n1, n2);
 
@@ -249,6 +250,19 @@ impl Beam {
         } else {
             no
         }
+    }
+
+    fn get_trans_prop(x: &Face, proj: Vector3<f32>, n1: RefrIndex, n2: RefrIndex) -> Vector3<f32> {
+        // upward facing normal
+        let norm = if x.data().normal.dot(&proj) < 0.0 {
+            x.data().normal
+        } else {
+            -x.data().normal
+        };
+        let dot = norm.dot(&proj);
+        // let frac = n1/ n2;
+
+        todo!()
     }
 }
 
