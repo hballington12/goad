@@ -197,7 +197,7 @@ impl<'a> Clipping<'a> {
         self.itransform = self.transform.try_inverse().unwrap(); // inverse transform
     }
 
-    pub fn init_clip(&mut self) -> (&Face, Vec<&Face>, Vec<(usize, usize)>) {
+    pub fn init_clip(&mut self) -> (&Face, Vec<&Face>) {
         if self.is_done {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
@@ -206,22 +206,20 @@ impl<'a> Clipping<'a> {
         self.clip.transform(&self.transform);
 
         let mut subjects = Vec::new();
-        let mut mapping = Vec::new();
 
         // create a mapping where each element links a subject to its shape and
         // face in the geometry
         for shape in self.geom.shapes.iter() {
-            for (j, face) in shape.faces.iter().enumerate() {
+            for face in shape.faces.iter() {
                 if face == self.clip {
                     // don't include the clip in the subjects
                     continue;
                 }
                 subjects.push(face);
-                mapping.push((face.data().shape_id.unwrap(), j));
             }
         }
 
-        (self.clip, subjects, mapping)
+        (self.clip, subjects)
     }
 
     pub fn finalise_clip(&mut self, mut intersection: Vec<Face>, mut remaining: Vec<Face>) {
@@ -247,20 +245,10 @@ impl<'a> Clipping<'a> {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
 
-        let (clip, mut subjects, mapping) = self.init_clip();
+        let (clip, mut subjects) = self.init_clip();
 
         // compute remapped intersections, converting to Intersection structs
         let (intersection, remaining) = clip_faces(&clip, &mut subjects);
-
-        // println!("intersections: {:?}", intersection);
-        // println!("subjects: {:?}", subjects);
-        // println!("sources: {:?}", sources);
-
-        // // get mapping back to geometry
-        // for (i, face) in intersection.iter_mut().enumerate() {
-        //     face.data_mut().parent_id = Some(mapping[sources[i]].0);
-        //     println!("the intersection parent is: {:?}", mapping[sources[i]].0)
-        // }
 
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);

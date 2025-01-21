@@ -8,12 +8,12 @@ use pbt::problem::Problem;
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
+    let geom = geom::Geom::from_file("./examples/data/clip_test.obj").unwrap();
 
-    let projection = Vector3::new(0.9, -1.0, -0.0);
+    let projection = Vector3::new(1.0, -1.0, -0.0);
 
-    let lower_left = vec![-10.0, -3.0];
-    let upper_right = vec![10.0, 3.0];
+    let lower_left = vec![-10.0, -0.8];
+    let upper_right = vec![10.0, 0.8];
     let clip_vertices = vec![
         Point3::new(lower_left[0], 10.0, upper_right[1]),
         Point3::new(lower_left[0], 10.0, lower_left[1]),

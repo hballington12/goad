@@ -1,10 +1,5 @@
-use std::cell::Ref;
-use std::result;
-
 use geo::Coord;
-use macroquad::conf;
 use macroquad::prelude::*;
-use macroquad::ui::Id;
 use nalgebra::Vector3;
 
 use crate::beam;
@@ -78,18 +73,27 @@ impl BeamPropagation {
 pub enum Beam {
     Initial(BeamData), // an initial beam to be traced in the near-field
     Default {
-        data: BeamData, // a beam to be traced in the near-field
+        data: BeamData,       // a beam to be traced in the near-field
+        variant: BeamVariant, // whether the beam was a refl, refraction, or tir,
     },
     OutGoing(BeamData), // a beam to be mapped to the far-field
 }
 
 impl Beam {
     pub fn new_initial(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
-        Beam::Initial(BeamData::new(face, proj, refr_index))
+        Beam::Initial(BeamData::new(face, proj, refr_index, 0, 0))
     }
-    pub fn new_default(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
+    pub fn new_default(
+        face: Face,
+        proj: Vector3<f32>,
+        refr_index: RefrIndex,
+        rec_count: i32,
+        tir_count: i32,
+        variant: BeamVariant,
+    ) -> Self {
         Beam::Default {
-            data: BeamData::new(face, proj, refr_index),
+            data: BeamData::new(face, proj, refr_index, rec_count, tir_count),
+            variant,
         }
     }
     pub fn to_outgoing(beam: Beam) -> Beam {
@@ -123,11 +127,19 @@ impl Beam {
                 println!("adding {} beams to the outputs", outputs_beams.len());
                 outputs.extend(outputs_beams);
             }
-            Beam::Default { data } => {
-                let output_beams = Self::process_beam(geom, data);
-
-                println!("adding {} beams to the outputs", output_beams.len());
-                outputs.extend(output_beams);
+            Beam::Default { data, variant } => {
+                if data.rec_count < config::MAX_REC
+                    || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR)
+                {
+                    let output_beams = Self::process_beam(geom, data);
+                    println!("adding {} beams to the outputs", output_beams.len());
+                    outputs.extend(output_beams);
+                } else {
+                    println!(
+                        "beam, variant: {:?}, trunacted with rec: {}, tir: {}",
+                        variant, data.rec_count, data.tir_count
+                    );
+                }
             }
             Beam::OutGoing(..) => {
                 println!("beam was outgoing. skipping...");
@@ -141,15 +153,6 @@ impl Beam {
         let mut output_beams = Vec::new();
         let n1 = beam_data.refr_index;
         let input_shape_id = beam_data.face.data().shape_id; // Option(shape id)
-
-        match input_shape_id {
-            Some(id) => {
-                println!("beam in originated from shape #{}", id)
-            }
-            None => {
-                println!("beam did not originate from a shape")
-            }
-        }
 
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
@@ -172,6 +175,8 @@ impl Beam {
                         face: x,
                         prop: beam_data.prop,
                         refr_index: beam_data.refr_index,
+                        rec_count: beam_data.rec_count,
+                        tir_count: beam_data.tir_count,
                     }))
                 }
             })
@@ -187,8 +192,6 @@ impl Beam {
             })
             .collect();
 
-        println!("number of 'good' intersections: {}", intersections.len());
-
         // create  beams
         let beams: Vec<_> = intersections
             .iter()
@@ -197,23 +200,50 @@ impl Beam {
                 let theta_i = normal.dot(&beam_data.prop).abs().acos();
                 let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
 
-                let transmitted = if theta_i > (n2.real / n1.real).asin() {
+                let refracted = if theta_i > (n2.real / n1.real).asin() {
+                    // if total internal reflection
                     None
                 } else {
                     let stt = get_sin_theta_t(theta_i, n1, n2); // sin(theta_t)
                     let prop = Self::get_refraction_vector(&normal, &beam_data.prop, stt);
                     assert!(beam_data.prop.dot(&prop) > 0.0);
-                    Some(Beam::new_default(x.clone(), prop, n2))
+                    Some(Beam::new_default(
+                        x.clone(),
+                        prop,
+                        n2,
+                        beam_data.rec_count + 1,
+                        beam_data.tir_count,
+                        BeamVariant::Refr,
+                    ))
                 };
 
                 let reflected = {
                     let prop = Self::get_reflection_vector(&normal, &beam_data.prop);
-                    Some(Beam::new_default(x.clone(), prop, n1))
+                    if theta_i > (n2.real / n1.real).asin() {
+                        // if total internal reflection
+                        Some(Beam::new_default(
+                            x.clone(),
+                            prop,
+                            n1,
+                            beam_data.rec_count + 1,
+                            beam_data.tir_count + 1,
+                            BeamVariant::Tir,
+                        ))
+                    } else {
+                        Some(Beam::new_default(
+                            x.clone(),
+                            prop,
+                            n1,
+                            beam_data.rec_count + 1,
+                            beam_data.tir_count,
+                            BeamVariant::Refl,
+                        ))
+                    }
                 };
 
                 // max recursions reached -> None
 
-                Some((reflected, transmitted))
+                Some((reflected, refracted))
 
                 // determine other BeamData values here later...
             })
@@ -294,16 +324,33 @@ pub struct BeamData {
     pub face: Face,
     pub prop: Vector3<f32>,
     pub refr_index: RefrIndex,
+    pub rec_count: i32,
+    pub tir_count: i32,
 }
 
 /// Creates a new beam
 impl BeamData {
-    pub fn new(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
+    pub fn new(
+        face: Face,
+        proj: Vector3<f32>,
+        refr_index: RefrIndex,
+        rec_count: i32,
+        tir_count: i32,
+    ) -> Self {
         let prop = proj.normalize();
         Self {
             face,
             prop: prop,
             refr_index,
+            rec_count,
+            tir_count,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BeamVariant {
+    Refl, // refraction
+    Refr, // reflection
+    Tir,  // total internal reflection
 }

@@ -6,3 +6,5 @@ pub const MEDIUM_REFR_INDEX: RefrIndex = RefrIndex {
     real: 1.0,
     imag: 0.0,
 };
+pub const MAX_REC: i32 = 5; // maximum number of beam recursions before truncation
+pub const MAX_TIR: i32 = 5; // maximum number of total internal reflections
