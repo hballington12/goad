@@ -1,7 +1,9 @@
-use crate::geom::RefrIndex;
+use nalgebra::Complex;
 
 #[cfg(test)]
 mod tests {
+
+    use nalgebra::Complex;
 
     use super::*;
     use std::f32::consts::PI;
@@ -9,10 +11,7 @@ mod tests {
     #[test]
     fn normal_incidence_same_media() {
         let theta_i = 0.0;
-        let m1 = RefrIndex {
-            real: 1.0,
-            imag: 0.0,
-        };
+        let m1 = Complex::new(1.0, 0.0);
         let m2 = m1;
         let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         assert!(theta_i - theta_t < 0.01)
@@ -21,14 +20,8 @@ mod tests {
     #[test]
     fn normal_incidence() {
         let theta_i = 0.0;
-        let m1 = RefrIndex {
-            real: 1.0,
-            imag: 0.0,
-        };
-        let m2 = RefrIndex {
-            real: 1.31,
-            imag: 0.0,
-        };
+        let m1 = Complex::new(1.0, 0.0);
+        let m2 = Complex::new(1.31, 0.0);
         let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         let abs_difference = (theta_i - theta_t).abs();
         assert!(abs_difference < f32::EPSILON)
@@ -37,14 +30,8 @@ mod tests {
     #[test]
     fn angle30_incidence() {
         let theta_i = 30.0 * PI / 180.0;
-        let m1 = RefrIndex {
-            real: 1.0,
-            imag: 0.0,
-        };
-        let m2 = RefrIndex {
-            real: 1.31,
-            imag: 0.0,
-        };
+        let m1 = Complex::new(1.0, 0.0);
+        let m2 = Complex::new(1.31, 0.0);
         let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         let abs_difference = (theta_t - 0.3916126).abs();
         assert!(abs_difference < 0.001)
@@ -53,14 +40,8 @@ mod tests {
     #[test]
     fn absorbing_test() {
         let theta_i = 1.17773;
-        let m1 = RefrIndex {
-            real: 1.0,
-            imag: 0.0,
-        };
-        let m2 = RefrIndex {
-            real: 1.5,
-            imag: 0.1,
-        };
+        let m1 = Complex::new(1.0, 0.0);
+        let m2 = Complex::new(1.31, 0.0);
         let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         let abs_difference = (theta_t - 0.662387).abs();
         assert!(abs_difference < 0.001)
@@ -70,11 +51,11 @@ mod tests {
 /// Returns the sine of the transmitted angle according to Snell's Law.
 /// Port from Fortran code rt_c.f90, Macke 1996.
 /// All angles are in radians.
-pub fn get_sin_theta_t(theta_i: f32, m1: RefrIndex, m2: RefrIndex) -> f32 {
-    let k1 = m1.imag / m1.real; // imag(inc) / real(inc)
-    let k2 = m2.imag / m2.real; // imag(trans) / real(trans)
+pub fn get_sin_theta_t(theta_i: f32, m1: Complex<f32>, m2: Complex<f32>) -> f32 {
+    let k1 = m1.im / m1.re; // imag(inc) / real(inc)
+    let k2 = m2.im / m2.re; // imag(trans) / real(trans)
     let krel = (k2 - k1) / (1.0 + k1 * k2);
-    let nrel = m2.real / m1.real * (1.0 + k1 * k2) / (1.0 + k1 * k1);
+    let nrel = m2.re / m1.re * (1.0 + k1 * k2) / (1.0 + k1 * k1);
 
     let ref1 = nrel * nrel;
     let ref2 = krel * krel;

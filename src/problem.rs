@@ -11,8 +11,7 @@ mod tests {
     use std::cell::Ref;
 
     use super::*;
-    use crate::geom::RefrIndex;
-    use nalgebra::Vector3;
+    use nalgebra::{Complex, Vector3};
 
     #[test]
     fn cube_inside_ico() {
@@ -45,7 +44,7 @@ mod tests {
 
         let mut problem = Problem::new(
             geom,
-            Beam::new_initial(clip, projection, RefrIndex::new(1.31, 0.1)),
+            Beam::new_initial(clip, projection, Complex::new(1.31, 0.1)),
         );
 
         problem.propagate_next();

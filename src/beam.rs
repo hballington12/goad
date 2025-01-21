@@ -1,13 +1,16 @@
 use geo::Coord;
 use macroquad::prelude::*;
+use nalgebra::Complex;
+use nalgebra::Matrix2;
 use nalgebra::Vector3;
 
 use crate::beam;
 use crate::clip::Clipping;
 use crate::config;
+use crate::field::Field;
+use crate::fresnel;
 use crate::geom::Face;
 use crate::geom::Geom;
-use crate::geom::RefrIndex;
 use crate::helpers::draw_face;
 use crate::helpers::lines_to_screen;
 use crate::snell::get_sin_theta_t;
@@ -15,7 +18,7 @@ use crate::snell::get_sin_theta_t;
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
     pub input: Beam,
-    pub refr_index: RefrIndex,
+    pub refr_index: Complex<f32>,
     pub outputs: Vec<Beam>,
 }
 
@@ -80,32 +83,39 @@ pub enum Beam {
 }
 
 impl Beam {
-    pub fn new_initial(face: Face, proj: Vector3<f32>, refr_index: RefrIndex) -> Self {
-        Beam::Initial(BeamData::new(face, proj, refr_index, 0, 0))
+    /// Creates a new initial field. The amplitude matrix is the identity matrix
+    /// with the specified perpendicular field vector.
+    pub fn new_initial(
+        face: Face,
+        prop: Vector3<f32>,
+        refr_index: Complex<f32>,
+        e_perp: Vector3<f32>,
+    ) -> Self {
+        Beam::Initial(BeamData::new(
+            face,
+            prop,
+            refr_index,
+            0,
+            0,
+            Field::new_identity(e_perp, prop),
+        ))
     }
     pub fn new_default(
         face: Face,
         proj: Vector3<f32>,
-        refr_index: RefrIndex,
+        refr_index: Complex<f32>,
         rec_count: i32,
         tir_count: i32,
         variant: BeamVariant,
+        field: Field,
     ) -> Self {
         Beam::Default {
-            data: BeamData::new(face, proj, refr_index, rec_count, tir_count),
+            data: BeamData::new(face, proj, refr_index, rec_count, tir_count, field),
             variant,
         }
     }
-    pub fn to_outgoing(beam: Beam) -> Beam {
-        match beam {
-            Beam::Default { data, .. } => Beam::OutGoing(data),
-            Beam::OutGoing(_) => panic!(
-                "You probably don't want to convert an outgoing beam to another outgoing beam."
-            ),
-            Beam::Initial(_) => {
-                panic!("An initial beam should not be converted to an outgoing beam.")
-            }
-        }
+    pub fn new_outgoing(beam_data: &BeamData) -> Beam {
+        Beam::OutGoing(beam_data.clone())
     }
     pub fn data(&self) -> &BeamData {
         match self {
@@ -177,6 +187,7 @@ impl Beam {
                         refr_index: beam_data.refr_index,
                         rec_count: beam_data.rec_count,
                         tir_count: beam_data.tir_count,
+                        field: beam_data.field.clone(),
                     }))
                 }
             })
@@ -199,14 +210,27 @@ impl Beam {
                 let normal = x.data().normal;
                 let theta_i = normal.dot(&beam_data.prop).abs().acos();
                 let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
+                let e_perp = normal.cross(&beam_data.prop).normalize(); // new e_perp
+                let rot = Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
+                    .map(|x| nalgebra::Complex::new(x, 0.0)); // rotation matrix
+                let mut ampl = rot * beam_data.field.ampl.clone();
+                let dist = (x.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
+                let arg = dist * config::WAVENO * n1.re; // optical path length
+                ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
+                let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
+                ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
 
-                let refracted = if theta_i > (n2.real / n1.real).asin() {
+                let refracted = if theta_i > (n2.re / n1.re).asin() {
                     // if total internal reflection
                     None
                 } else {
                     let stt = get_sin_theta_t(theta_i, n1, n2); // sin(theta_t)
                     let prop = Self::get_refraction_vector(&normal, &beam_data.prop, stt);
-                    assert!(beam_data.prop.dot(&prop) > 0.0);
+                    let fresnel = fresnel::refr(n1, n2, theta_i, stt.asin());
+                    let refr_ampl = fresnel * ampl.clone();
+
+                    debug_assert!(beam_data.prop.dot(&prop) > 0.0);
+
                     Some(Beam::new_default(
                         x.clone(),
                         prop,
@@ -214,13 +238,21 @@ impl Beam {
                         beam_data.rec_count + 1,
                         beam_data.tir_count,
                         BeamVariant::Refr,
+                        Field {
+                            ampl: refr_ampl,
+                            e_perp,
+                            e_par: e_perp.cross(&prop).normalize(),
+                        },
                     ))
                 };
 
                 let reflected = {
                     let prop = Self::get_reflection_vector(&normal, &beam_data.prop);
-                    if theta_i > (n2.real / n1.real).asin() {
+                    if theta_i > (n2.re / n1.re).asin() {
                         // if total internal reflection
+                        let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
+                        let refl_ampl = fresnel * ampl;
+
                         Some(Beam::new_default(
                             x.clone(),
                             prop,
@@ -228,8 +260,17 @@ impl Beam {
                             beam_data.rec_count + 1,
                             beam_data.tir_count + 1,
                             BeamVariant::Tir,
+                            Field {
+                                ampl: refl_ampl,
+                                e_perp,
+                                e_par: e_perp.cross(&prop).normalize(),
+                            },
                         ))
                     } else {
+                        let stt = get_sin_theta_t(theta_i, n1, n2); // sin(theta_t)
+                        let fresnel = fresnel::refl(n1, n2, theta_i, stt.asin());
+                        let refl_ampl = fresnel * ampl;
+
                         Some(Beam::new_default(
                             x.clone(),
                             prop,
@@ -237,6 +278,11 @@ impl Beam {
                             beam_data.rec_count + 1,
                             beam_data.tir_count,
                             BeamVariant::Refl,
+                            Field {
+                                ampl: refl_ampl,
+                                e_perp,
+                                e_par: e_perp.cross(&prop).normalize(),
+                            },
                         ))
                     }
                 };
@@ -258,7 +304,7 @@ impl Beam {
     }
 
     // Helper function to get the refractive index n2 based on the conditions
-    fn get_n2(geom: &Geom, output_shape_id: usize, input_shape_id: Option<usize>) -> RefrIndex {
+    fn get_n2(geom: &Geom, output_shape_id: usize, input_shape_id: Option<usize>) -> Complex<f32> {
         let ni = geom.shapes[output_shape_id].refr_index; // refr index inside x
 
         let no = geom
@@ -323,27 +369,30 @@ impl Beam {
 pub struct BeamData {
     pub face: Face,
     pub prop: Vector3<f32>,
-    pub refr_index: RefrIndex,
+    pub refr_index: Complex<f32>,
     pub rec_count: i32,
     pub tir_count: i32,
+    pub field: Field,
 }
 
 /// Creates a new beam
 impl BeamData {
     pub fn new(
         face: Face,
-        proj: Vector3<f32>,
-        refr_index: RefrIndex,
+        prop: Vector3<f32>,
+        refr_index: Complex<f32>,
         rec_count: i32,
         tir_count: i32,
+        field: Field,
     ) -> Self {
-        let prop = proj.normalize();
+        let prop = prop.normalize();
         Self {
             face,
             prop: prop,
             refr_index,
             rec_count,
             tir_count,
+            field,
         }
     }
 }

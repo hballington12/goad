@@ -5,6 +5,7 @@ use geo::Area;
 use geo_types::Coord;
 use geo_types::LineString;
 use geo_types::Polygon;
+use nalgebra::Complex;
 use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
@@ -511,19 +512,6 @@ impl Face {
     }
 }
 
-/// A refractive index
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RefrIndex {
-    pub real: f32,
-    pub imag: f32,
-}
-
-impl RefrIndex {
-    pub fn new(real: f32, imag: f32) -> Self {
-        Self { real, imag }
-    }
-}
-
 /// Represents a 3D surface mesh.
 #[derive(Debug, PartialEq)]
 pub struct Shape {
@@ -531,7 +519,7 @@ pub struct Shape {
     pub num_vertices: usize,        // Number of vertices in the mesh
     pub faces: Vec<Face>,           // List of all facets in the mesh
     pub num_faces: usize,           // Number of facets in the mesh
-    pub refr_index: RefrIndex,      // Refractive index of this shape
+    pub refr_index: Complex<f32>,   // Refractive index of this shape
     pub id: Option<usize>,          // an id number
     pub parent_id: Option<usize>,   // An optional parent shape index, which encompasses this one
     pub aabb: Option<AABB>,         // axis-aligned bounding box
@@ -544,10 +532,7 @@ impl Shape {
             num_vertices: 0,
             faces: Vec::new(),
             num_faces: 0,
-            refr_index: RefrIndex {
-                real: 1.31, // some default settings, temporary
-                imag: 0.0,
-            },
+            refr_index: Complex { re: 1.31, im: 0.0 },
             id,
             parent_id,
             aabb: None,

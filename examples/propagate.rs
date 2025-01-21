@@ -1,8 +1,8 @@
 use macroquad::prelude::*;
-use nalgebra::{Point3, Vector3};
+use nalgebra::{Complex, Point3, Vector, Vector3};
 use pbt::beam::Beam;
 use pbt::clip::Clipping;
-use pbt::geom::{self, Face, RefrIndex};
+use pbt::geom::{self, Face};
 use pbt::helpers::draw_face;
 use pbt::problem::Problem;
 
@@ -10,7 +10,8 @@ use pbt::problem::Problem;
 async fn main() {
     let geom = geom::Geom::from_file("./examples/data/clip_test.obj").unwrap();
 
-    let projection = Vector3::new(1.0, -1.0, -0.0);
+    let projection = Vector3::new(1.0, -1.0, 0.0).normalize();
+    let e_perp = Vector3::z(); // choose e_perp along z-axis for now
 
     let lower_left = vec![-10.0, -0.8];
     let upper_right = vec![10.0, 0.8];
@@ -25,7 +26,7 @@ async fn main() {
 
     let mut problem = Problem::new(
         geom,
-        Beam::new_initial(clip, projection, RefrIndex::new(1.00, 0.0)),
+        Beam::new_initial(clip, projection, Complex::new(1.00, 0.0), e_perp),
     );
 
     println!(
