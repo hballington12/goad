@@ -8,9 +8,9 @@ use pbt::problem::Problem;
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let geom = geom::Geom::from_file("./examples/data/para.obj").unwrap();
+    let geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
-    let projection = Vector3::new(0.95, -1.0, -0.0);
+    let projection = Vector3::new(0.9, -1.0, -0.0);
 
     let lower_left = vec![-10.0, -3.0];
     let upper_right = vec![10.0, 3.0];

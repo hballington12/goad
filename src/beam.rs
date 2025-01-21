@@ -1,4 +1,5 @@
 use std::cell::Ref;
+use std::result;
 
 use geo::Coord;
 use macroquad::conf;
@@ -188,65 +189,40 @@ impl Beam {
 
         println!("number of 'good' intersections: {}", intersections.len());
 
-        // create transmitted beams
-        let transmitted_beams: Vec<_> = intersections
+        // create  beams
+        let beams: Vec<_> = intersections
             .iter()
             .filter_map(|x| {
-                // apply filtering here -> return None if fail
                 let normal = x.data().normal;
-                println!("norm . prop = {:?}", normal.dot(&beam_data.prop));
                 let theta_i = normal.dot(&beam_data.prop).abs().acos();
                 let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
 
-                if theta_i > (n2.real / n1.real).asin() {
-                    // total internal reflection
-                    println!("tir! theta_i: {:?}, n2: {:?}, n1: {:?}", theta_i, n2, n1);
-                    return None;
-                }
+                let transmitted = if theta_i > (n2.real / n1.real).asin() {
+                    None
+                } else {
+                    let stt = get_sin_theta_t(theta_i, n1, n2); // sin(theta_t)
+                    let prop = Self::get_refraction_vector(&normal, &beam_data.prop, stt);
+                    assert!(beam_data.prop.dot(&prop) > 0.0);
+                    Some(Beam::new_default(x.clone(), prop, n2))
+                };
 
-                // implement this now
+                let reflected = {
+                    let prop = Self::get_reflection_vector(&normal, &beam_data.prop);
+                    Some(Beam::new_default(x.clone(), prop, n1))
+                };
 
                 // max recursions reached -> None
-                // get refractive index
-                println!("thetai: {:?}", theta_i);
-                println!("n1: {:?}", n1);
-                println!("n2: {:?}", n2);
-                let stt = get_sin_theta_t(theta_i, n1, n2);
-                println!("theta t is {:?}, sin theta t is: {:?}", stt.asin(), stt);
-                // total internal reflection
 
-                let prop = Self::get_refraction_vector(&normal, &beam_data.prop, stt);
-                // check this derivation
+                Some((reflected, transmitted))
 
-                assert!(beam_data.prop.dot(&prop) > 0.0);
-
-                println!("n1: {:?}, n2: {:?}", n1, n2);
-
-                // determine transmitted propagation direction
-                let proj = beam_data.prop;
                 // determine other BeamData values here later...
-                Some(Beam::new_default(x.clone(), prop, n2))
             })
+            .into_iter()
+            .flat_map(|(refl, trans)| refl.into_iter().chain(trans))
             .collect();
 
-        // create reflected beams
-        let reflected_beams: Vec<_> = intersections
-            .into_iter() // can consume the intersections here to avoid cloning
-            .filter_map(|x| {
-                // apply filtering here -> return None if fail
-                // total internal reflection && max tir reached -> None
-                // max recursions reached -> None
-                // refractive index of reflected beam is always the same as the source
-                // determine reflected propagation direction
-                let proj = beam_data.prop;
-                // determine other BeamData values here later...
-                Some(Beam::new_default(x, proj, beam_data.refr_index))
-            })
-            .collect();
-
-        // output_beams.extend(reflected_beams);
-        output_beams.extend(transmitted_beams);
-        // output_beams.extend(remainder_beams);
+        output_beams.extend(beams);
+        output_beams.extend(remainder_beams);
 
         output_beams
     }
@@ -287,13 +263,28 @@ impl Beam {
             *norm * -1.0
         };
 
-        // Port from Macke 1996.
         let w = n.dot(&prop); // cos theta_i
         let wvz = w / w.abs();
         let wf = stt;
         let ctt = (1.0 - stt.powi(2)).sqrt();
-        let result = wf * (prop - w * n) + wvz * ctt * n;
+        let mut result = wf * (prop - w * n) + wvz * ctt * n;
 
+        result.normalize_mut();
+
+        result
+    }
+
+    fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f32> {
+        // upward facing normal
+        let n = if norm.dot(&prop) > 0.0 {
+            *norm
+        } else {
+            *norm * -1.0
+        };
+        let w = n.dot(&prop); // cos theta_i
+        let mut result = prop - 2.0 * w * n;
+        result.normalize_mut();
+        assert!((result.dot(&n) - w) < 0.01);
         result
     }
 }
