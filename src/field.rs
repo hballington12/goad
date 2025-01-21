@@ -12,9 +12,18 @@ impl Field {
     /// and propagation vectors.
     pub fn new_identity(e_perp: Vector3<f32>, prop: Vector3<f32>) -> Self {
         #[cfg(debug_assertions)]
-        debug_assert!((e_perp.norm() - 1.0).abs() < 0.01);
-        debug_assert!((prop.norm() - 1.0).abs() < 0.01);
-        debug_assert!(e_perp.dot(&prop) < 0.01);
+        debug_assert!(
+            (e_perp.norm() - 1.0).abs() < 0.01,
+            "e-perp is not normalised"
+        );
+        debug_assert!(
+            (prop.norm() - 1.0).abs() < 0.01,
+            "propagation vector is not normalised"
+        );
+        debug_assert!(
+            e_perp.dot(&prop) < 0.01,
+            "e-perp and propagation vector are not perpendicular"
+        );
 
         Self {
             ampl: Matrix2::identity(),

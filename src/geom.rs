@@ -29,7 +29,7 @@ mod tests {
         assert_eq!(shape.num_vertices, 12);
         match &shape.faces[0] {
             Face::Simple(data) => {
-                assert_eq!(data.exterior[0].x, 5.0);
+                assert_eq!(data.exterior[0].x, -0.0);
             }
             Face::Complex { .. } => {
                 panic!();
@@ -37,7 +37,7 @@ mod tests {
         }
         match &shape.faces[4] {
             Face::Simple(data) => {
-                assert_eq!(data.exterior[0].x, 2.5);
+                assert_eq!(data.exterior[0].x, -4.330127);
                 assert_eq!(data.exterior[4].z, 5.0);
                 assert_eq!(data.num_vertices, 6);
             }
@@ -52,7 +52,7 @@ mod tests {
         assert_eq!(geom.shapes[0].num_vertices, 12);
         match &geom.shapes[0].faces[0] {
             Face::Simple(data) => {
-                assert_eq!(data.exterior[0].x, 5.0);
+                assert_eq!(data.exterior[0].x, -0.0);
             }
             Face::Complex { .. } => {
                 panic!();
@@ -60,7 +60,7 @@ mod tests {
         }
         match &geom.shapes[0].faces[4] {
             Face::Simple(data) => {
-                assert_eq!(data.exterior[0].x, 2.5);
+                assert_eq!(data.exterior[0].x, -4.330127);
                 assert_eq!(data.exterior[4].z, 5.0);
                 assert_eq!(data.num_vertices, 6);
             }

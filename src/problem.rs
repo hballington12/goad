@@ -18,10 +18,10 @@ mod tests {
         use nalgebra::Point3;
 
         let mut geom = Geom::from_file("./examples/data/cube_inside_ico.obj").unwrap();
-        geom.shapes[0].refr_index = RefrIndex {
+        geom.shapes[0].refr_index = Complex {
             // modify the refractive index of the outer shape
-            real: 2.0,
-            imag: 0.1,
+            re: 2.0,
+            im: 0.1,
         };
         geom.shapes[1].parent_id = Some(0); // set the parent of the second shape to be the first
         assert_ne!(geom.shapes[0].refr_index, geom.shapes[1].refr_index);
@@ -31,6 +31,7 @@ mod tests {
         );
 
         let projection = Vector3::new(0.0, 0.0, -1.0);
+        let e_perp = Vector3::x(); // choose e_perp along x-axis for now
 
         let lower_left = vec![-10.0, -3.0];
         let upper_right = vec![10.0, 3.0];
@@ -44,7 +45,7 @@ mod tests {
 
         let mut problem = Problem::new(
             geom,
-            Beam::new_initial(clip, projection, Complex::new(1.31, 0.1)),
+            Beam::new_initial(clip, projection, Complex::new(1.31, 0.1), e_perp),
         );
 
         problem.propagate_next();

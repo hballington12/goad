@@ -41,7 +41,7 @@ mod tests {
     fn absorbing_test() {
         let theta_i = 1.17773;
         let m1 = Complex::new(1.0, 0.0);
-        let m2 = Complex::new(1.31, 0.0);
+        let m2 = Complex::new(1.5, 0.1);
         let theta_t = get_sin_theta_t(theta_i, m1, m2).asin();
         let abs_difference = (theta_t - 0.662387).abs();
         assert!(abs_difference < 0.001)
