@@ -8,7 +8,7 @@ use pbt::{helpers::draw_face, problem::Problem};
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
+    let geom = geom::Geom::from_file("./examples/data/cube.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now

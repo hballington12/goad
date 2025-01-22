@@ -227,7 +227,11 @@ impl FaceData {
         if u.dot(&normal) < 0.01 && v.dot(&normal) < 0.01 {
             self.normal = normal;
         } else {
-            panic!("normal could not be computed");
+            println!("ERRORRRORORORORO");
+            // panic!(
+            //     "normal could not be computed, u: {u}, v: {v}, face: {:?}",
+            //     self
+            // );
         }
     }
 

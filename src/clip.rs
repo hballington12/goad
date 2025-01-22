@@ -10,7 +10,7 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::iter::repeat;
 
-const AREA_THRESHOLD: f32 = 1e-3;
+const AREA_THRESHOLD: f32 = 1e-2;
 
 #[cfg(test)]
 mod tests {
@@ -296,7 +296,7 @@ pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>
 
             if intersection.0.iter().any(|poly| {
                 let face = poly.project(&subject.plane());
-                face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.1
+                face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.5
             }) {
                 // Include intersections that are unphysical back into the difference.
                 difference.0.extend(intersection.0);

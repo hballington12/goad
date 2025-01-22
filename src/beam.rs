@@ -45,13 +45,13 @@ impl BeamPropagation {
         for beam in &self.outputs {
             draw_face(&beam.data().face, BLUE, 4.0);
         }
+        let input_mid = self.input.data().face.data().midpoint;
         // draw lines from the outputs to the input
-        let line_strings: Vec<_> = self
+        let mut line_strings: Vec<_> = self
             .outputs
             .iter()
             .map(|x| {
                 let output_mid = x.data().face.midpoint();
-                let input_mid = self.input.data().face.data().midpoint;
                 let vec = input_mid - output_mid;
                 let input_normal = self.input.data().face.data().normal;
                 let norm_dist_to_plane = vec.dot(&input_normal);
@@ -72,7 +72,21 @@ impl BeamPropagation {
             })
             .collect();
 
+        // draw a small line in the direction of propagation
+        let length = 3.0;
+        let propagation_line = vec![vec![
+            Coord {
+                x: input_mid.coords.x,
+                y: input_mid.coords.y,
+            },
+            Coord {
+                x: input_mid.coords.x + self.input.data().prop.x,
+                y: input_mid.coords.y + self.input.data().prop.y,
+            },
+        ]];
+
         lines_to_screen(line_strings, RED, 2.0);
+        lines_to_screen(propagation_line, MAGENTA, 5.0);
     }
 
     pub fn input_power(&self) -> f32 {
