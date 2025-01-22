@@ -201,8 +201,8 @@ impl FaceData {
             shape_id,
         };
 
-        face.set_normal();
         face.set_midpoint();
+        face.set_normal(); // midpoint should be set first
 
         face
     }

@@ -1,6 +1,9 @@
+use std::f32::consts::PI;
+
 use geo::Coord;
 use macroquad::prelude::*;
 use nalgebra::Complex;
+use nalgebra::ComplexField;
 use nalgebra::Matrix2;
 use nalgebra::Vector3;
 
@@ -70,6 +73,42 @@ impl BeamPropagation {
             .collect();
 
         lines_to_screen(line_strings, RED, 2.0);
+    }
+
+    pub fn input_power(&self) {
+        let result = self.input.data().field.intensity()
+            * self.input.data().refr_index.re
+            // * self
+            //     .input
+            //     .data()
+            //     .face
+            //     .data()
+            //     .normal
+            //     .dot(&self.input.data().prop)
+            //     .abs()
+            * self.input.data().csa();
+        println!("TOTAL INPUT POWER: {}", result);
+    }
+
+    pub fn output_power(&self) {
+        let result = self.outputs.iter().fold(0.0, |acc, x| {
+            // println!(
+            //     "ipower: {}, intensity: {}, re: {}, cosangle: {}",
+            //     x.data().field.intensity()
+            //         * x.data().refr_index.re
+            //         * x.data().face.data().area.unwrap()
+            //         * x.data().face.data().normal.dot(&x.data().prop).abs(),
+            //     x.data().field.intensity(),
+            //     x.data().refr_index.re,
+            //     x.data().face.data().normal.dot(&x.data().prop).abs()
+            // );
+            acc + x.data().field.intensity()
+                * x.data().refr_index.re
+                // * x.data().face.data().area.unwrap()
+                // * x.data().face.data().normal.dot(&x.data().prop).abs()
+            *x.data().csa()
+        });
+        println!("TOTAL OUTPUT POWER: {}", result);
     }
 }
 
@@ -165,8 +204,18 @@ impl Beam {
         let n1 = beam_data.refr_index;
         let input_shape_id = beam_data.face.data().shape_id; // Option(shape id)
 
+        let copy = beam_data.clone();
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
+
+        let raw_incident_power = copy.field.intensity()
+            * beam_data.refr_index.re
+            * copy.face.data().area.unwrap()
+            * copy.face.data().normal.dot(&beam_data.prop).abs();
+
+        let mut incident_power = 0.0;
+        let mut reflected_power = 0.0;
+        let mut transmitted_power = 0.0;
 
         let remainder_beams: Vec<_> = clipping
             .remaining
@@ -182,6 +231,8 @@ impl Beam {
                         rec_count: beam_data.rec_count,
                         tir_count: beam_data.tir_count,
                         field: beam_data.field.clone(),
+                        power_in: 0.0,
+                        power_out: 0.0,
                     }))
                 }
             })
@@ -204,7 +255,11 @@ impl Beam {
                 let normal = x.data().normal;
                 let theta_i = normal.dot(&beam_data.prop).abs().acos();
                 let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
-                let e_perp = normal.cross(&beam_data.prop).normalize(); // new e_perp
+                let e_perp = if normal.dot(&beam_data.prop) > 0.001 {
+                    normal.cross(&beam_data.prop).normalize() // new e_perp
+                } else {
+                    -beam_data.field.e_perp
+                };
                 let rot = Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
                     .map(|x| nalgebra::Complex::new(x, 0.0)); // rotation matrix
                 let mut ampl = rot * beam_data.field.ampl.clone();
@@ -214,6 +269,10 @@ impl Beam {
                 ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
                 let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
                 ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
+
+                incident_power = beam_data.field.intensity() * n1.re
+                    // * x.data().area.unwrap() 
+                    * theta_i.cos();
 
                 let refracted = if theta_i > (n2.re / n1.re).asin() {
                     // if total internal reflection
@@ -225,7 +284,20 @@ impl Beam {
                     let refr_ampl = fresnel * ampl.clone();
 
                     debug_assert!(beam_data.prop.dot(&prop) > 0.0);
-                    debug_assert!((prop.dot(&normal) - stt.asin().cos()) < 0.01);
+                    debug_assert!((prop.dot(&normal).abs() - stt.asin().cos()).abs() < 0.01);
+
+                    transmitted_power = Field::ampl_intensity(&refr_ampl)
+                        * n2.re
+                        // * x.data().area.unwrap()
+                        * stt.asin().cos();
+
+                    println!(
+                        "transmitted power: {}, intensity: {}, re: {}, cos angle: {}",
+                        transmitted_power,
+                        Field::ampl_intensity(&refr_ampl),
+                        n2.re,
+                        stt.asin().cos()
+                    );
 
                     Some(Beam::new_default(
                         x.clone(),
@@ -248,6 +320,11 @@ impl Beam {
                         let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
                         let refl_ampl = fresnel * ampl;
 
+                        reflected_power = Field::ampl_intensity(&refl_ampl)
+                            * n1.re
+                            // * x.data().area.unwrap()
+                            * theta_i.cos();
+
                         Some(Beam::new_default(
                             x.clone(),
                             prop,
@@ -262,6 +339,11 @@ impl Beam {
                         let fresnel = fresnel::refl(n1, n2, theta_i, stt.asin());
                         let refl_ampl = fresnel * ampl;
 
+                        reflected_power = Field::ampl_intensity(&refl_ampl)
+                            * n1.re
+                            // * x.data().area.unwrap()
+                            * theta_i.cos();
+
                         Some(Beam::new_default(
                             x.clone(),
                             prop,
@@ -273,6 +355,14 @@ impl Beam {
                         ))
                     }
                 };
+
+                println!("incident power: {}", incident_power);
+                println!("reflected power: {}", reflected_power);
+
+                println!(
+                    "conservation: {}",
+                    (reflected_power + transmitted_power) / incident_power
+                );
 
                 Some((reflected, refracted))
 
@@ -324,13 +414,24 @@ impl Beam {
             *norm * -1.0
         };
 
-        let w = n.dot(&prop); // cos theta_i
-        let wvz = w / w.abs();
-        let wf = stt;
-        let ctt = (1.0 - stt.powi(2)).sqrt();
-        let mut result = wf * (prop - w * n) + wvz * ctt * n;
+        let ti = n.dot(&prop).acos(); //  theta_i
+        let tt = stt.asin(); // theta_t
+        let alpha = PI - tt;
+
+        let a = (tt - ti).sin() / ti.sin();
+        let b = alpha.sin() / ti.sin();
+
+        let mut result = b * prop + a * norm;
 
         result.normalize_mut();
+
+        // debug_assert!((tt.cos() - result.dot(&norm)).abs() < 0.01);
+        // debug_assert_eq!(tt.cos(), result.dot(&norm).abs());
+        println!(
+            "expected cosine: {}, actual cosine: {}",
+            tt.cos(),
+            result.dot(&norm).abs()
+        );
 
         result
     }
@@ -342,14 +443,15 @@ impl Beam {
         } else {
             *norm * -1.0
         };
-        let w = n.dot(&prop); // cos theta_i
-        let mut result = prop - 2.0 * w * n;
+        let cti = n.dot(&prop); // cos theta_i
+        let mut result = prop - 2.0 * cti * n;
         result.normalize_mut();
-        assert!((result.dot(&n) - w) < 0.01);
+        assert!((result.dot(&n) - cti) < 0.01);
         result
     }
 }
 
+/// Contains information about a beam.
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct BeamData {
     pub face: Face,
@@ -358,6 +460,8 @@ pub struct BeamData {
     pub rec_count: i32,
     pub tir_count: i32,
     pub field: Field,
+    pub power_in: f32,
+    pub power_out: f32,
 }
 
 /// Creates a new beam
@@ -373,11 +477,13 @@ impl BeamData {
         let prop = prop.normalize();
         Self {
             face,
-            prop: prop,
+            prop,
             refr_index,
             rec_count,
             tir_count,
             field,
+            power_in: 0.0,
+            power_out: 0.0,
         }
     }
 
