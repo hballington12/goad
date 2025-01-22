@@ -173,14 +173,6 @@ impl Beam {
                     || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR)
                 {
                     let output_beams = Self::process_beam(geom, data);
-                    println!("face coords: {:?}", data.face.data().exterior);
-                    println!(
-                        "intsn coords: {:?}",
-                        output_beams
-                            .iter()
-                            .map(|x| x.data().face.data().exterior.clone())
-                            .collect::<Vec<_>>()
-                    );
                     println!("adding {} beams to the outputs", output_beams.len());
                     outputs.extend(output_beams);
                 } else {
@@ -205,7 +197,6 @@ impl Beam {
 
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
-        println!("{:?}", clipping.stats.unwrap());
 
         let remainder_beams: Vec<_> = clipping
             .remaining
@@ -232,10 +223,7 @@ impl Beam {
         let intersections: Vec<_> = clipping
             .intersections
             .into_iter()
-            .filter(|x| {
-                println!("intersection... {:?}", x.data().area.unwrap());
-                x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD
-            })
+            .filter(|x| x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD)
             .collect();
 
         // create  beams
