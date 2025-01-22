@@ -75,8 +75,8 @@ impl Problem {
             let outputs = beam.propagate(&mut self.geom);
             self.beam_queue.extend(outputs.clone());
             let propagation = BeamPropagation::new(beam, outputs);
-            propagation.input_power();
-            propagation.output_power();
+            println!("input power: {}", propagation.input_power());
+            println!("output power: {}", propagation.output_power());
             Some(propagation)
         } else {
             println!("no beams left to pop!");

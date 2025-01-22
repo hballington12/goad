@@ -13,8 +13,8 @@ async fn main() {
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now
 
-    let lower_left = vec![-2.0, -2.0];
-    let upper_right = vec![2.0, 2.0];
+    let lower_left = vec![-10.0, -2.0];
+    let upper_right = vec![10.0, 2.0];
     let clip_vertices = vec![
         Point3::new(lower_left[0], 10.0, upper_right[1]),
         Point3::new(lower_left[0], 10.0, lower_left[1]),

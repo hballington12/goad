@@ -17,7 +17,7 @@ use crate::geom::Face;
 use crate::geom::Geom;
 use crate::helpers::draw_face;
 use crate::helpers::lines_to_screen;
-use crate::snell::get_sin_theta_t;
+use crate::snell::get_theta_t;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
@@ -75,40 +75,17 @@ impl BeamPropagation {
         lines_to_screen(line_strings, RED, 2.0);
     }
 
-    pub fn input_power(&self) {
-        let result = self.input.data().field.intensity()
-            * self.input.data().refr_index.re
-            // * self
-            //     .input
-            //     .data()
-            //     .face
-            //     .data()
-            //     .normal
-            //     .dot(&self.input.data().prop)
-            //     .abs()
-            * self.input.data().csa();
-        println!("TOTAL INPUT POWER: {}", result);
+    pub fn input_power(&self) -> f32 {
+        self.input.data().power()
     }
 
-    pub fn output_power(&self) {
-        let result = self.outputs.iter().fold(0.0, |acc, x| {
-            // println!(
-            //     "ipower: {}, intensity: {}, re: {}, cosangle: {}",
-            //     x.data().field.intensity()
-            //         * x.data().refr_index.re
-            //         * x.data().face.data().area.unwrap()
-            //         * x.data().face.data().normal.dot(&x.data().prop).abs(),
-            //     x.data().field.intensity(),
-            //     x.data().refr_index.re,
-            //     x.data().face.data().normal.dot(&x.data().prop).abs()
-            // );
-            acc + x.data().field.intensity()
-                * x.data().refr_index.re
-                // * x.data().face.data().area.unwrap()
-                // * x.data().face.data().normal.dot(&x.data().prop).abs()
-            *x.data().csa()
-        });
-        println!("TOTAL OUTPUT POWER: {}", result);
+    pub fn output_power(&self) -> f32 {
+        let total = self
+            .outputs
+            .iter()
+            .fold(0.0, |acc, x| acc + x.data().power());
+
+        total
     }
 }
 
@@ -204,18 +181,8 @@ impl Beam {
         let n1 = beam_data.refr_index;
         let input_shape_id = beam_data.face.data().shape_id; // Option(shape id)
 
-        let copy = beam_data.clone();
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
-
-        let raw_incident_power = copy.field.intensity()
-            * beam_data.refr_index.re
-            * copy.face.data().area.unwrap()
-            * copy.face.data().normal.dot(&beam_data.prop).abs();
-
-        let mut incident_power = 0.0;
-        let mut reflected_power = 0.0;
-        let mut transmitted_power = 0.0;
 
         let remainder_beams: Vec<_> = clipping
             .remaining
@@ -270,34 +237,18 @@ impl Beam {
                 let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
                 ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
 
-                incident_power = beam_data.field.intensity() * n1.re
-                    // * x.data().area.unwrap() 
-                    * theta_i.cos();
-
                 let refracted = if theta_i > (n2.re / n1.re).asin() {
                     // if total internal reflection
                     None
                 } else {
-                    let stt = get_sin_theta_t(theta_i, n1, n2); // sin(theta_t)
-                    let prop = Self::get_refraction_vector(&normal, &beam_data.prop, stt);
-                    let fresnel = fresnel::refr(n1, n2, theta_i, stt.asin());
+                    let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
+                    let prop =
+                        Self::get_refraction_vector(&normal, &beam_data.prop, theta_i, theta_t);
+                    let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
                     let refr_ampl = fresnel * ampl.clone();
 
                     debug_assert!(beam_data.prop.dot(&prop) > 0.0);
-                    debug_assert!((prop.dot(&normal).abs() - stt.asin().cos()).abs() < 0.01);
-
-                    transmitted_power = Field::ampl_intensity(&refr_ampl)
-                        * n2.re
-                        // * x.data().area.unwrap()
-                        * stt.asin().cos();
-
-                    println!(
-                        "transmitted power: {}, intensity: {}, re: {}, cos angle: {}",
-                        transmitted_power,
-                        Field::ampl_intensity(&refr_ampl),
-                        n2.re,
-                        stt.asin().cos()
-                    );
+                    debug_assert!((prop.dot(&normal).abs() - theta_t.cos()).abs() < 0.01);
 
                     Some(Beam::new_default(
                         x.clone(),
@@ -320,11 +271,6 @@ impl Beam {
                         let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
                         let refl_ampl = fresnel * ampl;
 
-                        reflected_power = Field::ampl_intensity(&refl_ampl)
-                            * n1.re
-                            // * x.data().area.unwrap()
-                            * theta_i.cos();
-
                         Some(Beam::new_default(
                             x.clone(),
                             prop,
@@ -335,14 +281,9 @@ impl Beam {
                             Field::new(e_perp, prop, refl_ampl),
                         ))
                     } else {
-                        let stt = get_sin_theta_t(theta_i, n1, n2); // sin(theta_t)
-                        let fresnel = fresnel::refl(n1, n2, theta_i, stt.asin());
+                        let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
+                        let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
                         let refl_ampl = fresnel * ampl;
-
-                        reflected_power = Field::ampl_intensity(&refl_ampl)
-                            * n1.re
-                            // * x.data().area.unwrap()
-                            * theta_i.cos();
 
                         Some(Beam::new_default(
                             x.clone(),
@@ -355,14 +296,6 @@ impl Beam {
                         ))
                     }
                 };
-
-                println!("incident power: {}", incident_power);
-                println!("reflected power: {}", reflected_power);
-
-                println!(
-                    "conservation: {}",
-                    (reflected_power + transmitted_power) / incident_power
-                );
 
                 Some((reflected, refracted))
 
@@ -403,8 +336,13 @@ impl Beam {
     }
 
     /// Returns a transmitted propagation vector, where `stt` is the sine of the angle of transmission.
-    fn get_refraction_vector(norm: &Vector3<f32>, prop: &Vector3<f32>, stt: f32) -> Vector3<f32> {
-        if stt < 0.0001 {
+    fn get_refraction_vector(
+        norm: &Vector3<f32>,
+        prop: &Vector3<f32>,
+        theta_i: f32,
+        theta_t: f32,
+    ) -> Vector3<f32> {
+        if theta_t.sin() < 0.0001 {
             return *prop;
         }
         // upward facing normal
@@ -414,24 +352,15 @@ impl Beam {
             *norm * -1.0
         };
 
-        let ti = n.dot(&prop).acos(); //  theta_i
-        let tt = stt.asin(); // theta_t
-        let alpha = PI - tt;
+        let alpha = PI - theta_t;
+        let a = (theta_t - theta_i).sin() / theta_i.sin();
+        let b = alpha.sin() / theta_i.sin();
 
-        let a = (tt - ti).sin() / ti.sin();
-        let b = alpha.sin() / ti.sin();
-
-        let mut result = b * prop + a * norm;
+        let mut result = b * prop - a * n;
 
         result.normalize_mut();
 
-        // debug_assert!((tt.cos() - result.dot(&norm)).abs() < 0.01);
-        // debug_assert_eq!(tt.cos(), result.dot(&norm).abs());
-        println!(
-            "expected cosine: {}, actual cosine: {}",
-            tt.cos(),
-            result.dot(&norm).abs()
-        );
+        debug_assert!((theta_t.cos() - result.dot(&norm).abs()).abs() < 0.01);
 
         result
     }
@@ -498,9 +427,7 @@ impl BeamData {
 
     /// Returns the power of a beam.
     pub fn power(&self) -> f32 {
-        let intensity = self.field.intensity();
-
-        intensity * self.refr_index.re
+        self.field.intensity() * self.refr_index.re * self.csa()
     }
 }
 
