@@ -47,7 +47,7 @@ impl BeamPropagation {
         }
         let input_mid = self.input.data().face.data().midpoint;
         // draw lines from the outputs to the input
-        let mut line_strings: Vec<_> = self
+        let line_strings: Vec<_> = self
             .outputs
             .iter()
             .map(|x| {
@@ -85,8 +85,22 @@ impl BeamPropagation {
             },
         ]];
 
+        // draw a small line in the direction of normal
+        let length = 1.5;
+        let normal_line = vec![vec![
+            Coord {
+                x: input_mid.coords.x,
+                y: input_mid.coords.y,
+            },
+            Coord {
+                x: input_mid.coords.x + self.input.data().face.data().normal.x * length,
+                y: input_mid.coords.y + self.input.data().face.data().normal.y * length,
+            },
+        ]];
+
         lines_to_screen(line_strings, RED, 2.0);
         lines_to_screen(propagation_line, MAGENTA, 5.0);
+        lines_to_screen(normal_line, WHITE, 5.0);
     }
 
     pub fn input_power(&self) -> f32 {
@@ -232,8 +246,20 @@ impl Beam {
             .filter_map(|x| {
                 let normal = x.data().normal;
                 let theta_i = normal.dot(&beam_data.prop).abs().acos();
-                let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
-                let e_perp = if normal.dot(&beam_data.prop) > 0.001 {
+                // let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
+                let id = x.data().shape_id.unwrap();
+                println!("dot product: {}", normal.dot(&beam_data.prop));
+                let n2 = if normal.dot(&beam_data.prop) < 0.0 {
+                    println!("going in");
+                    geom.shapes[id].refr_index
+                } else {
+                    println!("going out");
+                    geom.n_out(id)
+                };
+                println!("n1: {}, n2: {}", n1, n2);
+                let e_perp = if normal.dot(&beam_data.prop).abs() < 0.001 {
+                    println!("val: {}", normal.cross(&beam_data.prop).normalize());
+                    println!("prop {}, e-perp {}", beam_data.prop, normal);
                     normal.cross(&beam_data.prop).normalize() // new e_perp
                 } else {
                     -beam_data.field.e_perp
@@ -336,7 +362,15 @@ impl Beam {
         let going_into = match input_shape_id {
             None => true, // If no input shape, it's going into the second medium
             Some(id) if id == output_shape_id => false, // If input and output shape are the same, it's going out
-            Some(id) => geom.containment_graph.get_parent(output_shape_id) == Some(id), // Check for parent-child relationship
+            Some(id)
+                if geom.containment_graph.get_parent(id)
+                    == geom.containment_graph.get_parent(output_shape_id) =>
+            {
+                true
+            } // if they are different shapes but both have the same (or no) parent
+            Some(id) if geom.containment_graph.get_parent(id) == Some(output_shape_id) => false, // if output is the parent of input, must be going out
+            Some(id) if geom.containment_graph.get_parent(output_shape_id) == Some(id) => true, // if input is the parent of output, must be going in
+            Some(_) => false,
         };
 
         if going_into {

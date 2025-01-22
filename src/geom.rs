@@ -1,3 +1,4 @@
+use crate::config;
 use crate::containment;
 use crate::containment::ContainmentGraph;
 use crate::containment::AABB;
@@ -697,5 +698,14 @@ impl Geom {
         for shape in &mut self.shapes {
             shape.transform(transform);
         }
+    }
+
+    /// Returns the refractive outside a shape
+    pub fn n_out(&self, shape_id: usize) -> Complex<f32> {
+        self.containment_graph
+            .get_parent(shape_id)
+            .map_or(config::MEDIUM_REFR_INDEX, |parent_id| {
+                self.shapes[parent_id].refr_index
+            })
     }
 }

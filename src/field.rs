@@ -38,11 +38,13 @@ impl Field {
         #[cfg(debug_assertions)]
         debug_assert!(
             (e_perp.norm() - 1.0).abs() < 0.01,
-            "e-perp is not normalised"
+            "e-perp is not normalised: {}",
+            e_perp
         );
         debug_assert!(
             (prop.norm() - 1.0).abs() < 0.01,
-            "propagation vector is not normalised"
+            "propagation vector is not normalised: {}",
+            prop
         );
         debug_assert!(
             e_perp.dot(&prop) < 0.01,
@@ -64,11 +66,13 @@ impl Field {
         #[cfg(debug_assertions)]
         debug_assert!(
             (e_perp.norm() - 1.0).abs() < 0.01,
-            "e-perp is not normalised"
+            "e-perp is not normalised: {}",
+            e_perp
         );
         debug_assert!(
             (prop.norm() - 1.0).abs() < 0.01,
-            "propagation vector is not normalised"
+            "propagation vector is not normalised: {}",
+            prop
         );
         debug_assert!(
             e_perp.dot(&prop) < 0.01,

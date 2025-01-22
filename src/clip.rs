@@ -1,6 +1,6 @@
 use super::config;
 use super::geom::{Face, Geom, Plane};
-use geo::{Area, Point};
+use geo::Area;
 use geo_clipper::Clipper;
 use geo_types::Coord;
 use geo_types::Polygon;
@@ -8,7 +8,6 @@ use macroquad::prelude::*;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
 use std::fmt;
-use std::iter::repeat;
 
 const AREA_THRESHOLD: f32 = 1e-2;
 
@@ -63,6 +62,10 @@ impl PolygonExtensions for Polygon<f32> {
     fn project(&self, plane: &Plane) -> Face {
         let area = self.unsigned_area() / plane.normal.z.abs();
 
+        // condition to enforce that all normals point outwards,
+        // assuming the initial planes were correctly oriented
+        let reverse = if plane.normal.z < 0.0 { true } else { false };
+
         let project_coords = |coords: &Vec<Coord<f32>>| -> Vec<Point3<f32>> {
             coords
                 .iter()
@@ -71,18 +74,27 @@ impl PolygonExtensions for Polygon<f32> {
                 .collect()
         };
 
-        let exterior = project_coords(&self.exterior().0);
+        let mut exterior = project_coords(&self.exterior().0);
+        println!("vertices: {:?}", exterior);
+        if reverse {
+            exterior.reverse()
+        }
+
+        println!("vertices reversed: {:?}", exterior);
 
         if self.interiors().is_empty() {
             let mut face = Face::new_simple(exterior, None);
             face.set_area(area);
             face
         } else {
-            let interiors = self
+            let mut interiors: Vec<_> = self
                 .interiors()
                 .iter()
                 .map(|interior| project_coords(&interior.0))
                 .collect();
+            if reverse {
+                interiors.reverse();
+            }
             let mut face = Face::new_complex(exterior, interiors, None);
             face.set_area(area);
             face

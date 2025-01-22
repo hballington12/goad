@@ -62,6 +62,7 @@ pub struct Problem {
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom, beam: Beam) -> Self {
+        println!("geom struct: {:?}", geom.containment_graph);
         Self {
             geom,
             beam_queue: vec![beam],
