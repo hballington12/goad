@@ -1,16 +1,16 @@
 use macroquad::prelude::*;
 use nalgebra::{Complex, Point3, Vector, Vector3};
-use pbt::beam::Beam;
-use pbt::clip::Clipping;
-use pbt::geom::{self, Face};
-use pbt::helpers::draw_face;
-use pbt::problem::Problem;
+use pbt::{
+    beam::Beam,
+    geom::{self, Face},
+};
+use pbt::{helpers::draw_face, problem::Problem};
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let geom = geom::Geom::from_file("./examples/data/clip_test.obj").unwrap();
+    let geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
-    let projection = Vector3::new(1.0, -1.0, 0.0).normalize();
+    let projection = Vector3::new(0.5, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now
 
     let lower_left = vec![-10.0, -0.8];
@@ -21,7 +21,9 @@ async fn main() {
         Point3::new(upper_right[0], 10.0, lower_left[1]),
         Point3::new(upper_right[0], 10.0, upper_right[1]),
     ];
-    let clip = Face::new_simple(clip_vertices, None);
+    let mut clip = Face::new_simple(clip_vertices, None);
+    clip.data_mut().area =
+        Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     let initial = clip.clone();
 
     let mut problem = Problem::new(
@@ -34,7 +36,7 @@ async fn main() {
         problem.beam_queue.len()
     );
 
-    let mut propagation = None;
+    let mut propagation: Option<pbt::beam::BeamPropagation> = None;
 
     loop {
         clear_background(BLACK);
@@ -53,7 +55,7 @@ async fn main() {
                     problem.beam_queue.len()
                 );
             } else {
-                println!("No more beams to propagate.");
+                // println!("No more beams to propagate.");
             }
         }
 

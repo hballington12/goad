@@ -7,6 +7,7 @@ use nalgebra::Vector3;
 use crate::beam;
 use crate::clip::Clipping;
 use crate::config;
+use crate::field;
 use crate::field::Field;
 use crate::fresnel;
 use crate::geom::Face;
@@ -47,7 +48,7 @@ impl BeamPropagation {
             .iter()
             .map(|x| {
                 let output_mid = x.data().face.midpoint();
-                let input_mid = self.input.data().face.midpoint();
+                let input_mid = self.input.data().face.data().midpoint;
                 let vec = input_mid - output_mid;
                 let input_normal = self.input.data().face.data().normal;
                 let norm_dist_to_plane = vec.dot(&input_normal);
@@ -167,13 +168,6 @@ impl Beam {
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
 
-        // assert!(
-        //     clipping.stats.clone().unwrap().total_consvtn > 0.99,
-        //     "Error, poor total energy conservation in clipping: {:?}",
-        //     clipping.stats.clone().unwrap().total_consvtn
-        // );
-        println!("{}", clipping.stats.unwrap());
-
         let remainder_beams: Vec<_> = clipping
             .remaining
             .into_iter()
@@ -214,6 +208,7 @@ impl Beam {
                 let rot = Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
                     .map(|x| nalgebra::Complex::new(x, 0.0)); // rotation matrix
                 let mut ampl = rot * beam_data.field.ampl.clone();
+                // let mut ampl = beam_data.field.ampl.clone();
                 let dist = (x.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
                 let arg = dist * config::WAVENO * n1.re; // optical path length
                 ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
@@ -230,6 +225,7 @@ impl Beam {
                     let refr_ampl = fresnel * ampl.clone();
 
                     debug_assert!(beam_data.prop.dot(&prop) > 0.0);
+                    debug_assert!((prop.dot(&normal) - stt.asin().cos()) < 0.01);
 
                     Some(Beam::new_default(
                         x.clone(),
@@ -238,16 +234,15 @@ impl Beam {
                         beam_data.rec_count + 1,
                         beam_data.tir_count,
                         BeamVariant::Refr,
-                        Field {
-                            ampl: refr_ampl,
-                            e_perp,
-                            e_par: e_perp.cross(&prop).normalize(),
-                        },
+                        Field::new(e_perp, prop, refr_ampl),
                     ))
                 };
 
                 let reflected = {
                     let prop = Self::get_reflection_vector(&normal, &beam_data.prop);
+
+                    debug_assert!((prop.dot(&normal) - theta_i.cos()) < 0.01);
+
                     if theta_i > (n2.re / n1.re).asin() {
                         // if total internal reflection
                         let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
@@ -260,11 +255,7 @@ impl Beam {
                             beam_data.rec_count + 1,
                             beam_data.tir_count + 1,
                             BeamVariant::Tir,
-                            Field {
-                                ampl: refl_ampl,
-                                e_perp,
-                                e_par: e_perp.cross(&prop).normalize(),
-                            },
+                            Field::new(e_perp, prop, refl_ampl),
                         ))
                     } else {
                         let stt = get_sin_theta_t(theta_i, n1, n2); // sin(theta_t)
@@ -278,16 +269,10 @@ impl Beam {
                             beam_data.rec_count + 1,
                             beam_data.tir_count,
                             BeamVariant::Refl,
-                            Field {
-                                ampl: refl_ampl,
-                                e_perp,
-                                e_par: e_perp.cross(&prop).normalize(),
-                            },
+                            Field::new(e_perp, prop, refl_ampl),
                         ))
                     }
                 };
-
-                // max recursions reached -> None
 
                 Some((reflected, refracted))
 
@@ -394,6 +379,22 @@ impl BeamData {
             tir_count,
             field,
         }
+    }
+
+    /// Returns the cross sectional area of the beam.
+    pub fn csa(&self) -> f32 {
+        let area = self.face.data().area.unwrap();
+        let norm = self.face.data().normal;
+        let cosine = self.prop.dot(&norm).abs();
+
+        area * cosine
+    }
+
+    /// Returns the power of a beam.
+    pub fn power(&self) -> f32 {
+        let intensity = self.field.intensity();
+
+        intensity * self.refr_index.re
     }
 }
 

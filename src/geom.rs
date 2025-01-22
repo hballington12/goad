@@ -211,31 +211,24 @@ impl FaceData {
     fn set_normal(&mut self) {
         let vertices = &self.exterior;
 
-        // Iterate to find three non-collinear vertices
-        for i in 0..vertices.len() {
-            for j in i + 1..vertices.len() {
-                for k in j + 1..vertices.len() {
-                    let v1 = &vertices[i];
-                    let v2 = &vertices[j];
-                    let v3 = &vertices[k];
+        let v1 = &vertices[0];
+        let v2 = &vertices[1];
+        let v3 = self.midpoint;
 
-                    // Compute edge vectors
-                    let u = v2 - v1;
-                    let v = v3 - v1;
+        // Compute edge vectors
+        let u = v2 - v1;
+        let v = v3 - v1;
 
-                    // Compute the cross product
-                    let mut normal = u.cross(&v);
+        // Compute the cross product
+        let mut normal = u.cross(&v);
 
-                    normal.normalize_mut();
+        normal.normalize_mut();
 
-                    if u.dot(&normal) < 0.01 && v.dot(&normal) < 0.01 {
-                        self.normal = normal;
-                        return;
-                    }
-                }
-            }
+        if u.dot(&normal) < 0.01 && v.dot(&normal) < 0.01 {
+            self.normal = normal;
+        } else {
+            panic!("normal could not be computed");
         }
-        panic!("couldnt compute normal")
     }
 
     /// Compute the midpoint of the facet.

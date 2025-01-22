@@ -74,7 +74,8 @@ impl Problem {
         if let Some(mut beam) = self.beam_queue.pop() {
             let outputs = beam.propagate(&mut self.geom);
             self.beam_queue.extend(outputs.clone());
-            Some(BeamPropagation::new(beam, outputs))
+            let propagation = BeamPropagation::new(beam, outputs);
+            Some(propagation)
         } else {
             println!("no beams left to pop!");
             // panic!("Tried to pop() beam but there were no beams to pop.");
