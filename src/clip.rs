@@ -228,10 +228,25 @@ impl<'a> Clipping<'a> {
         intersection
             .iter_mut()
             .for_each(|x| x.transform(&self.itransform));
+        println!(
+            "remaining before transform: {:?}",
+            remaining
+                .iter()
+                .map(|x| x.data().exterior.clone())
+                .collect::<Vec<_>>()
+        );
         remaining
             .iter_mut()
             .for_each(|face| face.transform(&self.itransform));
         self.clip.transform(&self.itransform);
+
+        println!(
+            "remaining after transform: {:?}",
+            remaining
+                .iter()
+                .map(|x| x.data().exterior.clone())
+                .collect::<Vec<_>>()
+        );
 
         // append the remapped intersections to the struct
         self.intersections.extend(intersection);
@@ -266,6 +281,15 @@ pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>
     if subjects_in.is_empty() {
         return (Vec::new(), vec![clip_in.clone()]);
     }
+    println!("clip in has type:");
+    match clip_in {
+        Face::Simple(..) => {
+            println!("simple")
+        }
+        Face::Complex { .. } => {
+            println!("complex")
+        }
+    }
 
     let clip_polygon = clip_in.to_polygon();
     let mut intersections = Vec::new();
@@ -294,26 +318,33 @@ pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>
             let mut intersection = subject_poly.intersection(clip, config::CLIP_TOLERANCE);
             let mut difference = clip.difference(&subject_poly, config::CLIP_TOLERANCE);
 
+            // Retain only meaningful intersections and differences.
+            intersection.0.retain(|f| {
+                println!("unsigned area of intersction: {}", f.unsigned_area());
+                f.unsigned_area() > AREA_THRESHOLD
+            });
+            difference.0.retain(|f| {
+                println!("unsigned area of difference: {}", f.unsigned_area());
+                f.unsigned_area() > AREA_THRESHOLD
+            });
+
             if intersection.0.iter().any(|poly| {
                 let face = poly.project(&subject.plane());
-                face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.5
+                face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.1
             }) {
                 // Include intersections that are unphysical back into the difference.
                 difference.0.extend(intersection.0);
             } else {
-                // Retain only meaningful intersections and differences.
-                intersection
-                    .0
-                    .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
-                difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
-
                 intersections.extend(intersection.0.into_iter().map(|poly| {
+                    println!("unsigned area of intersction: {}", poly.unsigned_area());
                     let mut face = poly.project(&subject.plane());
                     face.data_mut().shape_id = subject.data().shape_id;
                     face
                 }));
             }
 
+            println!("number of differences : {}", difference.0.len());
+            println!("number of remaining clips: {}", next_clips.len());
             next_clips.extend(difference.0);
         }
 
@@ -323,10 +354,16 @@ pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>
         }
     }
 
-    let remaining = remaining_clips
+    let remaining: Vec<_> = remaining_clips
         .into_iter()
         .map(|poly| poly.project(&clip_in.plane()))
         .collect();
+
+    println!(
+        "clipping finished. num intersections: {}, num remaining: {}",
+        intersections.len(),
+        remaining.len()
+    );
 
     (intersections, remaining)
 }

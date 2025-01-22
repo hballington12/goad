@@ -80,8 +80,8 @@ impl BeamPropagation {
                 y: input_mid.coords.y,
             },
             Coord {
-                x: input_mid.coords.x + self.input.data().prop.x,
-                y: input_mid.coords.y + self.input.data().prop.y,
+                x: input_mid.coords.x + self.input.data().prop.x * length,
+                y: input_mid.coords.y + self.input.data().prop.y * length,
             },
         ]];
 
@@ -173,6 +173,14 @@ impl Beam {
                     || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR)
                 {
                     let output_beams = Self::process_beam(geom, data);
+                    println!("face coords: {:?}", data.face.data().exterior);
+                    println!(
+                        "intsn coords: {:?}",
+                        output_beams
+                            .iter()
+                            .map(|x| x.data().face.data().exterior.clone())
+                            .collect::<Vec<_>>()
+                    );
                     println!("adding {} beams to the outputs", output_beams.len());
                     outputs.extend(output_beams);
                 } else {
@@ -197,6 +205,7 @@ impl Beam {
 
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
+        println!("{:?}", clipping.stats.unwrap());
 
         let remainder_beams: Vec<_> = clipping
             .remaining
