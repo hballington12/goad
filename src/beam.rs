@@ -246,20 +246,13 @@ impl Beam {
             .filter_map(|x| {
                 let normal = x.data().normal;
                 let theta_i = normal.dot(&beam_data.prop).abs().acos();
-                // let n2 = Self::get_n2(geom, x.data().shape_id.unwrap(), input_shape_id);
                 let id = x.data().shape_id.unwrap();
-                println!("dot product: {}", normal.dot(&beam_data.prop));
                 let n2 = if normal.dot(&beam_data.prop) < 0.0 {
-                    println!("going in");
                     geom.shapes[id].refr_index
                 } else {
-                    println!("going out");
                     geom.n_out(id)
                 };
-                println!("n1: {}, n2: {}", n1, n2);
                 let e_perp = if normal.dot(&beam_data.prop).abs() < 0.001 {
-                    println!("val: {}", normal.cross(&beam_data.prop).normalize());
-                    println!("prop {}, e-perp {}", beam_data.prop, normal);
                     normal.cross(&beam_data.prop).normalize() // new e_perp
                 } else {
                     -beam_data.field.e_perp

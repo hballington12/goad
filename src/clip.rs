@@ -75,12 +75,9 @@ impl PolygonExtensions for Polygon<f32> {
         };
 
         let mut exterior = project_coords(&self.exterior().0);
-        println!("vertices: {:?}", exterior);
         if reverse {
             exterior.reverse()
         }
-
-        println!("vertices reversed: {:?}", exterior);
 
         if self.interiors().is_empty() {
             let mut face = Face::new_simple(exterior, None);
