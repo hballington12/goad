@@ -9,6 +9,6 @@ pub const MEDIUM_REFR_INDEX: Complex<f32> = Complex {
     re: 1.0,
     im: 0.0,
 };
-pub const MAX_REC: i32 = 5; // maximum number of beam recursions before truncation
-pub const MAX_TIR: i32 = 5; // maximum number of total internal reflections
+pub const MAX_REC: i32 = 10; // maximum number of beam recursions before truncation
+pub const MAX_TIR: i32 = 10; // maximum number of total internal reflections
 pub const WAVENO: f32 = 2.0 * PI / 0.532; // wavenumber

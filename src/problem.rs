@@ -57,8 +57,11 @@ mod tests {
 /// A solvable physics problem.
 #[derive(Debug, PartialEq)] // Added Default derive
 pub struct Problem {
-    pub geom: Geom,            // geometry to trace beams in
-    pub beam_queue: Vec<Beam>, // beams which need to be propagated
+    pub geom: Geom,                // geometry to trace beams in
+    pub beam_queue: Vec<Beam>,     // beams awaiting near-field propagation
+    pub out_beam_queue: Vec<Beam>, // beams awaiting diffraction
+    pub power_in: f32,             // power in, excluding remainders from any initial beams
+    pub power_out: f32,            // power out in the near-field
 }
 
 impl Problem {
@@ -68,6 +71,9 @@ impl Problem {
         Self {
             geom,
             beam_queue: vec![beam],
+            out_beam_queue: vec![],
+            power_in: 0.0,
+            power_out: 0.0,
         }
     }
 
@@ -76,14 +82,39 @@ impl Problem {
         // try to pop the next beam
         if let Some(mut beam) = self.beam_queue.pop() {
             let outputs = beam.propagate(&mut self.geom);
-            self.beam_queue.extend(outputs.clone());
+
+            // Process each output beam
+            for output in outputs.iter() {
+                match (&beam, output) {
+                    // Handle Default beams
+                    (Beam::Default { .. }, Beam::Default { .. }) => {
+                        self.insert_beam(output.clone());
+                    }
+                    (Beam::Default { .. }, Beam::OutGoing(..)) => {
+                        self.power_out += output.data().power();
+                        self.out_beam_queue.push(output.clone());
+                    }
+
+                    // Handle Initial beams
+                    (Beam::Initial(..), Beam::Default { .. }) => {
+                        self.power_in += output.data().power();
+                        self.insert_beam(output.clone());
+                    }
+
+                    _ => {}
+                }
+            }
+
             let propagation = BeamPropagation::new(beam, outputs);
-            println!("input power: {}", propagation.input_power());
-            println!("output power: {}", propagation.output_power());
+            println!(
+                "total power in: {}, out: {}, conservation: {}",
+                self.power_in,
+                self.power_out,
+                self.power_out / self.power_in
+            );
             Some(propagation)
         } else {
             println!("no beams left to pop!");
-            // panic!("Tried to pop() beam but there were no beams to pop.");
             None
         }
     }
@@ -97,5 +128,20 @@ impl Problem {
             }
         }
         propagation.draw();
+    }
+
+    /// Inserts a beam into the beam queue such that beams with greatest power
+    /// are prioritised for dequeueing.
+    pub fn insert_beam(&mut self, beam: Beam) {
+        let value = beam.data().power();
+
+        // Find the position to insert the beam using binary search
+        let pos = self
+            .beam_queue
+            .binary_search_by(|x| x.data().power().partial_cmp(&value).unwrap())
+            .unwrap_or_else(|e| e);
+
+        // Insert the beam at the determined position
+        self.beam_queue.insert(pos, beam);
     }
 }

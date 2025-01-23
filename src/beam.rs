@@ -3,14 +3,11 @@ use std::f32::consts::PI;
 use geo::Coord;
 use macroquad::prelude::*;
 use nalgebra::Complex;
-use nalgebra::ComplexField;
 use nalgebra::Matrix2;
 use nalgebra::Vector3;
 
-use crate::beam;
 use crate::clip::Clipping;
 use crate::config;
-use crate::field;
 use crate::field::Field;
 use crate::fresnel;
 use crate::geom::Face;
@@ -207,7 +204,6 @@ impl Beam {
     fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
         let mut output_beams = Vec::new();
         let n1 = beam_data.refr_index;
-        let input_shape_id = beam_data.face.data().shape_id; // Option(shape id)
 
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
@@ -216,7 +212,7 @@ impl Beam {
             .remaining
             .into_iter()
             .filter_map(|x| {
-                if x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD {
+                if x.data().area.unwrap() < config::BEAM_AREA_THRESHOLD {
                     None // remove below threshold
                 } else {
                     Some(Beam::OutGoing(BeamData {
@@ -226,8 +222,6 @@ impl Beam {
                         rec_count: beam_data.rec_count,
                         tir_count: beam_data.tir_count,
                         field: beam_data.field.clone(),
-                        power_in: 0.0,
-                        power_out: 0.0,
                     }))
                 }
             })
@@ -341,38 +335,6 @@ impl Beam {
         output_beams
     }
 
-    // Helper function to get the refractive index n2 based on the conditions
-    fn get_n2(geom: &Geom, output_shape_id: usize, input_shape_id: Option<usize>) -> Complex<f32> {
-        let ni = geom.shapes[output_shape_id].refr_index; // refr index inside x
-
-        let no = geom
-            .containment_graph
-            .get_parent(output_shape_id)
-            .map_or(config::MEDIUM_REFR_INDEX, |parent_id| {
-                geom.shapes[parent_id].refr_index
-            });
-
-        let going_into = match input_shape_id {
-            None => true, // If no input shape, it's going into the second medium
-            Some(id) if id == output_shape_id => false, // If input and output shape are the same, it's going out
-            Some(id)
-                if geom.containment_graph.get_parent(id)
-                    == geom.containment_graph.get_parent(output_shape_id) =>
-            {
-                true
-            } // if they are different shapes but both have the same (or no) parent
-            Some(id) if geom.containment_graph.get_parent(id) == Some(output_shape_id) => false, // if output is the parent of input, must be going out
-            Some(id) if geom.containment_graph.get_parent(output_shape_id) == Some(id) => true, // if input is the parent of output, must be going in
-            Some(_) => false,
-        };
-
-        if going_into {
-            ni
-        } else {
-            no
-        }
-    }
-
     /// Returns a transmitted propagation vector, where `stt` is the sine of the angle of transmission.
     fn get_refraction_vector(
         norm: &Vector3<f32>,
@@ -427,8 +389,6 @@ pub struct BeamData {
     pub rec_count: i32,
     pub tir_count: i32,
     pub field: Field,
-    pub power_in: f32,
-    pub power_out: f32,
 }
 
 /// Creates a new beam
@@ -449,8 +409,6 @@ impl BeamData {
             rec_count,
             tir_count,
             field,
-            power_in: 0.0,
-            power_out: 0.0,
         }
     }
 
