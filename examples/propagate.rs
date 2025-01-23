@@ -30,7 +30,7 @@ async fn main() {
 
     let mut problem = Problem::new(
         geom,
-        Beam::new_initial(clip, projection, Complex::new(1.00, 0.0), e_perp),
+        Beam::new_initial(clip, projection, Complex::new(1.00, 0.0), e_perp).unwrap(),
     );
 
     println!(

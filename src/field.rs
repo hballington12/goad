@@ -1,3 +1,6 @@
+use core::fmt;
+use std::fmt::{Debug, Error};
+
 use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
 
 #[cfg(test)]
@@ -11,7 +14,7 @@ mod tests {
     fn identity_ampl() {
         let e_perp = Vector3::x();
         let prop = Vector3::z();
-        let field = Field::new_identity(e_perp, prop);
+        let field = Field::new_identity(e_perp, prop).unwrap();
         assert!((field.intensity() - 1.0).abs() < 0.01);
     }
 
@@ -19,11 +22,12 @@ mod tests {
     fn null_ampl() {
         let e_perp = Vector3::x();
         let prop = Vector3::z();
-        let mut field = Field::new_identity(e_perp, prop);
+        let mut field = Field::new_identity(e_perp, prop).unwrap();
         field.ampl *= Complex::ZERO;
         assert!((field.intensity()).abs() < 0.01);
     }
 }
+
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Field {
     pub ampl: Matrix2<Complex<f32>>,
@@ -34,23 +38,27 @@ pub struct Field {
 impl Field {
     /// Creates a new unit electric field with the given input perpendicular
     /// and propagation vectors.
-    pub fn new_identity(e_perp: Vector3<f32>, prop: Vector3<f32>) -> Self {
+    pub fn new_identity(e_perp: Vector3<f32>, prop: Vector3<f32>) -> Result<Self, String> {
         #[cfg(debug_assertions)]
-        debug_assert!(
-            (e_perp.norm() - 1.0).abs() < 0.01,
-            "e-perp is not normalised: {}",
-            e_perp
-        );
-        debug_assert!(
-            (prop.norm() - 1.0).abs() < 0.01,
-            "propagation vector is not normalised: {}",
-            prop
-        );
-        debug_assert!(
-            e_perp.dot(&prop) < 0.01,
-            "e-perp and propagation vector are not perpendicular, dot product is: {}",
-            e_perp.dot(&prop)
-        );
+        let norm_e_perp_diff = e_perp.norm() - 1.0;
+        if norm_e_perp_diff.abs() >= 0.01 {
+            return Err(format!("e-perp is not normalised: {:?}", e_perp));
+        }
+
+        let norm_prop_diff = prop.norm() - 1.0;
+        if norm_prop_diff.abs() >= 0.01 {
+            return Err(format!("propagation vector is not normalised: {:?}", prop));
+        }
+
+        let dot_product = e_perp.dot(&prop);
+        if dot_product.abs() >= 0.01 {
+            return Err(format!(
+                "e-perp and propagation vector are not perpendicular, e_perp is: {:?}, prop is: {:?}, dot product is: {:?}",
+                e_perp,
+                prop,
+                dot_product
+            ));
+        }
 
         let field = Self {
             ampl: Matrix2::identity(),
@@ -58,28 +66,36 @@ impl Field {
             e_par: e_perp.cross(&prop).normalize(),
         };
 
-        field
+        Ok(field)
     }
 
     /// Creates an electric field with the given input perpendicular field
     /// vector, propagation vector, and amplitude matrix.
-    pub fn new(e_perp: Vector3<f32>, prop: Vector3<f32>, ampl: Matrix2<Complex<f32>>) -> Self {
+    pub fn new(
+        e_perp: Vector3<f32>,
+        prop: Vector3<f32>,
+        ampl: Matrix2<Complex<f32>>,
+    ) -> Result<Self, String> {
         #[cfg(debug_assertions)]
-        debug_assert!(
-            (e_perp.norm() - 1.0).abs() < 0.01,
-            "e-perp is not normalised: {}",
-            e_perp
-        );
-        debug_assert!(
-            (prop.norm() - 1.0).abs() < 0.01,
-            "propagation vector is not normalised: {}",
-            prop
-        );
-        debug_assert!(
-            e_perp.dot(&prop) < 0.01,
-            "e-perp and propagation vector are not perpendicular, dot product is: {}",
-            e_perp.dot(&prop)
-        );
+        let norm_e_perp_diff = e_perp.norm() - 1.0;
+        if norm_e_perp_diff.abs() >= 0.01 {
+            return Err(format!("e-perp is not normalised: {:?}", e_perp));
+        }
+
+        let norm_prop_diff = prop.norm() - 1.0;
+        if norm_prop_diff.abs() >= 0.01 {
+            return Err(format!("propagation vector is not normalised: {:?}", prop));
+        }
+
+        let dot_product = e_perp.dot(&prop);
+        if dot_product.abs() >= 0.01 {
+            return Err(format!(
+                "e-perp and propagation vector are not perpendicular, e_perp is: {:?}, prop is: {:?}, dot product is: {:?}",
+                e_perp,
+                prop,
+                dot_product
+            ));
+        }
 
         let field = Self {
             ampl,
@@ -87,7 +103,7 @@ impl Field {
             e_par: e_perp.cross(&prop).normalize(),
         };
 
-        field
+        Ok(field)
     }
 
     /// Returns the 2x2 rotation matrix for rotating an amplitude matrix

@@ -26,7 +26,7 @@ fn main() {
 
     let mut problem = Problem::new(
         geom,
-        Beam::new_initial(clip, projection, Complex::new(1.31, 0.1), e_perp),
+        Beam::new_initial(clip, projection, Complex::new(1.31, 0.1), e_perp).unwrap(),
     );
 
     problem.propagate_next();

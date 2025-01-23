@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use std::fmt::Error;
 
 use geo::Coord;
 use macroquad::prelude::*;
@@ -132,15 +133,11 @@ impl Beam {
         prop: Vector3<f32>,
         refr_index: Complex<f32>,
         e_perp: Vector3<f32>,
-    ) -> Self {
-        Beam::Initial(BeamData::new(
-            face,
-            prop,
-            refr_index,
-            0,
-            0,
-            Field::new_identity(e_perp, prop),
-        ))
+    ) -> Result<Self, String> {
+        let field = Field::new_identity(e_perp, prop)?;
+        Ok(Beam::Initial(BeamData::new(
+            face, prop, refr_index, 0, 0, field,
+        )))
     }
     pub fn new_default(
         face: Face,
@@ -202,38 +199,18 @@ impl Beam {
     }
 
     fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
-        let mut output_beams = Vec::new();
-        let n1 = beam_data.refr_index;
-
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         clipping.clip(); // do the clipping -> contains the intersections
 
-        let remainder_beams: Vec<_> = clipping
-            .remaining
-            .into_iter()
-            .filter_map(|x| {
-                if x.data().area.unwrap() < config::BEAM_AREA_THRESHOLD {
-                    None // remove below threshold
-                } else {
-                    Some(Beam::OutGoing(BeamData {
-                        face: x,
-                        prop: beam_data.prop,
-                        refr_index: beam_data.refr_index,
-                        rec_count: beam_data.rec_count,
-                        tir_count: beam_data.tir_count,
-                        field: beam_data.field.clone(),
-                    }))
-                }
-            })
-            .collect();
+        let (intersections, remainders) = (
+            filter_faces(clipping.intersections),
+            filter_faces(clipping.remaining),
+        );
 
-        // remove intersections with below threshold area
-        let intersections: Vec<_> = clipping
-            .intersections
-            .into_iter()
-            .filter(|x| x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD)
-            .collect();
+        let remainder_beams = remainders_to_beams(beam_data, remainders);
 
+        let mut output_beams = Vec::new();
+        let n1 = beam_data.refr_index;
         // create  beams
         let beams: Vec<_> = intersections
             .iter()
@@ -281,7 +258,7 @@ impl Beam {
                         beam_data.rec_count + 1,
                         beam_data.tir_count,
                         BeamVariant::Refr,
-                        Field::new(e_perp, prop, refr_ampl),
+                        Field::new(e_perp, prop, refr_ampl).unwrap(),
                     ))
                 };
 
@@ -302,7 +279,7 @@ impl Beam {
                             beam_data.rec_count + 1,
                             beam_data.tir_count + 1,
                             BeamVariant::Tir,
-                            Field::new(e_perp, prop, refl_ampl),
+                            Field::new(e_perp, prop, refl_ampl).unwrap(),
                         ))
                     } else {
                         let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
@@ -316,7 +293,7 @@ impl Beam {
                             beam_data.rec_count + 1,
                             beam_data.tir_count,
                             BeamVariant::Refl,
-                            Field::new(e_perp, prop, refl_ampl),
+                            Field::new(e_perp, prop, refl_ampl).unwrap(),
                         ))
                     }
                 };
@@ -378,6 +355,32 @@ impl Beam {
         assert!((result.dot(&n) - cti) < 0.01);
         result
     }
+}
+
+/// Filter faces by threshold area
+fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
+    // remove intersections with below threshold area
+    faces
+        .into_iter()
+        .filter(|x| x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD)
+        .collect()
+}
+
+fn remainders_to_beams(beam_data: &mut BeamData, remainders: Vec<Face>) -> Vec<Beam> {
+    let remainder_beams: Vec<_> = remainders
+        .into_iter()
+        .filter_map(|remainder| {
+            Some(Beam::OutGoing(BeamData {
+                face: remainder,
+                prop: beam_data.prop,
+                refr_index: beam_data.refr_index,
+                rec_count: beam_data.rec_count,
+                tir_count: beam_data.tir_count,
+                field: beam_data.field.clone(),
+            }))
+        })
+        .collect();
+    remainder_beams
 }
 
 /// Contains information about a beam.

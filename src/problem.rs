@@ -47,7 +47,7 @@ mod tests {
 
         let mut problem = Problem::new(
             geom,
-            Beam::new_initial(clip, projection, Complex::new(1.31, 0.1), e_perp),
+            Beam::new_initial(clip, projection, Complex::new(1.31, 0.1), e_perp).unwrap(),
         );
 
         problem.propagate_next();
@@ -138,7 +138,12 @@ impl Problem {
         // Find the position to insert the beam using binary search
         let pos = self
             .beam_queue
-            .binary_search_by(|x| x.data().power().partial_cmp(&value).unwrap())
+            .binary_search_by(|x| {
+                x.data()
+                    .power()
+                    .partial_cmp(&value)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .unwrap_or_else(|e| e);
 
         // Insert the beam at the determined position
