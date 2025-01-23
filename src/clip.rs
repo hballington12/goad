@@ -216,9 +216,20 @@ impl<'a> Clipping<'a> {
 
         let mut subjects = Vec::new();
 
+        let clip_shape_id = self.clip.data().shape_id;
+        let internal = if self.clip.data().normal.z > 0.0 {
+            true
+        } else {
+            false
+        };
+
         // create a mapping where each element links a subject to its shape and
         // face in the geometry
         for shape in self.geom.shapes.iter() {
+            if internal && !shape.is_within(&self.geom, clip_shape_id) {
+                continue;
+            }
+
             for face in shape.faces.iter() {
                 if face == self.clip {
                     // don't include the clip in the subjects

@@ -26,7 +26,7 @@ async fn main() {
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     geom.shapes[0].refr_index.re = 1.5;
     geom.shapes[1].refr_index.re = 2.0;
-    geom.shapes[2].refr_index.re = 2.5;
+    // geom.shapes[2].refr_index.re = 2.5;
 
     let mut problem = Problem::new(
         geom,

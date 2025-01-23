@@ -48,7 +48,8 @@ impl Field {
         );
         debug_assert!(
             e_perp.dot(&prop) < 0.01,
-            "e-perp and propagation vector are not perpendicular"
+            "e-perp and propagation vector are not perpendicular, dot product is: {}",
+            e_perp.dot(&prop)
         );
 
         let field = Self {
@@ -76,7 +77,8 @@ impl Field {
         );
         debug_assert!(
             e_perp.dot(&prop) < 0.01,
-            "e-perp and propagation vector are not perpendicular"
+            "e-perp and propagation vector are not perpendicular, dot product is: {}",
+            e_perp.dot(&prop)
         );
 
         let field = Self {

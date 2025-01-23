@@ -143,6 +143,20 @@ mod tests {
 
         assert!(!result.0.is_empty());
     }
+
+    #[test]
+    fn shape_within() {
+        let geom = &Geom::from_file("./examples/data/cubes.obj").unwrap();
+
+        assert_eq!(geom.num_shapes, 6);
+        assert!(geom.shapes[1].is_within(&geom, Some(0)));
+        assert!(!geom.shapes[2].is_within(&geom, Some(1)));
+        assert!(!geom.shapes[1].is_within(&geom, Some(2)));
+        assert!(geom.shapes[3].is_within(&geom, Some(0)));
+        assert!(geom.shapes[3].is_within(&geom, Some(1)));
+        assert!(!geom.shapes[4].is_within(&geom, Some(0)));
+        assert!(geom.shapes[5].is_within(&geom, Some(3)));
+    }
 }
 
 trait Point3Extensions {
@@ -623,6 +637,30 @@ impl Shape {
             (Some(a), Some(b)) => (0..3).all(|i| b.min[i] > a.min[i] && a.max[i] > b.max[i]),
             (_, _) => false,
         }
+    }
+
+    /// determines if a shape in a geometry is inside another. Returns `true`
+    /// if the two shapes have the same id.
+    pub fn is_within(&self, geom: &Geom, other_id: Option<usize>) -> bool {
+        if other_id.is_none() {
+            return false;
+        } else if other_id.unwrap() == self.id.unwrap() {
+            return true;
+        }
+
+        // traverse up the parents:
+        let mut current = self.id; // get current shape id
+        while current.is_some() {
+            // while current shape id exists
+            let parent_id = geom.containment_graph.get_parent(current.unwrap()); // try to get parent id
+            if parent_id == other_id {
+                // if parent id matches
+                return true; // other must contain this shape
+            }
+
+            current = parent_id; // else, move up and try again
+        }
+        false
     }
 }
 
