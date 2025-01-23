@@ -272,26 +272,12 @@ fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Fa
             let normal = face.data().normal;
             let theta_i = normal.dot(&beam_data.prop).abs().acos();
             let n2 = get_n2(geom, beam_data, face, normal);
-
-            let e_perp = if normal.dot(&beam_data.prop).abs() > 0.999 {
-                -beam_data.field.e_perp
-            } else {
-                normal.cross(&beam_data.prop).normalize() // new e_perp
-            };
-
-            let rot = Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
-                .map(|x| nalgebra::Complex::new(x, 0.0)); // rotation matrix
-            let mut ampl = rot * beam_data.field.ampl.clone();
-            // let mut ampl = beam_data.field.ampl.clone();
-            let dist = (face.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
-            let arg = dist * config::WAVENO * n1.re; // optical path length
-            ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
-            let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
-            ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
+            let e_perp = get_e_perp(normal, &beam_data);
+            let rot = get_rotation_matrix(&beam_data, e_perp);
+            let ampl = get_ampl(&beam_data, rot, face, n1);
 
             let refracted =
                 create_refracted(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
-
             let reflected =
                 create_reflected(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
 
@@ -304,6 +290,43 @@ fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Fa
         .collect()
 }
 
+/// Takes an amplitude matrix from the input beam data, rotates it into the new
+/// scattering plane using the rotation matrix `rot`, computes the distance to
+/// the intersection `face`, and applies the corresponding phase and absorption
+/// factors.
+fn get_ampl(
+    beam_data: &BeamData,
+    rot: Matrix2<Complex<f32>>,
+    face: &Face,
+    n1: Complex<f32>,
+) -> Matrix2<Complex<f32>> {
+    let mut ampl = rot * beam_data.field.ampl.clone();
+    let dist = (face.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
+    let arg = dist * config::WAVENO * n1.re; // optical path length
+    ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
+    let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
+    ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
+    ampl
+}
+
+/// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
+/// in `beam_data` to the plane perpendicular to `e_perp`.
+fn get_rotation_matrix(beam_data: &BeamData, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
+    Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
+        .map(|x| nalgebra::Complex::new(x, 0.0))
+}
+
+/// Determines the new `e_perp` vector for an intersection at a `face``.
+fn get_e_perp(normal: Vector3<f32>, beam_data: &BeamData) -> Vector3<f32> {
+    if normal.dot(&beam_data.prop).abs() > 0.999 {
+        -beam_data.field.e_perp
+    } else {
+        normal.cross(&beam_data.prop).normalize() // new e_perp
+    }
+}
+
+/// Determines the refractive index of the second medium when a beam intersects
+/// with a face.
 fn get_n2(
     geom: &mut Geom,
     beam_data: &mut BeamData,
@@ -318,6 +341,7 @@ fn get_n2(
     }
 }
 
+/// Creates a new reflected beam
 fn create_reflected(
     face: &Face,
     ampl: Matrix2<Complex<f32>>,
@@ -363,6 +387,7 @@ fn create_reflected(
     }
 }
 
+/// Creates a new refracted beam.
 fn create_refracted(
     face: &Face,
     ampl: Matrix2<Complex<f32>>,
@@ -397,7 +422,7 @@ fn create_refracted(
     }
 }
 
-/// Filter faces by threshold area
+/// Filter faces by threshold area.
 fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
     // remove intersections with below threshold area
     faces
@@ -406,6 +431,8 @@ fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
         .collect()
 }
 
+/// Converts the remainder faces from a clipping into beams with the same field
+/// properties as the original beam.
 fn remainders_to_beams(beam_data: &mut BeamData, remainders: Vec<Face>) -> Vec<Beam> {
     let remainder_beams: Vec<_> = remainders
         .into_iter()
