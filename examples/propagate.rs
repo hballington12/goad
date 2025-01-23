@@ -8,7 +8,7 @@ use pbt::{helpers::draw_face, problem::Problem};
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/cube_inside_ico.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/cube.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now
@@ -25,7 +25,7 @@ async fn main() {
     clip.data_mut().area =
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     geom.shapes[0].refr_index.re = 1.5;
-    geom.shapes[1].refr_index.re = 2.0;
+    // geom.shapes[1].refr_index.re = 2.0;
     // geom.shapes[2].refr_index.re = 2.5;
 
     let mut problem = Problem::new(

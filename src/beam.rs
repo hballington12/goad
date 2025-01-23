@@ -252,7 +252,7 @@ impl Beam {
                 } else {
                     geom.n_out(id)
                 };
-                let e_perp = if normal.dot(&beam_data.prop).abs() < 0.001 {
+                let e_perp = if normal.dot(&beam_data.prop).abs() > 0.999 {
                     -beam_data.field.e_perp
                 } else {
                     normal.cross(&beam_data.prop).normalize() // new e_perp
