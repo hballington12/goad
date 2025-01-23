@@ -41,7 +41,9 @@ mod tests {
             Point3::new(upper_right[0], lower_left[1], 10.0),
             Point3::new(upper_right[0], upper_right[1], 10.0),
         ];
-        let clip = Face::new_simple(clip_vertices, None);
+        let mut clip = Face::new_simple(clip_vertices, None);
+        clip.data_mut().area =
+            Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
 
         let mut problem = Problem::new(
             geom,

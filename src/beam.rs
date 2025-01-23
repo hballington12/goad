@@ -253,9 +253,9 @@ impl Beam {
                     geom.n_out(id)
                 };
                 let e_perp = if normal.dot(&beam_data.prop).abs() < 0.001 {
-                    normal.cross(&beam_data.prop).normalize() // new e_perp
-                } else {
                     -beam_data.field.e_perp
+                } else {
+                    normal.cross(&beam_data.prop).normalize() // new e_perp
                 };
                 let rot = Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
                     .map(|x| nalgebra::Complex::new(x, 0.0)); // rotation matrix
