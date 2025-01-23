@@ -266,70 +266,34 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
 fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Face>) -> Vec<Beam> {
     let n1 = beam_data.refr_index;
     // create  beams
-    let beams: Vec<_> = intersections
+    intersections
         .iter()
-        .filter_map(|x| {
-            let normal = x.data().normal;
+        .filter_map(|face| {
+            let normal = face.data().normal;
             let theta_i = normal.dot(&beam_data.prop).abs().acos();
-            let id = x.data().shape_id.unwrap();
-            let n2 = if normal.dot(&beam_data.prop) < 0.0 {
-                geom.shapes[id].refr_index
-            } else {
-                geom.n_out(id)
-            };
+            let n2 = get_n2(geom, beam_data, face, normal);
+
             let e_perp = if normal.dot(&beam_data.prop).abs() > 0.999 {
                 -beam_data.field.e_perp
             } else {
                 normal.cross(&beam_data.prop).normalize() // new e_perp
             };
+
             let rot = Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
                 .map(|x| nalgebra::Complex::new(x, 0.0)); // rotation matrix
             let mut ampl = rot * beam_data.field.ampl.clone();
             // let mut ampl = beam_data.field.ampl.clone();
-            let dist = (x.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
+            let dist = (face.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
             let arg = dist * config::WAVENO * n1.re; // optical path length
             ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
             let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
             ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
 
             let refracted =
-                create_refracted(x, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
+                create_refracted(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
 
-            let reflected = {
-                let prop = get_reflection_vector(&normal, &beam_data.prop);
-
-                debug_assert!((prop.dot(&normal) - theta_i.cos()) < 0.01);
-
-                if theta_i > (n2.re / n1.re).asin() {
-                    // if total internal reflection
-                    let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
-                    let refl_ampl = fresnel * ampl;
-
-                    Some(Beam::new_default(
-                        x.clone(),
-                        prop,
-                        n1,
-                        beam_data.rec_count + 1,
-                        beam_data.tir_count + 1,
-                        BeamVariant::Tir,
-                        Field::new(e_perp, prop, refl_ampl).unwrap(),
-                    ))
-                } else {
-                    let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
-                    let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
-                    let refl_ampl = fresnel * ampl;
-
-                    Some(Beam::new_default(
-                        x.clone(),
-                        prop,
-                        n1,
-                        beam_data.rec_count + 1,
-                        beam_data.tir_count,
-                        BeamVariant::Refl,
-                        Field::new(e_perp, prop, refl_ampl).unwrap(),
-                    ))
-                }
-            };
+            let reflected =
+                create_reflected(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
 
             Some((reflected, refracted))
 
@@ -337,8 +301,66 @@ fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Fa
         })
         .into_iter()
         .flat_map(|(refl, trans)| refl.into_iter().chain(trans))
-        .collect();
-    beams
+        .collect()
+}
+
+fn get_n2(
+    geom: &mut Geom,
+    beam_data: &mut BeamData,
+    face: &Face,
+    normal: Vector3<f32>,
+) -> Complex<f32> {
+    let id = face.data().shape_id.unwrap();
+    if normal.dot(&beam_data.prop) < 0.0 {
+        geom.shapes[id].refr_index
+    } else {
+        geom.n_out(id)
+    }
+}
+
+fn create_reflected(
+    face: &Face,
+    ampl: Matrix2<Complex<f32>>,
+    e_perp: Vector3<f32>,
+    normal: Vector3<f32>,
+    beam_data: &BeamData,
+    theta_i: f32,
+    n1: Complex<f32>,
+    n2: Complex<f32>,
+) -> Result<Option<Beam>, String> {
+    let prop = get_reflection_vector(&normal, &beam_data.prop);
+
+    debug_assert!((prop.dot(&normal) - theta_i.cos()) < 0.01);
+
+    if theta_i > (n2.re / n1.re).asin() {
+        // if total internal reflection
+        let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
+        let refl_ampl = fresnel * ampl;
+
+        Ok(Some(Beam::new_default(
+            face.clone(),
+            prop,
+            n1,
+            beam_data.rec_count + 1,
+            beam_data.tir_count + 1,
+            BeamVariant::Tir,
+            Field::new(e_perp, prop, refl_ampl).unwrap(),
+        )))
+    } else {
+        let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
+        let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
+        let refl_ampl = fresnel * ampl;
+
+        Ok(Some(Beam::new_default(
+            face.clone(),
+            prop,
+            n1,
+            beam_data.rec_count + 1,
+            beam_data.tir_count,
+            BeamVariant::Refl,
+            Field::new(e_perp, prop, refl_ampl).unwrap(),
+        )))
+    }
 }
 
 fn create_refracted(
