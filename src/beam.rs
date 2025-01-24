@@ -177,28 +177,6 @@ impl Beam {
         }
     }
 
-    /// Computes the propagation of a `Beam`, yielding the output
-    /// beams which can then be dealt with as needed.
-    pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
-        match self {
-            Beam::Initial(data) => Self::process_beam(geom, data),
-            Beam::Default { data, variant } => {
-                if data.power() > config::BEAM_POWER_THRESHOLD
-                    && (data.rec_count < config::MAX_REC
-                        || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
-                {
-                    Self::process_beam(geom, data)
-                } else {
-                    Vec::new()
-                }
-            }
-            Beam::OutGoing(..) => {
-                println!("Beam was outgoing. Skipping...");
-                Vec::new()
-            }
-        }
-    }
-
     /// Processes a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
     pub fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
