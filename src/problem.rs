@@ -158,6 +158,9 @@ impl Problem {
             .unwrap_or_else(|e| e);
 
         // Insert the beam at the determined position
-        self.beam_queue.insert(pos, beam);
+        // self.beam_queue.insert(pos, beam);
+
+        // Or just push
+        self.beam_queue.push(beam);
     }
 }

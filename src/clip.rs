@@ -327,11 +327,23 @@ pub fn clip_faces<'a>(
                 .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
             difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
+            // for poly in intersection.0.iter() {
+            //     let face = match poly.project(&subject.plane()) {
+            //         Ok(face) => face,
+            //         Err(_) => continue,
+            //     };
+
+            //     if face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.1 {
+            //         difference.0.extend(iter);
+            //     }
+
+            // }
+
             if intersection.0.iter().any(|poly| {
                 let face = poly.project(&subject.plane()).unwrap();
                 face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.1
             }) {
-                // Include intersections that are unphysical back into the difference.
+                //
                 difference.0.extend(intersection.0);
             } else {
                 intersections.extend(intersection.0.into_iter().map(|poly| {

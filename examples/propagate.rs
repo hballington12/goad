@@ -8,7 +8,7 @@ use pbt::{
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/cube_inside_ico.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex_hollow.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now
@@ -25,7 +25,7 @@ async fn main() {
     clip.data_mut().area =
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     geom.shapes[0].refr_index.re = 1.5;
-    geom.shapes[0].refr_index.im = 1e-1;
+    // geom.shapes[0].refr_index.im = 1e-3;
     // geom.shapes[1].refr_index.re = 2.0;
     // geom.shapes[2].refr_index.re = 2.5;
 
@@ -50,18 +50,18 @@ async fn main() {
         }
 
         // Check if "Enter" is pressed
-        if is_key_pressed(KeyCode::Enter) {
-            if let Some(next_propagation) = problem.propagate_next() {
-                propagation = Some(next_propagation);
-                println!(
-                    "number of beams in beam queue: {:?}",
-                    problem.beam_queue.len()
-                );
-            } else {
-                println!("No more beams to propagate.");
-                break;
-            }
+        // if is_key_pressed(KeyCode::Enter) {
+        if let Some(next_propagation) = problem.propagate_next() {
+            propagation = Some(next_propagation);
+            println!(
+                "number of beams in beam queue: {:?}",
+                problem.beam_queue.len()
+            );
+        } else {
+            println!("No more beams to propagate.");
+            break;
         }
+        // }
 
         next_frame().await;
     }
