@@ -6,6 +6,7 @@ use geo::Coord;
 use macroquad::prelude::*;
 use nalgebra::Complex;
 use nalgebra::Matrix2;
+use nalgebra::Point3;
 use nalgebra::Vector3;
 
 use crate::clip::Clipping;
@@ -45,34 +46,24 @@ impl BeamPropagation {
             draw_face(&beam.data().face, BLUE, 4.0);
         }
         let input_mid = self.input.data().face.data().midpoint;
-        // draw lines from the outputs to the input
-        let line_strings: Vec<_> = self
-            .outputs
-            .iter()
-            .map(|x| {
-                let output_mid = x.data().face.midpoint();
-                let vec = input_mid - output_mid;
-                let input_normal = self.input.data().face.data().normal;
-                let norm_dist_to_plane = vec.dot(&input_normal);
-                let dist_to_plane =
-                    norm_dist_to_plane / (input_normal.dot(&self.input.data().prop));
-                // ray cast along propagation direction
-                let intsn = output_mid + dist_to_plane * self.input.data().prop;
-                vec![
-                    Coord {
-                        x: output_mid.coords.x,
-                        y: output_mid.coords.y,
-                    },
-                    Coord {
-                        x: intsn.coords.x,
-                        y: intsn.coords.y,
-                    },
-                ]
-            })
-            .collect();
+
+        // // draw lines from the outputs midpoints to the input
+        // let line_strings: Vec<_> = self
+        //     .outputs
+        //     .iter()
+        //     .map(|x| Self::get_line(&x.data().face.midpoint(), &self.input))
+        //     .collect();
+
+        // draw lines from all vertices of outputs to the input
+        let mut line_strings = Vec::new();
+        for output in &self.outputs {
+            for vertex in &output.data().face.data().exterior {
+                line_strings.push(Self::get_line(&vertex, &self.input));
+            }
+        }
 
         // draw a small line in the direction of propagation
-        let length = 3.0;
+        let length = 1.0;
         let propagation_line = vec![vec![
             Coord {
                 x: input_mid.coords.x,
@@ -99,7 +90,28 @@ impl BeamPropagation {
 
         lines_to_screen(line_strings, RED, 2.0);
         lines_to_screen(propagation_line, MAGENTA, 5.0);
-        lines_to_screen(normal_line, WHITE, 5.0);
+        lines_to_screen(normal_line, WHITE, 2.5);
+    }
+
+    fn get_line(point: &Point3<f32>, input: &Beam) -> Vec<Coord<f32>> {
+        let output_mid = point;
+        let input_mid = input.data().face.data().midpoint;
+        let vec = input_mid - output_mid;
+        let input_normal = input.data().face.data().normal;
+        let norm_dist_to_plane = vec.dot(&input_normal);
+        let dist_to_plane = norm_dist_to_plane / (input_normal.dot(&input.data().prop));
+        // ray cast along propagation direction
+        let intsn = output_mid + dist_to_plane * input.data().prop;
+        vec![
+            Coord {
+                x: output_mid.coords.x,
+                y: output_mid.coords.y,
+            },
+            Coord {
+                x: intsn.coords.x,
+                y: intsn.coords.y,
+            },
+        ]
     }
 
     pub fn input_power(&self) -> f32 {
