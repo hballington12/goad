@@ -215,7 +215,7 @@ impl Beam {
     /// and refracted beams are computed and output.
     fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
-        clipping.clip();
+        let _ = clipping.clip();
 
         let (intersections, remainders) = (
             filter_faces(clipping.intersections),
