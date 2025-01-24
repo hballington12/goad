@@ -135,6 +135,56 @@ fn diffraction(
     let incidence2 = rot2 * rot * incidence;
     println!("incidence2: {}", incidence2);
 
+    // make some far field bins
+    let r = 1e6;
+    let help1s: Vec<f32> = vec![0.1, 0.2]; // replace with theta later
+    let help2s: Vec<f32> = vec![0.1, 0.4]; // replace with phi later
+    let mut xfar: [[f32; 2]; 2] = [[0.0; 2]; 2];
+    let mut yfar: [[f32; 2]; 2] = [[0.0; 2]; 2];
+    let mut zfar: [[f32; 2]; 2] = [[0.0; 2]; 2];
+    for (i, help1) in help1s.iter().enumerate() {
+        for (j, help2) in help2s.iter().enumerate() {
+            xfar[i][j] = r * help1.sin() * help2.cos();
+            yfar[i][j] = r * help1.sin() * help2.sin();
+            zfar[i][j] = r * help1.cos();
+        }
+    }
+    println!("xfar: {:?}", xfar);
+    println!("yfar: {:?}", yfar);
+    println!("zfar: {:?}", zfar);
+
+    // translate far-field bins to aperture system
+    let mut x1 = xfar.clone();
+    let mut y1 = yfar.clone();
+    let mut z1 = zfar.clone();
+    for row in x1.iter_mut() {
+        for elem in row.iter_mut() {
+            *elem -= center_of_mass.x;
+        }
+    }
+    for row in y1.iter_mut() {
+        for elem in row.iter_mut() {
+            *elem -= center_of_mass.y;
+        }
+    }
+    for row in z1.iter_mut() {
+        for elem in row.iter_mut() {
+            *elem -= center_of_mass.z;
+        }
+    }
+
+    println!("x1: {:?}", x1);
+    println!("y1: {:?}", y1);
+    println!("z1: {:?}", z1);
+
+    let mut r1: [[f32; 2]; 2] = [[0.0; 2]; 2];
+    for (i, row) in x1.iter().enumerate() {
+        for (j, elem) in row.iter().enumerate() {
+            r1[i][j] = (x1[i][j].powi(2) + y1[i][j].powi(2) + z1[i][j].powi(2)).sqrt();
+        }
+    }
+    println!("r1: {:?}", r1);
+
     todo!()
 }
 
