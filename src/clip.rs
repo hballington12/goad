@@ -1,5 +1,6 @@
 use super::config;
 use super::geom::{Face, Geom, Plane};
+use anyhow::Result;
 use geo::Area;
 use geo_clipper::Clipper;
 use geo_types::Coord;
@@ -53,13 +54,13 @@ impl Coord3Extensions for Coord<f32> {
 }
 
 trait PolygonExtensions {
-    fn project(&self, plane: &Plane) -> Face;
+    fn project(&self, plane: &Plane) -> Result<Face>;
 }
 
 impl PolygonExtensions for Polygon<f32> {
     /// Projects the xy coordinates of a polygon onto a plane in 3D
     ///  the last vertex, which is a duplicate of the first
-    fn project(&self, plane: &Plane) -> Face {
+    fn project(&self, plane: &Plane) -> Result<Face> {
         let area = self.unsigned_area() / plane.normal.z.abs();
 
         // condition to enforce that all normals point outwards,
@@ -80,9 +81,9 @@ impl PolygonExtensions for Polygon<f32> {
         }
 
         if self.interiors().is_empty() {
-            let mut face = Face::new_simple(exterior, None);
+            let mut face = Face::new_simple(exterior, None)?;
             face.set_area(area);
-            face
+            Ok(face)
         } else {
             let mut interiors: Vec<_> = self
                 .interiors()
@@ -92,9 +93,9 @@ impl PolygonExtensions for Polygon<f32> {
             if reverse {
                 interiors.reverse();
             }
-            let mut face = Face::new_complex(exterior, interiors, None);
+            let mut face = Face::new_complex(exterior, interiors, None)?;
             face.set_area(area);
-            face
+            Ok(face)
         }
     }
 }
@@ -260,7 +261,7 @@ impl<'a> Clipping<'a> {
     }
 
     /// Performs the clip on a `Clipping` object.
-    pub fn clip(&mut self) {
+    pub fn clip(&mut self) -> Result<()> {
         if self.is_done {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
@@ -268,12 +269,14 @@ impl<'a> Clipping<'a> {
         let (clip, mut subjects) = self.init_clip();
 
         // compute remapped intersections, converting to Intersection structs
-        let (intersection, remaining) = clip_faces(&clip, &mut subjects);
+        let (intersection, remaining) = clip_faces(&clip, &mut subjects)?;
 
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);
 
         self.finalise_clip(intersection, remaining);
+
+        Ok(())
     }
 
     fn set_stats(&mut self, intersection: &Vec<Face>, remaining: &Vec<Face>) {
@@ -282,9 +285,12 @@ impl<'a> Clipping<'a> {
 }
 
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
-pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>, Vec<Face>) {
+pub fn clip_faces<'a>(
+    clip_in: &Face,
+    subjects_in: &Vec<&'a Face>,
+) -> Result<(Vec<Face>, Vec<Face>)> {
     if subjects_in.is_empty() {
-        return (Vec::new(), vec![clip_in.clone()]);
+        return Ok((Vec::new(), vec![clip_in.clone()]));
     }
 
     let clip_polygon = clip_in.to_polygon();
@@ -321,14 +327,14 @@ pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>
             difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
 
             if intersection.0.iter().any(|poly| {
-                let face = poly.project(&subject.plane());
+                let face = poly.project(&subject.plane()).unwrap();
                 face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.1
             }) {
                 // Include intersections that are unphysical back into the difference.
                 difference.0.extend(intersection.0);
             } else {
                 intersections.extend(intersection.0.into_iter().map(|poly| {
-                    let mut face = poly.project(&subject.plane());
+                    let mut face = poly.project(&subject.plane()).unwrap();
                     face.data_mut().shape_id = subject.data().shape_id;
                     face
                 }));
@@ -345,8 +351,8 @@ pub fn clip_faces<'a>(clip_in: &Face, subjects_in: &Vec<&'a Face>) -> (Vec<Face>
 
     let remaining: Vec<_> = remaining_clips
         .into_iter()
-        .map(|poly| poly.project(&clip_in.plane()))
+        .map(|poly| poly.project(&clip_in.plane()).unwrap())
         .collect();
 
-    (intersections, remaining)
+    Ok((intersections, remaining))
 }

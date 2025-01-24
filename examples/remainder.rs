@@ -19,10 +19,10 @@ async fn main() {
         Point3::new(upper_right[0], upper_right[1], 10.0),
     ];
     clip_vertices.reverse();
-    let mut clip = Face::new_simple(clip_vertices, None);
+    let mut clip = Face::new_simple(clip_vertices, None).unwrap();
 
     let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
-    clipping.clip();
+    let _ = clipping.clip();
     println!("{}", clipping.stats.unwrap());
 
     let intersections = clipping.intersections;

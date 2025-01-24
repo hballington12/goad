@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.95"
 geo = "0.29.3"
 geo-clipper = "0.8.0"
 geo-types = "0.7.14"

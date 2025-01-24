@@ -2,6 +2,7 @@ use crate::config;
 use crate::containment;
 use crate::containment::ContainmentGraph;
 use crate::containment::AABB;
+use anyhow::Result;
 use geo::Area;
 use geo_types::Coord;
 use geo_types::LineString;
@@ -11,6 +12,7 @@ use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
+use std::any;
 use std::cell::Ref;
 use std::path::Path;
 use tobj;
@@ -203,7 +205,7 @@ pub struct FaceData {
 }
 
 impl FaceData {
-    pub fn new(vertices: Vec<Point3<f32>>, shape_id: Option<usize>) -> Self {
+    pub fn new(vertices: Vec<Point3<f32>>, shape_id: Option<usize>) -> Result<Self> {
         let vertices = vertices.clone();
         let num_vertices = vertices.len();
 
@@ -217,14 +219,20 @@ impl FaceData {
         };
 
         face.set_midpoint();
-        face.set_normal(); // midpoint should be set first
+        face.set_normal()?; // midpoint should be set first
 
-        face
+        Ok(face)
     }
 
     /// Compute the normal vector for the face.
-    fn set_normal(&mut self) {
+    fn set_normal(&mut self) -> Result<()> {
         let vertices = &self.exterior;
+
+        if vertices.len() < 2 {
+            return Err(anyhow::anyhow!(
+                "Not enough vertices to compute the normal."
+            ));
+        }
 
         let v1 = &vertices[0];
         let v2 = &vertices[1];
@@ -237,16 +245,23 @@ impl FaceData {
         // Compute the cross product
         let mut normal = u.cross(&v);
 
+        if normal.magnitude() == 0.0 {
+            return Err(anyhow::anyhow!(
+                "Degenerate face detected; the cross product is zero. u: {u}, v: {v}"
+            ));
+        }
+
         normal.normalize_mut();
 
-        if u.dot(&normal) < 0.01 && v.dot(&normal) < 0.01 {
+        // Verify the normal
+        if u.dot(&normal).abs() < 0.01 && v.dot(&normal).abs() < 0.01 {
             self.normal = normal;
+            Ok(())
         } else {
-            println!("ERRORRRORORORORO");
-            // panic!(
-            //     "normal could not be computed, u: {u}, v: {v}, face: {:?}",
-            //     self
-            // );
+            Err(anyhow::anyhow!(
+                "Normal could not be computed correctly. u: {u}, v: {v}, face: {:?}",
+                self
+            ))
         }
     }
 
@@ -389,19 +404,19 @@ pub enum Face {
 }
 
 impl Face {
-    pub fn new_simple(exterior: Vec<Point3<f32>>, parent_id: Option<usize>) -> Self {
-        Face::Simple(FaceData::new(exterior, parent_id))
+    pub fn new_simple(exterior: Vec<Point3<f32>>, parent_id: Option<usize>) -> Result<Self> {
+        Ok(Face::Simple(FaceData::new(exterior, parent_id)?))
     }
 
     pub fn new_complex(
         exterior: Vec<Point3<f32>>,
         interiors: Vec<Vec<Point3<f32>>>,
         parent_id: Option<usize>,
-    ) -> Self {
-        Face::Complex {
-            data: FaceData::new(exterior, parent_id),
+    ) -> Result<Self> {
+        Ok(Face::Complex {
+            data: FaceData::new(exterior, parent_id)?,
             interiors,
-        }
+        })
     }
 
     /// Transform a `Face` to another coordinate system.
@@ -472,7 +487,7 @@ impl Face {
 
     /// Creates a `Face` struct from a `Polygon`
     #[allow(dead_code)]
-    fn from_polygon(polygon: &Polygon<f32>) -> Self {
+    fn from_polygon(polygon: &Polygon<f32>) -> Result<Self> {
         // do the exterior
         let mut exterior = Vec::new();
         for coord in polygon
@@ -485,12 +500,11 @@ impl Face {
         }
 
         if polygon.interiors().is_empty() {
-            let mut face = Face::new_simple(exterior, None);
-            match face {
-                Face::Simple(ref mut data) => data.area = Some(polygon.unsigned_area()),
-                Face::Complex { .. } => {}
+            let mut face = Face::new_simple(exterior, None)?;
+            if let Face::Simple(ref mut data) = face {
+                data.area = Some(polygon.unsigned_area());
             }
-            face
+            Ok(face)
         } else {
             let mut interiors = Vec::new();
             for interior in polygon.interiors() {
@@ -500,12 +514,11 @@ impl Face {
                 }
                 interiors.push(vertices);
             }
-            let mut face = Face::new_complex(exterior, interiors, None);
-            match face {
-                Face::Simple { .. } => {}
-                Face::Complex { ref mut data, .. } => data.area = Some(polygon.unsigned_area()),
+            let mut face = Face::new_complex(exterior, interiors, None)?;
+            if let Face::Complex { ref mut data, .. } = face {
+                data.area = Some(polygon.unsigned_area());
             }
-            face
+            Ok(face)
         }
     }
 
@@ -551,7 +564,7 @@ impl Shape {
         }
     }
 
-    fn from_model(model: Model, id: Option<usize>) -> Shape {
+    fn from_model(model: Model, id: Option<usize>) -> Result<Shape> {
         let mesh = &model.mesh;
 
         let vertices = mesh
@@ -579,7 +592,7 @@ impl Shape {
                 .iter()
                 .map(|&i| shape.vertices[i as usize])
                 .collect();
-            shape.add_face(Face::new_simple(face_vertices, id));
+            shape.add_face(Face::new_simple(face_vertices, id)?);
 
             next_face = end;
         }
@@ -608,7 +621,7 @@ impl Shape {
 
         shape.aabb = Some(AABB { min, max });
 
-        shape
+        Ok(shape)
     }
 
     /// Adds a vertex to the mesh.
@@ -672,7 +685,7 @@ pub struct Geom {
 }
 
 impl Geom {
-    pub fn from_file(filename: &str) -> Result<Self, String> {
+    pub fn from_file(filename: &str) -> Result<Self> {
         // Log current directory only in debug builds
         #[cfg(debug_assertions)]
         match std::env::current_dir() {
@@ -686,21 +699,17 @@ impl Geom {
         } else {
             std::env::current_dir()
                 .map(|p| p.join(path).display().to_string())
-                .map_err(|e| format!("Could not resolve path: {}", e))?
+                .map_err(|e| anyhow::anyhow!("Could not resolve path: {}", e))?
         };
 
         let (models, _) = tobj::load_obj(&resolved_filename, &tobj::LoadOptions::default())
-            .map_err(|e| format!("Failed to load OBJ file '{}': {}", filename, e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to load OBJ file '{}': {}", filename, e))?;
 
         if models.is_empty() {
-            return Err("No models found in OBJ file".to_string());
+            return Err(anyhow::anyhow!("No models found in OBJ file"));
         }
 
-        let shapes: Vec<Shape> = models
-            .into_iter()
-            .enumerate()
-            .map(|(i, model)| Shape::from_model(model, Some(i)))
-            .collect();
+        let shapes = Self::shapes_from_models(models)?;
 
         // Create containment graph
         let mut containment_graph = ContainmentGraph::new(shapes.len());
@@ -730,6 +739,14 @@ impl Geom {
             shapes,
             containment_graph,
         })
+    }
+
+    fn shapes_from_models(models: Vec<Model>) -> Result<Vec<Shape>> {
+        models
+            .into_iter()
+            .enumerate()
+            .map(|(i, model)| Shape::from_model(model, Some(i)))
+            .collect()
     }
 
     pub fn transform(&mut self, transform: &Matrix4<f32>) {

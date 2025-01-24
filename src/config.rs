@@ -4,6 +4,7 @@ use nalgebra::Complex;
 
 pub const BEAM_AREA_THRESHOLD: f32 = 0.01; // minimum area for new beam to propagate
 pub const CLIP_TOLERANCE: f32 = 1e6; // Named constant for tolerance
+pub const COLINEAR_THRESHOLD: f32 = 0.001; // Named constant for avoiding taking cross products from colinear vectors
 pub const MEDIUM_REFR_INDEX: Complex<f32> = Complex {
     // outer medium refractive index
     re: 1.0,

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::f32::consts::PI;
 use std::fmt::Error;
 
@@ -133,7 +134,7 @@ impl Beam {
         prop: Vector3<f32>,
         refr_index: Complex<f32>,
         e_perp: Vector3<f32>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self> {
         let field = Field::new_identity(e_perp, prop)?;
         Ok(Beam::Initial(BeamData::new(
             face, prop, refr_index, 0, 0, field,
@@ -226,7 +227,7 @@ pub fn get_refraction_vector(
     theta_i: f32,
     theta_t: f32,
 ) -> Vector3<f32> {
-    if theta_t.sin() < 0.0001 {
+    if theta_t.sin() < config::COLINEAR_THRESHOLD {
         return *prop;
     }
     // upward facing normal
@@ -244,7 +245,7 @@ pub fn get_refraction_vector(
 
     result.normalize_mut();
 
-    debug_assert!((theta_t.cos() - result.dot(&norm).abs()).abs() < 0.01);
+    debug_assert!((theta_t.cos() - result.dot(&norm).abs()).abs() < config::COLINEAR_THRESHOLD);
 
     result
 }
@@ -259,7 +260,7 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
     let cti = n.dot(&prop); // cos theta_i
     let mut result = prop - 2.0 * cti * n;
     result.normalize_mut();
-    assert!((result.dot(&n) - cti) < 0.01);
+    assert!((result.dot(&n) - cti) < config::COLINEAR_THRESHOLD);
     result
 }
 
@@ -318,7 +319,7 @@ fn get_rotation_matrix(beam_data: &BeamData, e_perp: Vector3<f32>) -> Matrix2<Co
 
 /// Determines the new `e_perp` vector for an intersection at a `face``.
 fn get_e_perp(normal: Vector3<f32>, beam_data: &BeamData) -> Vector3<f32> {
-    if normal.dot(&beam_data.prop).abs() > 0.999 {
+    if normal.dot(&beam_data.prop).abs() > 1.0 - config::COLINEAR_THRESHOLD {
         -beam_data.field.e_perp
     } else {
         normal.cross(&beam_data.prop).normalize() // new e_perp
@@ -354,7 +355,7 @@ fn create_reflected(
 ) -> Result<Option<Beam>, String> {
     let prop = get_reflection_vector(&normal, &beam_data.prop);
 
-    debug_assert!((prop.dot(&normal) - theta_i.cos()) < 0.01);
+    debug_assert!((prop.dot(&normal) - theta_i.cos()) < config::COLINEAR_THRESHOLD);
 
     if theta_i > (n2.re / n1.re).asin() {
         // if total internal reflection
@@ -408,7 +409,7 @@ fn create_refracted(
         let refr_ampl = fresnel * ampl.clone();
 
         debug_assert!(beam_data.prop.dot(&prop) > 0.0);
-        debug_assert!((prop.dot(&normal).abs() - theta_t.cos()).abs() < 0.01);
+        debug_assert!((prop.dot(&normal).abs() - theta_t.cos()).abs() < config::COLINEAR_THRESHOLD);
 
         Ok(Some(Beam::new_default(
             face.clone(),
