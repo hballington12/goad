@@ -139,56 +139,52 @@ impl Problem {
 
     /// Propagates the next beam in the queue.
     pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
-        // try to pop the next beam
-        if let Some(mut beam) = self.beam_queue.pop() {
-            // let outputs = beam.propagate(&mut self.geom);
+        // Try to pop the next beam from the queue
+        let Some(mut beam) = self.beam_queue.pop() else {
+            println!("No beams left to pop!");
+            return None;
+        };
 
-            let outputs = match beam {
-                Beam::Default {
-                    ref mut data,
-                    ref variant,
-                } => {
-                    if data.power() > config::BEAM_POWER_THRESHOLD
-                        && (data.rec_count < config::MAX_REC
-                            || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
-                    {
-                        Beam::process_beam(&mut self.geom, data)
-                    } else {
-                        Vec::new()
-                    }
-                }
-                Beam::Initial(ref mut data) => Beam::process_beam(&mut self.geom, data),
-                _ => Vec::new(),
-            };
-
-            // Process each output beam
-            for output in outputs.iter() {
-                match (&beam, output) {
-                    // Handle Default beams
-                    (Beam::Default { .. }, Beam::Default { .. }) => {
-                        self.insert_beam(output.clone());
-                    }
-                    (Beam::Default { .. }, Beam::OutGoing(..)) => {
-                        self.powers.output += output.data().power();
-                        self.out_beam_queue.push(output.clone());
-                    }
-
-                    // Handle Initial beams
-                    (Beam::Initial(..), Beam::Default { .. }) => {
-                        self.powers.input += output.data().power();
-                        self.insert_beam(output.clone());
-                    }
-
-                    _ => {}
+        // Compute the outputs by propagating the beam
+        let outputs = match &mut beam {
+            Beam::Default { data, variant } => {
+                if data.power() > config::BEAM_POWER_THRESHOLD
+                    && (data.rec_count < config::MAX_REC
+                        || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
+                {
+                    Beam::process_beam(&mut self.geom, data)
+                } else {
+                    Vec::new() // Beam truncation case
                 }
             }
+            Beam::Initial(data) => Beam::process_beam(&mut self.geom, data),
+            _ => Vec::new(),
+        };
 
-            let propagation = BeamPropagation::new(beam, outputs);
-            Some(propagation)
-        } else {
-            println!("no beams left to pop!");
-            None
+        // Process each output beam
+        for output in &outputs {
+            match (&beam, output) {
+                // Handle Default beams
+                (Beam::Default { .. }, Beam::Default { .. }) => {
+                    self.insert_beam(output.clone());
+                }
+                (Beam::Default { .. }, Beam::OutGoing(..)) => {
+                    self.powers.output += output.data().power();
+                    self.out_beam_queue.push(output.clone());
+                }
+
+                // Handle Initial beams
+                (Beam::Initial(..), Beam::Default { .. }) => {
+                    self.powers.input += output.data().power();
+                    self.insert_beam(output.clone());
+                }
+
+                _ => {} // Ignore other cases
+            }
         }
+
+        // Create and return the propagation result
+        Some(BeamPropagation::new(beam, outputs))
     }
 
     /// Draws a `BeamPropagation` on top of a `Geom`.
