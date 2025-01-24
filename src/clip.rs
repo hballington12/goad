@@ -196,7 +196,8 @@ impl<'a> Clipping<'a> {
         let origin = Point3::origin(); // camera location
         let target = Point3::new(self.proj.x, self.proj.y, self.proj.z); // projection direction, defines negative z-axis in new coords
 
-        let up: Vector3<f32> = if self.proj.cross(&Vector3::y()).norm() < 0.01 {
+        let up: Vector3<f32> = if self.proj.cross(&Vector3::y()).norm() < config::COLINEAR_THRESHOLD
+        {
             Vector3::x()
         } else {
             Vector3::y()

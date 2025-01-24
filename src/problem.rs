@@ -157,6 +157,7 @@ impl Problem {
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam {
             Beam::Default { data, variant } => {
+                // truncation conditions
                 if data.power() < config::BEAM_POWER_THRESHOLD {
                     self.powers.trnc_energy += data.power();
                     Vec::new()
@@ -179,6 +180,8 @@ impl Problem {
         };
 
         self.powers.absorbed += beam.data().absorbed_power;
+        self.powers.trnc_clip +=
+            (beam.data().clipping_area - beam.data().csa()).abs() * beam.data().power();
 
         // Process each output beam
         for output in &outputs {

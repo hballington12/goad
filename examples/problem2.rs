@@ -8,7 +8,7 @@ use pbt::{
 use std::io::{self, Write};
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex_hollow.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/cube.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now
@@ -25,7 +25,7 @@ fn main() {
     clip.data_mut().area =
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     geom.shapes[0].refr_index.re = 1.5;
-    geom.shapes[0].refr_index.im = 0.0001;
+    // geom.shapes[0].refr_index.im = 0.0001;
 
     let mut problem = Problem::new(
         geom,

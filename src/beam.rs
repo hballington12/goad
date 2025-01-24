@@ -184,6 +184,11 @@ impl Beam {
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         let _ = clipping.clip();
 
+        beam_data.clipping_area = match clipping.stats {
+            Some(stats) => stats.intersection_area + stats.remaining_area,
+            _ => 0.0,
+        };
+
         let (intersections, remainders) = (
             filter_faces(clipping.intersections),
             filter_faces(clipping.remaining),
@@ -449,6 +454,7 @@ fn remainders_to_beams(beam_data: &mut BeamData, remainders: Vec<Face>) -> Vec<B
     let remainder_beams: Vec<_> = remainders
         .into_iter()
         .filter_map(|remainder| {
+            let area = remainder.data().area.unwrap();
             Some(Beam::OutGoing(BeamData {
                 face: remainder,
                 prop: beam_data.prop,
@@ -457,6 +463,7 @@ fn remainders_to_beams(beam_data: &mut BeamData, remainders: Vec<Face>) -> Vec<B
                 tir_count: beam_data.tir_count,
                 field: beam_data.field.clone(),
                 absorbed_power: beam_data.absorbed_power,
+                clipping_area: area,
             }))
         })
         .collect();
@@ -473,6 +480,7 @@ pub struct BeamData {
     pub tir_count: i32,
     pub field: Field,
     pub absorbed_power: f32, // power absorbed by the medium
+    pub clipping_area: f32,  // total area accounted for by intersections and remainders
 }
 
 /// Creates a new beam
@@ -494,6 +502,7 @@ impl BeamData {
             tir_count,
             field,
             absorbed_power: 0.0,
+            clipping_area: 0.0,
         }
     }
 
