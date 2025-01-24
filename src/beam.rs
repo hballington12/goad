@@ -190,16 +190,20 @@ impl Beam {
                 outputs.extend(outputs_beams);
             }
             Beam::Default { data, variant } => {
-                if data.rec_count < config::MAX_REC
-                    || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR)
+                if data.power() > config::BEAM_POWER_THRESHOLD
+                    && (data.rec_count < config::MAX_REC
+                        || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
                 {
                     let output_beams = Self::process_beam(geom, data);
                     println!("adding {} beams to the outputs", output_beams.len());
                     outputs.extend(output_beams);
                 } else {
                     println!(
-                        "beam, variant: {:?}, trunacted with rec: {}, tir: {}",
-                        variant, data.rec_count, data.tir_count
+                        "beam, variant: {:?}, trunacted with rec: {}, tir: {}, power: {}",
+                        variant,
+                        data.rec_count,
+                        data.tir_count,
+                        data.power()
                     );
                 }
             }
@@ -294,9 +298,22 @@ fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Fa
             };
 
             let refracted =
-                create_refracted(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
+                match create_refracted(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2) {
+                    Ok(beam) => beam,
+                    Err(_) => {
+                        // count skipped beams
+                        None
+                    }
+                };
+
             let reflected =
-                create_reflected(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
+                match create_reflected(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2) {
+                    Ok(beam) => beam,
+                    Err(_) => {
+                        // count skipped beams
+                        None
+                    }
+                };
 
             Some((reflected, refracted))
 
@@ -373,7 +390,7 @@ fn create_reflected(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
-) -> Result<Option<Beam>, String> {
+) -> Result<Option<Beam>> {
     let prop = get_reflection_vector(&normal, &beam_data.prop);
 
     debug_assert!((prop.dot(&normal) - theta_i.cos()) < config::COLINEAR_THRESHOLD);
@@ -406,7 +423,7 @@ fn create_reflected(
             beam_data.rec_count + 1,
             beam_data.tir_count,
             BeamVariant::Refl,
-            Field::new(e_perp, prop, refl_ampl).unwrap(),
+            Field::new(e_perp, prop, refl_ampl)?,
         )))
     }
 }
@@ -421,7 +438,7 @@ fn create_refracted(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
-) -> Result<Option<Beam>, String> {
+) -> Result<Option<Beam>> {
     if theta_i > (n2.re / n1.re).asin() {
         // if total internal reflection
         Ok(None)
@@ -441,7 +458,7 @@ fn create_refracted(
             beam_data.rec_count + 1,
             beam_data.tir_count,
             BeamVariant::Refr,
-            Field::new(e_perp, prop, refr_ampl).unwrap(),
+            Field::new(e_perp, prop, refr_ampl)?,
         )))
     }
 }

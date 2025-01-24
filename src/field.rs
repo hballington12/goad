@@ -80,21 +80,24 @@ impl Field {
         e_perp: Vector3<f32>,
         prop: Vector3<f32>,
         ampl: Matrix2<Complex<f32>>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self> {
         #[cfg(debug_assertions)]
         let norm_e_perp_diff = e_perp.norm() - 1.0;
         if norm_e_perp_diff.abs() >= config::COLINEAR_THRESHOLD {
-            return Err(format!("e-perp is not normalised: {:?}", e_perp));
+            return Err(anyhow::anyhow!("e-perp is not normalised: {:?}", e_perp));
         }
 
         let norm_prop_diff = prop.norm() - 1.0;
         if norm_prop_diff.abs() >= config::COLINEAR_THRESHOLD {
-            return Err(format!("propagation vector is not normalised: {:?}", prop));
+            return Err(anyhow::anyhow!(
+                "propagation vector is not normalised: {:?}",
+                prop
+            ));
         }
 
         let dot_product = e_perp.dot(&prop);
         if dot_product.abs() >= config::COLINEAR_THRESHOLD {
-            return Err(format!(
+            return Err(anyhow::anyhow!(
                 "e-perp and propagation vector are not perpendicular, e_perp is: {:?}, prop is: {:?}, dot product is: {:?}",
                 e_perp,
                 prop,

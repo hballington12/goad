@@ -8,7 +8,7 @@ use pbt::{
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/concave1.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/cube_inside_ico.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now
