@@ -9,6 +9,7 @@ use nalgebra::Matrix2;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 
+use crate::beam;
 use crate::clip::Clipping;
 use crate::config;
 use crate::field::Field;
@@ -177,9 +178,9 @@ impl Beam {
         }
     }
 
-    /// Processes a beam. The beam is propagated, the remainders, reflected,
+    /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    pub fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
+    pub fn process_beam_data(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         let _ = clipping.clip();
 
@@ -254,10 +255,12 @@ fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Fa
             let n2 = get_n2(geom, beam_data, face, normal);
             let e_perp = get_e_perp(normal, &beam_data);
             let rot = get_rotation_matrix(&beam_data, e_perp);
-            let ampl = match get_ampl(&beam_data, rot, face, n1) {
-                Ok(ampl) => ampl,
+            let (ampl, absorbed_intensity) = match get_ampl(&beam_data, rot, face, n1) {
+                Ok((ampl, absorbed_power)) => (ampl, absorbed_power),
                 Err(_) => return None, // skip this intersection if get_ampl() returns error
             };
+            beam_data.absorbed_power +=
+                absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
             let refracted =
                 match create_refracted(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2) {
@@ -295,7 +298,7 @@ fn get_ampl(
     rot: Matrix2<Complex<f32>>,
     face: &Face,
     n1: Complex<f32>,
-) -> Result<Matrix2<Complex<f32>>> {
+) -> Result<(Matrix2<Complex<f32>>, f32)> {
     let mut ampl = rot * beam_data.field.ampl.clone();
     let dist = (face.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
 
@@ -305,9 +308,15 @@ fn get_ampl(
 
     let arg = dist * config::WAVENO * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
+
+    let absorbed_intensity = Field::ampl_intensity(&ampl)
+        * (1.0 - (-2.0 * config::WAVENO * n1.im * dist.sqrt()).exp().powi(2));
+
     let exp_absorption = (-2.0 * config::WAVENO * n1.im * dist.sqrt()).exp(); // absorption
+
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
-    Ok(ampl)
+
+    Ok((ampl, absorbed_intensity))
 }
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
@@ -447,6 +456,7 @@ fn remainders_to_beams(beam_data: &mut BeamData, remainders: Vec<Face>) -> Vec<B
                 rec_count: beam_data.rec_count,
                 tir_count: beam_data.tir_count,
                 field: beam_data.field.clone(),
+                absorbed_power: beam_data.absorbed_power,
             }))
         })
         .collect();
@@ -462,6 +472,7 @@ pub struct BeamData {
     pub rec_count: i32,
     pub tir_count: i32,
     pub field: Field,
+    pub absorbed_power: f32, // power absorbed by the medium
 }
 
 /// Creates a new beam
@@ -482,6 +493,7 @@ impl BeamData {
             rec_count,
             tir_count,
             field,
+            absorbed_power: 0.0,
         }
     }
 

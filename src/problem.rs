@@ -58,12 +58,13 @@ mod tests {
 
 #[derive(Debug, PartialEq)]
 pub struct Powers {
-    pub input: f32,
-    pub output: f32,
-    pub absorbed: f32,
-    pub trnc_ref: f32,
-    pub trnc_rec: f32,
-    pub trnc_clip: f32,
+    pub input: f32,       // near-field input power
+    pub output: f32,      // near-field output power
+    pub absorbed: f32,    // near-field absorbed power
+    pub trnc_ref: f32,    // truncated power due to max reflections
+    pub trnc_rec: f32,    // truncated power due to max recursions
+    pub trnc_clip: f32,   // truncated power due to clipping
+    pub trnc_energy: f32, // truncated power due to threshold beam power
 }
 
 impl Powers {
@@ -75,25 +76,33 @@ impl Powers {
             trnc_ref: 0.0,
             trnc_rec: 0.0,
             trnc_clip: 0.0,
+            trnc_energy: 0.0,
         }
     }
 
     /// Returns the power unaccounted for.
     pub fn missing(&self) -> f32 {
-        self.input - (self.output + self.absorbed + self.trnc_ref + self.trnc_rec + self.trnc_clip)
+        self.input
+            - (self.output
+                + self.absorbed
+                + self.trnc_ref
+                + self.trnc_rec
+                + self.trnc_clip
+                + self.trnc_energy)
     }
 }
 
 impl fmt::Display for Powers {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Powers:")?;
-        writeln!(f, "  Input:          {:.6}", self.input)?;
-        writeln!(f, "  Output:         {:.6}", self.output)?;
-        writeln!(f, "  Absorbed:       {:.6}", self.absorbed)?;
-        writeln!(f, "  Truncated Ref:  {:.6}", self.trnc_ref)?;
-        writeln!(f, "  Truncated Rec:  {:.6}", self.trnc_rec)?;
-        writeln!(f, "  Truncated Clip: {:.6}", self.trnc_clip)?;
-        writeln!(f, "  Missing:        {:.6}", self.missing())
+        writeln!(f, "  Input:            {:.6}", self.input)?;
+        writeln!(f, "  Output:           {:.6}", self.output)?;
+        writeln!(f, "  Absorbed:         {:.6}", self.absorbed)?;
+        writeln!(f, "  Truncated Ref:    {:.6}", self.trnc_ref)?;
+        writeln!(f, "  Truncated Rec:    {:.6}", self.trnc_rec)?;
+        writeln!(f, "  Truncated Clip:   {:.6}", self.trnc_clip)?;
+        writeln!(f, "  Truncated Energy: {:.6}", self.trnc_energy)?;
+        writeln!(f, "  Unaccounted:      {:.6}", self.missing())
     }
 }
 
@@ -148,18 +157,28 @@ impl Problem {
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam {
             Beam::Default { data, variant } => {
-                if data.power() > config::BEAM_POWER_THRESHOLD
-                    && (data.rec_count < config::MAX_REC
-                        || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
-                {
-                    Beam::process_beam(&mut self.geom, data)
+                if data.power() < config::BEAM_POWER_THRESHOLD {
+                    self.powers.trnc_energy += data.power();
+                    Vec::new()
+                } else if *variant == BeamVariant::Tir {
+                    if data.tir_count > config::MAX_TIR {
+                        self.powers.trnc_ref += data.power();
+                        Vec::new()
+                    } else {
+                        Beam::process_beam_data(&mut self.geom, data)
+                    }
+                } else if data.rec_count > config::MAX_REC {
+                    self.powers.trnc_rec += data.power();
+                    Vec::new()
                 } else {
-                    Vec::new() // Beam truncation case
+                    Beam::process_beam_data(&mut self.geom, data)
                 }
             }
-            Beam::Initial(data) => Beam::process_beam(&mut self.geom, data),
+            Beam::Initial(data) => Beam::process_beam_data(&mut self.geom, data),
             _ => Vec::new(),
         };
+
+        self.powers.absorbed += beam.data().absorbed_power;
 
         // Process each output beam
         for output in &outputs {

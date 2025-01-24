@@ -25,6 +25,7 @@ fn main() {
     clip.data_mut().area =
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     geom.shapes[0].refr_index.re = 1.5;
+    geom.shapes[0].refr_index.im = 0.0001;
 
     let mut problem = Problem::new(
         geom,
