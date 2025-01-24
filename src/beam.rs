@@ -180,34 +180,28 @@ impl Beam {
     /// Computes the propagation of a `Beam`, yielding the output
     /// beams which can then be dealt with as needed.
     pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
-        let mut outputs = Vec::new();
         match self {
-            Beam::Initial(data) => {
-                let outputs_beams = Self::process_beam(geom, data);
-                outputs.extend(outputs_beams);
-            }
+            Beam::Initial(data) => Self::process_beam(geom, data),
             Beam::Default { data, variant } => {
                 if data.power() > config::BEAM_POWER_THRESHOLD
                     && (data.rec_count < config::MAX_REC
                         || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
                 {
-                    let output_beams = Self::process_beam(geom, data);
-                    outputs.extend(output_beams);
+                    Self::process_beam(geom, data)
                 } else {
-                    // beam truncation
+                    Vec::new()
                 }
             }
             Beam::OutGoing(..) => {
-                println!("beam was outgoing. skipping...");
-                // panic!("tried to propagate an outgoing beam, which is not yet supported.");
+                println!("Beam was outgoing. Skipping...");
+                Vec::new()
             }
         }
-        outputs
     }
 
     /// Processes a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
+    pub fn process_beam(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         let _ = clipping.clip();
 

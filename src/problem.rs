@@ -1,11 +1,12 @@
 use crate::{
-    beam::{Beam, BeamPropagation},
+    beam::{Beam, BeamPropagation, BeamVariant},
     clip::Clipping,
     config,
     geom::{Face, Geom},
     helpers::draw_face,
 };
 use macroquad::prelude::*;
+use std::fmt;
 
 #[cfg(test)]
 mod tests {
@@ -55,14 +56,54 @@ mod tests {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Powers {
+    pub input: f32,
+    pub output: f32,
+    pub absorbed: f32,
+    pub trnc_ref: f32,
+    pub trnc_rec: f32,
+    pub trnc_clip: f32,
+}
+
+impl Powers {
+    pub fn new() -> Self {
+        Self {
+            input: 0.0,
+            output: 0.0,
+            absorbed: 0.0,
+            trnc_ref: 0.0,
+            trnc_rec: 0.0,
+            trnc_clip: 0.0,
+        }
+    }
+
+    /// Returns the power unaccounted for.
+    pub fn missing(&self) -> f32 {
+        self.input - (self.output + self.absorbed + self.trnc_ref + self.trnc_rec + self.trnc_clip)
+    }
+}
+
+impl fmt::Display for Powers {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Powers:")?;
+        writeln!(f, "  Input:          {:.6}", self.input)?;
+        writeln!(f, "  Output:         {:.6}", self.output)?;
+        writeln!(f, "  Absorbed:       {:.6}", self.absorbed)?;
+        writeln!(f, "  Truncated Ref:  {:.6}", self.trnc_ref)?;
+        writeln!(f, "  Truncated Rec:  {:.6}", self.trnc_rec)?;
+        writeln!(f, "  Truncated Clip: {:.6}", self.trnc_clip)?;
+        writeln!(f, "  Missing:        {:.6}", self.missing())
+    }
+}
+
 /// A solvable physics problem.
 #[derive(Debug, PartialEq)] // Added Default derive
 pub struct Problem {
     pub geom: Geom,                // geometry to trace beams in
     pub beam_queue: Vec<Beam>,     // beams awaiting near-field propagation
     pub out_beam_queue: Vec<Beam>, // beams awaiting diffraction
-    pub power_in: f32,             // power in, excluding remainders from any initial beams
-    pub power_out: f32,            // power out in the near-field
+    pub powers: Powers,            // different power contributions
 }
 
 impl Problem {
@@ -72,8 +113,7 @@ impl Problem {
             geom,
             beam_queue: vec![beam],
             out_beam_queue: vec![],
-            power_in: 0.0,
-            power_out: 0.0,
+            powers: Powers::new(),
         }
     }
 
@@ -85,7 +125,7 @@ impl Problem {
                 break;
             }
 
-            if self.power_out / self.power_in > config::TOTAL_POWER_CUTOFF {
+            if self.powers.output / self.powers.input > config::TOTAL_POWER_CUTOFF {
                 println!("cut off power out reached...");
                 break;
             }
@@ -93,19 +133,33 @@ impl Problem {
             self.propagate_next();
         }
 
-        println!(
-            "done. power in: {}, power out: {}, conservation: {}",
-            self.power_in,
-            self.power_out,
-            self.power_out / self.power_in
-        )
+        println!("done.");
+        println!("{}", self.powers);
     }
 
     /// Propagates the next beam in the queue.
     pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
         // try to pop the next beam
         if let Some(mut beam) = self.beam_queue.pop() {
-            let outputs = beam.propagate(&mut self.geom);
+            // let outputs = beam.propagate(&mut self.geom);
+
+            let outputs = match beam {
+                Beam::Default {
+                    ref mut data,
+                    ref variant,
+                } => {
+                    if data.power() > config::BEAM_POWER_THRESHOLD
+                        && (data.rec_count < config::MAX_REC
+                            || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
+                    {
+                        Beam::process_beam(&mut self.geom, data)
+                    } else {
+                        Vec::new()
+                    }
+                }
+                Beam::Initial(ref mut data) => Beam::process_beam(&mut self.geom, data),
+                _ => Vec::new(),
+            };
 
             // Process each output beam
             for output in outputs.iter() {
@@ -115,13 +169,13 @@ impl Problem {
                         self.insert_beam(output.clone());
                     }
                     (Beam::Default { .. }, Beam::OutGoing(..)) => {
-                        self.power_out += output.data().power();
+                        self.powers.output += output.data().power();
                         self.out_beam_queue.push(output.clone());
                     }
 
                     // Handle Initial beams
                     (Beam::Initial(..), Beam::Default { .. }) => {
-                        self.power_in += output.data().power();
+                        self.powers.input += output.data().power();
                         self.insert_beam(output.clone());
                     }
 
