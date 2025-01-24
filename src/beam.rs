@@ -278,6 +278,7 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
 
 fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Face>) -> Vec<Beam> {
     let n1 = beam_data.refr_index;
+
     // create  beams
     intersections
         .iter()
@@ -287,7 +288,10 @@ fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Fa
             let n2 = get_n2(geom, beam_data, face, normal);
             let e_perp = get_e_perp(normal, &beam_data);
             let rot = get_rotation_matrix(&beam_data, e_perp);
-            let ampl = get_ampl(&beam_data, rot, face, n1);
+            let ampl = match get_ampl(&beam_data, rot, face, n1) {
+                Ok(ampl) => ampl,
+                Err(_) => return None, // skip this intersection if get_ampl() returns error
+            };
 
             let refracted =
                 create_refracted(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2).unwrap();
@@ -312,14 +316,19 @@ fn get_ampl(
     rot: Matrix2<Complex<f32>>,
     face: &Face,
     n1: Complex<f32>,
-) -> Matrix2<Complex<f32>> {
+) -> Result<Matrix2<Complex<f32>>> {
     let mut ampl = rot * beam_data.field.ampl.clone();
     let dist = (face.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
+
+    if dist < 0.0 {
+        return Err(anyhow::anyhow!("distance less than 0: {}", dist));
+    }
+
     let arg = dist * config::WAVENO * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
     let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
-    ampl
+    Ok(ampl)
 }
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
@@ -368,11 +377,13 @@ fn create_reflected(
     let prop = get_reflection_vector(&normal, &beam_data.prop);
 
     debug_assert!((prop.dot(&normal) - theta_i.cos()) < config::COLINEAR_THRESHOLD);
+    debug_assert!(!Field::ampl_intensity(&ampl).is_nan());
 
     if theta_i > (n2.re / n1.re).asin() {
         // if total internal reflection
         let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
         let refl_ampl = fresnel * ampl;
+        debug_assert!(!Field::ampl_intensity(&refl_ampl).is_nan());
 
         Ok(Some(Beam::new_default(
             face.clone(),

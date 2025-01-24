@@ -106,17 +106,17 @@ impl Problem {
             }
 
             let propagation = BeamPropagation::new(beam, outputs);
-            println!(
-                "this power in: {}, out: {}, conservation: {}",
-                propagation.input_power(),
-                propagation.output_power(),
-                propagation.output_power() / propagation.input_power()
-            );
-            println!(
-                "number of output beams in this propagation: {}",
-                propagation.outputs.len()
-            );
-            println!("{:?}", propagation.input);
+            // println!(
+            //     "this power in: {}, out: {}, conservation: {}",
+            //     propagation.input_power(),
+            //     propagation.output_power(),
+            //     propagation.output_power() / propagation.input_power()
+            // );
+            // println!(
+            //     "number of output beams in this propagation: {}",
+            //     propagation.outputs.len()
+            // );
+            // println!("{:?}", propagation.input);
             println!(
                 "total power in: {}, out: {}, conservation: {}",
                 self.power_in,

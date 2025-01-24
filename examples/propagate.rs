@@ -8,7 +8,7 @@ use pbt::{
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/cubes.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/concave1.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::z(); // choose e_perp along z-axis for now
@@ -49,18 +49,18 @@ async fn main() {
         }
 
         // Check if "Enter" is pressed
-        if is_key_pressed(KeyCode::Enter) {
-            if let Some(next_propagation) = problem.propagate_next() {
-                propagation = Some(next_propagation);
-                println!(
-                    "number of beams in beam queue: {:?}",
-                    problem.beam_queue.len()
-                );
-            } else {
-                println!("No more beams to propagate.");
-                break;
-            }
+        // if is_key_pressed(KeyCode::Enter) {
+        if let Some(next_propagation) = problem.propagate_next() {
+            propagation = Some(next_propagation);
+            println!(
+                "number of beams in beam queue: {:?}",
+                problem.beam_queue.len()
+            );
+        } else {
+            println!("No more beams to propagate.");
+            break;
         }
+        // }
 
         next_frame().await;
     }

@@ -28,8 +28,8 @@ mod tests {
 
         // start function `do_clip` here:
         let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
-        clipping.clip();
-        clipping.clip(); // try to clip again, which should panic
+        let _ = clipping.clip();
+        let _ = clipping.clip(); // cannot redo clipping
     }
 }
 trait Point3Extensions {
@@ -88,10 +88,11 @@ impl PolygonExtensions for Polygon<f32> {
             let mut interiors: Vec<_> = self
                 .interiors()
                 .iter()
+                .rev()
                 .map(|interior| project_coords(&interior.0))
                 .collect();
             if reverse {
-                interiors.reverse();
+                interiors.iter_mut().for_each(|interior| interior.reverse());
             }
             let mut face = Face::new_complex(exterior, interiors, None)?;
             face.set_area(area);
