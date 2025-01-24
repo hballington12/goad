@@ -25,6 +25,7 @@ async fn main() {
     clip.data_mut().area =
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     geom.shapes[0].refr_index.re = 1.5;
+    geom.shapes[0].refr_index.im = 1e-1;
     // geom.shapes[1].refr_index.re = 2.0;
     // geom.shapes[2].refr_index.re = 2.5;
 
@@ -49,18 +50,18 @@ async fn main() {
         }
 
         // Check if "Enter" is pressed
-        // if is_key_pressed(KeyCode::Enter) {
-        if let Some(next_propagation) = problem.propagate_next() {
-            propagation = Some(next_propagation);
-            println!(
-                "number of beams in beam queue: {:?}",
-                problem.beam_queue.len()
-            );
-        } else {
-            println!("No more beams to propagate.");
-            break;
+        if is_key_pressed(KeyCode::Enter) {
+            if let Some(next_propagation) = problem.propagate_next() {
+                propagation = Some(next_propagation);
+                println!(
+                    "number of beams in beam queue: {:?}",
+                    problem.beam_queue.len()
+                );
+            } else {
+                println!("No more beams to propagate.");
+                break;
+            }
         }
-        // }
 
         next_frame().await;
     }

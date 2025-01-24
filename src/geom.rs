@@ -234,8 +234,30 @@ impl FaceData {
             ));
         }
 
-        let v1 = &vertices[0];
-        let v2 = &vertices[1];
+        // Find a pair of vertices with a distance greater than the threshold
+        let mut v1 = None;
+        let mut v2 = None;
+        for i in 0..vertices.len() {
+            for j in (i + 1)..vertices.len() {
+                if (vertices[j] - vertices[i]).magnitude() > config::VEC_LENGTH_THRESHOLD {
+                    v1 = Some(&vertices[i]);
+                    v2 = Some(&vertices[j]);
+                    break;
+                }
+            }
+            if v1.is_some() && v2.is_some() {
+                break;
+            }
+        }
+
+        // Return an error if no suitable pair is found
+        let v1 = v1.ok_or_else(|| {
+            anyhow::anyhow!("No vertex pair found with a distance greater than the threshold.")
+        })?;
+        let v2 = v2.ok_or_else(|| {
+            anyhow::anyhow!("No vertex pair found with a distance greater than the threshold.")
+        })?;
+
         let v3 = self.midpoint;
 
         // Compute edge vectors

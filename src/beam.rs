@@ -343,8 +343,8 @@ fn get_ampl(
 
     let arg = dist * config::WAVENO * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
-    let arg = -2.0 * config::WAVENO * n1.im * dist.sqrt(); // absorption
-    ampl *= Complex::new(arg.cos(), arg.sin()); //  apply absorption factor
+    let exp_absorption = (-2.0 * config::WAVENO * n1.im * dist.sqrt()).exp(); // absorption
+    ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
     Ok(ampl)
 }
 
