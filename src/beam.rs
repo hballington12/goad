@@ -180,13 +180,10 @@ impl Beam {
     /// Computes the propagation of a `Beam`, yielding the output
     /// beams which can then be dealt with as needed.
     pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
-        println!("===================");
-        println!("propagating beam...");
         let mut outputs = Vec::new();
         match self {
             Beam::Initial(data) => {
                 let outputs_beams = Self::process_beam(geom, data);
-                println!("adding {} beams to the outputs", outputs_beams.len());
                 outputs.extend(outputs_beams);
             }
             Beam::Default { data, variant } => {
@@ -195,16 +192,9 @@ impl Beam {
                         || (*variant == BeamVariant::Tir && data.tir_count < config::MAX_TIR))
                 {
                     let output_beams = Self::process_beam(geom, data);
-                    println!("adding {} beams to the outputs", output_beams.len());
                     outputs.extend(output_beams);
                 } else {
-                    println!(
-                        "beam, variant: {:?}, trunacted with rec: {}, tir: {}, power: {}",
-                        variant,
-                        data.rec_count,
-                        data.tir_count,
-                        data.power()
-                    );
+                    // beam truncation
                 }
             }
             Beam::OutGoing(..) => {

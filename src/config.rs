@@ -8,6 +8,7 @@ pub const CLIP_TOLERANCE: f32 = 1e10; // Named constant for tolerance
 pub const COLINEAR_THRESHOLD: f32 = 0.001; // Named constant for avoiding taking cross products from colinear vectors
 pub const VEC_LENGTH_THRESHOLD: f32 = 0.01; // Minimum vector length to be considered non-degenerate
 pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01; // Minimum distance traversed by ray to intersection
+pub const TOTAL_POWER_CUTOFF: f32 = 1.0; // Acceptable energy threshold beyond which beam propagation terminates
 pub const MEDIUM_REFR_INDEX: Complex<f32> = Complex {
     // outer medium refractive index
     re: 1.0,

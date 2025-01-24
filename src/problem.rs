@@ -1,6 +1,7 @@
 use crate::{
     beam::{Beam, BeamPropagation},
     clip::Clipping,
+    config,
     geom::{Face, Geom},
     helpers::draw_face,
 };
@@ -67,7 +68,6 @@ pub struct Problem {
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom, beam: Beam) -> Self {
-        println!("geom struct: {:?}", geom.containment_graph);
         Self {
             geom,
             beam_queue: vec![beam],
@@ -75,6 +75,30 @@ impl Problem {
             power_in: 0.0,
             power_out: 0.0,
         }
+    }
+
+    /// Trace beams to solve the near-field problem.
+    pub fn solve_near(&mut self) {
+        loop {
+            if self.beam_queue.len() == 0 {
+                println!("all beams traced...");
+                break;
+            }
+
+            if self.power_out / self.power_in > config::TOTAL_POWER_CUTOFF {
+                println!("cut off power out reached...");
+                break;
+            }
+
+            self.propagate_next();
+        }
+
+        println!(
+            "done. power in: {}, power out: {}, conservation: {}",
+            self.power_in,
+            self.power_out,
+            self.power_out / self.power_in
+        )
     }
 
     /// Propagates the next beam in the queue.
@@ -106,23 +130,6 @@ impl Problem {
             }
 
             let propagation = BeamPropagation::new(beam, outputs);
-            // println!(
-            //     "this power in: {}, out: {}, conservation: {}",
-            //     propagation.input_power(),
-            //     propagation.output_power(),
-            //     propagation.output_power() / propagation.input_power()
-            // );
-            // println!(
-            //     "number of output beams in this propagation: {}",
-            //     propagation.outputs.len()
-            // );
-            // println!("{:?}", propagation.input);
-            println!(
-                "total power in: {}, out: {}, conservation: {}",
-                self.power_in,
-                self.power_out,
-                self.power_out / self.power_in
-            );
             Some(propagation)
         } else {
             println!("no beams left to pop!");

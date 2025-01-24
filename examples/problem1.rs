@@ -5,6 +5,7 @@ use pbt::{
     beam::Beam,
     geom::{self, Face},
 };
+use std::io::{self, Write};
 
 #[macroquad::main("Testing...")]
 async fn main() {
@@ -53,10 +54,11 @@ async fn main() {
         // if is_key_pressed(KeyCode::Enter) {
         if let Some(next_propagation) = problem.propagate_next() {
             propagation = Some(next_propagation);
-            println!(
-                "number of beams in beam queue: {:?}",
+            print!(
+                "\rnumber of beams in beam queue: {:?}    ", // Add spaces to overwrite previous text
                 problem.beam_queue.len()
             );
+            io::stdout().flush().unwrap();
         } else {
             println!("No more beams to propagate.");
             break;
