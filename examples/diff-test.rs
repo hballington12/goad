@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector, Vector3};
+use ndarray::{Array2, Axis};
 use pbt::problem::Problem;
 use pbt::{
     beam::Beam,
@@ -135,55 +136,53 @@ fn diffraction(
     let incidence2 = rot2 * rot * incidence;
     println!("incidence2: {}", incidence2);
 
-    // make some far field bins
+    // Constants
     let r = 1e6;
-    let help1s: Vec<f32> = vec![0.1, 0.2]; // replace with theta later
-    let help2s: Vec<f32> = vec![0.1, 0.4]; // replace with phi later
-    let mut xfar: [[f32; 2]; 2] = [[0.0; 2]; 2];
-    let mut yfar: [[f32; 2]; 2] = [[0.0; 2]; 2];
-    let mut zfar: [[f32; 2]; 2] = [[0.0; 2]; 2];
-    for (i, help1) in help1s.iter().enumerate() {
-        for (j, help2) in help2s.iter().enumerate() {
-            xfar[i][j] = r * help1.sin() * help2.cos();
-            yfar[i][j] = r * help1.sin() * help2.sin();
-            zfar[i][j] = r * help1.cos();
-        }
-    }
+
+    // Example theta and phi (replace later with actual values)
+    let help1s = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
+    let help2s = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
+
+    // Compute xfar, yfar, zfar
+    let sin_help1 = help1s.mapv(f32::sin);
+    let cos_help1 = help1s.mapv(f32::cos);
+    let sin_help2 = help2s.mapv(f32::sin);
+    let cos_help2 = help2s.mapv(f32::cos);
+
+    let xfar = r * &sin_help1 * &cos_help2;
+    let yfar = r * &sin_help1 * &sin_help2;
+    let zfar = r * &cos_help1;
+
     println!("xfar: {:?}", xfar);
     println!("yfar: {:?}", yfar);
     println!("zfar: {:?}", zfar);
 
-    // translate far-field bins to aperture system
-    let mut x1 = xfar.clone();
-    let mut y1 = yfar.clone();
-    let mut z1 = zfar.clone();
-    for row in x1.iter_mut() {
-        for elem in row.iter_mut() {
-            *elem -= center_of_mass.x;
-        }
-    }
-    for row in y1.iter_mut() {
-        for elem in row.iter_mut() {
-            *elem -= center_of_mass.y;
-        }
-    }
-    for row in z1.iter_mut() {
-        for elem in row.iter_mut() {
-            *elem -= center_of_mass.z;
-        }
-    }
+    // Translate far-field bins to the aperture system
+    let x1 = &xfar - center_of_mass[0];
+    let y1 = &yfar - center_of_mass[1];
+    let z1 = &zfar - center_of_mass[2];
 
     println!("x1: {:?}", x1);
     println!("y1: {:?}", y1);
     println!("z1: {:?}", z1);
 
-    let mut r1: [[f32; 2]; 2] = [[0.0; 2]; 2];
-    for (i, row) in x1.iter().enumerate() {
-        for (j, elem) in row.iter().enumerate() {
-            r1[i][j] = (x1[i][j].powi(2) + y1[i][j].powi(2) + z1[i][j].powi(2)).sqrt();
-        }
-    }
+    // Compute r1 (distance from the center of mass)
+    let r1 = (&x1.mapv(|v| v.powi(2)) + &y1.mapv(|v| v.powi(2)) + &z1.mapv(|v| v.powi(2)))
+        .mapv(f32::sqrt);
+
     println!("r1: {:?}", r1);
+    // TODO: numerical bodge for rot4 matrix here
+    // rotate bins
+
+    let rot3 = rot2 * rot;
+
+    let x3 = rot3[(0, 0)] * &x1 + rot3[(0, 1)] * &y1 + rot3[(0, 2)] * &z1;
+    let y3 = rot3[(1, 0)] * &x1 + rot3[(1, 1)] * &y1 + rot3[(1, 2)] * &z1;
+    let z3 = rot3[(2, 0)] * &x1 + rot3[(2, 1)] * &y1 + rot3[(2, 2)] * &z1;
+
+    println!("x3: {:?}", x3);
+    println!("y3: {:?}", y3);
+    println!("z3: {:?}", z3);
 
     todo!()
 }
