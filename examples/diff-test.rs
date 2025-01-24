@@ -8,10 +8,10 @@ use pbt::{
 use std::io::{self, Write};
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
-    let e_perp = Vector3::z(); // choose e_perp along z-axis for now
+    // let e_perp = Vector3::z(); // choose e_perp along z-axis for now
 
     let lower_left = vec![-10.0, -2.0];
     let upper_right = vec![10.0, 2.0];
@@ -27,10 +27,14 @@ fn main() {
     geom.shapes[0].refr_index.re = 1.5;
     geom.shapes[0].refr_index.im = 0.00001;
 
-    let mut problem = Problem::new(
-        geom,
-        Beam::new_initial(clip, projection, Complex::new(1.00, 0.0), e_perp).unwrap(),
-    );
+    // let mut problem = Problem::new(
+    //     geom,
+    //     Beam::new_initial(clip, projection, Complex::new(1.00, 0.0), e_perp).unwrap(),
+    // );
 
-    problem.solve_near();
+    // problem.solve_near();
+
+    // pull rectangular face and print vertices
+    let face = geom.shapes[0].faces[0].clone();
+    println!("face vertices: {:?}", face.data().exterior);
 }

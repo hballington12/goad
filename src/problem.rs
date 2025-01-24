@@ -144,6 +144,10 @@ impl Problem {
 
         println!("done.");
         println!("{}", self.powers);
+        println!(
+            "number of beams awaiting diffraction: {}",
+            self.out_beam_queue.len()
+        );
     }
 
     /// Propagates the next beam in the queue.
