@@ -1,6 +1,7 @@
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector, Vector3};
 use ndarray::{Array2, Axis};
+use pbt::field::Field;
 use pbt::problem::Problem;
 use pbt::{
     beam::Beam,
@@ -140,18 +141,18 @@ fn diffraction(
     let r = 1e6;
 
     // Example theta and phi (replace later with actual values)
-    let help1s = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
-    let help2s = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
+    let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
+    let phis = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
 
     // Compute xfar, yfar, zfar
-    let sin_help1 = help1s.mapv(f32::sin);
-    let cos_help1 = help1s.mapv(f32::cos);
-    let sin_help2 = help2s.mapv(f32::sin);
-    let cos_help2 = help2s.mapv(f32::cos);
+    let sin_theta = thetas.mapv(f32::sin);
+    let cos_theta = thetas.mapv(f32::cos);
+    let sin_phi = phis.mapv(f32::sin);
+    let cos_phi = phis.mapv(f32::cos);
 
-    let xfar = r * &sin_help1 * &cos_help2;
-    let yfar = r * &sin_help1 * &sin_help2;
-    let zfar = r * &cos_help1;
+    let xfar = r * &sin_theta * &cos_phi;
+    let yfar = r * &sin_theta * &sin_phi;
+    let zfar = r * &cos_theta;
 
     println!("xfar: {:?}", xfar);
     println!("yfar: {:?}", yfar);
@@ -184,11 +185,14 @@ fn diffraction(
     println!("y3: {:?}", y3);
     println!("z3: {:?}", z3);
 
-    for ((&x1_val, &y1_val), &z1_val) in x1.iter().zip(y1.iter()).zip(z1.iter()) {
+    for (((&phi_val, &x1_val), &y1_val), &z1_val) in
+        phis.iter().zip(x1.iter()).zip(y1.iter()).zip(z1.iter())
+    {
         let x3 = rot3[(0, 0)] * x1_val + rot3[(0, 1)] * y1_val + rot3[(0, 2)] * z1_val;
         let y3 = rot3[(1, 0)] * x1_val + rot3[(1, 1)] * y1_val + rot3[(1, 2)] * z1_val;
         let z3 = rot3[(2, 0)] * x1_val + rot3[(2, 1)] * y1_val + rot3[(2, 2)] * z1_val;
 
+        println!("phi val is: {}", phi_val);
         println!("x3: {}", x3);
         println!("y3: {}", y3);
         println!("z3: {}", z3);
@@ -222,6 +226,40 @@ fn diffraction(
         rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
 
         println!("rot4: {}", rot4);
+
+        let temp_vec3 = Vector3::new(phi_val.cos(), phi_val.sin(), 0.0);
+
+        println!("tempvec3: {}", temp_vec3);
+
+        // TODO this has normalisation, which is not present in Fortran version,
+        // but it appears like normalisation should be present, so probably
+        // uncomment this back in later...
+        let temp_rot1 = Field::rotation_matrix(
+            Vector3::x(),
+            Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
+            -Vector3::z(),
+        );
+        println!("temprot1: {}", temp_rot1);
+
+        // // START BODGE ROT MATRIX
+        // let vk7 = Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0);
+        // let ev1 = Vector3::x();
+        // let ev3 = -Vector3::z();
+        // let help1 = vk7.dot(&ev1);
+        // let evo2 = ev3.cross(&ev1);
+        // let temp_rot1 = Matrix2::new(help1, -vk7.dot(&evo2), vk7.dot(&evo2), help1);
+        // END BODGE ROT MATRIX
+
+        let temp_rot1 = temp_rot1.transpose();
+        println!("temprot1 after transpose: {}", temp_rot1);
+
+        let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
+        let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
+        let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
+
+        let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
+
+        println!("ampl_temp2: {}", ampl_temp2);
 
         break;
     }

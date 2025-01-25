@@ -127,6 +127,9 @@ impl Field {
         let evo2 = prop.cross(&e_perp_in).normalize();
         let dot2 = e_perp_out.dot(&evo2);
 
+        println!("dot1: {}", dot1);
+        println!("evo2: {}", evo2);
+
         let result = Matrix2::new(dot1, -dot2, dot2, dot1);
         let det = result.determinant();
 
