@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector, Vector3};
-use ndarray::{Array2, Axis};
+use ndarray::{Array2, Array3, Array4, Axis};
 use pbt::field::Field;
 use pbt::problem::Problem;
 use pbt::{
@@ -144,6 +144,15 @@ fn diffraction(
     let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
     let phis = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
 
+    // Define a 4D array with shape (thetas.len(), phis.len(), 2, 2) for Complex<f32>
+    let mut amplCs = Array2::<Matrix2<Complex<f32>>>::default((thetas.len(), phis.len()));
+
+    for ((i, j), elem) in amplCs.indexed_iter() {
+        println!("element at {} {}: {}", i, j, elem);
+    }
+
+    println!("amplCs: {}", amplCs);
+
     // Compute xfar, yfar, zfar
     let sin_theta = thetas.mapv(f32::sin);
     let cos_theta = thetas.mapv(f32::cos);
@@ -185,20 +194,29 @@ fn diffraction(
     println!("y3: {:?}", y3);
     println!("z3: {:?}", z3);
 
-    for (((&phi_val, &x1_val), &y1_val), &z1_val) in
-        phis.iter().zip(x1.iter()).zip(y1.iter()).zip(z1.iter())
-    {
-        let x3 = rot3[(0, 0)] * x1_val + rot3[(0, 1)] * y1_val + rot3[(0, 2)] * z1_val;
-        let y3 = rot3[(1, 0)] * x1_val + rot3[(1, 1)] * y1_val + rot3[(1, 2)] * z1_val;
-        let z3 = rot3[(2, 0)] * x1_val + rot3[(2, 1)] * y1_val + rot3[(2, 2)] * z1_val;
+    // for ((((ampl_c, &phi_val), &x1_val), &y1_val), &z1_val) in amplCs
+    //     .iter_mut()
+    //     .zip(phis.iter())
+    //     .zip(x1.iter())
+    //     .zip(y1.iter())
+    //     .zip(z1.iter())
+    // {
+    for ((i, j), elem) in amplCs.indexed_iter_mut() {
+        let x3_val = &x3[(i, j)];
+        let y3_val = &y3[(i, j)];
+        let z3_val = &z3[(i, j)];
+        let phi_val = &phis[(0, i)];
 
+        println!("###########################");
+        println!("###########################");
+        println!("###########################");
         println!("phi val is: {}", phi_val);
         println!("x3: {}", x3);
         println!("y3: {}", y3);
         println!("z3: {}", z3);
 
         // Call karczewski for each element
-        let (diff_ampl, m, k) = karczewski(&prop2, x3, y3, z3, r);
+        let (diff_ampl, m, k) = karczewski(&prop2, *x3_val, *y3_val, *z3_val, r);
 
         // Print the results or process them as needed
         println!("Diff Ampl:\n{}", diff_ampl);
@@ -260,8 +278,11 @@ fn diffraction(
         let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
 
         println!("ampl_temp2: {}", ampl_temp2);
-
-        break;
+        elem[(0, 0)] = ampl_temp2[(0, 0)];
+        elem[(1, 0)] = ampl_temp2[(1, 0)];
+        elem[(0, 1)] = ampl_temp2[(0, 1)];
+        elem[(1, 1)] = ampl_temp2[(1, 1)];
+        println!("amplC: {}", elem);
     }
 
     todo!()
