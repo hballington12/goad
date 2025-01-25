@@ -74,13 +74,13 @@ fn diffraction(
         .fold(Vector3::zeros(), |acc, vert| acc + vert.coords);
 
     // Compute center of mass
-    let center_of_mass = Point3::<f64>::from(sum.into() / num_verts as f64);
+    let center_of_mass = Point3::from(sum / num_verts as f32);
 
     println!("com: {}", center_of_mass);
 
     let v20: Vec<_> = verts
         .iter()
-        .map(|point| point.coords.into() - center_of_mass.coords)
+        .map(|point| point.coords - center_of_mass.coords)
         .collect();
 
     println!("v20: {:?}", v20);
@@ -140,7 +140,7 @@ fn diffraction(
     // println!("incidence2: {}", incidence2);
 
     // Constants
-    let r: f64 = 1e6;
+    let r = 1e6;
 
     // Example theta and phi (replace later with actual values)
     let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
@@ -149,7 +149,7 @@ fn diffraction(
     // Define a 4D array with shape (thetas.len(), phis.len(), 2, 2) for Complex<f32>
     let mut amplCs = Array2::<Matrix2<Complex<f32>>>::default((thetas.len(), phis.len()));
 
-    let mut area_facs2 = Array2::<Complex<f64>>::zeros((thetas.len(), phis.len()));
+    let mut area_facs2 = Array2::<Complex<f32>>::zeros((thetas.len(), phis.len()));
 
     // for ((i, j), elem) in amplCs.indexed_iter() {
     //     println!("element at {} {}: {}", i, j, elem);
@@ -158,10 +158,10 @@ fn diffraction(
     // println!("amplCs: {}", amplCs);
 
     // Compute xfar, yfar, zfar
-    let sin_theta = thetas.mapv(f64::sin);
-    let cos_theta = thetas.mapv(f64::cos);
-    let sin_phi = phis.mapv(f64::sin);
-    let cos_phi = phis.mapv(f64::cos);
+    let sin_theta = thetas.mapv(f32::sin);
+    let cos_theta = thetas.mapv(f32::cos);
+    let sin_phi = phis.mapv(f32::sin);
+    let cos_phi = phis.mapv(f32::cos);
 
     let xfar = r * &sin_theta * &cos_phi;
     let yfar = r * &sin_theta * &sin_phi;
@@ -182,13 +182,13 @@ fn diffraction(
 
     // Compute r1 (distance from the center of mass)
     let r1 = (&x1.mapv(|v| v.powi(2)) + &y1.mapv(|v| v.powi(2)) + &z1.mapv(|v| v.powi(2)))
-        .mapv(f64::sqrt);
+        .mapv(f32::sqrt);
 
     // println!("r1: {:?}", r1);
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
 
-    let rot3: Matrix3<f64> = rot2 * rot;
+    let rot3 = rot2 * rot;
 
     let x3 = rot3[(0, 0)] * &x1 + rot3[(0, 1)] * &y1 + rot3[(0, 2)] * &z1;
     let y3 = rot3[(1, 0)] * &x1 + rot3[(1, 1)] * &y1 + rot3[(1, 2)] * &z1;
@@ -334,14 +334,14 @@ fn diffraction(
         println!("n: {:?}", n);
 
         for (j, vertex) in v1.rows().into_iter().enumerate() {
-            let mut mj: f64 = m[j].into();
-            let mut nj: f64 = n[j].into();
-            let mut xj: f64 = x[j].into();
-            let mut yj: f64 = y[j].into();
+            let mut mj = m[j];
+            let mut nj = n[j];
+            let mut xj = x[j];
+            let mut yj = y[j];
             // println!("mj: {}, nj: {}, xj: {}, yj: {}", mj, nj, xj, yj);
 
-            let mj = if mj.abs() > f64::MAX { 1e6 } else { mj };
-            let nj = if mj.abs() > f64::MAX { 1e6 } else { nj };
+            let mj = if mj.abs() > f32::MAX { 1e6 } else { mj };
+            let nj = if mj.abs() > f32::MAX { 1e6 } else { nj };
             let mj = if nj.abs() < 1e-9 { 1e6 } else { mj };
             let nj = if mj.abs() < 1e-9 { 1e6 } else { nj };
 
@@ -351,50 +351,50 @@ fn diffraction(
                 (x[j + 1], y[j + 1])
             };
             // println!("xjplus1,yjplus1: {}, {}", xj_plus1, yj_plus1);
-            let xj_plus1: f64 = xj_plus1.into();
-            let yj_plus1: f64 = yj_plus1.into();
 
-            let dx: f64 = xj_plus1 - xj;
-            let dy: f64 = yj_plus1 - yj;
+            let dx = xj_plus1 - xj;
+            let dy = yj_plus1 - yj;
 
             // println!("dx, dy: {}, {}", dx, dy);
 
-            let bvsk: f64 = config::WAVENO
-                * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2))
-                    .sqrt()
-                    .into();
+            let dist: f64 =
+                ((*x3_val as f64).powi(2) + (*y3_val as f64).powi(2) + (*z3_val as f64).powi(2))
+                    .sqrt();
 
-            println!("bvsk: {}, cosine: {}", bvsk, bvsk.cos());
+            let bvsk = config::WAVENO * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2)).sqrt();
+            let bvsk = config::WAVENO as f64 * dist;
 
-            let kxx = kinc[0] - config::WAVENO.powi(2) * x3_val.into() / bvsk;
-            let kyy = kinc[1] - config::WAVENO.powi(2) * y3_val.into() / bvsk;
+            println!("bvsk: {}, cosine is {}", bvsk, bvsk.cos());
 
-            // println!("kxx, kyy: {}, {}", kxx, kyy);
+            // let kxx = kinc[0] - config::WAVENO.powi(2) * x3_val / bvsk;
+            // let kyy = kinc[1] - config::WAVENO.powi(2) * y3_val / bvsk;
 
-            let delta: f64 = kxx * xj + kyy * yj;
-            let delta1: f64 = kyy * mj + kxx;
-            let delta2: f64 = kxx * nj + kyy;
-            let omega1: f64 = dx * delta1;
-            let omega2: f64 = dy * delta2;
+            // // println!("kxx, kyy: {}, {}", kxx, kyy);
 
-            let alpha: f64 = 1.0 / (2.0 * kyy * delta1);
-            let beta: f64 = 1.0 / (2.0 * kxx * delta2);
+            // let delta = kxx * xj + kyy * yj;
+            // let delta1 = kyy * mj + kxx;
+            // let delta2 = kxx * nj + kyy;
+            // let omega1 = dx * delta1;
+            // let omega2 = dy * delta2;
 
-            let sumim = alpha * (delta.cos() - (delta + omega1).cos())
-                - beta * (delta.cos() - (delta + omega2).cos());
-            let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
-                + beta * (delta.sin() - (delta + omega2).sin());
+            // let alpha = 1.0 / (2.0 * kyy * delta1);
+            // let beta = 1.0 / (2.0 * kxx * delta2);
 
-            // println!("sumim, sumre: {}, {}", sumim, sumre);
+            // let sumim = alpha * (delta.cos() - (delta + omega1).cos())
+            //     - beta * (delta.cos() - (delta + omega2).cos());
+            // let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
+            //     + beta * (delta.sin() - (delta + omega2).sin());
+
+            // // println!("sumim, sumre: {}, {}", sumim, sumre);
             // println!("wavelength is: {}", config::WAVELENGTH);
-            println!(
-                "Complex::new((bvsk).cos(), (bvsk).sin()) : {}",
-                Complex::new((bvsk).cos(), (bvsk).sin())
-            );
-            area_facs2 += Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
-                / Complex::new(config::WAVELENGTH.into(), 0.0);
+            // println!(
+            //     "Complex::new((bvsk).cos(), (bvsk).cos()) : {}",
+            //     Complex::new((bvsk).cos(), (bvsk).cos())
+            // );
+            // area_facs2 += Complex::new((bvsk).cos(), (bvsk).cos()) * Complex::new(sumre, sumim)
+            //     / Complex::new(config::WAVELENGTH, 0.0);
 
-            println!("==")
+            // println!("==")
         }
 
         // break;
