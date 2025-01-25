@@ -184,6 +184,48 @@ fn diffraction(
     println!("y3: {:?}", y3);
     println!("z3: {:?}", z3);
 
+    for ((&x1_val, &y1_val), &z1_val) in x1.iter().zip(y1.iter()).zip(z1.iter()) {
+        let x3 = rot3[(0, 0)] * x1_val + rot3[(0, 1)] * y1_val + rot3[(0, 2)] * z1_val;
+        let y3 = rot3[(1, 0)] * x1_val + rot3[(1, 1)] * y1_val + rot3[(1, 2)] * z1_val;
+        let z3 = rot3[(2, 0)] * x1_val + rot3[(2, 1)] * y1_val + rot3[(2, 2)] * z1_val;
+
+        println!("x3: {}", x3);
+        println!("y3: {}", y3);
+        println!("z3: {}", z3);
+
+        // Call karczewski for each element
+        let (diff_ampl, m, k) = karczewski(&prop2, x3, y3, z3, r);
+
+        // Print the results or process them as needed
+        println!("Diff Ampl:\n{}", diff_ampl);
+        println!("M Vector: {}", m);
+        println!("K Vector: {}", k);
+
+        let hc = if incidence2.dot(&k).abs() < 0.999 {
+            incidence2.cross(&k).normalize()
+        } else {
+            panic!("need to implement this");
+        };
+
+        let evo2 = k.cross(&m);
+
+        println!("evo2 {}", evo2);
+        println!("hc {}", hc);
+
+        // Initialize a 2x2 matrix for rot4
+        let mut rot4 = Matrix2::zeros();
+
+        // Populate rot4 using the dot products
+        rot4[(0, 0)] = hc.dot(&m); // rot4(1,1) = dot_product(hc, m)
+        rot4[(1, 1)] = hc.dot(&m); // rot4(2,2) = dot_product(hc, m)
+        rot4[(0, 1)] = -hc.dot(&evo2); // rot4(1,2) = -dot_product(hc, evo2)
+        rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
+
+        println!("rot4: {}", rot4);
+
+        break;
+    }
+
     todo!()
 }
 
@@ -278,4 +320,62 @@ fn get_rotation_matrix2(verts: Vec<Vector3<f32>>) -> Matrix3<f32> {
     };
 
     rot
+}
+
+fn karczewski(
+    prop2: &Vector3<f32>, // Outgoing propagation direction in aperture system
+    x3: f32,              // x coordinate of far-field bin
+    y3: f32,              // y coordinate of far-field bin
+    z3: f32,              // z coordinate of far-field bin
+    r: f32,               // Distance to bin vector
+) -> (Matrix2<f32>, Vector3<f32>, Vector3<f32>) {
+    // Compute the diff ampl matrix for polarisation of far-field diffraction at a far-field bin
+    // TODO: Add debug mode with numerical checks (as mentioned in the original MATLAB code)
+
+    // Far-field bin distance
+    let bin_vec_size = r;
+
+    // Propagation vector components for each bin vector in the aperture system
+    let mut k = Vector3::new(x3 / bin_vec_size, y3 / bin_vec_size, z3 / bin_vec_size);
+
+    // Ensure k.y is within bounds
+    if k.y.abs() > 0.999_999 {
+        k.y = 0.999_999_f32.copysign(k.y);
+    }
+
+    // Propagation direction in aperture system
+    let big_kx = prop2.x;
+    let big_ky = prop2.y;
+    let big_kz = prop2.z;
+
+    // Perpendicular field direction
+    let sqrt_1_minus_k2y2 = (1.0 - k.y.powi(2)).sqrt();
+    let m = Vector3::new(
+        -k.x * k.y / sqrt_1_minus_k2y2,
+        sqrt_1_minus_k2y2,
+        -k.y * k.z / sqrt_1_minus_k2y2,
+    );
+
+    // Pre-calculate factor
+    let frac = ((1.0 - k.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
+
+    // KW coefficients
+    let a1m = -big_kz * frac;
+    let b2m = -k.z / frac;
+    let a1e = b2m;
+    let b2e = a1m;
+    let b1m = -k.x * k.y / frac + big_kx * big_ky * frac;
+    let a2e = -b1m;
+
+    // Combined (e-m theory) KW coefficients
+    let a1em = 0.5 * (a1m + a1e);
+    let a2em = 0.5 * a2e;
+    let b1em = 0.5 * b1m;
+    let b2em = 0.5 * (b2m + b2e);
+
+    // Fill the diff_ampl matrix (e-m theory)
+    let diff_ampl = Matrix2::new(a1em, b1em, a2em, b2em);
+
+    // Return the outputs
+    (diff_ampl, m, k)
 }
