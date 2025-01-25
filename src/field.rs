@@ -3,7 +3,7 @@ use anyhow::Result;
 use core::fmt;
 use std::fmt::{Debug, Error};
 
-use nalgebra::{Complex, ComplexField, Matrix2, Vector3};
+use nalgebra::{Complex, ComplexField, Matrix2, RealField, Vector3};
 
 #[cfg(test)]
 mod tests {
@@ -118,16 +118,16 @@ impl Field {
     /// about the propagation vector `prop` from
     /// the plane perpendicular to `e_perp_in` to the plane perpendicular to
     /// `e_perp_out`.
-    pub fn rotation_matrix(
-        e_perp_in: Vector3<f32>,
-        e_perp_out: Vector3<f32>,
-        prop: Vector3<f32>,
-    ) -> Matrix2<f32> {
+    pub fn rotation_matrix<T: RealField + std::marker::Copy>(
+        e_perp_in: Vector3<T>,
+        e_perp_out: Vector3<T>,
+        prop: Vector3<T>,
+    ) -> Matrix2<T> {
         let dot1 = e_perp_out.dot(&e_perp_in);
         let evo2 = prop.cross(&e_perp_in).normalize();
         let dot2 = e_perp_out.dot(&evo2);
 
-        let result = Matrix2::new(dot1, -dot2, dot2, dot1);
+        let result = Matrix2::new(dot1, -dot2, dot2.clone(), dot1.clone());
         let det = result.determinant();
 
         result / det.abs().sqrt()

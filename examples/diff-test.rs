@@ -140,7 +140,7 @@ fn diffraction(
     // println!("incidence2: {}", incidence2);
 
     // Constants
-    let r = 1e6;
+    let r: f64 = 1e6;
 
     // Example theta and phi (replace later with actual values)
     let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
@@ -158,10 +158,10 @@ fn diffraction(
     // println!("amplCs: {}", amplCs);
 
     // Compute xfar, yfar, zfar
-    let sin_theta = thetas.mapv(f32::sin);
-    let cos_theta = thetas.mapv(f32::cos);
-    let sin_phi = phis.mapv(f32::sin);
-    let cos_phi = phis.mapv(f32::cos);
+    let sin_theta = thetas.mapv(f64::sin);
+    let cos_theta = thetas.mapv(f64::cos);
+    let sin_phi = phis.mapv(f64::sin);
+    let cos_phi = phis.mapv(f64::cos);
 
     let xfar = r * &sin_theta * &cos_phi;
     let yfar = r * &sin_theta * &sin_phi;
@@ -172,9 +172,9 @@ fn diffraction(
     // println!("zfar: {:?}", zfar);
 
     // Translate far-field bins to the aperture system
-    let x1 = &xfar - center_of_mass[0];
-    let y1 = &yfar - center_of_mass[1];
-    let z1 = &zfar - center_of_mass[2];
+    let x1 = &xfar - center_of_mass[0] as f64;
+    let y1 = &yfar - center_of_mass[1] as f64;
+    let z1 = &zfar - center_of_mass[2] as f64;
 
     // println!("x1: {:?}", x1);
     // println!("y1: {:?}", y1);
@@ -182,13 +182,14 @@ fn diffraction(
 
     // Compute r1 (distance from the center of mass)
     let r1 = (&x1.mapv(|v| v.powi(2)) + &y1.mapv(|v| v.powi(2)) + &z1.mapv(|v| v.powi(2)))
-        .mapv(f32::sqrt);
+        .mapv(f64::sqrt);
 
     // println!("r1: {:?}", r1);
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
 
     let rot3 = rot2 * rot;
+    let rot3: Matrix3<f64> = rot2.map(|val| val as f64) * rot.map(|val| val as f64);
 
     let x3 = rot3[(0, 0)] * &x1 + rot3[(0, 1)] * &y1 + rot3[(0, 2)] * &z1;
     let y3 = rot3[(1, 0)] * &x1 + rot3[(1, 1)] * &y1 + rot3[(1, 2)] * &z1;
@@ -214,14 +215,20 @@ fn diffraction(
 
         // println!("###########################");
         // println!("###########################");
-        // println!("###########################");
-        // println!("phi val is: {}", phi_val);
-        // println!("x3: {}", x3);
-        // println!("y3: {}", y3);
-        // println!("z3: {}", z3);
+        println!("###########################");
+        println!("phi val is: {}", phi_val);
+        println!("x3: {}", x3);
+        println!("y3: {}", y3);
+        println!("z3: {}", z3);
 
         // Call karczewski for each element
-        let (diff_ampl, m, k) = karczewski(&prop2, *x3_val, *y3_val, *z3_val, r);
+        let (diff_ampl, m, k) = karczewski(
+            &prop2,
+            *x3_val as f32,
+            *y3_val as f32,
+            *z3_val as f32,
+            r as f32,
+        );
 
         // Print the results or process them as needed
         // println!("Diff Ampl:\n{}", diff_ampl);
@@ -278,7 +285,7 @@ fn diffraction(
 
         let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
         let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
-        let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
+        let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x as f32, 0.0));
 
         let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
 
@@ -357,12 +364,8 @@ fn diffraction(
 
             // println!("dx, dy: {}, {}", dx, dy);
 
-            let dist: f64 =
-                ((*x3_val as f64).powi(2) + (*y3_val as f64).powi(2) + (*z3_val as f64).powi(2))
-                    .sqrt();
-
-            let bvsk = config::WAVENO * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2)).sqrt();
-            let bvsk = config::WAVENO as f64 * dist;
+            let bvsk: f64 =
+                config::WAVENO as f64 * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2)).sqrt();
 
             println!("bvsk: {}, cosine is {}", bvsk, bvsk.cos());
 
@@ -394,7 +397,7 @@ fn diffraction(
             // area_facs2 += Complex::new((bvsk).cos(), (bvsk).cos()) * Complex::new(sumre, sumim)
             //     / Complex::new(config::WAVELENGTH, 0.0);
 
-            // println!("==")
+            println!("==")
         }
 
         // break;
