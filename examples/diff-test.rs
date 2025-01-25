@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use miniquad::ElapsedQuery;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector, Vector3};
 use ndarray::{Array2, Array3, Array4, Axis};
 use pbt::field::Field;
@@ -9,6 +10,7 @@ use pbt::{
     geom::{self, Face},
 };
 use std::f32::consts::PI;
+use std::f32::MAX;
 use std::io::{self, Write};
 
 fn main() {
@@ -72,27 +74,27 @@ fn diffraction(
         .fold(Vector3::zeros(), |acc, vert| acc + vert.coords);
 
     // Compute center of mass
-    let center_of_mass = Point3::from(sum / num_verts as f32);
+    let center_of_mass = Point3::<f64>::from(sum.into() / num_verts as f64);
 
     println!("com: {}", center_of_mass);
 
     let v20: Vec<_> = verts
         .iter()
-        .map(|point| point.coords - center_of_mass.coords)
+        .map(|point| point.coords.into() - center_of_mass.coords)
         .collect();
 
     println!("v20: {:?}", v20);
 
-    let rot = get_rotation_matrix2(v20);
-    println!("rot: {}", rot);
+    let rot = get_rotation_matrix2(&v20);
+    // println!("rot: {}", rot);
 
     let prop1 = rot * prop;
     let perp1 = rot * vk7;
-    println!("prop1: {}", prop1);
-    println!("per1: {}", perp1);
+    // println!("prop1: {}", prop1);
+    // println!("per1: {}", perp1);
 
     let angle = -prop1.y.atan2(prop1.x);
-    println!("angle is: {}", angle);
+    // println!("angle is: {}", angle);
 
     let rot2 = Matrix3::new(
         angle.cos(),
@@ -106,39 +108,39 @@ fn diffraction(
         1.0,
     );
 
-    println!("second rotation matrix rot2 {}", rot2);
+    // println!("second rotation matrix rot2 {}", rot2);
 
     let prop2 = rot2 * prop1;
     let perp2 = rot2 * perp1;
 
-    println!("prop2: {}", prop2);
-    println!("per2: {}", perp2);
+    // println!("prop2: {}", prop2);
+    // println!("per2: {}", perp2);
 
     let e_par2 = perp2.cross(&prop2).normalize();
-    println!("epar2 {}", e_par2);
+    // println!("epar2 {}", e_par2);
 
     let anti_parallel = if e_par2.z > config::COLINEAR_THRESHOLD {
         true
     } else {
         false
     };
-    println!("antiparallel: {}", anti_parallel);
+    // println!("antiparallel: {}", anti_parallel);
 
     let ampl = if anti_parallel {
-        println!("reversed ampl: {}", -ampl);
+        // println!("reversed ampl: {}", -ampl);
         -ampl
     } else {
-        println!("non-reversed ampl: {}", ampl);
+        // println!("non-reversed ampl: {}", ampl);
         ampl
     };
 
     let incidence = Vector3::new(0.0, 0.0, -1.0); // !todo: generalise
 
     let incidence2 = rot2 * rot * incidence;
-    println!("incidence2: {}", incidence2);
+    // println!("incidence2: {}", incidence2);
 
     // Constants
-    let r = 1e6;
+    let r: f64 = 1e6;
 
     // Example theta and phi (replace later with actual values)
     let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
@@ -147,52 +149,54 @@ fn diffraction(
     // Define a 4D array with shape (thetas.len(), phis.len(), 2, 2) for Complex<f32>
     let mut amplCs = Array2::<Matrix2<Complex<f32>>>::default((thetas.len(), phis.len()));
 
-    for ((i, j), elem) in amplCs.indexed_iter() {
-        println!("element at {} {}: {}", i, j, elem);
-    }
+    let mut area_facs2 = Array2::<Complex<f64>>::zeros((thetas.len(), phis.len()));
 
-    println!("amplCs: {}", amplCs);
+    // for ((i, j), elem) in amplCs.indexed_iter() {
+    //     println!("element at {} {}: {}", i, j, elem);
+    // }
+
+    // println!("amplCs: {}", amplCs);
 
     // Compute xfar, yfar, zfar
-    let sin_theta = thetas.mapv(f32::sin);
-    let cos_theta = thetas.mapv(f32::cos);
-    let sin_phi = phis.mapv(f32::sin);
-    let cos_phi = phis.mapv(f32::cos);
+    let sin_theta = thetas.mapv(f64::sin);
+    let cos_theta = thetas.mapv(f64::cos);
+    let sin_phi = phis.mapv(f64::sin);
+    let cos_phi = phis.mapv(f64::cos);
 
     let xfar = r * &sin_theta * &cos_phi;
     let yfar = r * &sin_theta * &sin_phi;
     let zfar = r * &cos_theta;
 
-    println!("xfar: {:?}", xfar);
-    println!("yfar: {:?}", yfar);
-    println!("zfar: {:?}", zfar);
+    // println!("xfar: {:?}", xfar);
+    // println!("yfar: {:?}", yfar);
+    // println!("zfar: {:?}", zfar);
 
     // Translate far-field bins to the aperture system
     let x1 = &xfar - center_of_mass[0];
     let y1 = &yfar - center_of_mass[1];
     let z1 = &zfar - center_of_mass[2];
 
-    println!("x1: {:?}", x1);
-    println!("y1: {:?}", y1);
-    println!("z1: {:?}", z1);
+    // println!("x1: {:?}", x1);
+    // println!("y1: {:?}", y1);
+    // println!("z1: {:?}", z1);
 
     // Compute r1 (distance from the center of mass)
     let r1 = (&x1.mapv(|v| v.powi(2)) + &y1.mapv(|v| v.powi(2)) + &z1.mapv(|v| v.powi(2)))
-        .mapv(f32::sqrt);
+        .mapv(f64::sqrt);
 
-    println!("r1: {:?}", r1);
+    // println!("r1: {:?}", r1);
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
 
-    let rot3 = rot2 * rot;
+    let rot3: Matrix3<f64> = rot2 * rot;
 
     let x3 = rot3[(0, 0)] * &x1 + rot3[(0, 1)] * &y1 + rot3[(0, 2)] * &z1;
     let y3 = rot3[(1, 0)] * &x1 + rot3[(1, 1)] * &y1 + rot3[(1, 2)] * &z1;
     let z3 = rot3[(2, 0)] * &x1 + rot3[(2, 1)] * &y1 + rot3[(2, 2)] * &z1;
 
-    println!("x3: {:?}", x3);
-    println!("y3: {:?}", y3);
-    println!("z3: {:?}", z3);
+    // println!("x3: {:?}", x3);
+    // println!("y3: {:?}", y3);
+    // println!("z3: {:?}", z3);
 
     // for ((((ampl_c, &phi_val), &x1_val), &y1_val), &z1_val) in amplCs
     //     .iter_mut()
@@ -206,22 +210,23 @@ fn diffraction(
         let y3_val = &y3[(i, j)];
         let z3_val = &z3[(i, j)];
         let phi_val = &phis[(0, i)];
+        let area_fac2 = &area_facs2[(i, j)];
 
-        println!("###########################");
-        println!("###########################");
-        println!("###########################");
-        println!("phi val is: {}", phi_val);
-        println!("x3: {}", x3);
-        println!("y3: {}", y3);
-        println!("z3: {}", z3);
+        // println!("###########################");
+        // println!("###########################");
+        // println!("###########################");
+        // println!("phi val is: {}", phi_val);
+        // println!("x3: {}", x3);
+        // println!("y3: {}", y3);
+        // println!("z3: {}", z3);
 
         // Call karczewski for each element
         let (diff_ampl, m, k) = karczewski(&prop2, *x3_val, *y3_val, *z3_val, r);
 
         // Print the results or process them as needed
-        println!("Diff Ampl:\n{}", diff_ampl);
-        println!("M Vector: {}", m);
-        println!("K Vector: {}", k);
+        // println!("Diff Ampl:\n{}", diff_ampl);
+        // println!("M Vector: {}", m);
+        // println!("K Vector: {}", k);
 
         let hc = if incidence2.dot(&k).abs() < 0.999 {
             incidence2.cross(&k).normalize()
@@ -231,8 +236,8 @@ fn diffraction(
 
         let evo2 = k.cross(&m);
 
-        println!("evo2 {}", evo2);
-        println!("hc {}", hc);
+        // println!("evo2 {}", evo2);
+        // println!("hc {}", hc);
 
         // Initialize a 2x2 matrix for rot4
         let mut rot4 = Matrix2::zeros();
@@ -243,11 +248,11 @@ fn diffraction(
         rot4[(0, 1)] = -hc.dot(&evo2); // rot4(1,2) = -dot_product(hc, evo2)
         rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
 
-        println!("rot4: {}", rot4);
+        // println!("rot4: {}", rot4);
 
         let temp_vec3 = Vector3::new(phi_val.cos(), phi_val.sin(), 0.0);
 
-        println!("tempvec3: {}", temp_vec3);
+        // println!("tempvec3: {}", temp_vec3);
 
         // TODO this has normalisation, which is not present in Fortran version,
         // but it appears like normalisation should be present, so probably
@@ -257,7 +262,7 @@ fn diffraction(
             Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
             -Vector3::z(),
         );
-        println!("temprot1: {}", temp_rot1);
+        // println!("temprot1: {}", temp_rot1);
 
         // // START BODGE ROT MATRIX
         // let vk7 = Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0);
@@ -269,7 +274,7 @@ fn diffraction(
         // END BODGE ROT MATRIX
 
         let temp_rot1 = temp_rot1.transpose();
-        println!("temprot1 after transpose: {}", temp_rot1);
+        // println!("temprot1 after transpose: {}", temp_rot1);
 
         let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
         let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
@@ -277,18 +282,130 @@ fn diffraction(
 
         let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
 
-        println!("ampl_temp2: {}", ampl_temp2);
+        // println!("ampl_temp2: {}", ampl_temp2);
         elem[(0, 0)] = ampl_temp2[(0, 0)];
         elem[(1, 0)] = ampl_temp2[(1, 0)];
         elem[(0, 1)] = ampl_temp2[(0, 1)];
         elem[(1, 1)] = ampl_temp2[(1, 1)];
-        println!("amplC: {}", elem);
+        // println!("amplC: {}", elem);
+        println!("start contour...");
+
+        let rot = rot2 * rot;
+        println!("rot is: {}", rot);
+
+        let nv = v20.len();
+        println!("num vertices: {}", nv);
+
+        let mut v1 = Array2::<f32>::zeros((v20.len(), v20[0].len()));
+
+        for (i, vertex) in v20.iter().enumerate() {
+            let transformed_vertex = rot * vertex;
+            v1[[i, 0]] = transformed_vertex.x;
+            v1[[i, 1]] = transformed_vertex.y;
+            v1[[i, 2]] = transformed_vertex.z;
+        }
+        println!("v1 is: {}", v1);
+
+        let kinc = prop2 * config::WAVENO;
+        println!("kinc is: {}", kinc);
+
+        let mut x = vec![0.0; nv];
+        let mut y = vec![0.0; nv];
+        for i in 0..nv {
+            x[i] = v1[[i, 0]];
+            y[i] = v1[[i, 1]];
+        }
+
+        let mut m = vec![0.0; nv];
+        let mut n = vec![0.0; nv];
+        for j in 0..nv {
+            if j == nv - 1 {
+                // Special case for the last vertex
+                m[j] = (y[0] - y[j]) / (x[0] - x[j]);
+            } else {
+                // Compute gradient for other vertices
+                m[j] = (y[j + 1] - y[j]) / (x[j + 1] - x[j]);
+            }
+            // Compute inverse gradient
+            n[j] = 1.0 / m[j];
+        }
+
+        println!("m: {:?}", m);
+        println!("n: {:?}", n);
+
+        for (j, vertex) in v1.rows().into_iter().enumerate() {
+            let mut mj: f64 = m[j].into();
+            let mut nj: f64 = n[j].into();
+            let mut xj: f64 = x[j].into();
+            let mut yj: f64 = y[j].into();
+            // println!("mj: {}, nj: {}, xj: {}, yj: {}", mj, nj, xj, yj);
+
+            let mj = if mj.abs() > f64::MAX { 1e6 } else { mj };
+            let nj = if mj.abs() > f64::MAX { 1e6 } else { nj };
+            let mj = if nj.abs() < 1e-9 { 1e6 } else { mj };
+            let nj = if mj.abs() < 1e-9 { 1e6 } else { nj };
+
+            let (xj_plus1, yj_plus1) = if j == nv - 1 {
+                (x[0], y[0])
+            } else {
+                (x[j + 1], y[j + 1])
+            };
+            // println!("xjplus1,yjplus1: {}, {}", xj_plus1, yj_plus1);
+            let xj_plus1: f64 = xj_plus1.into();
+            let yj_plus1: f64 = yj_plus1.into();
+
+            let dx: f64 = xj_plus1 - xj;
+            let dy: f64 = yj_plus1 - yj;
+
+            // println!("dx, dy: {}, {}", dx, dy);
+
+            let bvsk: f64 = config::WAVENO
+                * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2))
+                    .sqrt()
+                    .into();
+
+            println!("bvsk: {}, cosine: {}", bvsk, bvsk.cos());
+
+            let kxx = kinc[0] - config::WAVENO.powi(2) * x3_val.into() / bvsk;
+            let kyy = kinc[1] - config::WAVENO.powi(2) * y3_val.into() / bvsk;
+
+            // println!("kxx, kyy: {}, {}", kxx, kyy);
+
+            let delta: f64 = kxx * xj + kyy * yj;
+            let delta1: f64 = kyy * mj + kxx;
+            let delta2: f64 = kxx * nj + kyy;
+            let omega1: f64 = dx * delta1;
+            let omega2: f64 = dy * delta2;
+
+            let alpha: f64 = 1.0 / (2.0 * kyy * delta1);
+            let beta: f64 = 1.0 / (2.0 * kxx * delta2);
+
+            let sumim = alpha * (delta.cos() - (delta + omega1).cos())
+                - beta * (delta.cos() - (delta + omega2).cos());
+            let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
+                + beta * (delta.sin() - (delta + omega2).sin());
+
+            // println!("sumim, sumre: {}, {}", sumim, sumre);
+            // println!("wavelength is: {}", config::WAVELENGTH);
+            println!(
+                "Complex::new((bvsk).cos(), (bvsk).sin()) : {}",
+                Complex::new((bvsk).cos(), (bvsk).sin())
+            );
+            area_facs2 += Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
+                / Complex::new(config::WAVELENGTH.into(), 0.0);
+
+            println!("==")
+        }
+
+        // break;
     }
+
+    println!("areafacs2: {:?}", area_facs2);
 
     todo!()
 }
 
-fn get_rotation_matrix2(verts: Vec<Vector3<f32>>) -> Matrix3<f32> {
+fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     let a1 = verts[0];
     let b1 = verts[1];
 
