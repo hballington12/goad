@@ -110,7 +110,6 @@ fn diffraction(
 
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
-
     for (i, theta) in thetas.iter().enumerate() {
         for (j, phi) in phis.iter().enumerate() {
             // Compute sin and cos values for current theta and phi
@@ -138,8 +137,6 @@ fn diffraction(
             let amplc = &mut ampl_cs[(i, j)];
             let area_fac = &mut area_facs2[(i, j)];
 
-            // Perform necessary calculations involving amplc and area_fac here
-            // Example (replace with actual logic):
             *amplc = Matrix2::identity(); // Example, modify as needed
             *area_fac = Complex::new(0.0, 0.0); // Example, modify as needed
 
@@ -179,15 +176,13 @@ fn diffraction(
             amplc[(0, 1)] = ampl_temp2[(0, 1)];
             amplc[(1, 1)] = ampl_temp2[(1, 1)];
 
-            let rot = rot2 * rot;
-
             let nv = relative_vertices.len();
 
             let mut v1 =
                 Array2::<f32>::zeros((relative_vertices.len(), relative_vertices[0].len()));
 
             for (i, vertex) in relative_vertices.iter().enumerate() {
-                let transformed_vertex = rot * vertex;
+                let transformed_vertex = rot3 * vertex;
                 v1[[i, 0]] = transformed_vertex.x;
                 v1[[i, 1]] = transformed_vertex.y;
                 v1[[i, 2]] = transformed_vertex.z;
@@ -195,37 +190,33 @@ fn diffraction(
 
             let kinc = prop2 * config::WAVENO;
 
-            let mut x = vec![0.0; nv];
-            let mut y = vec![0.0; nv];
-            for i in 0..nv {
-                x[i] = v1[[i, 0]];
-                y[i] = v1[[i, 1]];
-            }
+            let x: Vec<f32> = v1.column(0).iter().cloned().collect();
+            let y: Vec<f32> = v1.column(1).iter().cloned().collect();
+            let m: Vec<f32> = (0..nv)
+                .map(|j| {
+                    if j == nv - 1 {
+                        (y[0] - y[j]) / (x[0] - x[j])
+                    } else {
+                        (y[j + 1] - y[j]) / (x[j + 1] - x[j])
+                    }
+                })
+                .collect();
 
-            let mut m = vec![0.0; nv];
-            let mut n = vec![0.0; nv];
-            for j in 0..nv {
-                if j == nv - 1 {
-                    // Special case for the last vertex
-                    m[j] = (y[0] - y[j]) / (x[0] - x[j]);
-                } else {
-                    // Compute gradient for other vertices
-                    m[j] = (y[j + 1] - y[j]) / (x[j + 1] - x[j]);
-                }
-                // Compute inverse gradient
-                n[j] = 1.0 / m[j];
-            }
+            let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
 
             for (j, vertex) in v1.rows().into_iter().enumerate() {
-                let mj = m[j];
-                let nj = n[j];
+                let mut mj = m[j];
+                let mut nj = n[j];
                 let xj = vertex[0];
                 let yj = vertex[1];
 
-                let mj = if mj.abs() > f32::MAX { 1e6 } else { mj };
-                let nj = if mj.abs() > f32::MAX { 1e6 } else { nj };
-                let mj = if nj.abs() < 1e-9 { 1e6 } else { mj };
-                let nj = if mj.abs() < 1e-9 { 1e6 } else { nj };
+                if mj.abs() > f32::MAX || nj.abs() < 1e-9 {
+                    mj = 1e6;
+                    nj = 1e6;
+                } else if nj.abs() > f32::MAX || mj.abs() < 1e-9 {
+                    mj = 1e6;
+                    nj = 1e6;
+                }
 
                 let (xj_plus1, yj_plus1) = if j == nv - 1 {
                     (x[0], y[0])
