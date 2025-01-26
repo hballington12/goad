@@ -56,61 +56,57 @@ fn main() {
     let vk7 = vk7.cross(&prop).normalize();
     let verts = face.data().exterior.clone();
 
-    diffraction(verts, ampl, prop, vk7);
+    diffraction(&verts, ampl, prop, vk7);
 }
 
 fn diffraction(
-    verts: Vec<Point3<f32>>,
-    ampl: Matrix2<Complex<f32>>,
+    verts: &[Point3<f32>],
+    mut ampl: Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
 ) {
-    let num_verts = verts.iter().len();
+    let num_verts = verts.len();
 
-    // Sum all vertex coordinates
-    let sum: Vector3<f32> = verts
-        .iter()
-        .fold(Vector3::zeros(), |acc, vert| acc + vert.coords);
+    // Sum all vertex coordinates and compute the center of mass
+    // Compute the center of mass directly without intermediate storage
+    let center_of_mass = Point3::from(
+        verts
+            .iter()
+            .map(|vert| vert.coords)
+            .fold(Vector3::zeros(), |acc, coords| acc + coords)
+            / num_verts as f32,
+    );
 
-    // Compute center of mass
-    let center_of_mass = Point3::from(sum / num_verts as f32);
-
-    let v20: Vec<_> = verts
+    // Transform vertices relative to the center of mass
+    let v20: Vec<Vector3<f32>> = verts
         .iter()
         .map(|point| point.coords - center_of_mass.coords)
         .collect();
 
+    // Rotation matrix from custom function
     let rot = get_rotation_matrix2(&v20);
 
+    // Transform propagation and auxiliary vectors
     let prop1 = rot * prop;
     let perp1 = rot * vk7;
 
     let angle = -prop1.y.atan2(prop1.x);
+    let cos_angle = angle.cos();
+    let sin_angle = angle.sin();
 
+    // Create the rotation matrix directly
     let rot2 = Matrix3::new(
-        angle.cos(),
-        -angle.sin(),
-        0.0,
-        angle.sin(),
-        angle.cos(),
-        0.0,
-        0.0,
-        0.0,
-        1.0,
+        cos_angle, -sin_angle, 0.0, sin_angle, cos_angle, 0.0, 0.0, 0.0, 1.0,
     );
 
     let prop2 = rot2 * prop1;
     let perp2 = rot2 * perp1;
-
     let e_par2 = perp2.cross(&prop2).normalize();
 
-    let anti_parallel = if e_par2.z > config::COLINEAR_THRESHOLD {
-        true
-    } else {
-        false
-    };
-
-    let ampl = if anti_parallel { -ampl } else { ampl };
+    // Check anti-parallel condition and modify amplitude in-place
+    if e_par2.z > config::COLINEAR_THRESHOLD {
+        ampl = -ampl;
+    }
 
     let incidence = Vector3::new(0.0, 0.0, -1.0); // !todo: generalise
 
@@ -122,7 +118,7 @@ fn diffraction(
     // Example theta and phi (replace later with actual values)
     // let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
     // let phis = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
-    let thetas = Array1::linspace(0.1, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (100, 1)
+    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (100, 1)
 
     // Phi: 100 steps from 0 to 2pi
     let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 50).insert_axis(ndarray::Axis(0)); // Reshape to (1, 100)
