@@ -147,7 +147,7 @@ fn diffraction(
             let (diff_ampl, m, k) =
                 karczewski(&prop2, rotated_pos.x, rotated_pos.y, rotated_pos.z, RADIUS);
 
-            let hc = if incidence2.dot(&k).abs() < 0.999 {
+            let hc = if incidence2.dot(&k).abs() < 1.0 - config::COLINEAR_THRESHOLD {
                 incidence2.cross(&k).normalize()
             } else {
                 print!("warn: need to implement this");
@@ -157,11 +157,7 @@ fn diffraction(
             let evo2 = k.cross(&m);
 
             // Initialize a 2x2 matrix for rot4
-            let mut rot4 = Matrix2::zeros();
-            rot4[(0, 0)] = hc.dot(&m); // rot4(1,1) = dot_product(hc, m)
-            rot4[(1, 1)] = hc.dot(&m); // rot4(2,2) = dot_product(hc, m)
-            rot4[(0, 1)] = -hc.dot(&evo2); // rot4(1,2) = -dot_product(hc, evo2)
-            rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
+            let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
 
             let temp_vec3 = Vector3::new(cos_phi, sin_phi, 0.0);
             let temp_rot1 = Field::rotation_matrix(
