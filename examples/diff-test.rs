@@ -56,7 +56,21 @@ fn main() {
     let vk7 = vk7.cross(&prop).normalize();
     let verts = face.data().exterior.clone();
 
-    diffraction(&verts, ampl, prop, vk7);
+    let theta_phi_combinations = generate_theta_phi_combinations();
+    let ampls = diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations);
+    writeup(&theta_phi_combinations, &ampls);
+}
+
+/// Generate theta and phi combinations
+fn generate_theta_phi_combinations() -> Vec<(f32, f32)> {
+    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
+    let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
+
+    // Flatten the combinations of theta and phi into a 1D array of tuples
+    thetas
+        .iter()
+        .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
+        .collect()
 }
 
 /// Diffraction. face in must be convex!
@@ -65,7 +79,19 @@ fn diffraction(
     mut ampl: Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
-) {
+    theta_phi_combinations: &[(f32, f32)],
+) -> Vec<Matrix2<Complex<f32>>> {
+    // Example theta and phi (replace later with actual values)
+    // let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
+    // let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
+    // let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
+
+    // Flatten the combinations of theta and phi into a 1D array of tuples
+    // let theta_phi_combinations: Vec<(f32, f32)> = thetas
+    //     .iter()
+    //     .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
+    //     .collect();
+
     // 1. Compute the center of mass
     let center_of_mass = calculate_center_of_mass(verts);
 
@@ -94,17 +120,6 @@ fn diffraction(
 
     // Constants
     const RADIUS: f32 = 1e4;
-
-    // Example theta and phi (replace later with actual values)
-    // let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
-    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
-    let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
-
-    // Flatten the combinations of theta and phi into a 1D array of tuples
-    let theta_phi_combinations: Vec<(f32, f32)> = thetas
-        .iter()
-        .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
-        .collect();
 
     // Define a 1D array with length theta_phi_combinations.len() for Complex<f32>
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
@@ -237,11 +252,13 @@ fn diffraction(
         amplc[(0, 1)] *= *area_fac;
         amplc[(1, 1)] *= *area_fac;
     }
-
+    ampl_cs
+}
+fn writeup(theta_phi_combinations: &[(f32, f32)], ampl_cs: &Vec<Matrix2<Complex<f32>>>) {
     println!("done.");
-    let mut s11 = Array1::<f32>::zeros(thetas.len() * phis.len());
+    let mut s11 = Array1::<f32>::zeros(theta_phi_combinations.len());
 
-    for (index, amplc) in ampl_cs.iter_mut().enumerate() {
+    for (index, amplc) in ampl_cs.iter().enumerate() {
         s11[index] = (Complex::new(0.5, 0.0)
             * (amplc[(0, 0)] * amplc[(0, 0)].conj()
                 + amplc[(0, 1)] * amplc[(0, 1)].conj()
@@ -259,13 +276,13 @@ fn diffraction(
 
     // Iterate over the array and write data to the file
     for (index, val) in s11.iter().enumerate() {
-        let (i, j) = (index / phis.len(), index % phis.len());
+        let (theta, phi) = theta_phi_combinations[index];
         writeln!(
             writer,
             "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
-            thetas[[i, 0]] * 180.0 / PI, // Theta at index i
-            phis[[0, j]] * 180.0 / PI,   // Phi at index j
-            val,                         // s11 value
+            theta * 180.0 / PI, // Theta at index i
+            phi * 180.0 / PI,   // Phi at index j
+            val,                // s11 value
             0.0,
             0.0,
             0.0,
