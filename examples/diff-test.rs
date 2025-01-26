@@ -68,53 +68,34 @@ fn diffraction(
 ) {
     let num_verts = verts.len();
 
-    // Sum all vertex coordinates and compute the center of mass
-    // Compute the center of mass directly without intermediate storage
-    let center_of_mass = Point3::from(
-        verts
-            .iter()
-            .map(|vert| vert.coords)
-            .fold(Vector3::zeros(), |acc, coords| acc + coords)
-            / num_verts as f32,
-    );
+    // 1. Compute the center of mass
+    let center_of_mass = calculate_center_of_mass(verts);
 
-    // Transform vertices relative to the center of mass
-    let v20: Vec<Vector3<f32>> = verts
-        .iter()
-        .map(|point| point.coords - center_of_mass.coords)
-        .collect();
+    // 2. Transform vertices relative to the center of mass
+    let relative_vertices = transform_to_center_of_mass(verts, &center_of_mass);
 
-    // Rotation matrix from custom function
-    let rot = get_rotation_matrix2(&v20);
-
-    // Transform propagation and auxiliary vectors
+    // 3. Compute rotation matrices
+    let rot = get_rotation_matrix2(&relative_vertices);
     let prop1 = rot * prop;
     let perp1 = rot * vk7;
+    let rot2 = calculate_rotation_matrix(prop1);
 
-    let angle = -prop1.y.atan2(prop1.x);
-    let cos_angle = angle.cos();
-    let sin_angle = angle.sin();
-
-    // Create the rotation matrix directly
-    let rot2 = Matrix3::new(
-        cos_angle, -sin_angle, 0.0, sin_angle, cos_angle, 0.0, 0.0, 0.0, 1.0,
-    );
-
+    // 4. Transform propagation and auxiliary vectors
     let prop2 = rot2 * prop1;
     let perp2 = rot2 * perp1;
     let e_par2 = perp2.cross(&prop2).normalize();
 
-    // Check anti-parallel condition and modify amplitude in-place
+    // 5. Update amplitude based on anti-parallel condition
     if e_par2.z > config::COLINEAR_THRESHOLD {
         ampl = -ampl;
     }
 
-    let incidence = Vector3::new(0.0, 0.0, -1.0); // !todo: generalise
-
-    let incidence2 = rot2 * rot * incidence;
+    let rot3 = rot2 * rot;
+    let incidence = Vector3::new(0.0, 0.0, -1.0); // TODO: generalise
+    let incidence2 = rot3 * incidence;
 
     // Constants
-    let r = 1e4;
+    const RADIUS: f32 = 1e4;
 
     // Example theta and phi (replace later with actual values)
     // let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
@@ -129,15 +110,16 @@ fn diffraction(
 
     let mut area_facs2 = Array2::<Complex<f32>>::zeros((thetas.len(), phis.len()));
 
+    // move from here inside the loop...
     // Compute xfar, yfar, zfar
     let sin_theta = thetas.mapv(f32::sin);
     let cos_theta = thetas.mapv(f32::cos);
     let sin_phi = phis.mapv(f32::sin);
     let cos_phi = phis.mapv(f32::cos);
 
-    let xfar = r * &sin_theta * &cos_phi;
-    let yfar = r * &sin_theta * &sin_phi;
-    let zfar = r * &cos_theta;
+    let xfar = RADIUS * &sin_theta * &cos_phi;
+    let yfar = RADIUS * &sin_theta * &sin_phi;
+    let zfar = RADIUS * &cos_theta;
 
     // Translate far-field bins to the aperture system
     let x1 = &xfar - center_of_mass[0];
@@ -147,149 +129,153 @@ fn diffraction(
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
 
-    let rot3 = rot2 * rot;
-
     let x3 = rot3[(0, 0)] * &x1 + rot3[(0, 1)] * &y1 + rot3[(0, 2)] * &z1;
     let y3 = rot3[(1, 0)] * &x1 + rot3[(1, 1)] * &y1 + rot3[(1, 2)] * &z1;
     let z3 = rot3[(2, 0)] * &x1 + rot3[(2, 1)] * &y1 + rot3[(2, 2)] * &z1;
 
-    for ((i, j), amplc) in ampl_cs.indexed_iter_mut() {
-        let x3_val = &x3[(i, j)];
-        let y3_val = &y3[(i, j)];
-        let z3_val = &z3[(i, j)];
-        let phi_val = &phis[(0, i)];
-        let area_fac2 = &mut area_facs2[(i, j)];
+    // for ((i, j), amplc) in ampl_cs.indexed_iter_mut() {
+    for (i, theta) in thetas.iter().enumerate() {
+        for (j, phi) in phis.iter().enumerate() {
+            let x3_val = &x3[(i, j)];
+            let y3_val = &y3[(i, j)];
+            let z3_val = &z3[(i, j)];
+            let phi_val = &phis[(0, i)];
+            let area_fac2 = &mut area_facs2[(i, j)];
+            let amplc = &mut ampl_cs[(i, j)];
 
-        // Call karczewski for each element
-        let (diff_ampl, m, k) = karczewski(&prop2, *x3_val, *y3_val, *z3_val, r);
+            // Call karczewski for each element
+            let (diff_ampl, m, k) = karczewski(&prop2, *x3_val, *y3_val, *z3_val, RADIUS);
 
-        let hc = if incidence2.dot(&k).abs() < 0.999 {
-            incidence2.cross(&k).normalize()
-        } else {
-            print!("warn: need to implement this");
-            incidence2.cross(&k).normalize()
-        };
-
-        let evo2 = k.cross(&m);
-
-        // Initialize a 2x2 matrix for rot4
-        let mut rot4 = Matrix2::zeros();
-
-        // Populate rot4 using the dot products
-        rot4[(0, 0)] = hc.dot(&m); // rot4(1,1) = dot_product(hc, m)
-        rot4[(1, 1)] = hc.dot(&m); // rot4(2,2) = dot_product(hc, m)
-        rot4[(0, 1)] = -hc.dot(&evo2); // rot4(1,2) = -dot_product(hc, evo2)
-        rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
-
-        let temp_vec3 = Vector3::new(phi_val.cos(), phi_val.sin(), 0.0);
-
-        // TODO this has normalisation, which is not present in Fortran version,
-        // but it appears like normalisation should be present, so probably
-        // uncomment this back in later...
-        let temp_rot1 = Field::rotation_matrix(
-            Vector3::x(),
-            Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
-            -Vector3::z(),
-        );
-
-        let temp_rot1 = temp_rot1.transpose();
-
-        let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
-        let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
-        let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
-
-        let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
-
-        amplc[(0, 0)] = ampl_temp2[(0, 0)];
-        amplc[(1, 0)] = ampl_temp2[(1, 0)];
-        amplc[(0, 1)] = ampl_temp2[(0, 1)];
-        amplc[(1, 1)] = ampl_temp2[(1, 1)];
-
-        let rot = rot2 * rot;
-
-        let nv = v20.len();
-
-        let mut v1 = Array2::<f32>::zeros((v20.len(), v20[0].len()));
-
-        for (i, vertex) in v20.iter().enumerate() {
-            let transformed_vertex = rot * vertex;
-            v1[[i, 0]] = transformed_vertex.x;
-            v1[[i, 1]] = transformed_vertex.y;
-            v1[[i, 2]] = transformed_vertex.z;
-        }
-
-        let kinc = prop2 * config::WAVENO;
-
-        let mut x = vec![0.0; nv];
-        let mut y = vec![0.0; nv];
-        for i in 0..nv {
-            x[i] = v1[[i, 0]];
-            y[i] = v1[[i, 1]];
-        }
-
-        let mut m = vec![0.0; nv];
-        let mut n = vec![0.0; nv];
-        for j in 0..nv {
-            if j == nv - 1 {
-                // Special case for the last vertex
-                m[j] = (y[0] - y[j]) / (x[0] - x[j]);
+            let hc = if incidence2.dot(&k).abs() < 0.999 {
+                incidence2.cross(&k).normalize()
             } else {
-                // Compute gradient for other vertices
-                m[j] = (y[j + 1] - y[j]) / (x[j + 1] - x[j]);
-            }
-            // Compute inverse gradient
-            n[j] = 1.0 / m[j];
-        }
-
-        for (j, vertex) in v1.rows().into_iter().enumerate() {
-            let mut mj = m[j];
-            let mut nj = n[j];
-            let mut xj = x[j];
-            let mut yj = y[j];
-
-            let mj = if mj.abs() > f32::MAX { 1e6 } else { mj };
-            let nj = if mj.abs() > f32::MAX { 1e6 } else { nj };
-            let mj = if nj.abs() < 1e-9 { 1e6 } else { mj };
-            let nj = if mj.abs() < 1e-9 { 1e6 } else { nj };
-
-            let (xj_plus1, yj_plus1) = if j == nv - 1 {
-                (x[0], y[0])
-            } else {
-                (x[j + 1], y[j + 1])
+                print!("warn: need to implement this");
+                incidence2.cross(&k).normalize()
             };
 
-            let dx = xj_plus1 - xj;
-            let dy = yj_plus1 - yj;
+            let evo2 = k.cross(&m);
 
-            let bvsk = config::WAVENO * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2)).sqrt();
+            // Initialize a 2x2 matrix for rot4
+            let mut rot4 = Matrix2::zeros();
 
-            let kxx = kinc[0] - config::WAVENO.powi(2) * x3_val / bvsk;
-            let kyy = kinc[1] - config::WAVENO.powi(2) * y3_val / bvsk;
+            // Populate rot4 using the dot products
+            rot4[(0, 0)] = hc.dot(&m); // rot4(1,1) = dot_product(hc, m)
+            rot4[(1, 1)] = hc.dot(&m); // rot4(2,2) = dot_product(hc, m)
+            rot4[(0, 1)] = -hc.dot(&evo2); // rot4(1,2) = -dot_product(hc, evo2)
+            rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
 
-            let delta = kxx * xj + kyy * yj;
-            let delta1 = kyy * mj + kxx;
-            let delta2 = kxx * nj + kyy;
-            let omega1 = dx * delta1;
-            let omega2 = dy * delta2;
+            let temp_vec3 = Vector3::new(phi_val.cos(), phi_val.sin(), 0.0);
 
-            let alpha = 1.0 / (2.0 * kyy * delta1);
-            let beta = 1.0 / (2.0 * kxx * delta2);
+            // TODO this has normalisation, which is not present in Fortran version,
+            // but it appears like normalisation should be present, so probably
+            // uncomment this back in later...
+            let temp_rot1 = Field::rotation_matrix(
+                Vector3::x(),
+                Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
+                -Vector3::z(),
+            );
 
-            let sumim = alpha * (delta.cos() - (delta + omega1).cos())
-                - beta * (delta.cos() - (delta + omega2).cos());
-            let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
-                + beta * (delta.sin() - (delta + omega2).sin());
+            let temp_rot1 = temp_rot1.transpose();
 
-            let summand = Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
-                / Complex::new(config::WAVELENGTH, 0.0);
+            let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
+            let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
+            let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
 
-            *area_fac2 += summand;
+            let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
+
+            amplc[(0, 0)] = ampl_temp2[(0, 0)];
+            amplc[(1, 0)] = ampl_temp2[(1, 0)];
+            amplc[(0, 1)] = ampl_temp2[(0, 1)];
+            amplc[(1, 1)] = ampl_temp2[(1, 1)];
+
+            let rot = rot2 * rot;
+
+            let nv = relative_vertices.len();
+
+            let mut v1 =
+                Array2::<f32>::zeros((relative_vertices.len(), relative_vertices[0].len()));
+
+            for (i, vertex) in relative_vertices.iter().enumerate() {
+                let transformed_vertex = rot * vertex;
+                v1[[i, 0]] = transformed_vertex.x;
+                v1[[i, 1]] = transformed_vertex.y;
+                v1[[i, 2]] = transformed_vertex.z;
+            }
+
+            let kinc = prop2 * config::WAVENO;
+
+            let mut x = vec![0.0; nv];
+            let mut y = vec![0.0; nv];
+            for i in 0..nv {
+                x[i] = v1[[i, 0]];
+                y[i] = v1[[i, 1]];
+            }
+
+            let mut m = vec![0.0; nv];
+            let mut n = vec![0.0; nv];
+            for j in 0..nv {
+                if j == nv - 1 {
+                    // Special case for the last vertex
+                    m[j] = (y[0] - y[j]) / (x[0] - x[j]);
+                } else {
+                    // Compute gradient for other vertices
+                    m[j] = (y[j + 1] - y[j]) / (x[j + 1] - x[j]);
+                }
+                // Compute inverse gradient
+                n[j] = 1.0 / m[j];
+            }
+
+            for (j, vertex) in v1.rows().into_iter().enumerate() {
+                let mut mj = m[j];
+                let mut nj = n[j];
+                let mut xj = x[j];
+                let mut yj = y[j];
+
+                let mj = if mj.abs() > f32::MAX { 1e6 } else { mj };
+                let nj = if mj.abs() > f32::MAX { 1e6 } else { nj };
+                let mj = if nj.abs() < 1e-9 { 1e6 } else { mj };
+                let nj = if mj.abs() < 1e-9 { 1e6 } else { nj };
+
+                let (xj_plus1, yj_plus1) = if j == nv - 1 {
+                    (x[0], y[0])
+                } else {
+                    (x[j + 1], y[j + 1])
+                };
+
+                let dx = xj_plus1 - xj;
+                let dy = yj_plus1 - yj;
+
+                let bvsk =
+                    config::WAVENO * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2)).sqrt();
+
+                let kxx = kinc[0] - config::WAVENO.powi(2) * x3_val / bvsk;
+                let kyy = kinc[1] - config::WAVENO.powi(2) * y3_val / bvsk;
+
+                let delta = kxx * xj + kyy * yj;
+                let delta1 = kyy * mj + kxx;
+                let delta2 = kxx * nj + kyy;
+                let omega1 = dx * delta1;
+                let omega2 = dy * delta2;
+
+                let alpha = 1.0 / (2.0 * kyy * delta1);
+                let beta = 1.0 / (2.0 * kxx * delta2);
+
+                let sumim = alpha * (delta.cos() - (delta + omega1).cos())
+                    - beta * (delta.cos() - (delta + omega2).cos());
+                let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
+                    + beta * (delta.sin() - (delta + omega2).sin());
+
+                let summand = Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
+                    / Complex::new(config::WAVELENGTH, 0.0);
+
+                *area_fac2 += summand;
+            }
+
+            amplc[(0, 0)] *= *area_fac2;
+            amplc[(1, 0)] *= *area_fac2;
+            amplc[(0, 1)] *= *area_fac2;
+            amplc[(1, 1)] *= *area_fac2;
         }
-
-        amplc[(0, 0)] *= *area_fac2;
-        amplc[(1, 0)] *= *area_fac2;
-        amplc[(0, 1)] *= *area_fac2;
-        amplc[(1, 1)] *= *area_fac2;
     }
 
     println!("done.");
@@ -487,4 +473,33 @@ fn karczewski(
 
     // Return the outputs
     (diff_ampl, m, k)
+}
+
+fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
+    Point3::from(
+        verts
+            .iter()
+            .map(|vert| vert.coords)
+            .fold(Vector3::zeros(), |acc, coords| acc + coords)
+            / verts.len() as f32,
+    )
+}
+
+fn transform_to_center_of_mass(
+    verts: &[Point3<f32>],
+    center_of_mass: &Point3<f32>,
+) -> Vec<Vector3<f32>> {
+    verts
+        .iter()
+        .map(|point| point.coords - center_of_mass.coords)
+        .collect()
+}
+
+fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
+    let angle = -prop1.y.atan2(prop1.x);
+    let (sin_angle, cos_angle) = angle.sin_cos();
+
+    Matrix3::new(
+        cos_angle, -sin_angle, 0.0, sin_angle, cos_angle, 0.0, 0.0, 0.0, 1.0,
+    )
 }
