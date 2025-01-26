@@ -66,8 +66,6 @@ fn diffraction(
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
 ) {
-    let num_verts = verts.len();
-
     // 1. Compute the center of mass
     let center_of_mass = calculate_center_of_mass(verts);
 
@@ -113,7 +111,6 @@ fn diffraction(
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
 
-    // for ((i, j), amplc) in ampl_cs.indexed_iter_mut() {
     for (i, theta) in thetas.iter().enumerate() {
         for (j, phi) in phis.iter().enumerate() {
             // Compute sin and cos values for current theta and phi
@@ -123,8 +120,9 @@ fn diffraction(
             let cos_phi = phi.cos();
 
             // Calculate xfar, yfar, zfar for the current (theta, phi)
-            let xfar = RADIUS * sin_theta * cos_phi;
-            let yfar = RADIUS * sin_theta * sin_phi;
+            let r_sin_theta = RADIUS * sin_theta;
+            let xfar = r_sin_theta * cos_phi;
+            let yfar = r_sin_theta * sin_phi;
             let zfar = RADIUS * cos_theta;
 
             // Translate far-field bins to the aperture system
@@ -132,10 +130,9 @@ fn diffraction(
             let y1 = yfar - center_of_mass[1];
             let z1 = zfar - center_of_mass[2];
 
-            // Rotate the bins using rot3 matrix
-            let x3 = rot3[(0, 0)] * x1 + rot3[(0, 1)] * y1 + rot3[(0, 2)] * z1;
-            let y3 = rot3[(1, 0)] * x1 + rot3[(1, 1)] * y1 + rot3[(1, 2)] * z1;
-            let z3 = rot3[(2, 0)] * x1 + rot3[(2, 1)] * y1 + rot3[(2, 2)] * z1;
+            // Rotate the bins using rot3 matrix (assuming rot3 is a 3x3 matrix)
+            let pos = Vector3::new(x1, y1, z1);
+            let rotated_pos = rot3 * pos; // Use matrix-vector multiplication
 
             // Use the calculated x3, y3, z3 for further processing in the loop
             let amplc = &mut ampl_cs[(i, j)];
@@ -147,7 +144,8 @@ fn diffraction(
             *area_fac = Complex::new(0.0, 0.0); // Example, modify as needed
 
             // Call karczewski for each element
-            let (diff_ampl, m, k) = karczewski(&prop2, x3, y3, z3, RADIUS);
+            let (diff_ampl, m, k) =
+                karczewski(&prop2, rotated_pos.x, rotated_pos.y, rotated_pos.z, RADIUS);
 
             let hc = if incidence2.dot(&k).abs() < 0.999 {
                 incidence2.cross(&k).normalize()
@@ -160,18 +158,12 @@ fn diffraction(
 
             // Initialize a 2x2 matrix for rot4
             let mut rot4 = Matrix2::zeros();
-
-            // Populate rot4 using the dot products
             rot4[(0, 0)] = hc.dot(&m); // rot4(1,1) = dot_product(hc, m)
             rot4[(1, 1)] = hc.dot(&m); // rot4(2,2) = dot_product(hc, m)
             rot4[(0, 1)] = -hc.dot(&evo2); // rot4(1,2) = -dot_product(hc, evo2)
             rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
 
             let temp_vec3 = Vector3::new(cos_phi, sin_phi, 0.0);
-
-            // TODO this has normalisation, which is not present in Fortran version,
-            // but it appears like normalisation should be present, so probably
-            // uncomment this back in later...
             let temp_rot1 = Field::rotation_matrix(
                 Vector3::x(),
                 Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
@@ -248,10 +240,12 @@ fn diffraction(
                 let dx = xj_plus1 - xj;
                 let dy = yj_plus1 - yj;
 
-                let bvsk = config::WAVENO * (x3.powi(2) + y3.powi(2) + z3.powi(2)).sqrt();
+                let bvsk = config::WAVENO
+                    * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2))
+                        .sqrt();
 
-                let kxx = kinc[0] - config::WAVENO.powi(2) * x3 / bvsk;
-                let kyy = kinc[1] - config::WAVENO.powi(2) * y3 / bvsk;
+                let kxx = kinc[0] - config::WAVENO.powi(2) * rotated_pos.x / bvsk;
+                let kyy = kinc[1] - config::WAVENO.powi(2) * rotated_pos.y / bvsk;
 
                 let delta = kxx * xj + kyy * yj;
                 let delta1 = kyy * mj + kxx;
