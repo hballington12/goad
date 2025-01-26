@@ -1,3 +1,4 @@
+use anyhow::Result;
 use macroquad::prelude::*;
 use miniquad::ElapsedQuery;
 use nalgebra::{Complex, ComplexField, Matrix2, Matrix3, Point3, Vector, Vector3};
@@ -81,17 +82,6 @@ fn diffraction(
     vk7: Vector3<f32>,
     theta_phi_combinations: &[(f32, f32)],
 ) -> Vec<Matrix2<Complex<f32>>> {
-    // Example theta and phi (replace later with actual values)
-    // let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
-    // let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
-    // let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
-
-    // Flatten the combinations of theta and phi into a 1D array of tuples
-    // let theta_phi_combinations: Vec<(f32, f32)> = thetas
-    //     .iter()
-    //     .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
-    //     .collect();
-
     // 1. Compute the center of mass
     let center_of_mass = calculate_center_of_mass(verts);
 
@@ -254,12 +244,16 @@ fn diffraction(
     }
     ampl_cs
 }
-fn writeup(theta_phi_combinations: &[(f32, f32)], ampl_cs: &Vec<Matrix2<Complex<f32>>>) {
+
+fn writeup(
+    theta_phi_combinations: &[(f32, f32)],
+    ampl_cs: &Vec<Matrix2<Complex<f32>>>,
+) -> Result<()> {
     println!("done.");
-    let mut s11 = Array1::<f32>::zeros(theta_phi_combinations.len());
+    let mut s11 = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
 
     for (index, amplc) in ampl_cs.iter().enumerate() {
-        s11[index] = (Complex::new(0.5, 0.0)
+        s11[[index, 0]] = (Complex::new(0.5, 0.0)
             * (amplc[(0, 0)] * amplc[(0, 0)].conj()
                 + amplc[(0, 1)] * amplc[(0, 1)].conj()
                 + amplc[(1, 0)] * amplc[(1, 0)].conj()
@@ -272,10 +266,10 @@ fn writeup(theta_phi_combinations: &[(f32, f32)], ampl_cs: &Vec<Matrix2<Complex<
     let mut writer = BufWriter::new(file);
 
     // Write header
-    // writeln!(writer, "theta,phi,s11");
 
     // Iterate over the array and write data to the file
-    for (index, val) in s11.iter().enumerate() {
+    for (index, row) in s11.outer_iter().enumerate() {
+        let val = row[0];
         let (theta, phi) = theta_phi_combinations[index];
         writeln!(
             writer,
@@ -298,24 +292,20 @@ fn writeup(theta_phi_combinations: &[(f32, f32)], ampl_cs: &Vec<Matrix2<Complex<
             0.0,
             0.0,
             0.0
-        );
+        )?;
     }
+    Ok(())
 }
 
 fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     let a1 = verts[0];
     let b1 = verts[1];
 
-    println!("a1: {}", a1);
-    println!("b1: {}", b1);
-
     let theta1 = if a1.y.abs() > config::COLINEAR_THRESHOLD {
         (a1[0] / a1[1]).atan()
     } else {
         PI / 4.0
     };
-
-    println!("theta1: {}", theta1);
 
     let rot1 = Matrix3::new(
         theta1.cos(),
@@ -331,9 +321,6 @@ fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
 
     let a2 = rot1 * a1;
     let b2 = rot1 * b1;
-
-    println!("a2: {}", a2);
-    println!("b2: {}", b2);
 
     let theta2 = if a2.y.abs() > config::COLINEAR_THRESHOLD {
         -(a2[2] / a2[1]).atan()
@@ -356,16 +343,11 @@ fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     let a3 = rot2 * a2;
     let b3 = rot2 * b2;
 
-    println!("a3: {}", a3);
-    println!("b3: {}", b3);
-
     let theta3 = if b3.x.abs() > config::COLINEAR_THRESHOLD {
         (b3[2] / b3[0]).atan()
     } else {
         PI / 4.0
     };
-
-    println!("theta3: {}", theta3);
 
     let rot3 = Matrix3::new(
         theta3.cos(),
@@ -381,9 +363,6 @@ fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
 
     let a4 = rot3 * a3;
     let b4 = rot3 * b3;
-
-    println!("a4: {}", a4);
-    println!("b4: {}", b4);
 
     let rot = if a4[0] * b4[1] - a4[1] * b4[0] > 0.0 {
         let rot4 = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0);
