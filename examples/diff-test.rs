@@ -144,7 +144,7 @@ fn diffraction(
             let hc = if incidence2.dot(&k).abs() < 1.0 - config::COLINEAR_THRESHOLD {
                 incidence2.cross(&k).normalize()
             } else {
-                print!("warn: need to implement this");
+                print!("warn");
                 incidence2.cross(&k).normalize()
             };
 
@@ -198,25 +198,19 @@ fn diffraction(
                     }
                 })
                 .collect();
-
             let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
 
             let area_fac = &mut area_facs2[(i, j)];
             let mut area_fac_sum = Complex::new(0.0, 0.0); // Example, modify as needed
 
             for (j, vertex) in v1.rows().into_iter().enumerate() {
-                let mut mj = m[j];
-                let mut nj = n[j];
+                let mj = m[j];
+                let nj = n[j];
                 let xj = vertex[0];
                 let yj = vertex[1];
 
-                if mj.abs() > 1e6 || nj.abs() < 1e-6 {
-                    mj = 1e6;
-                    nj = 1e6;
-                } else if nj.abs() > f32::MAX || mj.abs() < 1e-6 {
-                    mj = 1e6;
-                    nj = 1e6;
-                }
+                // Adjust mj and nj
+                let (mj, nj) = adjust_mj_nj(mj, nj);
 
                 let (xj_plus1, yj_plus1) = if j == nv - 1 {
                     (x[0], y[0])
@@ -227,29 +221,13 @@ fn diffraction(
                 let dx = xj_plus1 - xj;
                 let dy = yj_plus1 - yj;
 
-                let bvsk = config::WAVENO
-                    * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2))
-                        .sqrt();
-
-                let kxx = kinc[0] - config::WAVENO.powi(2) * rotated_pos.x / bvsk;
-                let kyy = kinc[1] - config::WAVENO.powi(2) * rotated_pos.y / bvsk;
-
-                let delta = kxx * xj + kyy * yj;
-                let delta1 = kyy * mj + kxx;
-                let delta2 = kxx * nj + kyy;
-                let omega1 = dx * delta1;
-                let omega2 = dy * delta2;
-
-                let alpha = 1.0 / (2.0 * kyy * delta1);
-                let beta = 1.0 / (2.0 * kxx * delta2);
-
-                let sumim = alpha * (delta.cos() - (delta + omega1).cos())
-                    - beta * (delta.cos() - (delta + omega2).cos());
-                let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
-                    + beta * (delta.sin() - (delta + omega2).sin());
-
-                let summand = Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
-                    / Complex::new(config::WAVELENGTH, 0.0);
+                let bvsk = calculate_bvsk(&rotated_pos);
+                let (kxx, kyy) =
+                    calculate_kxx_kyy(&kinc.fixed_rows::<2>(0).into(), &rotated_pos, bvsk);
+                let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
+                let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
+                let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
+                let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
 
                 area_fac_sum += summand;
             }
@@ -487,4 +465,60 @@ fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
     Matrix3::new(
         cos_angle, -sin_angle, 0.0, sin_angle, cos_angle, 0.0, 0.0, 0.0, 1.0,
     )
+}
+
+fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
+    if mj.abs() > 1e6 || nj.abs() < 1e-6 {
+        (1e6, 1e6)
+    } else if nj.abs() > f32::MAX || mj.abs() < 1e-6 {
+        (1e6, 1e6)
+    } else {
+        (mj, nj)
+    }
+}
+
+fn calculate_bvsk(rotated_pos: &Vector3<f32>) -> f32 {
+    config::WAVENO * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
+}
+
+fn calculate_kxx_kyy(kinc: &[f32; 2], rotated_pos: &Vector3<f32>, bvsk: f32) -> (f32, f32) {
+    let kxx = kinc[0] - config::WAVENO.powi(2) * rotated_pos.x / bvsk;
+    let kyy = kinc[1] - config::WAVENO.powi(2) * rotated_pos.y / bvsk;
+    (kxx, kyy)
+}
+
+fn calculate_deltas(kxx: f32, kyy: f32, xj: f32, yj: f32, mj: f32, nj: f32) -> (f32, f32, f32) {
+    let delta = kxx * xj + kyy * yj;
+    let delta1 = kyy * mj + kxx;
+    let delta2 = kxx * nj + kyy;
+    (delta, delta1, delta2)
+}
+
+fn calculate_omegas(dx: f32, dy: f32, delta1: f32, delta2: f32) -> (f32, f32) {
+    let omega1 = dx * delta1;
+    let omega2 = dy * delta2;
+    (omega1, omega2)
+}
+
+fn calculate_alpha_beta(delta1: f32, delta2: f32, kxx: f32, kyy: f32) -> (f32, f32) {
+    let alpha = 1.0 / (2.0 * kyy * delta1);
+    let beta = 1.0 / (2.0 * kxx * delta2);
+    (alpha, beta)
+}
+
+fn calculate_summand(
+    bvsk: f32,
+    delta: f32,
+    omega1: f32,
+    omega2: f32,
+    alpha: f32,
+    beta: f32,
+) -> Complex<f32> {
+    let sumim = alpha * (delta.cos() - (delta + omega1).cos())
+        - beta * (delta.cos() - (delta + omega2).cos());
+    let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
+        + beta * (delta.sin() - (delta + omega2).sin());
+
+    Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
+        / Complex::new(config::WAVELENGTH, 0.0)
 }
