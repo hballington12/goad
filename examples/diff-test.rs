@@ -43,7 +43,7 @@ fn main() {
     // problem.solve_near();
 
     // pull rectangular face and print vertices
-    let face = geom.shapes[0].faces[0].clone();
+    let face = geom.shapes[0].faces[4].clone();
 
     let m11: Complex<f32> = Complex::new(0.5, 0.25);
     let m12: Complex<f32> = Complex::new(0.25, -0.45);
@@ -51,7 +51,8 @@ fn main() {
     let m22: Complex<f32> = Complex::new(-0.5, 0.5);
     let ampl = Matrix2::new(m11, m12, m21, m22);
     let prop: Vector3<f32> = Vector3::new(0.5, 0.3, -0.2).normalize();
-    let vk7: Vector3<f32> = Vector3::new(0.0, 0.0, 0.1);
+    // let prop: Vector3<f32> = Vector3::new(0.0, 0.0, 1.0).normalize();
+    let vk7: Vector3<f32> = Vector3::new(1.0, 0.0, 0.0);
     let vk7 = vk7.cross(&prop).normalize();
     let verts = face.data().exterior.clone();
 
@@ -68,7 +69,7 @@ fn diffraction(
     println!(" ampl: {:?}", ampl);
     println!(" prop: {:?}", prop);
     println!(" vk7: {:?}", vk7);
-    let num_verts = 4;
+    let num_verts = 6;
 
     // Sum all vertex coordinates
     let sum: Vector3<f32> = verts
