@@ -1,7 +1,7 @@
 use macroquad::prelude::*;
 use miniquad::ElapsedQuery;
-use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector, Vector3};
-use ndarray::{Array2, Array3, Array4, Axis};
+use nalgebra::{Complex, ComplexField, Matrix2, Matrix3, Point3, Vector, Vector3};
+use ndarray::{Array1, Array2, Array3, Array4, Axis};
 use pbt::field::Field;
 use pbt::problem::Problem;
 use pbt::{
@@ -11,6 +11,8 @@ use pbt::{
 };
 use std::f32::consts::PI;
 use std::f32::MAX;
+use std::fs::File;
+use std::io::BufWriter;
 use std::io::{self, Write};
 
 fn main() {
@@ -143,8 +145,12 @@ fn diffraction(
     let r = 1e4;
 
     // Example theta and phi (replace later with actual values)
-    let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
-    let phis = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
+    // let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
+    // let phis = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
+    let thetas = Array1::linspace(0.0, std::f32::consts::PI, 200).insert_axis(ndarray::Axis(1)); // Reshape to (100, 1)
+
+    // Phi: 100 steps from 0 to 2pi
+    let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 200).insert_axis(ndarray::Axis(0)); // Reshape to (1, 100)
 
     // Define a 4D array with shape (thetas.len(), phis.len(), 2, 2) for Complex<f32>
     let mut amplCs = Array2::<Matrix2<Complex<f32>>>::default((thetas.len(), phis.len()));
@@ -231,7 +237,8 @@ fn diffraction(
         let hc = if incidence2.dot(&k).abs() < 0.999 {
             incidence2.cross(&k).normalize()
         } else {
-            panic!("need to implement this");
+            print!("warn: need to implement this");
+            incidence2.cross(&k).normalize()
         };
 
         let evo2 = k.cross(&m);
@@ -400,9 +407,52 @@ fn diffraction(
     }
 
     // println!("areafacs2: {:?}", area_facs2);
-    println!("amplc: {:?}", amplCs);
+    // println!("amplc: {:?}", amplCs);
 
-    println!("done.")
+    println!("done.");
+    let mut s11 = Array2::<f32>::zeros((thetas.len(), phis.len()));
+
+    for ((i, j), amplc) in amplCs.indexed_iter_mut() {
+        s11[(i, j)] = (Complex::new(0.5, 0.0)
+            * (amplc[(0, 0)] * amplc[(0, 0)].conj()
+                + amplc[(0, 1)] * amplc[(0, 1)].conj()
+                + amplc[(1, 0)] * amplc[(1, 0)].conj()
+                + amplc[(1, 1)] * amplc[(1, 1)].conj()))
+        .real()
+    }
+
+    // Open a file for writing
+    let file = File::create("output.txt").unwrap();
+    let mut writer = BufWriter::new(file);
+
+    // Write header
+    // writeln!(writer, "theta,phi,s11");
+
+    // Iterate over the array and write data to the file
+    for ((i, j), val) in s11.indexed_iter_mut() {
+        writeln!(
+            writer,
+            "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+            thetas[[i, 0]] * 180.0 / PI, // Theta at index i
+            phis[[0, j]] * 180.0 / PI,   // Phi at index j
+            val,                         // s11 value
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+        );
+    }
 }
 
 fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
