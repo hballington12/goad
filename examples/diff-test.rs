@@ -97,155 +97,152 @@ fn diffraction(
 
     // Example theta and phi (replace later with actual values)
     // let thetas = Array2::from_shape_vec((2, 1), vec![0.1, 0.2]).unwrap(); // Theta
-    // let phis = Array2::from_shape_vec((1, 2), vec![0.1, 0.4]).unwrap(); // Phi
-    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (100, 1)
+    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
+    let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
 
-    // Phi: 100 steps from 0 to 2pi
-    let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 100)
+    // Define a 1D array with length thetas.len() * phis.len() for Complex<f32>
+    let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); thetas.len() * phis.len()];
+    let mut area_facs2 = vec![Complex::<f32>::default(); thetas.len() * phis.len()];
 
-    // Define a 4D array with shape (thetas.len(), phis.len(), 2, 2) for Complex<f32>
-    let mut ampl_cs = Array2::<Matrix2<Complex<f32>>>::default((thetas.len(), phis.len()));
+    // Flatten the combinations of theta and phi into a 1D array of tuples
+    let theta_phi_combinations: Vec<(f32, f32)> = thetas
+        .iter()
+        .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
+        .collect();
 
-    let mut area_facs2 = Array2::<Complex<f32>>::zeros((thetas.len(), phis.len()));
+    // Iterate over the flattened combinations
+    for (index, (theta, phi)) in theta_phi_combinations.iter().enumerate() {
+        // Compute sin and cos values for current theta and phi
+        let sin_theta = theta.sin();
+        let cos_theta = theta.cos();
+        let sin_phi = phi.sin();
+        let cos_phi = phi.cos();
 
-    // TODO: numerical bodge for rot4 matrix here
-    // rotate bins
-    for (i, theta) in thetas.iter().enumerate() {
-        for (j, phi) in phis.iter().enumerate() {
-            // Compute sin and cos values for current theta and phi
-            let sin_theta = theta.sin();
-            let cos_theta = theta.cos();
-            let sin_phi = phi.sin();
-            let cos_phi = phi.cos();
+        // Calculate xfar, yfar, zfar for the current (theta, phi)
+        let r_sin_theta = RADIUS * sin_theta;
+        let xfar = r_sin_theta * cos_phi;
+        let yfar = r_sin_theta * sin_phi;
+        let zfar = RADIUS * cos_theta;
 
-            // Calculate xfar, yfar, zfar for the current (theta, phi)
-            let r_sin_theta = RADIUS * sin_theta;
-            let xfar = r_sin_theta * cos_phi;
-            let yfar = r_sin_theta * sin_phi;
-            let zfar = RADIUS * cos_theta;
+        // Translate far-field bins to the aperture system
+        let x1 = xfar - center_of_mass[0];
+        let y1 = yfar - center_of_mass[1];
+        let z1 = zfar - center_of_mass[2];
 
-            // Translate far-field bins to the aperture system
-            let x1 = xfar - center_of_mass[0];
-            let y1 = yfar - center_of_mass[1];
-            let z1 = zfar - center_of_mass[2];
+        // Rotate the bins using rot3 matrix (assuming rot3 is a 3x3 matrix)
+        let pos = Vector3::new(x1, y1, z1);
+        let rotated_pos = rot3 * pos; // Use matrix-vector multiplication
 
-            // Rotate the bins using rot3 matrix (assuming rot3 is a 3x3 matrix)
-            let pos = Vector3::new(x1, y1, z1);
-            let rotated_pos = rot3 * pos; // Use matrix-vector multiplication
+        // Use the calculated x3, y3, z3 for further processing in the loop
+        let amplc = &mut ampl_cs[index];
+        *amplc = Matrix2::identity(); // Example, modify as needed
 
-            // Use the calculated x3, y3, z3 for further processing in the loop
-            let amplc = &mut ampl_cs[(i, j)];
-            *amplc = Matrix2::identity(); // Example, modify as needed
+        // Call karczewski for each element
+        let (diff_ampl, m, k) =
+            karczewski(&prop2, rotated_pos.x, rotated_pos.y, rotated_pos.z, RADIUS);
 
-            // Call karczewski for each element
-            let (diff_ampl, m, k) =
-                karczewski(&prop2, rotated_pos.x, rotated_pos.y, rotated_pos.z, RADIUS);
+        let hc = if incidence2.dot(&k).abs() < 1.0 - config::COLINEAR_THRESHOLD {
+            incidence2.cross(&k).normalize()
+        } else {
+            print!("warn");
+            incidence2.cross(&k).normalize()
+        };
 
-            let hc = if incidence2.dot(&k).abs() < 1.0 - config::COLINEAR_THRESHOLD {
-                incidence2.cross(&k).normalize()
+        let evo2 = k.cross(&m);
+
+        // Initialize a 2x2 matrix for rot4
+        let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
+
+        let temp_vec3 = Vector3::new(cos_phi, sin_phi, 0.0);
+        let temp_rot1 = Field::rotation_matrix(
+            Vector3::x(),
+            Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
+            -Vector3::z(),
+        );
+
+        let temp_rot1 = temp_rot1.transpose();
+
+        let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
+        let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
+        let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
+
+        let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
+
+        amplc[(0, 0)] = ampl_temp2[(0, 0)];
+        amplc[(1, 0)] = ampl_temp2[(1, 0)];
+        amplc[(0, 1)] = ampl_temp2[(0, 1)];
+        amplc[(1, 1)] = ampl_temp2[(1, 1)];
+
+        let nv = relative_vertices.len();
+
+        let mut v1 = Array2::<f32>::zeros((relative_vertices.len(), relative_vertices[0].len()));
+
+        for (i, vertex) in relative_vertices.iter().enumerate() {
+            let transformed_vertex = rot3 * vertex;
+            v1[[i, 0]] = transformed_vertex.x;
+            v1[[i, 1]] = transformed_vertex.y;
+            v1[[i, 2]] = transformed_vertex.z;
+        }
+
+        let kinc = prop2 * config::WAVENO;
+
+        let x: Vec<f32> = v1.column(0).iter().cloned().collect();
+        let y: Vec<f32> = v1.column(1).iter().cloned().collect();
+        let m: Vec<f32> = (0..nv)
+            .map(|j| {
+                if j == nv - 1 {
+                    (y[0] - y[j]) / (x[0] - x[j])
+                } else {
+                    (y[j + 1] - y[j]) / (x[j + 1] - x[j])
+                }
+            })
+            .collect();
+        let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
+
+        let area_fac = &mut area_facs2[index];
+        let mut area_fac_sum = Complex::new(0.0, 0.0); // Example, modify as needed
+
+        for (j, vertex) in v1.rows().into_iter().enumerate() {
+            let mj = m[j];
+            let nj = n[j];
+            let xj = vertex[0];
+            let yj = vertex[1];
+
+            // Adjust mj and nj
+            let (mj, nj) = adjust_mj_nj(mj, nj);
+
+            let (xj_plus1, yj_plus1) = if j == nv - 1 {
+                (x[0], y[0])
             } else {
-                print!("warn");
-                incidence2.cross(&k).normalize()
+                (x[j + 1], y[j + 1])
             };
 
-            let evo2 = k.cross(&m);
+            let dx = xj_plus1 - xj;
+            let dy = yj_plus1 - yj;
 
-            // Initialize a 2x2 matrix for rot4
-            let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
+            let bvsk = calculate_bvsk(&rotated_pos);
+            let (kxx, kyy) = calculate_kxx_kyy(&kinc.fixed_rows::<2>(0).into(), &rotated_pos, bvsk);
+            let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
+            let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
+            let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
+            let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
 
-            let temp_vec3 = Vector3::new(cos_phi, sin_phi, 0.0);
-            let temp_rot1 = Field::rotation_matrix(
-                Vector3::x(),
-                Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
-                -Vector3::z(),
-            );
-
-            let temp_rot1 = temp_rot1.transpose();
-
-            let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
-            let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
-            let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
-
-            let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
-
-            amplc[(0, 0)] = ampl_temp2[(0, 0)];
-            amplc[(1, 0)] = ampl_temp2[(1, 0)];
-            amplc[(0, 1)] = ampl_temp2[(0, 1)];
-            amplc[(1, 1)] = ampl_temp2[(1, 1)];
-
-            let nv = relative_vertices.len();
-
-            let mut v1 =
-                Array2::<f32>::zeros((relative_vertices.len(), relative_vertices[0].len()));
-
-            for (i, vertex) in relative_vertices.iter().enumerate() {
-                let transformed_vertex = rot3 * vertex;
-                v1[[i, 0]] = transformed_vertex.x;
-                v1[[i, 1]] = transformed_vertex.y;
-                v1[[i, 2]] = transformed_vertex.z;
-            }
-
-            let kinc = prop2 * config::WAVENO;
-
-            let x: Vec<f32> = v1.column(0).iter().cloned().collect();
-            let y: Vec<f32> = v1.column(1).iter().cloned().collect();
-            let m: Vec<f32> = (0..nv)
-                .map(|j| {
-                    if j == nv - 1 {
-                        (y[0] - y[j]) / (x[0] - x[j])
-                    } else {
-                        (y[j + 1] - y[j]) / (x[j + 1] - x[j])
-                    }
-                })
-                .collect();
-            let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
-
-            let area_fac = &mut area_facs2[(i, j)];
-            let mut area_fac_sum = Complex::new(0.0, 0.0); // Example, modify as needed
-
-            for (j, vertex) in v1.rows().into_iter().enumerate() {
-                let mj = m[j];
-                let nj = n[j];
-                let xj = vertex[0];
-                let yj = vertex[1];
-
-                // Adjust mj and nj
-                let (mj, nj) = adjust_mj_nj(mj, nj);
-
-                let (xj_plus1, yj_plus1) = if j == nv - 1 {
-                    (x[0], y[0])
-                } else {
-                    (x[j + 1], y[j + 1])
-                };
-
-                let dx = xj_plus1 - xj;
-                let dy = yj_plus1 - yj;
-
-                let bvsk = calculate_bvsk(&rotated_pos);
-                let (kxx, kyy) =
-                    calculate_kxx_kyy(&kinc.fixed_rows::<2>(0).into(), &rotated_pos, bvsk);
-                let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
-                let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
-                let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
-                let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
-
-                area_fac_sum += summand;
-            }
-
-            *area_fac = area_fac_sum;
-
-            amplc[(0, 0)] *= *area_fac;
-            amplc[(1, 0)] *= *area_fac;
-            amplc[(0, 1)] *= *area_fac;
-            amplc[(1, 1)] *= *area_fac;
+            area_fac_sum += summand;
         }
+
+        *area_fac = area_fac_sum;
+
+        amplc[(0, 0)] *= *area_fac;
+        amplc[(1, 0)] *= *area_fac;
+        amplc[(0, 1)] *= *area_fac;
+        amplc[(1, 1)] *= *area_fac;
     }
 
     println!("done.");
-    let mut s11 = Array2::<f32>::zeros((thetas.len(), phis.len()));
+    let mut s11 = Array1::<f32>::zeros(thetas.len() * phis.len());
 
-    for ((i, j), amplc) in ampl_cs.indexed_iter_mut() {
-        s11[(i, j)] = (Complex::new(0.5, 0.0)
+    for (index, amplc) in ampl_cs.iter_mut().enumerate() {
+        s11[index] = (Complex::new(0.5, 0.0)
             * (amplc[(0, 0)] * amplc[(0, 0)].conj()
                 + amplc[(0, 1)] * amplc[(0, 1)].conj()
                 + amplc[(1, 0)] * amplc[(1, 0)].conj()
@@ -261,7 +258,8 @@ fn diffraction(
     // writeln!(writer, "theta,phi,s11");
 
     // Iterate over the array and write data to the file
-    for ((i, j), val) in s11.indexed_iter_mut() {
+    for (index, val) in s11.iter().enumerate() {
+        let (i, j) = (index / phis.len(), index % phis.len());
         writeln!(
             writer,
             "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
