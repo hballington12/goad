@@ -135,10 +135,7 @@ fn diffraction(
 
             // Use the calculated x3, y3, z3 for further processing in the loop
             let amplc = &mut ampl_cs[(i, j)];
-            let area_fac = &mut area_facs2[(i, j)];
-
             *amplc = Matrix2::identity(); // Example, modify as needed
-            *area_fac = Complex::new(0.0, 0.0); // Example, modify as needed
 
             // Call karczewski for each element
             let (diff_ampl, m, k) =
@@ -204,16 +201,19 @@ fn diffraction(
 
             let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
 
+            let area_fac = &mut area_facs2[(i, j)];
+            let mut area_fac_sum = Complex::new(0.0, 0.0); // Example, modify as needed
+
             for (j, vertex) in v1.rows().into_iter().enumerate() {
                 let mut mj = m[j];
                 let mut nj = n[j];
                 let xj = vertex[0];
                 let yj = vertex[1];
 
-                if mj.abs() > f32::MAX || nj.abs() < 1e-9 {
+                if mj.abs() > 1e6 || nj.abs() < 1e-6 {
                     mj = 1e6;
                     nj = 1e6;
-                } else if nj.abs() > f32::MAX || mj.abs() < 1e-9 {
+                } else if nj.abs() > f32::MAX || mj.abs() < 1e-6 {
                     mj = 1e6;
                     nj = 1e6;
                 }
@@ -251,8 +251,10 @@ fn diffraction(
                 let summand = Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
                     / Complex::new(config::WAVELENGTH, 0.0);
 
-                *area_fac += summand;
+                area_fac_sum += summand;
             }
+
+            *area_fac = area_fac_sum;
 
             amplc[(0, 0)] *= *area_fac;
             amplc[(1, 0)] *= *area_fac;
