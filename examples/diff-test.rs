@@ -110,39 +110,12 @@ fn diffraction(
 
     let mut area_facs2 = Array2::<Complex<f32>>::zeros((thetas.len(), phis.len()));
 
-    // move from here inside the loop...
-    // Compute xfar, yfar, zfar
-    let sin_theta = thetas.mapv(f32::sin);
-    let cos_theta = thetas.mapv(f32::cos);
-    let sin_phi = phis.mapv(f32::sin);
-    let cos_phi = phis.mapv(f32::cos);
-
-    let xfar = RADIUS * &sin_theta * &cos_phi;
-    let yfar = RADIUS * &sin_theta * &sin_phi;
-    let zfar = RADIUS * &cos_theta;
-
-    // Translate far-field bins to the aperture system
-    let x1 = &xfar - center_of_mass[0];
-    let y1 = &yfar - center_of_mass[1];
-    let z1 = &zfar - center_of_mass[2];
-
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
-
-    let x3 = rot3[(0, 0)] * &x1 + rot3[(0, 1)] * &y1 + rot3[(0, 2)] * &z1;
-    let y3 = rot3[(1, 0)] * &x1 + rot3[(1, 1)] * &y1 + rot3[(1, 2)] * &z1;
-    let z3 = rot3[(2, 0)] * &x1 + rot3[(2, 1)] * &y1 + rot3[(2, 2)] * &z1;
 
     // for ((i, j), amplc) in ampl_cs.indexed_iter_mut() {
     for (i, theta) in thetas.iter().enumerate() {
         for (j, phi) in phis.iter().enumerate() {
-            // let x3_val = &x3[(i, j)];
-            // let y3_val = &y3[(i, j)];
-            // let z3_val = &z3[(i, j)];
-
-            // let area_fac2 = &mut area_facs2[(i, j)];
-            // let amplc = &mut ampl_cs[(i, j)];
-
             // Compute sin and cos values for current theta and phi
             let sin_theta = theta.sin();
             let cos_theta = theta.cos();
@@ -160,9 +133,9 @@ fn diffraction(
             let z1 = zfar - center_of_mass[2];
 
             // Rotate the bins using rot3 matrix
-            let x3_val = rot3[(0, 0)] * x1 + rot3[(0, 1)] * y1 + rot3[(0, 2)] * z1;
-            let y3_val = rot3[(1, 0)] * x1 + rot3[(1, 1)] * y1 + rot3[(1, 2)] * z1;
-            let z3_val = rot3[(2, 0)] * x1 + rot3[(2, 1)] * y1 + rot3[(2, 2)] * z1;
+            let x3 = rot3[(0, 0)] * x1 + rot3[(0, 1)] * y1 + rot3[(0, 2)] * z1;
+            let y3 = rot3[(1, 0)] * x1 + rot3[(1, 1)] * y1 + rot3[(1, 2)] * z1;
+            let z3 = rot3[(2, 0)] * x1 + rot3[(2, 1)] * y1 + rot3[(2, 2)] * z1;
 
             // Use the calculated x3, y3, z3 for further processing in the loop
             let amplc = &mut ampl_cs[(i, j)];
@@ -174,7 +147,7 @@ fn diffraction(
             *area_fac = Complex::new(0.0, 0.0); // Example, modify as needed
 
             // Call karczewski for each element
-            let (diff_ampl, m, k) = karczewski(&prop2, x3_val, y3_val, z3_val, RADIUS);
+            let (diff_ampl, m, k) = karczewski(&prop2, x3, y3, z3, RADIUS);
 
             let hc = if incidence2.dot(&k).abs() < 0.999 {
                 incidence2.cross(&k).normalize()
@@ -194,7 +167,7 @@ fn diffraction(
             rot4[(0, 1)] = -hc.dot(&evo2); // rot4(1,2) = -dot_product(hc, evo2)
             rot4[(1, 0)] = hc.dot(&evo2); // rot4(2,1) = +dot_product(hc, evo2)
 
-            let temp_vec3 = Vector3::new(phi.cos(), phi.sin(), 0.0);
+            let temp_vec3 = Vector3::new(cos_phi, sin_phi, 0.0);
 
             // TODO this has normalisation, which is not present in Fortran version,
             // but it appears like normalisation should be present, so probably
@@ -256,10 +229,10 @@ fn diffraction(
             }
 
             for (j, vertex) in v1.rows().into_iter().enumerate() {
-                let mut mj = m[j];
-                let mut nj = n[j];
-                let mut xj = x[j];
-                let mut yj = y[j];
+                let mj = m[j];
+                let nj = n[j];
+                let xj = vertex[0];
+                let yj = vertex[1];
 
                 let mj = if mj.abs() > f32::MAX { 1e6 } else { mj };
                 let nj = if mj.abs() > f32::MAX { 1e6 } else { nj };
@@ -275,11 +248,10 @@ fn diffraction(
                 let dx = xj_plus1 - xj;
                 let dy = yj_plus1 - yj;
 
-                let bvsk =
-                    config::WAVENO * (x3_val.powi(2) + y3_val.powi(2) + z3_val.powi(2)).sqrt();
+                let bvsk = config::WAVENO * (x3.powi(2) + y3.powi(2) + z3.powi(2)).sqrt();
 
-                let kxx = kinc[0] - config::WAVENO.powi(2) * x3_val / bvsk;
-                let kyy = kinc[1] - config::WAVENO.powi(2) * y3_val / bvsk;
+                let kxx = kinc[0] - config::WAVENO.powi(2) * x3 / bvsk;
+                let kyy = kinc[1] - config::WAVENO.powi(2) * y3 / bvsk;
 
                 let delta = kxx * xj + kyy * yj;
                 let delta1 = kyy * mj + kxx;
