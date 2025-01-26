@@ -17,7 +17,7 @@ use std::io::BufWriter;
 use std::io::{self, Write};
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     // let e_perp = Vector3::z(); // choose e_perp along z-axis for now
@@ -44,14 +44,14 @@ fn main() {
     // problem.solve_near();
 
     // pull rectangular face and print vertices
-    let face = geom.shapes[0].faces[4].clone();
+    let face = geom.shapes[0].faces[1].clone();
 
     let m11: Complex<f32> = Complex::new(0.5, 0.25);
     let m12: Complex<f32> = Complex::new(0.25, -0.45);
     let m21: Complex<f32> = Complex::new(0.85, 0.2);
     let m22: Complex<f32> = Complex::new(-0.5, 0.5);
     let ampl = Matrix2::new(m11, m12, m21, m22);
-    let prop: Vector3<f32> = Vector3::new(0.5, 0.3, -0.2).normalize();
+    let prop: Vector3<f32> = Vector3::new(0.2, 0.3, -1.0).normalize();
     // let prop: Vector3<f32> = Vector3::new(0.0, 0.0, 1.0).normalize();
     let vk7: Vector3<f32> = Vector3::new(1.0, 0.0, 0.0);
     let vk7 = vk7.cross(&prop).normalize();
@@ -59,13 +59,13 @@ fn main() {
 
     let theta_phi_combinations = generate_theta_phi_combinations();
     let ampls = diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations);
-    writeup(&theta_phi_combinations, &ampls);
+    let _ = writeup(&theta_phi_combinations, &ampls);
 }
 
 /// Generate theta and phi combinations
 fn generate_theta_phi_combinations() -> Vec<(f32, f32)> {
-    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
-    let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
+    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 180).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
+    let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 180).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
 
     // Flatten the combinations of theta and phi into a 1D array of tuples
     thetas
@@ -250,15 +250,21 @@ fn writeup(
     ampl_cs: &Vec<Matrix2<Complex<f32>>>,
 ) -> Result<()> {
     println!("done.");
-    let mut s11 = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
+    let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
 
     for (index, amplc) in ampl_cs.iter().enumerate() {
-        s11[[index, 0]] = (Complex::new(0.5, 0.0)
+        mueller[[index, 0]] = (Complex::new(0.5, 0.0)
             * (amplc[(0, 0)] * amplc[(0, 0)].conj()
                 + amplc[(0, 1)] * amplc[(0, 1)].conj()
                 + amplc[(1, 0)] * amplc[(1, 0)].conj()
                 + amplc[(1, 1)] * amplc[(1, 1)].conj()))
-        .real()
+        .real();
+
+        mueller[[index, 1]] = (Complex::new(0.5, 0.0)
+            * (amplc[(0, 0)] * amplc[(0, 0)].conj() - amplc[(0, 1)] * amplc[(0, 1)].conj()
+                + amplc[(1, 0)] * amplc[(1, 0)].conj()
+                - amplc[(1, 1)] * amplc[(1, 1)].conj()))
+        .real();
     }
 
     // Open a file for writing
@@ -268,16 +274,15 @@ fn writeup(
     // Write header
 
     // Iterate over the array and write data to the file
-    for (index, row) in s11.outer_iter().enumerate() {
-        let val = row[0];
+    for (index, row) in mueller.outer_iter().enumerate() {
         let (theta, phi) = theta_phi_combinations[index];
         writeln!(
             writer,
             "{} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
             theta * 180.0 / PI, // Theta at index i
             phi * 180.0 / PI,   // Phi at index j
-            val,                // s11 value
-            0.0,
+            row[0],             // s11 value
+            row[1],
             0.0,
             0.0,
             0.0,
