@@ -59,6 +59,7 @@ fn main() {
     diffraction(&verts, ampl, prop, vk7);
 }
 
+/// Diffraction. face in must be convex!
 fn diffraction(
     verts: &[Point3<f32>],
     mut ampl: Matrix2<Complex<f32>>,
@@ -124,7 +125,7 @@ fn diffraction(
     let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 50).insert_axis(ndarray::Axis(0)); // Reshape to (1, 100)
 
     // Define a 4D array with shape (thetas.len(), phis.len(), 2, 2) for Complex<f32>
-    let mut amplCs = Array2::<Matrix2<Complex<f32>>>::default((thetas.len(), phis.len()));
+    let mut ampl_cs = Array2::<Matrix2<Complex<f32>>>::default((thetas.len(), phis.len()));
 
     let mut area_facs2 = Array2::<Complex<f32>>::zeros((thetas.len(), phis.len()));
 
@@ -143,10 +144,6 @@ fn diffraction(
     let y1 = &yfar - center_of_mass[1];
     let z1 = &zfar - center_of_mass[2];
 
-    // Compute r1 (distance from the center of mass)
-    let r1 = (&x1.mapv(|v| v.powi(2)) + &y1.mapv(|v| v.powi(2)) + &z1.mapv(|v| v.powi(2)))
-        .mapv(f32::sqrt);
-
     // TODO: numerical bodge for rot4 matrix here
     // rotate bins
 
@@ -156,7 +153,7 @@ fn diffraction(
     let y3 = rot3[(1, 0)] * &x1 + rot3[(1, 1)] * &y1 + rot3[(1, 2)] * &z1;
     let z3 = rot3[(2, 0)] * &x1 + rot3[(2, 1)] * &y1 + rot3[(2, 2)] * &z1;
 
-    for ((i, j), amplc) in amplCs.indexed_iter_mut() {
+    for ((i, j), amplc) in ampl_cs.indexed_iter_mut() {
         let x3_val = &x3[(i, j)];
         let y3_val = &y3[(i, j)];
         let z3_val = &z3[(i, j)];
@@ -298,7 +295,7 @@ fn diffraction(
     println!("done.");
     let mut s11 = Array2::<f32>::zeros((thetas.len(), phis.len()));
 
-    for ((i, j), amplc) in amplCs.indexed_iter_mut() {
+    for ((i, j), amplc) in ampl_cs.indexed_iter_mut() {
         s11[(i, j)] = (Complex::new(0.5, 0.0)
             * (amplc[(0, 0)] * amplc[(0, 0)].conj()
                 + amplc[(0, 1)] * amplc[(0, 1)].conj()
