@@ -100,15 +100,15 @@ fn diffraction(
     let thetas = Array1::linspace(0.2, std::f32::consts::PI, 50).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
     let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 60).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
 
-    // Define a 1D array with length thetas.len() * phis.len() for Complex<f32>
-    let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); thetas.len() * phis.len()];
-    let mut area_facs2 = vec![Complex::<f32>::default(); thetas.len() * phis.len()];
-
     // Flatten the combinations of theta and phi into a 1D array of tuples
     let theta_phi_combinations: Vec<(f32, f32)> = thetas
         .iter()
         .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
         .collect();
+
+    // Define a 1D array with length theta_phi_combinations.len() for Complex<f32>
+    let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
+    let mut area_facs2 = vec![Complex::<f32>::default(); theta_phi_combinations.len()];
 
     // Iterate over the flattened combinations
     for (index, (theta, phi)) in theta_phi_combinations.iter().enumerate() {
