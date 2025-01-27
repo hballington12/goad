@@ -12,7 +12,7 @@ use std::io::{self, Write};
 use crate::field::Field;
 use crate::{config, geom};
 
-// diffract// diffrac/// Diffraction. face in must be convex!
+// Diffraction. Face must be convex.
 pub fn diffraction(
     verts: &[Point3<f32>],
     mut ampl: Matrix2<Complex<f32>>,
@@ -46,8 +46,6 @@ pub fn diffraction(
     }
 
     let rot3 = rot2 * rot;
-    let incidence = Vector3::new(0.0, 0.0, -1.0); // TODO: generalise
-    let incidence2 = rot3 * incidence;
 
     // Constants
     const RADIUS: f32 = 1e4;
@@ -70,25 +68,25 @@ pub fn diffraction(
         let yfar = r_sin_theta * sin_phi;
         let zfar = -RADIUS * cos_theta;
 
-        // Translate far-field bins to the aperture system
-        let x1 = xfar - center_of_mass[0];
-        let y1 = yfar - center_of_mass[1];
-        let z1 = zfar - center_of_mass[2];
+        // Translate and rotate far-field bins to the aperture system
+        let rotated_pos = rot3
+            * Vector3::new(
+                xfar - center_of_mass[0],
+                yfar - center_of_mass[1],
+                zfar - center_of_mass[2],
+            );
 
-        // Rotate the bins using rot3 matrix (assuming rot3 is a 3x3 matrix)
-        let pos = Vector3::new(x1, y1, z1);
-        let rotated_pos = rot3 * pos; // Use matrix-vector multiplication
+        let bvs = rotated_pos.norm();
 
-        // Use the calculated x3, y3, z3 for further processing in the loop
-        let amplc = &mut ampl_cs[index];
-        *amplc = Matrix2::identity(); // Example, modify as needed
+        let k = rotated_pos / bvs;
 
         // Call karczewski for each element
-        let (diff_ampl, m, k) =
-            karczewski(&prop2, rotated_pos.x, rotated_pos.y, rotated_pos.z, RADIUS);
+        let (diff_ampl, m) = karczewski(&prop2, &k);
 
+        // Vector perpendicular to the scattering plane in the aperture system
         let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
 
+        // Vector perpendicular to the karczewski plane in the aperture system
         let evo2 = k.cross(&m);
 
         // Initialize a 2x2 matrix for rot4
@@ -96,18 +94,20 @@ pub fn diffraction(
 
         let temp_vec3 = Vector3::new(cos_phi, sin_phi, 0.0);
         let temp_rot1 = Field::rotation_matrix(
-            Vector3::x(),
-            Vector3::new(-temp_vec3[1], temp_vec3[0], 0.0),
-            -Vector3::z(),
+            -Vector3::x(),
+            Vector3::new(temp_vec3[1], -temp_vec3[0], 0.0),
+            Vector3::z(),
         );
-
-        let temp_rot1 = temp_rot1.transpose();
 
         let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
         let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
         let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
 
         let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
+
+        // Use the calculated x3, y3, z3 for further processing in the loop
+        let amplc = &mut ampl_cs[index];
+        *amplc = Matrix2::identity(); // Example, modify as needed
 
         amplc[(0, 0)] = ampl_temp2[(0, 0)];
         amplc[(1, 0)] = ampl_temp2[(1, 0)];
@@ -161,7 +161,7 @@ pub fn diffraction(
             let dx = xj_plus1 - xj;
             let dy = yj_plus1 - yj;
 
-            let bvsk = calculate_bvsk(&rotated_pos);
+            let bvsk = bvs * config::WAVENO;
             let (kxx, kyy) = calculate_kxx_kyy(&kinc.fixed_rows::<2>(0).into(), &rotated_pos, bvsk);
             let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
@@ -260,24 +260,9 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
 
 pub fn karczewski(
     prop2: &Vector3<f32>, // Outgoing propagation direction in aperture system
-    x3: f32,              // x coordinate of far-field bin
-    y3: f32,              // y coordinate of far-field bin
-    z3: f32,              // z coordinate of far-field bin
-    r: f32,               // Distance to bin vector
-) -> (Matrix2<f32>, Vector3<f32>, Vector3<f32>) {
+    bvk: &Vector3<f32>,   // bin unit vector
+) -> (Matrix2<f32>, Vector3<f32>) {
     // Compute the diff ampl matrix for polarisation of far-field diffraction at a far-field bin
-    // TODO: Add debug mode with numerical checks (as mentioned in the original MATLAB code)
-
-    // Far-field bin distance
-    let bin_vec_size = r;
-
-    // Propagation vector components for each bin vector in the aperture system
-    let mut k = Vector3::new(x3 / bin_vec_size, y3 / bin_vec_size, z3 / bin_vec_size);
-
-    // Ensure k.y is within bounds
-    if k.y.abs() > 0.999_999 {
-        k.y = 0.999_999_f32.copysign(k.y);
-    }
 
     // Propagation direction in aperture system
     let big_kx = prop2.x;
@@ -285,22 +270,22 @@ pub fn karczewski(
     let big_kz = prop2.z;
 
     // Perpendicular field direction
-    let sqrt_1_minus_k2y2 = (1.0 - k.y.powi(2)).sqrt();
+    let sqrt_1_minus_k2y2 = (1.0 - bvk.y.powi(2)).sqrt();
     let m = Vector3::new(
-        -k.x * k.y / sqrt_1_minus_k2y2,
+        -bvk.x * bvk.y / sqrt_1_minus_k2y2,
         sqrt_1_minus_k2y2,
-        -k.y * k.z / sqrt_1_minus_k2y2,
+        -bvk.y * bvk.z / sqrt_1_minus_k2y2,
     );
 
     // Pre-calculate factor
-    let frac = ((1.0 - k.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
+    let frac = ((1.0 - bvk.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
 
     // KW coefficients
     let a1m = -big_kz * frac;
-    let b2m = -k.z / frac;
+    let b2m = -bvk.z / frac;
     let a1e = b2m;
     let b2e = a1m;
-    let b1m = -k.x * k.y / frac + big_kx * big_ky * frac;
+    let b1m = -bvk.x * bvk.y / frac + big_kx * big_ky * frac;
     let a2e = -b1m;
 
     // Combined (e-m theory) KW coefficients
@@ -313,7 +298,7 @@ pub fn karczewski(
     let diff_ampl = Matrix2::new(a1em, b1em, a2em, b2em);
 
     // Return the outputs
-    (diff_ampl, m, k)
+    (diff_ampl, m)
 }
 
 pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
