@@ -17,7 +17,7 @@ use std::io::BufWriter;
 use std::io::{self, Write};
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     // let e_perp = Vector3::z(); // choose e_perp along z-axis for now
@@ -44,16 +44,17 @@ fn main() {
     // problem.solve_near();
 
     // pull rectangular face and print vertices
-    let face = geom.shapes[0].faces[1].clone();
+    let face = geom.shapes[0].faces[0].clone();
+    println!("face vertices: {:?}", face.data().exterior);
 
     let m11: Complex<f32> = Complex::new(0.5, 0.25);
     let m12: Complex<f32> = Complex::new(0.25, -0.45);
     let m21: Complex<f32> = Complex::new(0.85, 0.2);
     let m22: Complex<f32> = Complex::new(-0.5, 0.5);
     let ampl = Matrix2::new(m11, m12, m21, m22);
-    let prop: Vector3<f32> = Vector3::new(0.2, 0.3, -1.0).normalize();
+    let prop: Vector3<f32> = Vector3::new(0.5, 0.3, -0.2).normalize();
     // let prop: Vector3<f32> = Vector3::new(0.0, 0.0, 1.0).normalize();
-    let vk7: Vector3<f32> = Vector3::new(1.0, 0.0, 0.0);
+    let vk7: Vector3<f32> = Vector3::new(0.0, 0.0, 1.0);
     let vk7 = vk7.cross(&prop).normalize();
     let verts = face.data().exterior.clone();
 
@@ -64,7 +65,7 @@ fn main() {
 
 /// Generate theta and phi combinations
 fn generate_theta_phi_combinations() -> Vec<(f32, f32)> {
-    let thetas = Array1::linspace(0.2, std::f32::consts::PI, 180).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
+    let thetas = Array1::linspace(0.0, std::f32::consts::PI, 180).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
     let phis = Array1::linspace(0.0, 2.0 * std::f32::consts::PI, 180).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
 
     // Flatten the combinations of theta and phi into a 1D array of tuples
@@ -127,7 +128,7 @@ fn diffraction(
         let r_sin_theta = RADIUS * sin_theta;
         let xfar = r_sin_theta * cos_phi;
         let yfar = r_sin_theta * sin_phi;
-        let zfar = RADIUS * cos_theta;
+        let zfar = -RADIUS * cos_theta;
 
         // Translate far-field bins to the aperture system
         let x1 = xfar - center_of_mass[0];
@@ -265,6 +266,13 @@ fn writeup(
                 + amplc[(1, 0)] * amplc[(1, 0)].conj()
                 - amplc[(1, 1)] * amplc[(1, 1)].conj()))
         .real();
+        // s22
+        mueller[[index, 5]] = (Complex::new(0.5, 0.0)
+            * (amplc[(0, 0)] * amplc[(0, 0)].conj()
+                - amplc[(0, 1)] * amplc[(0, 1)].conj()
+                - amplc[(1, 0)] * amplc[(1, 0)].conj()
+                + amplc[(1, 1)] * amplc[(1, 1)].conj()))
+        .real();
     }
 
     // Open a file for writing
@@ -286,7 +294,7 @@ fn writeup(
             0.0,
             0.0,
             0.0,
-            0.0,
+            row[5],
             0.0,
             0.0,
             0.0,
