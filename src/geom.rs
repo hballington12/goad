@@ -786,3 +786,23 @@ impl Geom {
             })
     }
 }
+
+pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
+    Point3::from(
+        verts
+            .iter()
+            .map(|vert| vert.coords)
+            .fold(Vector3::zeros(), |acc, coords| acc + coords)
+            / verts.len() as f32,
+    )
+}
+
+pub fn transform_to_center_of_mass(
+    verts: &[Point3<f32>],
+    center_of_mass: &Point3<f32>,
+) -> Vec<Vector3<f32>> {
+    verts
+        .iter()
+        .map(|point| point.coords - center_of_mass.coords)
+        .collect()
+}

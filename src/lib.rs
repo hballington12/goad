@@ -1,10 +1,13 @@
 pub mod beam;
+pub mod bins;
 pub mod clip;
 pub mod config;
 pub mod containment;
+pub mod diff;
 pub mod field;
 pub mod fresnel;
 pub mod geom;
 pub mod helpers;
+pub mod output;
 pub mod problem;
 pub mod snell;
