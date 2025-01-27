@@ -12,7 +12,7 @@ use std::io::{self, Write};
 use crate::field::Field;
 use crate::{config, geom};
 
-// diffraction. face in must be convex!
+// diffract// diffrac/// Diffraction. face in must be convex!
 pub fn diffraction(
     verts: &[Point3<f32>],
     mut ampl: Matrix2<Complex<f32>>,
