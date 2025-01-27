@@ -30,10 +30,11 @@ pub fn diffraction(
     let relative_vertices = geom::transform_to_center_of_mass(verts, &center_of_mass);
 
     // 3. Compute rotation matrices
-    let rot = get_rotation_matrix2(&relative_vertices);
-    let prop1 = rot * prop;
-    let perp1 = rot * vk7;
+    let rot1 = get_rotation_matrix2(&relative_vertices);
+    let prop1 = rot1 * prop;
+    let perp1 = rot1 * vk7;
     let rot2 = calculate_rotation_matrix(prop1);
+    let rot3 = rot2 * rot1;
 
     // 4. Transform propagation and auxiliary vectors
     let prop2 = rot2 * prop1;
@@ -44,11 +45,6 @@ pub fn diffraction(
     if e_par2.z > config::COLINEAR_THRESHOLD {
         ampl = -ampl;
     }
-
-    let rot3 = rot2 * rot;
-
-    // Constants
-    const RADIUS: f32 = 1e4;
 
     // Define a 1D array with length theta_phi_combinations.len() for Complex<f32>
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
@@ -63,10 +59,10 @@ pub fn diffraction(
         let cos_phi = phi.cos();
 
         // Calculate xfar, yfar, zfar for the current (theta, phi)
-        let r_sin_theta = RADIUS * sin_theta;
+        let r_sin_theta = config::RADIUS * sin_theta;
         let xfar = r_sin_theta * cos_phi;
         let yfar = r_sin_theta * sin_phi;
-        let zfar = -RADIUS * cos_theta;
+        let zfar = -config::RADIUS * cos_theta;
 
         // Translate and rotate far-field bins to the aperture system
         let rotated_pos = rot3
@@ -76,26 +72,21 @@ pub fn diffraction(
                 zfar - center_of_mass[2],
             );
 
+        // Calculate distance to bins and bin unit vectors
         let bvs = rotated_pos.norm();
-
         let k = rotated_pos / bvs;
 
-        // Call karczewski for each element
+        // Compute Karczewski polarisation matrix for each element
         let (diff_ampl, m) = karczewski(&prop2, &k);
 
         // Vector perpendicular to the scattering plane in the aperture system
         let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
-
-        // Vector perpendicular to the karczewski plane in the aperture system
         let evo2 = k.cross(&m);
-
-        // Initialize a 2x2 matrix for rot4
         let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
 
-        let temp_vec3 = Vector3::new(cos_phi, sin_phi, 0.0);
         let temp_rot1 = Field::rotation_matrix(
             -Vector3::x(),
-            Vector3::new(temp_vec3[1], -temp_vec3[0], 0.0),
+            Vector3::new(sin_phi, -cos_phi, 0.0),
             Vector3::z(),
         );
 
