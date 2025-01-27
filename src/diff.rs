@@ -20,33 +20,10 @@ pub fn diffraction(
     vk7: Vector3<f32>,
     theta_phi_combinations: &[(f32, f32)],
 ) -> Vec<Matrix2<Complex<f32>>> {
-    // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
-    ampl *= Complex::new(config::WAVENO, 0.0);
+    // Translate to aperture system, rotate, and transform propagation and auxiliary vectors.
+    let (center_of_mass, relative_vertices, rot3, prop2) = init_diff(verts, &mut ampl, prop, vk7);
 
-    // 1. Compute the center of mass
-    let center_of_mass = geom::calculate_center_of_mass(verts);
-
-    // 2. Transform vertices relative to the center of mass
-    let relative_vertices = geom::transform_to_center_of_mass(verts, &center_of_mass);
-
-    // 3. Compute rotation matrices
-    let rot1 = get_rotation_matrix2(&relative_vertices);
-    let prop1 = rot1 * prop;
-    let perp1 = rot1 * vk7;
-    let rot2 = calculate_rotation_matrix(prop1);
-    let rot3 = rot2 * rot1;
-
-    // 4. Transform propagation and auxiliary vectors
-    let prop2 = rot2 * prop1;
-    let perp2 = rot2 * perp1;
-    let e_par2 = perp2.cross(&prop2).normalize();
-
-    // 5. Update amplitude based on anti-parallel condition
-    if e_par2.z > config::COLINEAR_THRESHOLD {
-        ampl = -ampl;
-    }
-
-    // Define a 1D array with length theta_phi_combinations.len() for Complex<f32>
+    // Define the output variables.
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
     let mut area_facs2 = vec![Complex::<f32>::default(); theta_phi_combinations.len()];
 
@@ -165,6 +142,40 @@ pub fn diffraction(
         ampl_far_field[(1, 1)] *= *fraunhofer;
     }
     ampl_cs
+}
+
+fn init_diff(
+    verts: &[Point3<f32>],
+    ampl: &mut Matrix2<Complex<f32>>,
+    prop: Vector3<f32>,
+    vk7: Vector3<f32>,
+) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
+    // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
+    *ampl *= Complex::new(config::WAVENO, 0.0);
+
+    // 1. Compute the center of mass
+    let center_of_mass = geom::calculate_center_of_mass(verts);
+
+    // 2. Transform vertices relative to the center of mass
+    let relative_vertices = geom::transform_to_center_of_mass(verts, &center_of_mass);
+
+    // 3. Compute rotation matrices
+    let rot1 = get_rotation_matrix2(&relative_vertices);
+    let prop1 = rot1 * prop;
+    let perp1 = rot1 * vk7;
+    let rot2 = calculate_rotation_matrix(prop1);
+    let rot3 = rot2 * rot1;
+
+    // 4. Transform propagation and auxiliary vectors
+    let prop2 = rot2 * prop1;
+    let perp2 = rot2 * perp1;
+    let e_par2 = perp2.cross(&prop2).normalize();
+
+    // 5. Update amplitude based on anti-parallel condition
+    if e_par2.z > config::COLINEAR_THRESHOLD {
+        *ampl = -*ampl;
+    }
+    (center_of_mass, relative_vertices, rot3, prop2)
 }
 
 pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
