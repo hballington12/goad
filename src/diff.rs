@@ -87,12 +87,7 @@ pub fn diffraction(
         let (diff_ampl, m, k) =
             karczewski(&prop2, rotated_pos.x, rotated_pos.y, rotated_pos.z, RADIUS);
 
-        let hc = if incidence2.dot(&k).abs() < 1.0 - config::COLINEAR_THRESHOLD {
-            incidence2.cross(&k).normalize()
-        } else {
-            print!("warn");
-            incidence2.cross(&k).normalize()
-        };
+        let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
 
         let evo2 = k.cross(&m);
 
