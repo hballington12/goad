@@ -77,38 +77,34 @@ pub fn diffraction(
         let k = rotated_pos / bvs;
 
         // Compute Karczewski polarisation matrix for each element
-        let (diff_ampl, m) = karczewski(&prop2, &k);
+        let (polarisation, m) = karczewski(&prop2, &k);
 
         // Vector perpendicular to the scattering plane in the aperture system
         let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
         let evo2 = k.cross(&m);
         let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
 
-        let temp_rot1 = Field::rotation_matrix(
+        let prerotation = Field::rotation_matrix(
             -Vector3::x(),
             Vector3::new(sin_phi, -cos_phi, 0.0),
             Vector3::z(),
         );
-
-        let rot4_complex = rot4.map(|x| Complex::new(x, 0.0));
-        let diff_ampl_complex = diff_ampl.map(|x| Complex::new(x, 0.0));
-        let temp_rot1_complex = temp_rot1.map(|x| Complex::new(x, 0.0));
-
-        let ampl_temp2 = rot4_complex * diff_ampl_complex * ampl * temp_rot1_complex;
+        let ampl_temp = rot4.map(Complex::from)
+            * polarisation.map(Complex::from)
+            * ampl
+            * prerotation.map(Complex::from);
 
         // Use the calculated x3, y3, z3 for further processing in the loop
-        let amplc = &mut ampl_cs[index];
-        *amplc = Matrix2::identity(); // Example, modify as needed
+        let ampl_far_field = &mut ampl_cs[index];
+        *ampl_far_field = Matrix2::identity(); // Example, modify as needed
 
-        amplc[(0, 0)] = ampl_temp2[(0, 0)];
-        amplc[(1, 0)] = ampl_temp2[(1, 0)];
-        amplc[(0, 1)] = ampl_temp2[(0, 1)];
-        amplc[(1, 1)] = ampl_temp2[(1, 1)];
+        ampl_far_field[(0, 0)] = ampl_temp[(0, 0)];
+        ampl_far_field[(1, 0)] = ampl_temp[(1, 0)];
+        ampl_far_field[(0, 1)] = ampl_temp[(0, 1)];
+        ampl_far_field[(1, 1)] = ampl_temp[(1, 1)];
 
         let nv = relative_vertices.len();
-
-        let mut v1 = Array2::<f32>::zeros((relative_vertices.len(), relative_vertices[0].len()));
-
+        let mut v1 = Array2::<f32>::zeros((nv, 3));
         for (i, vertex) in relative_vertices.iter().enumerate() {
             let transformed_vertex = rot3 * vertex;
             v1[[i, 0]] = transformed_vertex.x;
@@ -117,7 +113,6 @@ pub fn diffraction(
         }
 
         let kinc = prop2 * config::WAVENO;
-
         let x: Vec<f32> = v1.column(0).iter().cloned().collect();
         let y: Vec<f32> = v1.column(1).iter().cloned().collect();
         let m: Vec<f32> = (0..nv)
@@ -131,8 +126,8 @@ pub fn diffraction(
             .collect();
         let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
 
-        let area_fac = &mut area_facs2[index];
-        let mut area_fac_sum = Complex::new(0.0, 0.0); // Example, modify as needed
+        let fraunhofer = &mut area_facs2[index];
+        let mut fraunhofer_sum = Complex::new(0.0, 0.0); // Example, modify as needed
 
         for (j, vertex) in v1.rows().into_iter().enumerate() {
             let mj = m[j];
@@ -159,15 +154,15 @@ pub fn diffraction(
             let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
             let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
 
-            area_fac_sum += summand;
+            fraunhofer_sum += summand;
         }
 
-        *area_fac = area_fac_sum;
+        *fraunhofer = fraunhofer_sum;
 
-        amplc[(0, 0)] *= *area_fac;
-        amplc[(1, 0)] *= *area_fac;
-        amplc[(0, 1)] *= *area_fac;
-        amplc[(1, 1)] *= *area_fac;
+        ampl_far_field[(0, 0)] *= *fraunhofer;
+        ampl_far_field[(1, 0)] *= *fraunhofer;
+        ampl_far_field[(0, 1)] *= *fraunhofer;
+        ampl_far_field[(1, 1)] *= *fraunhofer;
     }
     ampl_cs
 }
