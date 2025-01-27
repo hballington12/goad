@@ -20,6 +20,9 @@ pub fn diffraction(
     vk7: Vector3<f32>,
     theta_phi_combinations: &[(f32, f32)],
 ) -> Vec<Matrix2<Complex<f32>>> {
+    // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
+    ampl *= Complex::new(config::WAVENO, 0.0);
+
     // 1. Compute the center of mass
     let center_of_mass = geom::calculate_center_of_mass(verts);
 
