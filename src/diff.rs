@@ -53,27 +53,16 @@ pub fn diffraction(
         let bvs = rotated_pos.norm();
         let k = rotated_pos / bvs;
 
-        // Compute Karczewski polarisation matrix for each element
-        let (polarisation, m) = karczewski(&prop2, &k);
+        // Use the calculated x3, y3, z3 for further processing in the loop
+        let ampl_far_field = &mut ampl_cs[index];
+        *ampl_far_field = Matrix2::identity(); // Example, modify as needed
 
-        // Vector perpendicular to the scattering plane in the aperture system
-        let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
-        let evo2 = k.cross(&m);
-        let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
+        let (polarisation, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
 
-        let prerotation = Field::rotation_matrix(
-            -Vector3::x(),
-            Vector3::new(sin_phi, -cos_phi, 0.0),
-            Vector3::z(),
-        );
         let ampl_temp = rot4.map(Complex::from)
             * polarisation.map(Complex::from)
             * ampl
             * prerotation.map(Complex::from);
-
-        // Use the calculated x3, y3, z3 for further processing in the loop
-        let ampl_far_field = &mut ampl_cs[index];
-        *ampl_far_field = Matrix2::identity(); // Example, modify as needed
 
         ampl_far_field[(0, 0)] = ampl_temp[(0, 0)];
         ampl_far_field[(1, 0)] = ampl_temp[(1, 0)];
@@ -142,6 +131,29 @@ pub fn diffraction(
         ampl_far_field[(1, 1)] *= *fraunhofer;
     }
     ampl_cs
+}
+
+fn get_rotations(
+    rot3: Matrix3<f32>,
+    prop2: Vector3<f32>,
+    sin_phi: f32,
+    cos_phi: f32,
+    k: Vector3<f32>,
+) -> (Matrix2<f32>, Matrix2<f32>, Matrix2<f32>) {
+    // Compute Karczewski polarisation matrix for each element
+    let (polarisation, m) = karczewski(&prop2, &k);
+
+    // Vector perpendicular to the scattering plane in the aperture system
+    let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
+    let evo2 = k.cross(&m);
+    let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
+
+    let prerotation = Field::rotation_matrix(
+        -Vector3::x(),
+        Vector3::new(sin_phi, -cos_phi, 0.0),
+        Vector3::z(),
+    );
+    (polarisation, rot4, prerotation)
 }
 
 fn init_diff(
