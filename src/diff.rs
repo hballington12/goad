@@ -1,13 +1,6 @@
-use anyhow::Result;
-use macroquad::prelude::*;
-use miniquad::ElapsedQuery;
-use nalgebra::{Complex, ComplexField, Matrix2, Matrix3, Point3, Vector, Vector3};
-use ndarray::{Array1, Array2, Array3, Array4, Axis};
+use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
+use ndarray::Array2;
 use std::f32::consts::PI;
-use std::f32::MAX;
-use std::fs::File;
-use std::io::BufWriter;
-use std::io::{self, Write};
 
 use crate::field::Field;
 use crate::{config, geom};
@@ -35,27 +28,20 @@ pub fn diffraction(
         let sin_phi = phi.sin();
         let cos_phi = phi.cos();
 
-        // Calculate xfar, yfar, zfar for the current (theta, phi)
+        // Calculate pos (xfar, yfar, zfar) for the current (theta, phi)
         let r_sin_theta = config::RADIUS * sin_theta;
-        let xfar = r_sin_theta * cos_phi;
-        let yfar = r_sin_theta * sin_phi;
-        let zfar = -config::RADIUS * cos_theta;
-
-        // Translate and rotate far-field bins to the aperture system
         let rotated_pos = rot3
-            * Vector3::new(
-                xfar - center_of_mass[0],
-                yfar - center_of_mass[1],
-                zfar - center_of_mass[2],
-            );
+            * (Vector3::new(
+                r_sin_theta * cos_phi,
+                r_sin_theta * sin_phi,
+                -config::RADIUS * cos_theta,
+            ) - center_of_mass.coords);
 
         // Calculate distance to bins and bin unit vectors
         let bvs = rotated_pos.norm();
         let k = rotated_pos / bvs;
-
-        // Use the calculated x3, y3, z3 for further processing in the loop
+        let bvsk = bvs * config::WAVENO;
         let ampl_far_field = &mut ampl_cs[index];
-        *ampl_far_field = Matrix2::identity(); // Example, modify as needed
 
         let (polarisation, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
 
@@ -113,7 +99,6 @@ pub fn diffraction(
             let dx = xj_plus1 - xj;
             let dy = yj_plus1 - yj;
 
-            let bvsk = bvs * config::WAVENO;
             let (kxx, kyy) = calculate_kxx_kyy(&kinc.fixed_rows::<2>(0).into(), &rotated_pos, bvsk);
             let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
