@@ -319,15 +319,20 @@ pub fn calculate_bvsk(rotated_pos: &Vector3<f32>) -> f32 {
 }
 
 pub fn calculate_kxx_kyy(kinc: &[f32; 2], rotated_pos: &Vector3<f32>, bvsk: f32) -> (f32, f32) {
-    let mut kxx = kinc[0] - config::WAVENO.powi(2) * rotated_pos.x / bvsk;
-    let mut kyy = kinc[1] - config::WAVENO.powi(2) * rotated_pos.y / bvsk;
+    let kxx = kinc[0] - config::WAVENO.powi(2) * rotated_pos.x / bvsk;
+    let kyy = kinc[1] - config::WAVENO.powi(2) * rotated_pos.y / bvsk;
 
-    if kxx.abs() < 1e-6 {
-        kxx = 1e-6;
-    }
-    if kyy.abs() < 1e-6 {
-        kyy = 1e-6;
-    }
+    // numerical fix for kxx and kyy
+    let kxx = if kxx.abs() < config::DIFF_EPSILON {
+        config::DIFF_EPSILON
+    } else {
+        kxx
+    };
+    let kyy = if kyy.abs() < config::DIFF_EPSILON {
+        config::DIFF_EPSILON
+    } else {
+        kyy
+    };
 
     (kxx, kyy)
 }

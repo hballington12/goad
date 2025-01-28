@@ -20,3 +20,4 @@ pub const MAX_TIR: i32 = 10; // maximum number of total internal reflections
 pub const WAVELENGTH: f32 = 0.532;
 pub const WAVENO: f32 = 2.0 * PI / WAVELENGTH; // wavenumber
 pub const RADIUS: f32 = 1e4; // distance to far-field
+pub const DIFF_EPSILON: f32 = 1e-2; // epsilon for diffraction calculation
