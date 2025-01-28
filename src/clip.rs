@@ -1,7 +1,7 @@
 use super::config;
 use super::geom::{Face, Geom, Plane};
 use anyhow::Result;
-use geo::Area;
+use geo::{Area, CoordsIter, MultiLineString, MultiPolygon};
 use geo_clipper::Clipper;
 use geo_types::Coord;
 use geo_types::Polygon;
@@ -14,6 +14,8 @@ const AREA_THRESHOLD: f32 = 1e-2;
 
 #[cfg(test)]
 mod tests {
+
+    use geo::polygon;
 
     use super::*;
 
@@ -30,6 +32,29 @@ mod tests {
         let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
         let _ = clipping.clip();
         let _ = clipping.clip(); // cannot redo clipping
+    }
+
+    #[test]
+    fn remove_duplicate_vertices() {
+        // Define a MultiPolygon
+        let multipolygon = MultiPolygon(vec![polygon![
+            (x: 0.0, y: 0.0),
+            (x: 5.0, y: 0.0),
+            (x: 5.0, y: 5.0),
+            (x: 5.0, y: 4.99),
+            (x: 0.0, y: 5.0),
+            (x: 0.0, y: 0.0),
+        ]]);
+
+        let cleaned_multipolygon = simplify(&multipolygon);
+
+        // Print the cleaned polygon
+        println!("Original MultiPolygon: {:?}", multipolygon);
+        println!("Cleaned Polygon: {:?}", cleaned_multipolygon);
+
+        // Assert that the number of vertices in the cleaned exterior is 5
+        let cleaned_exterior = &cleaned_multipolygon.0[0].exterior();
+        assert_eq!(cleaned_exterior.coords_count(), 5);
     }
 }
 trait Point3Extensions {
@@ -322,6 +347,10 @@ pub fn clip_faces<'a>(
             let mut intersection = subject_poly.intersection(clip, config::CLIP_TOLERANCE);
             let mut difference = clip.difference(&subject_poly, config::CLIP_TOLERANCE);
 
+            // Clean up degenerate vertices etc.
+            intersection = simplify(&intersection);
+            difference = simplify(&difference);
+
             // Retain only meaningful intersections and differences.
             intersection
                 .0
@@ -360,4 +389,20 @@ pub fn clip_faces<'a>(
         .collect();
 
     Ok((intersections, remaining))
+}
+
+fn simplify(multipolygon: &MultiPolygon<f32>) -> MultiPolygon<f32> {
+    // Clean the MultiPolygon, which returns a MultiLineString
+    let cleaned_multipolygon: MultiLineString<f32> =
+        multipolygon.simplify(geo_clipper::PolyFillType::EvenOdd, config::CLIP_TOLERANCE);
+
+    // Convert the MultiLineString back into a MultiPolygon
+    let cleaned_multipolygon: MultiPolygon<f32> = MultiPolygon(
+        cleaned_multipolygon
+            .0
+            .into_iter()
+            .map(|line_string| Polygon::new(line_string, vec![]))
+            .collect(),
+    );
+    cleaned_multipolygon
 }
