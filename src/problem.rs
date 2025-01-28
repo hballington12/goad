@@ -147,7 +147,7 @@ impl Problem {
                 Face::Simple(face) => {
                     println!("simple face, ready for diffraction...");
                     // println!("Press any key to start...");
-                    // let _ = std::io::stdin().read_line(&mut String::new());
+                    let _ = std::io::stdin().read_line(&mut String::new());
 
                     let verts = face.exterior.clone();
                     let ampl = outbeam.data().field.ampl;
@@ -164,7 +164,8 @@ impl Problem {
                         total_ampl_far_field[i] += ampl;
                     }
 
-                    let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
+                    // let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
+                    let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
                     println!("done.");
                 }
                 Face::Complex { .. } => {
