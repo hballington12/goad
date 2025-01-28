@@ -2,6 +2,7 @@ use std::f32::consts::PI;
 
 use nalgebra::Complex;
 
+pub const VERTEX_MERGE_DISTANCE: f32 = 0.01; // minimum distance for vertices to be considered the same
 pub const BEAM_AREA_THRESHOLD: f32 = 0.001; // minimum area for new beam to propagate
 pub const BEAM_POWER_THRESHOLD: f32 = 0.00001; // minimum power for new beam to propagate
 pub const CLIP_TOLERANCE: f32 = 1e8; // Named constant for tolerance
