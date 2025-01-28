@@ -146,7 +146,7 @@ impl Problem {
             match &outbeam.data().face {
                 Face::Simple(face) => {
                     println!("simple face, ready for diffraction...");
-                    // println!("Press any key to start...");
+                    println!("Press any key to start...");
                     let _ = std::io::stdin().read_line(&mut String::new());
 
                     let verts = face.exterior.clone();
@@ -164,8 +164,8 @@ impl Problem {
                         total_ampl_far_field[i] += ampl;
                     }
 
-                    // let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
-                    let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
+                    let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
+                    // let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
                     println!("done.");
                 }
                 Face::Complex { .. } => {
@@ -245,7 +245,7 @@ impl Problem {
                 }
                 (Beam::Default { .. }, Beam::OutGoing(..)) => {
                     self.powers.output += output.data().power();
-                    self.out_beam_queue.push(output.clone());
+                    self.insert_outbeam(output.clone());
                 }
 
                 // Handle Initial beams
@@ -291,6 +291,29 @@ impl Problem {
 
         // Insert the beam at the determined position
         self.beam_queue.insert(pos, beam);
+
+        // Or just push
+        // self.beam_queue.push(beam);
+    }
+
+    /// Inserts a beam into the outbeam queue such that beams with greatest power
+    /// are prioritised for dequeueing.
+    pub fn insert_outbeam(&mut self, beam: Beam) {
+        let value = beam.data().power();
+
+        // Find the position to insert the beam using binary search
+        let pos = self
+            .out_beam_queue
+            .binary_search_by(|x| {
+                x.data()
+                    .power()
+                    .partial_cmp(&value)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap_or_else(|e| e);
+
+        // Insert the beam at the determined position
+        self.out_beam_queue.insert(pos, beam);
 
         // Or just push
         // self.beam_queue.push(beam);
