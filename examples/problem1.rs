@@ -8,19 +8,19 @@ use pbt::{
 use std::io::{self, Write};
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex3.obj").unwrap();
 
     let projection = Vector3::new(0.0, 0.0, -1.0).normalize();
-    let e_perp = Vector3::z(); // choose e_perp along z-axis for now
-
-    let lower_left = vec![-10.0, -2.0];
-    let upper_right = vec![10.0, 2.0];
+    let e_perp = Vector3::x(); // choose e_perp along z-axis for now
+    let lower_left = vec![-10.0, -10.0];
+    let upper_right = vec![10.0, 10.0];
     let clip_vertices = vec![
-        Point3::new(lower_left[0], 10.0, upper_right[1]),
-        Point3::new(lower_left[0], 10.0, lower_left[1]),
-        Point3::new(upper_right[0], 10.0, lower_left[1]),
-        Point3::new(upper_right[0], 10.0, upper_right[1]),
+        Point3::new(upper_right[0], upper_right[1], 10.0),
+        Point3::new(upper_right[0], lower_left[1], 10.0),
+        Point3::new(lower_left[0], lower_left[1], 10.0),
+        Point3::new(lower_left[0], upper_right[1], 10.0),
     ];
+
     let mut clip = Face::new_simple(clip_vertices, None).unwrap();
     clip.data_mut().area =
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));

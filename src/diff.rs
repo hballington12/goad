@@ -43,10 +43,10 @@ pub fn diffraction(
         let bvsk = bvs * config::WAVENO;
         let ampl_far_field = &mut ampl_cs[index];
 
-        let (polarisation, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
+        let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
 
         let ampl_temp = rot4.map(Complex::from)
-            * polarisation.map(Complex::from)
+            * karczewski.map(Complex::from)
             * ampl
             * prerotation.map(Complex::from);
 
@@ -290,6 +290,12 @@ pub fn karczewski(
 
     // Perpendicular field direction
     let sqrt_1_minus_k2y2 = (1.0 - bvk.y.powi(2)).sqrt();
+    let sqrt_1_minus_k2y2 = if sqrt_1_minus_k2y2.abs() < config::DIFF_EPSILON {
+        config::DIFF_EPSILON
+    } else {
+        sqrt_1_minus_k2y2
+    };
+
     let m = Vector3::new(
         -bvk.x * bvk.y / sqrt_1_minus_k2y2,
         sqrt_1_minus_k2y2,
@@ -298,6 +304,11 @@ pub fn karczewski(
 
     // Pre-calculate factor
     let frac = ((1.0 - bvk.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
+    let frac = if frac.abs() < config::DIFF_EPSILON {
+        config::DIFF_EPSILON
+    } else {
+        frac
+    };
 
     // KW coefficients
     let a1m = -big_kz * frac;
