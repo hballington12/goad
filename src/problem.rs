@@ -1,11 +1,14 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant},
+    bins,
     clip::Clipping,
-    config,
+    config, diff,
     geom::{Face, Geom},
     helpers::draw_face,
+    output,
 };
 use macroquad::prelude::*;
+use nalgebra::{Complex, Matrix2};
 use std::fmt;
 
 #[cfg(test)]
@@ -123,6 +126,51 @@ impl Problem {
             beam_queue: vec![beam],
             out_beam_queue: vec![],
             powers: Powers::new(),
+        }
+    }
+
+    pub fn solve_far(&mut self) {
+        println!("solving far-field problem...");
+        // set up bins
+        let theta_phi_combinations = bins::generate_theta_phi_combinations();
+        let mut total_ampl_far_field =
+            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
+
+        loop {
+            if self.out_beam_queue.len() == 0 {
+                println!("no beams remaining to solve far-field problem...");
+                break;
+            }
+
+            let outbeam = self.out_beam_queue.pop().unwrap();
+            match &outbeam.data().face {
+                Face::Simple(face) => {
+                    println!("simple face, ready for diffraction...");
+                    // println!("Press any key to start...");
+                    // let _ = std::io::stdin().read_line(&mut String::new());
+
+                    let verts = face.exterior.clone();
+                    let ampl = outbeam.data().field.ampl;
+                    let prop = outbeam.data().prop;
+                    let vk7 = outbeam.data().field.e_perp;
+                    println!("Vertices: {:?}", verts);
+                    println!("Amplitude: {:?}", ampl);
+                    println!("Propagation: {:?}", prop);
+                    println!("E_perp: {:?}", vk7);
+                    let ampl_far_field =
+                        diff::diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations);
+
+                    for (i, ampl) in ampl_far_field.iter().enumerate() {
+                        total_ampl_far_field[i] += ampl;
+                    }
+
+                    let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
+                    println!("done.");
+                }
+                Face::Complex { .. } => {
+                    println!("complex face not supported yet...");
+                }
+            }
         }
     }
 

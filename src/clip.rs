@@ -345,21 +345,6 @@ pub fn clip_faces<'a>(
                     difference.0.push(poly);
                 }
             }
-
-            // if intersection.0.iter().any(|poly| {
-            //     let face = poly.project(&subject.plane()).unwrap();
-            //     face.data().midpoint.ray_cast_z(&clip_in.plane()) < 0.1
-            // }) {
-            //     //
-            //     difference.0.extend(intersection.0);
-            // } else {
-            //     intersections.extend(intersection.0.into_iter().map(|poly| {
-            //         let mut face = poly.project(&subject.plane()).unwrap();
-            //         face.data_mut().shape_id = subject.data().shape_id;
-            //         face
-            //     }));
-            // }
-
             next_clips.extend(difference.0);
         }
 
