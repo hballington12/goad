@@ -90,7 +90,7 @@ impl Powers {
                 + self.absorbed
                 + self.trnc_ref
                 + self.trnc_rec
-                + self.trnc_clip
+                // + self.trnc_clip
                 + self.trnc_energy)
     }
 }
@@ -103,7 +103,7 @@ impl fmt::Display for Powers {
         writeln!(f, "  Absorbed:         {:.6}", self.absorbed)?;
         writeln!(f, "  Truncated Ref:    {:.6}", self.trnc_ref)?;
         writeln!(f, "  Truncated Rec:    {:.6}", self.trnc_rec)?;
-        writeln!(f, "  Truncated Clip:   {:.6}", self.trnc_clip)?;
+        // writeln!(f, "  Truncated Clip:   {:.6}", self.trnc_clip)?;
         writeln!(f, "  Truncated Energy: {:.6}", self.trnc_energy)?;
         writeln!(f, "  Unaccounted:      {:.6}", self.missing())
     }
@@ -145,18 +145,18 @@ impl Problem {
             let outbeam = self.out_beam_queue.pop().unwrap();
             match &outbeam.data().face {
                 Face::Simple(face) => {
-                    println!("simple face, ready for diffraction...");
-                    println!("Press any key to start...");
-                    let _ = std::io::stdin().read_line(&mut String::new());
+                    // println!("simple face, ready for diffraction...");
+                    // println!("Press any key to start...");
+                    // let _ = std::io::stdin().read_line(&mut String::new());
 
                     let verts = face.exterior.clone();
                     let ampl = outbeam.data().field.ampl;
                     let prop = outbeam.data().prop;
                     let vk7 = outbeam.data().field.e_perp;
-                    println!("Vertices: {:?}", verts);
-                    println!("Amplitude: {:?}", ampl);
-                    println!("Propagation: {:?}", prop);
-                    println!("E_perp: {:?}", vk7);
+                    // println!("Vertices: {:?}", verts);
+                    // println!("Amplitude: {:?}", ampl);
+                    // println!("Propagation: {:?}", prop);
+                    // println!("E_perp: {:?}", vk7);
                     let ampl_far_field =
                         diff::diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations);
 
@@ -166,7 +166,7 @@ impl Problem {
 
                     let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
                     // let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
-                    println!("done.");
+                    // println!("done.");
                 }
                 Face::Complex { .. } => {
                     println!("complex face not supported yet...");

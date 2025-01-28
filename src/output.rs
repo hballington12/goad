@@ -9,7 +9,6 @@ pub fn writeup(
     theta_phi_combinations: &[(f32, f32)],
     ampl_cs: &Vec<Matrix2<Complex<f32>>>,
 ) -> Result<()> {
-    println!("done.");
     let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
 
     for (index, amplc) in ampl_cs.iter().enumerate() {
