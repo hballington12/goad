@@ -99,10 +99,26 @@ pub fn diffraction(
             let dx = xj_plus1 - xj;
             let dy = yj_plus1 - yj;
 
+            let dx = if dx.abs() < config::DIFF_EPSILON {
+                config::DIFF_EPSILON
+            } else {
+                dx
+            };
+            let dy = if dy.abs() < config::DIFF_EPSILON {
+                config::DIFF_EPSILON
+            } else {
+                dy
+            };
+
             let (kxx, kyy) = calculate_kxx_kyy(&kinc.fixed_rows::<2>(0).into(), &rotated_pos, bvsk);
             let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
             let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
+
+            if alpha.is_infinite() || beta.is_infinite() {
+                continue;
+            }
+
             let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
 
             fraunhofer_sum += summand;
@@ -147,6 +163,15 @@ fn init_diff(
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
 ) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
+    // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
+    let prop = (prop
+        + Vector3::new(
+            config::DIFF_EPSILON,
+            config::DIFF_EPSILON,
+            config::DIFF_EPSILON,
+        ))
+    .normalize();
+
     // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
     *ampl *= Complex::new(config::WAVENO, 0.0);
 

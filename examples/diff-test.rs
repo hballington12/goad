@@ -15,7 +15,7 @@ fn main() {
     let m21: Complex<f32> = Complex::new(0.85, 0.2);
     let m22: Complex<f32> = Complex::new(-0.5, 0.5);
     let ampl = Matrix2::new(m11, m12, m21, m22);
-    let prop: Vector3<f32> = Vector3::new(0.0, 0.4, -0.3).normalize();
+    let prop: Vector3<f32> = Vector3::new(0.0, 0.5, -0.9).normalize();
     let vk7: Vector3<f32> = Vector3::new(1.0, 0.0, 0.0);
     let vk7 = vk7.cross(&prop).normalize();
     let verts = face.data().exterior.clone();
