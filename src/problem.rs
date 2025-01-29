@@ -239,31 +239,24 @@ impl Problem {
 
         // Process each output beam
         for output in &outputs {
+            let output_power = output.power();
             match (&beam.type_, &output.type_) {
-                // Handle Default beams
-                (BeamType::Default, BeamType::Default) => {
-                    self.insert_beam(output.clone());
-                }
+                (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
                 (BeamType::Default, BeamType::OutGoing) => {
-                    self.powers.output += output.power();
+                    self.powers.output += output_power;
                     self.insert_outbeam(output.clone());
                 }
-
-                // Handle Initial beams
                 (BeamType::Initial, BeamType::Default) => {
-                    self.powers.input += output.power();
+                    self.powers.input += output_power;
                     self.insert_beam(output.clone());
                 }
                 (BeamType::Initial, BeamType::ExternalDiff) => {
-                    self.powers.ext_diff += output.power();
+                    self.powers.ext_diff += output_power;
                     self.ext_diff_beam_queue.push(output.clone());
                 }
-
-                _ => {} // Ignore other cases
+                _ => {}
             }
         }
-
-        // Create and return the propagation result
         Some(BeamPropagation::new(beam, outputs))
     }
 
