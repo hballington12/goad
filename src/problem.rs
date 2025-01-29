@@ -1,8 +1,6 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins,
-    clip::Clipping,
-    config, diff,
+    bins, config, diff,
     geom::{Face, Geom},
     helpers::draw_face,
     output,
@@ -13,7 +11,6 @@ use std::fmt;
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Ref;
 
     use super::*;
     use nalgebra::{Complex, Vector3};
@@ -224,16 +221,16 @@ impl Problem {
                         self.powers.trnc_ref += beam.power();
                         Vec::new()
                     } else {
-                        Beam::propagate(&mut self.geom, &mut beam)
+                        beam.propagate(&mut self.geom)
                     }
                 } else if beam.rec_count > config::MAX_REC {
                     self.powers.trnc_rec += beam.power();
                     Vec::new()
                 } else {
-                    Beam::propagate(&mut self.geom, &mut beam)
+                    beam.propagate(&mut self.geom)
                 }
             }
-            BeamType::Initial => Beam::propagate(&mut self.geom, &mut beam),
+            BeamType::Initial => beam.propagate(&mut self.geom),
             _ => Vec::new(),
         };
 

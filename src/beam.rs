@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::f32::consts::PI;
-use std::fmt::Error;
 
 use geo::Coord;
 use macroquad::prelude::*;
@@ -9,7 +8,6 @@ use nalgebra::Matrix2;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 
-use crate::beam;
 use crate::clip::Clipping;
 use crate::config;
 use crate::field::Field;
@@ -126,16 +124,6 @@ impl BeamPropagation {
     }
 }
 
-// pub enum Beam {
-//     Initial(BeamData), // an initial beam to be traced in the near-field
-//     Default {
-//         data: BeamData,       // a beam to be traced in the near-field
-//         variant: BeamVariant, // whether the beam was a refl, refraction, or tir,
-//     },
-//     OutGoing(BeamData),     // a beam to be mapped to the far-field
-//     ExternalDiff(BeamData), // a beam due to external diffraction to be mapped to the far-field
-// }
-
 impl Beam {
     /// Creates a new initial field. The amplitude matrix is the identity matrix
     /// with the specified perpendicular field vector.
@@ -157,28 +145,14 @@ impl Beam {
             BeamType::Initial,
         ))
     }
-    // pub fn new_default(
-    //     face: Face,
-    //     proj: Vector3<f32>,
-    //     refr_index: Complex<f32>,
-    //     rec_count: i32,
-    //     tir_count: i32,
-    //     variant: BeamVariant,
-    //     field: Field,
-    // ) -> Self {
-    //     Beam::new(face, proj, refr_index, rec_count, tir_count, field)
-    // }
-    // pub fn new_outgoing(beam_data: &Beam) -> Beam {
-    //     beam_data.clone()
-    // }
 
     /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    pub fn propagate(geom: &mut Geom, beam_data: &mut Beam) -> Vec<Beam> {
-        let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
+    pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
+        let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
         let _ = clipping.clip();
 
-        beam_data.clipping_area = match clipping.stats {
+        self.clipping_area = match clipping.stats {
             Some(stats) => stats.intersection_area + stats.remaining_area,
             _ => 0.0,
         };
@@ -188,8 +162,8 @@ impl Beam {
             filter_faces(clipping.remaining),
         );
 
-        let remainder_beams = remainders_to_beams(beam_data, remainders);
-        let beams = create_beams(geom, beam_data, intersections);
+        let remainder_beams = remainders_to_beams(self, remainders);
+        let beams = create_beams(geom, self, intersections);
 
         let mut output_beams = Vec::new();
         output_beams.extend(beams);
@@ -242,28 +216,28 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
     result
 }
 
-fn create_beams(geom: &mut Geom, beam_data: &mut Beam, intersections: Vec<Face>) -> Vec<Beam> {
-    let n1 = beam_data.refr_index;
+fn create_beams(geom: &mut Geom, beam: &mut Beam, intersections: Vec<Face>) -> Vec<Beam> {
+    let n1 = beam.refr_index;
 
     // create  beams
     intersections
         .iter()
         .filter_map(|face| {
             let normal = face.data().normal;
-            let theta_i = normal.dot(&beam_data.prop).abs().acos();
-            let n2 = get_n2(geom, beam_data, face, normal);
-            let e_perp = get_e_perp(normal, &beam_data);
-            let rot = get_rotation_matrix(&beam_data, e_perp);
-            let (ampl, absorbed_intensity) = match get_ampl(&beam_data, rot, face, n1) {
+            let theta_i = normal.dot(&beam.prop).abs().acos();
+            let n2 = get_n2(geom, beam, face, normal);
+            let e_perp = get_e_perp(normal, &beam);
+            let rot = get_rotation_matrix(&beam, e_perp);
+            let (ampl, absorbed_intensity) = match get_ampl(&beam, rot, face, n1) {
                 Ok((ampl, absorbed_power)) => (ampl, absorbed_power),
                 Err(_) => return None, // skip this intersection if get_ampl() returns error
             };
 
-            beam_data.absorbed_power +=
+            beam.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
             let refracted =
-                match create_refracted(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2) {
+                match create_refracted(face, ampl, e_perp, normal, beam, theta_i, n1, n2) {
                     Ok(beam) => beam,
                     Err(_) => {
                         // count skipped beams
@@ -272,7 +246,7 @@ fn create_beams(geom: &mut Geom, beam_data: &mut Beam, intersections: Vec<Face>)
                 };
 
             let reflected =
-                match create_reflected(face, ampl, e_perp, normal, beam_data, theta_i, n1, n2) {
+                match create_reflected(face, ampl, e_perp, normal, beam, theta_i, n1, n2) {
                     Ok(beam) => beam,
                     Err(_) => {
                         // count skipped beams
@@ -294,13 +268,13 @@ fn create_beams(geom: &mut Geom, beam_data: &mut Beam, intersections: Vec<Face>)
 /// the intersection `face`, and applies the corresponding phase and absorption
 /// factors.
 fn get_ampl(
-    beam_data: &Beam,
+    beam: &Beam,
     rot: Matrix2<Complex<f32>>,
     face: &Face,
     n1: Complex<f32>,
 ) -> Result<(Matrix2<Complex<f32>>, f32)> {
-    let mut ampl = rot * beam_data.field.ampl.clone();
-    let dist = (face.midpoint() - beam_data.face.data().midpoint).dot(&beam_data.prop); // z-distance
+    let mut ampl = rot * beam.field.ampl.clone();
+    let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
 
     if dist < 0.0 {
         return Err(anyhow::anyhow!("distance less than 0: {}", dist));
@@ -320,31 +294,26 @@ fn get_ampl(
 }
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
-/// in `beam_data` to the plane perpendicular to `e_perp`.
-fn get_rotation_matrix(beam_data: &Beam, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
-    Field::rotation_matrix(beam_data.field.e_perp, e_perp, beam_data.prop)
+/// in `beam` to the plane perpendicular to `e_perp`.
+fn get_rotation_matrix(beam: &Beam, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
+    Field::rotation_matrix(beam.field.e_perp, e_perp, beam.prop)
         .map(|x| nalgebra::Complex::new(x, 0.0))
 }
 
 /// Determines the new `e_perp` vector for an intersection at a `face``.
-fn get_e_perp(normal: Vector3<f32>, beam_data: &Beam) -> Vector3<f32> {
-    if normal.dot(&beam_data.prop).abs() > 1.0 - config::COLINEAR_THRESHOLD {
-        -beam_data.field.e_perp
+fn get_e_perp(normal: Vector3<f32>, beam: &Beam) -> Vector3<f32> {
+    if normal.dot(&beam.prop).abs() > 1.0 - config::COLINEAR_THRESHOLD {
+        -beam.field.e_perp
     } else {
-        normal.cross(&beam_data.prop).normalize() // new e_perp
+        normal.cross(&beam.prop).normalize() // new e_perp
     }
 }
 
 /// Determines the refractive index of the second medium when a beam intersects
 /// with a face.
-fn get_n2(
-    geom: &mut Geom,
-    beam_data: &mut Beam,
-    face: &Face,
-    normal: Vector3<f32>,
-) -> Complex<f32> {
+fn get_n2(geom: &mut Geom, beam: &mut Beam, face: &Face, normal: Vector3<f32>) -> Complex<f32> {
     let id = face.data().shape_id.unwrap();
-    if normal.dot(&beam_data.prop) < 0.0 {
+    if normal.dot(&beam.prop) < 0.0 {
         geom.shapes[id].refr_index
     } else {
         geom.n_out(id)
@@ -357,12 +326,12 @@ fn create_reflected(
     ampl: Matrix2<Complex<f32>>,
     e_perp: Vector3<f32>,
     normal: Vector3<f32>,
-    beam_data: &Beam,
+    beam: &Beam,
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
 ) -> Result<Option<Beam>> {
-    let prop = get_reflection_vector(&normal, &beam_data.prop);
+    let prop = get_reflection_vector(&normal, &beam.prop);
 
     debug_assert!((prop.dot(&normal) - theta_i.cos()) < config::COLINEAR_THRESHOLD);
     debug_assert!(!Field::ampl_intensity(&ampl).is_nan());
@@ -377,8 +346,8 @@ fn create_reflected(
             face.clone(),
             prop,
             n1,
-            beam_data.rec_count + 1,
-            beam_data.tir_count + 1,
+            beam.rec_count + 1,
+            beam.tir_count + 1,
             Field::new(e_perp, prop, refl_ampl).unwrap(),
             Some(BeamVariant::Tir),
             BeamType::Default,
@@ -392,8 +361,8 @@ fn create_reflected(
             face.clone(),
             prop,
             n1,
-            beam_data.rec_count + 1,
-            beam_data.tir_count,
+            beam.rec_count + 1,
+            beam.tir_count,
             Field::new(e_perp, prop, refl_ampl)?,
             Some(BeamVariant::Refl),
             BeamType::Default,
@@ -407,7 +376,7 @@ fn create_refracted(
     ampl: Matrix2<Complex<f32>>,
     e_perp: Vector3<f32>,
     normal: Vector3<f32>,
-    beam_data: &Beam,
+    beam: &Beam,
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
@@ -417,19 +386,19 @@ fn create_refracted(
         Ok(None)
     } else {
         let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
-        let prop = get_refraction_vector(&normal, &beam_data.prop, theta_i, theta_t);
+        let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
         let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
         let refr_ampl = fresnel * ampl.clone();
 
-        debug_assert!(beam_data.prop.dot(&prop) > 0.0);
+        debug_assert!(beam.prop.dot(&prop) > 0.0);
         debug_assert!((prop.dot(&normal).abs() - theta_t.cos()).abs() < config::COLINEAR_THRESHOLD);
 
         Ok(Some(Beam::new(
             face.clone(),
             prop,
             n2,
-            beam_data.rec_count + 1,
-            beam_data.tir_count,
+            beam.rec_count + 1,
+            beam.tir_count,
             Field::new(e_perp, prop, refr_ampl)?,
             Some(BeamVariant::Refr),
             BeamType::Default,
@@ -448,18 +417,18 @@ fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
 
 /// Converts the remainder faces from a clipping into beams with the same field
 /// properties as the original beam.
-fn remainders_to_beams(beam_data: &mut Beam, remainders: Vec<Face>) -> Vec<Beam> {
+fn remainders_to_beams(beam: &mut Beam, remainders: Vec<Face>) -> Vec<Beam> {
     let remainder_beams: Vec<_> = remainders
         .into_iter()
         .filter_map(|remainder| {
-            let area = remainder.data().area.unwrap();
+            // let area = remainder.data().area.unwrap();
             Some(Beam::new(
                 remainder,
-                beam_data.prop,
-                beam_data.refr_index,
-                beam_data.rec_count,
-                beam_data.tir_count,
-                beam_data.field.clone(),
+                beam.prop,
+                beam.refr_index,
+                beam.rec_count,
+                beam.tir_count,
+                beam.field.clone(),
                 None,
                 BeamType::OutGoing,
             ))
