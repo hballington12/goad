@@ -1,4 +1,6 @@
+#[cfg(debug_assertions)]
 use crate::config;
+
 use anyhow::Result;
 use std::fmt::Debug;
 
@@ -6,8 +8,6 @@ use nalgebra::{Complex, Matrix2, RealField, Vector3};
 
 #[cfg(test)]
 mod tests {
-
-    use nalgebra::Complex;
 
     use super::*;
 
