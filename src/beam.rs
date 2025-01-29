@@ -10,6 +10,7 @@ use nalgebra::Vector3;
 
 use crate::clip::Clipping;
 use crate::config;
+use crate::diff;
 use crate::field::Field;
 use crate::fresnel;
 use crate::geom::Face;
@@ -295,13 +296,16 @@ fn get_ampl(
         return Err(anyhow::anyhow!("distance less than 0: {}", dist));
     }
 
-    let arg = dist * config::WAVENO * n1.re; // optical path length
+    let arg = dist * config::WAVENUMBER * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
 
     let absorbed_intensity = Field::ampl_intensity(&ampl)
-        * (1.0 - (-2.0 * config::WAVENO * n1.im * dist.sqrt()).exp().powi(2));
+        * (1.0
+            - (-2.0 * config::WAVENUMBER * n1.im * dist.sqrt())
+                .exp()
+                .powi(2));
 
-    let exp_absorption = (-2.0 * config::WAVENO * n1.im * dist.sqrt()).exp(); // absorption
+    let exp_absorption = (-2.0 * config::WAVENUMBER * n1.im * dist.sqrt()).exp(); // absorption
 
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
 
@@ -507,6 +511,30 @@ impl Beam {
     /// Returns the power of a beam.
     pub fn power(&self) -> f32 {
         self.field.intensity() * self.refr_index.re * self.csa()
+    }
+
+    pub fn diffract(
+        &self,
+        theta_phi_combinations: &[(f32, f32)],
+        total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
+    ) {
+        match &self.face {
+            Face::Simple(face) => {
+                let verts = &face.exterior;
+                let ampl = self.field.ampl;
+                let prop = self.prop;
+                let vk7 = self.field.e_perp;
+                let ampl_far_field =
+                    diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations);
+
+                for (i, ampl) in ampl_far_field.iter().enumerate() {
+                    total_ampl_far_field[i] += ampl;
+                }
+            }
+            Face::Complex { .. } => {
+                println!("complex face not supported yet...");
+            }
+        }
     }
 }
 

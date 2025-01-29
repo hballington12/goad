@@ -7,7 +7,7 @@ use std::io::Write;
 
 pub fn writeup(
     theta_phi_combinations: &[(f32, f32)],
-    ampl_cs: &Vec<Matrix2<Complex<f32>>>,
+    ampl_cs: &[Matrix2<Complex<f32>>],
 ) -> Result<()> {
     let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
 

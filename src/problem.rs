@@ -1,7 +1,7 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins, config, diff,
-    geom::{Face, Geom},
+    bins, config,
+    geom::Geom,
     helpers::draw_face,
     output,
 };
@@ -13,6 +13,7 @@ use std::fmt;
 mod tests {
 
     use super::*;
+    use crate::geom::Face;
     use nalgebra::{Complex, Vector3};
 
     #[test]
@@ -104,7 +105,7 @@ impl fmt::Display for Powers {
         writeln!(f, "  Truncated Rec:    {:.6}", self.trnc_rec)?;
         // writeln!(f, "  Truncated Clip:   {:.6}", self.trnc_clip)?;
         writeln!(f, "  Truncated Energy: {:.6}", self.trnc_energy)?;
-        writeln!(f, "  Unaccounted:      {:.6}", self.missing())?;
+        writeln!(f, "  Other:            {:.6}", self.missing())?;
         writeln!(f, "  External Diff:    {:.6}", self.ext_diff)
     }
 }
@@ -112,105 +113,75 @@ impl fmt::Display for Powers {
 /// A solvable physics problem.
 #[derive(Debug, PartialEq)] // Added Default derive
 pub struct Problem {
-    pub geom: Geom,                     // geometry to trace beams in
-    pub beam_queue: Vec<Beam>,          // beams awaiting near-field propagation
-    pub out_beam_queue: Vec<Beam>,      // beams awaiting diffraction
-    pub ext_diff_beam_queue: Vec<Beam>, // beams awaiting external diffraction
-    pub powers: Powers,                 // different power contributions
+    pub geom: Geom,                       // geometry to trace beams in
+    pub beam_queue: Vec<Beam>,            // beams awaiting near-field propagation
+    pub out_beam_queue: Vec<Beam>,        // beams awaiting diffraction
+    pub ext_diff_beam_queue: Vec<Beam>,   // beams awaiting external diffraction
+    pub powers: Powers,                   // different power contributions
+    pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
+    pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
 }
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom, beam: Beam) -> Self {
+        let theta_phi_combinations = bins::generate_theta_phi_combinations();
+        let total_ampl_far_field =
+            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
         Self {
             geom,
             beam_queue: vec![beam],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             powers: Powers::new(),
+            bins: theta_phi_combinations,
+            ampl: total_ampl_far_field,
         }
+    }
+
+    fn diffract_outbeams(
+        queue: &mut Vec<Beam>,
+        theta_phi_combinations: &[(f32, f32)],
+        total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
+        description: &str,
+    ) {
+        println!("solving far-field problem ({})...", description);
+
+        loop {
+            if queue.is_empty() {
+                println!("no beams remaining to solve far-field problem...");
+                break;
+            }
+
+            let outbeam = queue.pop().unwrap();
+            outbeam.diffract(theta_phi_combinations, total_ampl_far_field);
+            let _ = output::writeup(&theta_phi_combinations, total_ampl_far_field);
+            // iterative write
+        }
+        let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
+        // total write
     }
 
     pub fn solve_far_ext_diff(&mut self) {
-        println!("solving far-field problem (external diffraction)...");
-        // set up bins
-        let theta_phi_combinations = bins::generate_theta_phi_combinations();
-        let mut total_ampl_far_field =
-            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
-
-        loop {
-            if self.ext_diff_beam_queue.len() == 0 {
-                println!("no beams remaining to solve far-field problem...");
-                break;
-            }
-
-            let outbeam = self.ext_diff_beam_queue.pop().unwrap();
-            match &outbeam.face {
-                Face::Simple(face) => {
-                    // println!("Press any key to start...");
-                    // let _ = std::io::stdin().read_line(&mut String::new());
-
-                    let verts = &face.exterior;
-                    let ampl = outbeam.field.ampl;
-                    let prop = outbeam.prop;
-                    let vk7 = outbeam.field.e_perp;
-                    let ampl_far_field =
-                        diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations);
-
-                    for (i, ampl) in ampl_far_field.iter().enumerate() {
-                        total_ampl_far_field[i] += ampl;
-                    }
-
-                    let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
-                    // write current total
-                    // let _ = output::writeup(&theta_phi_combinations, &ampl_far_field); // write current beam
-                }
-                Face::Complex { .. } => {
-                    println!("complex face not supported yet...");
-                }
-            }
-        }
+        Self::diffract_outbeams(
+            &mut self.ext_diff_beam_queue,
+            &self.bins,
+            &mut self.ampl,
+            "external diffraction",
+        );
     }
 
     pub fn solve_far_outbeams(&mut self) {
-        println!("solving far-field problem...");
-        // set up bins
-        let theta_phi_combinations = bins::generate_theta_phi_combinations();
-        let mut total_ampl_far_field =
-            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
-
-        loop {
-            if self.out_beam_queue.len() == 0 {
-                println!("no beams remaining to solve far-field problem...");
-                break;
-            }
-
-            let outbeam = self.out_beam_queue.pop().unwrap();
-            match &outbeam.face {
-                Face::Simple(face) => {
-                    // println!("Press any key to start...");
-                    // let _ = std::io::stdin().read_line(&mut String::new());
-
-                    let verts = &face.exterior;
-                    let ampl = outbeam.field.ampl;
-                    let prop = outbeam.prop;
-                    let vk7 = outbeam.field.e_perp;
-                    let ampl_far_field =
-                        diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations);
-
-                    for (i, ampl) in ampl_far_field.iter().enumerate() {
-                        total_ampl_far_field[i] += ampl;
-                    }
-
-                    let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
-                    // write current total
-                    // let _ = output::writeup(&theta_phi_combinations, &ampl_far_field); // write current beam
-                }
-                Face::Complex { .. } => {
-                    println!("complex face not supported yet...");
-                }
-            }
-        }
+        Self::diffract_outbeams(
+            &mut self.out_beam_queue,
+            &self.bins,
+            &mut self.ampl,
+            "outgoing beams",
+        );
+    }
+    pub fn solve_far(&mut self) {
+        self.solve_far_ext_diff();
+        self.solve_far_outbeams();
     }
 
     /// Trace beams to solve the near-field problem.

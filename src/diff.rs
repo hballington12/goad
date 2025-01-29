@@ -40,7 +40,7 @@ pub fn diffraction(
         // Calculate distance to bins and bin unit vectors
         let bvs = rotated_pos.norm();
         let k = rotated_pos / bvs;
-        let bvsk = bvs * config::WAVENO;
+        let bvsk = bvs * config::WAVENUMBER;
         let ampl_far_field = &mut ampl_cs[index];
 
         let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
@@ -64,7 +64,7 @@ pub fn diffraction(
             v1[[i, 2]] = transformed_vertex.z;
         }
 
-        let kinc = prop2 * config::WAVENO;
+        let kinc = prop2 * config::WAVENUMBER;
         let x: Vec<f32> = v1.column(0).iter().cloned().collect();
         let y: Vec<f32> = v1.column(1).iter().cloned().collect();
         let m: Vec<f32> = (0..nv)
@@ -173,7 +173,7 @@ fn init_diff(
     .normalize();
 
     // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
-    *ampl *= Complex::new(config::WAVENO, 0.0);
+    *ampl *= Complex::new(config::WAVENUMBER, 0.0);
 
     // 1. Compute the center of mass
     let center_of_mass = geom::calculate_center_of_mass(verts);
@@ -351,12 +351,12 @@ pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
 }
 
 pub fn calculate_bvsk(rotated_pos: &Vector3<f32>) -> f32 {
-    config::WAVENO * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
+    config::WAVENUMBER * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
 }
 
 pub fn calculate_kxx_kyy(kinc: &[f32; 2], rotated_pos: &Vector3<f32>, bvsk: f32) -> (f32, f32) {
-    let kxx = kinc[0] - config::WAVENO.powi(2) * rotated_pos.x / bvsk;
-    let kyy = kinc[1] - config::WAVENO.powi(2) * rotated_pos.y / bvsk;
+    let kxx = kinc[0] - config::WAVENUMBER.powi(2) * rotated_pos.x / bvsk;
+    let kyy = kinc[1] - config::WAVENUMBER.powi(2) * rotated_pos.y / bvsk;
 
     // numerical fix for kxx and kyy
     let kxx = if kxx.abs() < config::DIFF_EPSILON {
