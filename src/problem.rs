@@ -1,6 +1,6 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins, config,
+    bins, config, diff,
     geom::Geom,
     helpers::draw_face,
     output,
@@ -8,6 +8,10 @@ use crate::{
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2};
 use std::fmt;
+use std::thread;
+use std::time::Duration;
+
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 #[cfg(test)]
 mod tests {
@@ -145,20 +149,47 @@ impl Problem {
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         description: &str,
     ) {
-        println!("solving far-field problem ({})...", description);
+        let m = MultiProgress::new();
+
+        let n = queue.len();
+        let pb = m.add(ProgressBar::new(n as u64));
+        pb.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg}",
+            )
+            .unwrap()
+            .progress_chars("➤➤➤➤➤➤➤➤"),
+        );
+        pb.set_message(description.to_string());
+        let pb2 = m.add(ProgressBar::new(100 as u64));
+        pb2.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {pos:>5}/{len:5} {msg}",
+            )
+            .unwrap()
+            .progress_chars("➤➤➤➤➤➤➤➤"),
+        );
+        pb2.set_message("power diffracted (%)".to_string());
+
+        let mut diffracted_power = 0.0;
+        let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
 
         loop {
             if queue.is_empty() {
-                println!("no beams remaining to solve far-field problem...");
                 break;
             }
 
             let outbeam = queue.pop().unwrap();
+            diffracted_power += outbeam.power();
             outbeam.diffract(theta_phi_combinations, total_ampl_far_field);
-            let _ = output::writeup(&theta_phi_combinations, total_ampl_far_field);
-            // iterative write
+
+            pb.inc(1);
+            let progress = (diffracted_power / total_power) * 100.0;
+            pb2.set_position(progress as u64);
         }
         let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
+        pb.finish_with_message(format!("{} (done)", description));
+        pb2.finish_with_message(format!("power diffracted (%)"));
         // total write
     }
 
@@ -200,12 +231,7 @@ impl Problem {
             self.propagate_next();
         }
 
-        println!("done.");
         println!("{}", self.powers);
-        println!(
-            "number of beams awaiting diffraction: {}",
-            self.out_beam_queue.len()
-        );
     }
 
     /// Propagates the next beam in the queue.
