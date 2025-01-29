@@ -188,6 +188,21 @@ impl Beam {
                     Err(_) => return None, // skip this intersection if get_ampl() returns error
                 };
 
+                let external_diff = if self.type_ == BeamType::Initial {
+                    Some(Beam::new(
+                        face.clone(),
+                        self.prop,
+                        n1,
+                        self.rec_count + 1,
+                        self.tir_count,
+                        Field::new(e_perp, self.prop, ampl).unwrap(),
+                        None,
+                        BeamType::ExternalDiff,
+                    ))
+                } else {
+                    None
+                };
+
                 self.absorbed_power +=
                     absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
@@ -209,12 +224,12 @@ impl Beam {
                         }
                     };
 
-                Some((reflected, refracted))
+                Some((reflected, refracted, external_diff))
 
                 // determine other BeamData values here later...
             })
             .into_iter()
-            .flat_map(|(refl, trans)| refl.into_iter().chain(trans))
+            .flat_map(|(refl, trans, ext)| refl.into_iter().chain(trans).chain(ext))
             .collect()
     }
 }
