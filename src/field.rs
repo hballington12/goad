@@ -72,6 +72,8 @@ impl Field {
             e_par: e_perp.cross(&prop).normalize(),
         };
 
+        println!("Field: {:?}", field);
+
         Ok(field)
     }
 

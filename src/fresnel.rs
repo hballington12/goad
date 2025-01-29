@@ -18,8 +18,8 @@ pub fn refl(
 ) -> Matrix2<Complex<f32>> {
     let cti = theta_i.cos();
     let ctt = theta_t.cos();
-    let f11 = (n1 * cti - n2 * ctt) / (n1 * cti + n2 * ctt);
-    let f22 = (n2 * cti - n1 * ctt) / (n1 * ctt + n2 * cti);
+    let f11 = (n2 * cti - n1 * ctt) / (n1 * ctt + n2 * cti);
+    let f22 = (n1 * cti - n2 * ctt) / (n1 * cti + n2 * ctt);
     Matrix2::from_diagonal(&Vector2::new(f11, f22))
 }
 

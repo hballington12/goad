@@ -43,7 +43,25 @@ pub fn diffraction(
         let bvsk = bvs * config::WAVENUMBER;
         let ampl_far_field = &mut ampl_cs[index];
 
+        let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
+
         let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
+
+        if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
+            println!("hc: {:?}", hc);
+            println!("bvs: {:?}", bvs);
+            println!("k: {:?}", k);
+            println!("bvsk: {:?}", bvsk);
+            println!("karczewski: {}", karczewski);
+            println!("rot4: {:?}", rot4);
+            println!("prerotation: {}", prerotation);
+            println!();
+            println!("karczewski[0, 0]: {:?}", karczewski[(0, 0)]);
+            println!("karczewski[0, 1]: {:?}", karczewski[(0, 1)]);
+            println!("karczewski[1, 0]: {:?}", karczewski[(1, 0)]);
+            println!("karczewski[1, 1]: {:?}", karczewski[(1, 1)]);
+            // break;
+        }
 
         let ampl_temp = rot4.map(Complex::from)
             * karczewski.map(Complex::from)
@@ -121,10 +139,35 @@ pub fn diffraction(
 
             let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
 
-            fraunhofer_sum += summand;
+            if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
+                println!("mj: {:?}", mj);
+                println!("nj: {:?}", nj);
+                println!("xj: {:?}", xj);
+                println!("yj: {:?}", yj);
+                println!("xj_plus1: {:?}", xj_plus1);
+                println!("yj_plus1: {:?}", yj_plus1);
+                println!("dx: {:?}", dx);
+                println!("dy: {:?}", dy);
+                println!("kxx: {:?}", kxx);
+                println!("kyy: {:?}", kyy);
+                println!("delta: {:?}", delta);
+                println!("delta1: {:?}", delta1);
+                println!("delta2: {:?}", delta2);
+                println!("omega1: {:?}", omega1);
+                println!("omega2: {:?}", omega2);
+                println!("alpha: {:?}", alpha);
+                println!("beta: {:?}", beta);
+                println!("summand: {:?}", summand);
+            }
+
+            fraunhofer_sum += summand.conj();
         }
 
         *fraunhofer = fraunhofer_sum;
+        if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
+            println!("fraunhofer: {:?}", fraunhofer);
+            println!();
+        }
 
         ampl_far_field[(0, 0)] *= *fraunhofer;
         ampl_far_field[(1, 0)] *= *fraunhofer;
@@ -142,7 +185,7 @@ fn get_rotations(
     k: Vector3<f32>,
 ) -> (Matrix2<f32>, Matrix2<f32>, Matrix2<f32>) {
     // Compute Karczewski polarisation matrix for each element
-    let (polarisation, m) = karczewski(&prop2, &k);
+    let (karczewski, m) = karczewski(&prop2, &k);
 
     // Vector perpendicular to the scattering plane in the aperture system
     let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
@@ -155,7 +198,7 @@ fn get_rotations(
         -Vector3::z(),
     )
     .transpose();
-    (polarisation, rot4, prerotation)
+    (karczewski, rot4, prerotation)
 }
 
 fn init_diff(
@@ -164,6 +207,13 @@ fn init_diff(
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
 ) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
+    println!("Vertices: {:?}", verts);
+    println!("Amplitude matrix: {:?}", ampl);
+    println!("ampl intensity: {:?}", Field::ampl_intensity(&ampl));
+    println!("Propagation vector: {:?}", prop);
+    println!("Auxiliary vector: {:?}", vk7);
+    println!();
+
     // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
     let prop = (prop
         + Vector3::new(
@@ -193,6 +243,10 @@ fn init_diff(
     let prop2 = rot2 * prop1;
     let perp2 = rot2 * perp1;
     let e_par2 = perp2.cross(&prop2).normalize();
+
+    println!("prop2 is: {:?}", prop2);
+    println!("prop1 is: {:?}", prop1);
+    println!();
 
     // 5. Update amplitude based on anti-parallel condition
     if e_par2.z > config::COLINEAR_THRESHOLD {
@@ -303,6 +357,8 @@ pub fn karczewski(
         -bvk.y * bvk.z / sqrt_1_minus_k2y2,
     );
 
+    // println!("m is: {:?}", m);
+
     // Pre-calculate factor
     let frac = ((1.0 - bvk.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
     let frac = if frac.abs() < config::DIFF_EPSILON {
@@ -325,8 +381,19 @@ pub fn karczewski(
     let b1em = 0.5 * b1m;
     let b2em = 0.5 * (b2m + b2e);
 
+    // println!("==");
+    // println!("a1em: {:?}", a1em);
+    // println!("a2em: {:?}", a2em);
+    // println!("b1em: {:?}", b1em);
+    // println!("b2em: {:?}", b2em);
+
     // Fill the diff_ampl matrix (e-m theory)
     let diff_ampl = Matrix2::new(a1em, b1em, a2em, b2em);
+
+    // println!("diff_ampl[0, 0]: {:?}", diff_ampl[(0, 0)]);
+    // println!("diff_ampl[0, 1]: {:?}", diff_ampl[(0, 1)]);
+    // println!("diff_ampl[1, 0]: {:?}", diff_ampl[(1, 0)]);
+    // println!("diff_ampl[1, 1]: {:?}", diff_ampl[(1, 1)]);
 
     // Return the outputs
     (diff_ampl, m)
@@ -402,6 +469,7 @@ pub fn calculate_summand(
     alpha: f32,
     beta: f32,
 ) -> Complex<f32> {
+    let bvsk: f32 = 1.0;
     let sumim = alpha * (delta.cos() - (delta + omega1).cos())
         - beta * (delta.cos() - (delta + omega2).cos());
     let sumre = -alpha * (delta.sin() - (delta + omega1).sin())

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use nalgebra::convert_ref_unchecked;
 use std::f32::consts::PI;
 
 use geo::Coord;
@@ -43,7 +44,11 @@ impl BeamPropagation {
         draw_face(&self.input.face, YELLOW, 4.0);
         // draw the outputs
         for beam in &self.outputs {
-            draw_face(&beam.face, BLUE, 4.0);
+            if beam.type_ == BeamType::Default {
+                draw_face(&beam.face, BLUE, 4.0);
+            } else if beam.type_ == BeamType::OutGoing {
+                draw_face(&beam.face, RED, 3.0);
+            }
         }
         let input_mid = self.input.face.data().midpoint;
 
@@ -152,6 +157,7 @@ impl Beam {
     pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
         let _ = clipping.clip();
+        println!("{}", clipping.stats.clone().unwrap());
 
         self.clipping_area = match clipping.stats {
             Some(stats) => stats.intersection_area + stats.remaining_area,
@@ -162,6 +168,9 @@ impl Beam {
             filter_faces(clipping.intersections),
             filter_faces(clipping.remaining),
         );
+
+        println!("number of intersections: {}", intersections.len());
+        println!("number of remainders: {}", remainders.len());
 
         let remainder_beams = self.remainders_to_beams(remainders);
         let beams = self.create_beams(geom, intersections);
@@ -224,6 +233,8 @@ impl Beam {
                             None
                         }
                     };
+
+                println!("refl ampl: {}", reflected.clone().unwrap().field.ampl);
 
                 Some((reflected, refracted, external_diff))
 
@@ -292,12 +303,16 @@ fn get_ampl(
     let mut ampl = rot * beam.field.ampl.clone();
     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
 
+    println!("distance: {}", dist);
+
     if dist < 0.0 {
         return Err(anyhow::anyhow!("distance less than 0: {}", dist));
     }
 
     let arg = dist * config::WAVENUMBER * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
+
+    println!("ampl after distance and rot: {}", ampl);
 
     let absorbed_intensity = Field::ampl_intensity(&ampl)
         * (1.0
@@ -375,6 +390,9 @@ fn create_reflected(
         let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
         let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
         let refl_ampl = fresnel * ampl;
+        println!("not tir");
+        println!("fresnel elements: {}", fresnel);
+        println!("refl_ampl elements: {}", refl_ampl);
 
         Ok(Some(Beam::new(
             face.clone(),

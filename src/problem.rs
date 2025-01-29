@@ -178,6 +178,11 @@ impl Problem {
             }
 
             let outbeam = queue.pop().unwrap();
+
+            if queue.len() != 1 {
+                continue;
+            }
+
             diffracted_power += outbeam.power();
             outbeam.diffract(theta_phi_combinations, total_ampl_far_field);
 
@@ -234,6 +239,7 @@ impl Problem {
 
     /// Propagates the next beam in the queue.
     pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
+        println!("propagating next beam...");
         // Try to pop the next beam from the queue
         let Some(mut beam) = self.beam_queue.pop() else {
             println!("No beams left to pop!");
@@ -245,35 +251,48 @@ impl Problem {
             BeamType::Default => {
                 // truncation conditions
                 if beam.power() < config::BEAM_POWER_THRESHOLD {
+                    println!("Beam power below threshold, truncating energy.");
                     self.powers.trnc_energy += beam.power();
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
                     if beam.tir_count > config::MAX_TIR {
+                        println!("Beam exceeded max TIR count, truncating reflections.");
                         self.powers.trnc_ref += beam.power();
                         Vec::new()
                     } else {
+                        println!("Propagating beam with TIR variant.");
                         beam.propagate(&mut self.geom)
                     }
                 } else if beam.rec_count > config::MAX_REC {
+                    println!("Beam exceeded max recursion count, truncating recursions.");
                     self.powers.trnc_rec += beam.power();
                     Vec::new()
                 } else {
+                    println!("Propagating default beam.");
                     beam.propagate(&mut self.geom)
                 }
             }
-            BeamType::Initial => beam.propagate(&mut self.geom),
-            _ => Vec::new(),
+            BeamType::Initial => {
+                println!("Propagating initial beam.");
+                beam.propagate(&mut self.geom)
+            }
+            _ => {
+                println!("Unknown beam type, returning empty outputs.");
+                Vec::new()
+            }
         };
 
         self.powers.absorbed += beam.absorbed_power;
         self.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power();
 
         // Process each output beam
-        for output in &outputs {
+        for (i, output) in outputs.iter().enumerate() {
             let output_power = output.power();
+            println!("processing output beam {} with power {}", i, output_power);
             match (&beam.type_, &output.type_) {
                 (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
                 (BeamType::Default, BeamType::OutGoing) => {
+                    println!("Outgoing beam detected at index {}!", i);
                     self.powers.output += output_power;
                     self.insert_outbeam(output.clone());
                 }
@@ -318,10 +337,10 @@ impl Problem {
             .unwrap_or_else(|e| e);
 
         // Insert the beam at the determined position
-        self.beam_queue.insert(pos, beam);
+        // self.beam_queue.insert(pos, beam);
 
         // Or just push
-        // self.beam_queue.push(beam);
+        self.beam_queue.push(beam);
     }
 
     /// Inserts a beam into the outbeam queue such that beams with greatest power
@@ -340,9 +359,9 @@ impl Problem {
             .unwrap_or_else(|e| e);
 
         // Insert the beam at the determined position
-        self.out_beam_queue.insert(pos, beam);
+        // self.out_beam_queue.insert(pos, beam);
 
         // Or just push
-        // self.beam_queue.push(beam);
+        self.out_beam_queue.push(beam);
     }
 }

@@ -9,7 +9,7 @@ use std::io::{self, Write};
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex3.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30.obj").unwrap();
 
     // let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     // let e_perp = Vector3::z(); // choose e_perp along z-axis for now
@@ -70,9 +70,13 @@ async fn main() {
             if let Some(next_propagation) = problem.propagate_next() {
                 propagation = Some(next_propagation);
                 // Print the number of beams in the queue without a new line and flush the output
-                print!(
+                println!(
                     "\rnumber of beams in beam queue: {:?}    ", // Add spaces to overwrite previous text
                     problem.beam_queue.len()
+                );
+                println!(
+                    "number of beams in outbeams: {:?}    ",
+                    problem.out_beam_queue.len()
                 );
                 io::stdout().flush().unwrap();
             } else {
