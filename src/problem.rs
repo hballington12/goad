@@ -131,7 +131,48 @@ impl Problem {
         }
     }
 
-    pub fn solve_far(&mut self) {
+    pub fn solve_far_ext_diff(&mut self) {
+        println!("solving far-field problem (external diffraction)...");
+        // set up bins
+        let theta_phi_combinations = bins::generate_theta_phi_combinations();
+        let mut total_ampl_far_field =
+            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
+
+        loop {
+            if self.ext_diff_beam_queue.len() == 0 {
+                println!("no beams remaining to solve far-field problem...");
+                break;
+            }
+
+            let outbeam = self.ext_diff_beam_queue.pop().unwrap();
+            match &outbeam.face {
+                Face::Simple(face) => {
+                    // println!("Press any key to start...");
+                    // let _ = std::io::stdin().read_line(&mut String::new());
+
+                    let verts = &face.exterior;
+                    let ampl = outbeam.field.ampl;
+                    let prop = outbeam.prop;
+                    let vk7 = outbeam.field.e_perp;
+                    let ampl_far_field =
+                        diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations);
+
+                    for (i, ampl) in ampl_far_field.iter().enumerate() {
+                        total_ampl_far_field[i] += ampl;
+                    }
+
+                    let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
+                    // write current total
+                    // let _ = output::writeup(&theta_phi_combinations, &ampl_far_field); // write current beam
+                }
+                Face::Complex { .. } => {
+                    println!("complex face not supported yet...");
+                }
+            }
+        }
+    }
+
+    pub fn solve_far_outbeams(&mut self) {
         println!("solving far-field problem...");
         // set up bins
         let theta_phi_combinations = bins::generate_theta_phi_combinations();
@@ -147,7 +188,6 @@ impl Problem {
             let outbeam = self.out_beam_queue.pop().unwrap();
             match &outbeam.face {
                 Face::Simple(face) => {
-                    // println!("simple face, ready for diffraction...");
                     // println!("Press any key to start...");
                     // let _ = std::io::stdin().read_line(&mut String::new());
 
@@ -155,10 +195,6 @@ impl Problem {
                     let ampl = outbeam.field.ampl;
                     let prop = outbeam.prop;
                     let vk7 = outbeam.field.e_perp;
-                    // println!("Vertices: {:?}", verts);
-                    // println!("Amplitude: {:?}", ampl);
-                    // println!("Propagation: {:?}", prop);
-                    // println!("E_perp: {:?}", vk7);
                     let ampl_far_field =
                         diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations);
 
@@ -167,8 +203,8 @@ impl Problem {
                     }
 
                     let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
-                    // let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
-                    // println!("done.");
+                    // write current total
+                    // let _ = output::writeup(&theta_phi_combinations, &ampl_far_field); // write current beam
                 }
                 Face::Complex { .. } => {
                     println!("complex face not supported yet...");

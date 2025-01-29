@@ -8,7 +8,7 @@ use pbt::{
 use std::io::{self, Write};
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/clip_test.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
 
     let projection = Vector3::new(0.0, 0.0, -1.0).normalize();
     let e_perp = Vector3::x(); // choose e_perp along z-axis for now
@@ -34,5 +34,6 @@ fn main() {
     );
 
     problem.solve_near();
-    problem.solve_far();
+    problem.solve_far_ext_diff();
+    // problem.solve_far_outbeams();
 }
