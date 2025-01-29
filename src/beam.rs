@@ -467,6 +467,7 @@ fn remainders_to_beams(beam_data: &mut BeamData, remainders: Vec<Face>) -> Vec<B
                 field: beam_data.field.clone(),
                 absorbed_power: beam_data.absorbed_power,
                 clipping_area: area,
+                type_: BeamType::OutGoing,
             }))
         })
         .collect();
@@ -484,6 +485,7 @@ pub struct BeamData {
     pub field: Field,
     pub absorbed_power: f32, // power absorbed by the medium
     pub clipping_area: f32,  // total area accounted for by intersections and remainders
+    pub type_: BeamType,     // type of beam, e.g. initial, default, outgoing, external diff
 }
 
 /// Creates a new beam
@@ -506,6 +508,7 @@ impl BeamData {
             field,
             absorbed_power: 0.0,
             clipping_area: 0.0,
+            type_: BeamType::Default,
         }
     }
 
@@ -529,4 +532,12 @@ pub enum BeamVariant {
     Refl, // refraction
     Refr, // reflection
     Tir,  // total internal reflection
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BeamType {
+    Initial,
+    Default,
+    OutGoing,
+    ExternalDiff,
 }
