@@ -41,7 +41,7 @@ pub fn refr(
 ) -> Matrix2<Complex<f32>> {
     let cti = theta_i.cos();
     let ctt = theta_t.cos();
-    let f11 = (2.0 * n1 * cti) / (n1 * cti + n2 * ctt);
-    let f22 = (2.0 * n1 * cti) / (n1 * ctt + n2 * cti);
+    let f11 = (2.0 * n1 * cti) / (n1 * ctt + n2 * cti);
+    let f22 = (2.0 * n1 * cti) / (n1 * cti + n2 * ctt);
     Matrix2::from_diagonal(&Vector2::new(f11, f22))
 }
