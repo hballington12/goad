@@ -1,5 +1,5 @@
 use crate::{
-    beam::{Beam, BeamPropagation, BeamVariant},
+    beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins,
     clip::Clipping,
     config, diff,
@@ -148,16 +148,16 @@ impl Problem {
             }
 
             let outbeam = self.out_beam_queue.pop().unwrap();
-            match &outbeam.data().face {
+            match &outbeam.face {
                 Face::Simple(face) => {
                     // println!("simple face, ready for diffraction...");
                     // println!("Press any key to start...");
                     // let _ = std::io::stdin().read_line(&mut String::new());
 
                     let verts = &face.exterior;
-                    let ampl = outbeam.data().field.ampl;
-                    let prop = outbeam.data().prop;
-                    let vk7 = outbeam.data().field.e_perp;
+                    let ampl = outbeam.field.ampl;
+                    let prop = outbeam.prop;
+                    let vk7 = outbeam.field.e_perp;
                     // println!("Vertices: {:?}", verts);
                     // println!("Amplitude: {:?}", ampl);
                     // println!("Propagation: {:?}", prop);
@@ -213,53 +213,52 @@ impl Problem {
         };
 
         // Compute the outputs by propagating the beam
-        let outputs = match &mut beam {
-            Beam::Default { data, variant } => {
+        let outputs = match &mut beam.type_ {
+            BeamType::Default => {
                 // truncation conditions
-                if data.power() < config::BEAM_POWER_THRESHOLD {
-                    self.powers.trnc_energy += data.power();
+                if beam.power() < config::BEAM_POWER_THRESHOLD {
+                    self.powers.trnc_energy += beam.power();
                     Vec::new()
-                } else if *variant == BeamVariant::Tir {
-                    if data.tir_count > config::MAX_TIR {
-                        self.powers.trnc_ref += data.power();
+                } else if beam.variant == Some(BeamVariant::Tir) {
+                    if beam.tir_count > config::MAX_TIR {
+                        self.powers.trnc_ref += beam.power();
                         Vec::new()
                     } else {
-                        Beam::propagate(&mut self.geom, data)
+                        Beam::propagate(&mut self.geom, &mut beam)
                     }
-                } else if data.rec_count > config::MAX_REC {
-                    self.powers.trnc_rec += data.power();
+                } else if beam.rec_count > config::MAX_REC {
+                    self.powers.trnc_rec += beam.power();
                     Vec::new()
                 } else {
-                    Beam::propagate(&mut self.geom, data)
+                    Beam::propagate(&mut self.geom, &mut beam)
                 }
             }
-            Beam::Initial(data) => Beam::propagate(&mut self.geom, data),
+            BeamType::Initial => Beam::propagate(&mut self.geom, &mut beam),
             _ => Vec::new(),
         };
 
-        self.powers.absorbed += beam.data().absorbed_power;
-        self.powers.trnc_clip +=
-            (beam.data().clipping_area - beam.data().csa()).abs() * beam.data().power();
+        self.powers.absorbed += beam.absorbed_power;
+        self.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power();
 
         // Process each output beam
         for output in &outputs {
-            match (&beam, output) {
+            match (&beam.type_, &output.type_) {
                 // Handle Default beams
-                (Beam::Default { .. }, Beam::Default { .. }) => {
+                (BeamType::Default, BeamType::Default) => {
                     self.insert_beam(output.clone());
                 }
-                (Beam::Default { .. }, Beam::OutGoing(..)) => {
-                    self.powers.output += output.data().power();
+                (BeamType::Default, BeamType::OutGoing) => {
+                    self.powers.output += output.power();
                     self.insert_outbeam(output.clone());
                 }
 
                 // Handle Initial beams
-                (Beam::Initial(..), Beam::Default { .. }) => {
-                    self.powers.input += output.data().power();
+                (BeamType::Initial, BeamType::Default) => {
+                    self.powers.input += output.power();
                     self.insert_beam(output.clone());
                 }
-                (Beam::Initial(..), Beam::ExternalDiff(..)) => {
-                    self.powers.ext_diff += output.data().power();
+                (BeamType::Initial, BeamType::ExternalDiff) => {
+                    self.powers.ext_diff += output.power();
                     self.ext_diff_beam_queue.push(output.clone());
                 }
 
@@ -285,14 +284,13 @@ impl Problem {
     /// Inserts a beam into the beam queue such that beams with greatest power
     /// are prioritised for dequeueing.
     pub fn insert_beam(&mut self, beam: Beam) {
-        let value = beam.data().power();
+        let value = beam.power();
 
         // Find the position to insert the beam using binary search
         let pos = self
             .beam_queue
             .binary_search_by(|x| {
-                x.data()
-                    .power()
+                x.power()
                     .partial_cmp(&value)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
@@ -308,14 +306,13 @@ impl Problem {
     /// Inserts a beam into the outbeam queue such that beams with greatest power
     /// are prioritised for dequeueing.
     pub fn insert_outbeam(&mut self, beam: Beam) {
-        let value = beam.data().power();
+        let value = beam.power();
 
         // Find the position to insert the beam using binary search
         let pos = self
             .out_beam_queue
             .binary_search_by(|x| {
-                x.data()
-                    .power()
+                x.power()
                     .partial_cmp(&value)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })

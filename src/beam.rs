@@ -139,15 +139,24 @@ impl BeamPropagation {
 impl Beam {
     /// Creates a new initial field. The amplitude matrix is the identity matrix
     /// with the specified perpendicular field vector.
-    // pub fn new_initial(
-    //     face: Face,
-    //     prop: Vector3<f32>,
-    //     refr_index: Complex<f32>,
-    //     e_perp: Vector3<f32>,
-    // ) -> Result<Self> {
-    //     let field = Field::new_identity(e_perp, prop)?;
-    //     Ok(Beam::new(face, prop, refr_index, 0, 0, field))
-    // }
+    pub fn new_initial(
+        face: Face,
+        prop: Vector3<f32>,
+        refr_index: Complex<f32>,
+        e_perp: Vector3<f32>,
+    ) -> Result<Self> {
+        let field = Field::new_identity(e_perp, prop)?;
+        Ok(Beam::new(
+            face,
+            prop,
+            refr_index,
+            0,
+            0,
+            field,
+            None,
+            BeamType::Initial,
+        ))
+    }
     // pub fn new_default(
     //     face: Face,
     //     proj: Vector3<f32>,
