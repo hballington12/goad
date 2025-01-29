@@ -1,5 +1,4 @@
 use crate::config;
-use crate::containment;
 use crate::containment::ContainmentGraph;
 use crate::containment::AABB;
 use anyhow::Result;
@@ -12,8 +11,6 @@ use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
-use std::any;
-use std::cell::Ref;
 use std::path::Path;
 use tobj;
 use tobj::Model;
@@ -162,19 +159,22 @@ mod tests {
 }
 
 trait Point3Extensions {
-    fn transform(&mut self, model_view: &Matrix4<f32>);
+    fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()>;
     fn to_xy(&self) -> Coord<f32>;
 }
 
 impl Point3Extensions for Point3<f32> {
     /// Transforms a Point3 type to another coordinate system.
-    fn transform(&mut self, model_view: &Matrix4<f32>) {
+    fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()> {
         let vertex4 = Vector4::new(self.x, self.y, self.z, 1.0);
         let projected_vertex = model_view * vertex4;
         self.x = projected_vertex.x;
         self.y = projected_vertex.y;
         self.z = projected_vertex.z;
+
+        Ok(())
     }
+
     fn to_xy(&self) -> Coord<f32> {
         Coord {
             x: self.x,
@@ -322,9 +322,9 @@ impl FaceData {
 
     /// Returns the minimum value of the vertices in a `FaceData` along the
     /// specified dimension.
-    pub fn vert_min(&self, dim: usize) -> Result<f32, &'static str> {
+    pub fn vert_min(&self, dim: usize) -> Result<f32> {
         if dim > 2 {
-            return Err("Dimension must be 0, 1, or 2");
+            return Err(anyhow::anyhow!("Dimension must be 0, 1, or 2"));
         }
 
         let min = self
@@ -337,15 +337,15 @@ impl FaceData {
 
         match min {
             Some(val) => Ok(val),
-            None => Err("No vertices found"), // Handle the case where vertices is empty
+            None => Err(anyhow::anyhow!("No vertices found")), // Handle the case where vertices is empty
         }
     }
 
     /// Returns the maximum value of the vertices in a `FaceData` along the
     /// specified dimension.
-    pub fn vert_max(&self, dim: usize) -> Result<f32, &'static str> {
+    pub fn vert_max(&self, dim: usize) -> Result<f32> {
         if dim > 2 {
-            return Err("Dimension must be 0, 1, or 2");
+            return Err(anyhow::anyhow!("Dimension must be 0, 1, or 2"));
         }
 
         let min = self
@@ -358,7 +358,7 @@ impl FaceData {
 
         match min {
             Some(val) => Ok(val),
-            None => Err("No vertices found"), // Handle the case where vertices is empty
+            None => Err(anyhow::anyhow!("No vertices found")), // Handle the case where vertices is empty
         }
     }
 
@@ -403,12 +403,12 @@ impl FaceData {
     }
 
     /// Transforms a Face in place using a `nalgebra` matrix transformation.
-    pub fn transform(&mut self, model_view: &Matrix4<f32>) {
+    pub fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()> {
         for point in &mut self.exterior {
-            point.transform(model_view);
+            point.transform(model_view)?;
         }
         self.set_midpoint();
-        self.set_normal();
+        self.set_normal()
     }
 }
 
@@ -442,16 +442,18 @@ impl Face {
     }
 
     /// Transform a `Face` to another coordinate system.
-    pub fn transform(&mut self, model_view: &Matrix4<f32>) {
+    pub fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()> {
         match self {
             Face::Simple(data) => data.transform(model_view),
             Face::Complex { data, interiors } => {
-                data.transform(model_view);
+                data.transform(model_view)?;
+
                 for interior in interiors {
                     for point in interior {
-                        point.transform(model_view);
+                        point.transform(model_view)?;
                     }
                 }
+                Ok(())
             }
         }
     }
@@ -658,11 +660,12 @@ impl Shape {
         self.num_faces += 1;
     }
 
-    pub fn transform(&mut self, transform: &Matrix4<f32>) {
+    pub fn transform(&mut self, transform: &Matrix4<f32>) -> Result<()> {
         for face in &mut self.faces {
             // Iterate mutably
-            face.transform(transform); // Call the in-place project method
+            face.transform(transform)?; // Call the in-place project method
         }
+        Ok(())
     }
 
     /// Determines if the axis-aligned bounding box of this shape contains
@@ -771,10 +774,11 @@ impl Geom {
             .collect()
     }
 
-    pub fn transform(&mut self, transform: &Matrix4<f32>) {
+    pub fn transform(&mut self, transform: &Matrix4<f32>) -> Result<()> {
         for shape in &mut self.shapes {
-            shape.transform(transform);
+            shape.transform(transform)?;
         }
+        Ok(())
     }
 
     /// Returns the refractive outside a shape

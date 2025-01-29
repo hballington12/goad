@@ -1,6 +1,5 @@
 use macroquad::prelude::*;
 use nalgebra::{Complex, Point3, Vector3};
-use pbt::clip;
 use pbt::problem::Problem;
 use pbt::{
     beam::Beam,

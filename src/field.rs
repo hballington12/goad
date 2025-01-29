@@ -1,9 +1,8 @@
 use crate::config;
 use anyhow::Result;
-use core::fmt;
-use std::fmt::{Debug, Error};
+use std::fmt::Debug;
 
-use nalgebra::{Complex, ComplexField, Matrix2, RealField, Vector3};
+use nalgebra::{Complex, Matrix2, RealField, Vector3};
 
 #[cfg(test)]
 mod tests {

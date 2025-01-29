@@ -1,7 +1,7 @@
 use super::config;
 use super::geom::{Face, Geom, Plane};
 use anyhow::Result;
-use geo::{Area, CoordsIter, MultiLineString, MultiPolygon, Simplify};
+use geo::{Area, Simplify};
 use geo_clipper::Clipper;
 use geo_types::Coord;
 use geo_types::Polygon;
@@ -16,6 +16,7 @@ const AREA_THRESHOLD: f32 = 1e-2;
 mod tests {
 
     use geo::polygon;
+    use geo::{CoordsIter, MultiPolygon, Simplify};
 
     use super::*;
 
@@ -235,13 +236,13 @@ impl<'a> Clipping<'a> {
         self.itransform = self.transform.try_inverse().unwrap(); // inverse transform
     }
 
-    pub fn init_clip(&mut self) -> (&Face, Vec<&Face>) {
+    pub fn init_clip(&mut self) -> Result<(&Face, Vec<&Face>)> {
         if self.is_done {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
 
-        self.geom.transform(&self.transform); // transform to clipping coordinate system
-        self.clip.transform(&self.transform);
+        self.geom.transform(&self.transform)?; // transform to clipping coordinate system
+        self.clip.transform(&self.transform)?;
 
         let mut subjects = Vec::new();
 
@@ -268,24 +269,29 @@ impl<'a> Clipping<'a> {
             }
         }
 
-        (self.clip, subjects)
+        Ok((self.clip, subjects))
     }
 
-    pub fn finalise_clip(&mut self, mut intersection: Vec<Face>, mut remaining: Vec<Face>) {
+    pub fn finalise_clip(
+        &mut self,
+        mut intersection: Vec<Face>,
+        mut remaining: Vec<Face>,
+    ) -> Result<()> {
         // transform back to original coordinate system
-        self.geom.transform(&self.itransform);
+        self.geom.transform(&self.itransform)?;
         intersection
             .iter_mut()
-            .for_each(|x| x.transform(&self.itransform));
+            .try_for_each(|x| x.transform(&self.itransform))?;
         remaining
             .iter_mut()
-            .for_each(|face| face.transform(&self.itransform));
-        self.clip.transform(&self.itransform);
+            .try_for_each(|face| face.transform(&self.itransform))?;
+        self.clip.transform(&self.itransform)?;
 
         // append the remapped intersections to the struct
         self.intersections.extend(intersection);
         self.remaining.extend(remaining);
         self.is_done = true;
+        Ok(())
     }
 
     /// Performs the clip on a `Clipping` object.
@@ -294,7 +300,7 @@ impl<'a> Clipping<'a> {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
 
-        let (clip, mut subjects) = self.init_clip();
+        let (clip, mut subjects) = self.init_clip()?;
 
         // compute remapped intersections, converting to Intersection structs
         let (intersection, remaining) = clip_faces(&clip, &mut subjects)?;
@@ -302,7 +308,7 @@ impl<'a> Clipping<'a> {
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);
 
-        self.finalise_clip(intersection, remaining);
+        self.finalise_clip(intersection, remaining)?;
 
         Ok(())
     }
@@ -337,10 +343,12 @@ pub fn clip_faces<'a>(
         subjects
     };
 
-    for subject in sorted_subjects
-        .iter()
-        .filter(|subj| subj.data().vert_min(2) <= clip_in.data().vert_max(2))
-    {
+    for subject in sorted_subjects.iter().filter(|subj| {
+        match (subj.data().vert_min(2), clip_in.data().vert_max(2)) {
+            (Ok(subj_min), Ok(clip_max)) => subj_min <= clip_max,
+            _ => false,
+        }
+    }) {
         let subject_poly = subject.to_polygon();
         let mut next_clips = Vec::new();
 

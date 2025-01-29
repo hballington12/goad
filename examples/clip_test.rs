@@ -14,7 +14,7 @@ async fn main() {
 
     // start function `do_clip` here:
     let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
-    clipping.clip();
+    let _ = clipping.clip();
     println!("{}", clipping.stats.unwrap());
 
     loop {

@@ -1,11 +1,9 @@
-use macroquad::prelude::*;
 use nalgebra::{Complex, Point3, Vector3};
 use pbt::problem::Problem;
 use pbt::{
     beam::Beam,
     geom::{self, Face},
 };
-use std::io::{self, Write};
 
 fn main() {
     let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
