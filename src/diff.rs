@@ -150,10 +150,11 @@ fn get_rotations(
     let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
 
     let prerotation = Field::rotation_matrix(
-        -Vector3::x(),
-        Vector3::new(sin_phi, -cos_phi, 0.0),
-        Vector3::z(),
-    );
+        Vector3::x(),
+        Vector3::new(-sin_phi, cos_phi, 0.0),
+        -Vector3::z(),
+    )
+    .transpose();
     (polarisation, rot4, prerotation)
 }
 
@@ -351,7 +352,8 @@ pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
 }
 
 pub fn calculate_bvsk(rotated_pos: &Vector3<f32>) -> f32 {
-    config::WAVENUMBER * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
+    config::WAVENUMBER
+        * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
 }
 
 pub fn calculate_kxx_kyy(kinc: &[f32; 2], rotated_pos: &Vector3<f32>, bvsk: f32) -> (f32, f32) {
