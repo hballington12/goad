@@ -68,6 +68,7 @@ pub struct Powers {
     pub trnc_rec: f32,    // truncated power due to max recursions
     pub trnc_clip: f32,   // truncated power due to clipping
     pub trnc_energy: f32, // truncated power due to threshold beam power
+    pub ext_diff: f32,    // external diffraction power
 }
 
 impl Powers {
@@ -80,6 +81,7 @@ impl Powers {
             trnc_rec: 0.0,
             trnc_clip: 0.0,
             trnc_energy: 0.0,
+            ext_diff: 0.0,
         }
     }
 
@@ -105,17 +107,19 @@ impl fmt::Display for Powers {
         writeln!(f, "  Truncated Rec:    {:.6}", self.trnc_rec)?;
         // writeln!(f, "  Truncated Clip:   {:.6}", self.trnc_clip)?;
         writeln!(f, "  Truncated Energy: {:.6}", self.trnc_energy)?;
-        writeln!(f, "  Unaccounted:      {:.6}", self.missing())
+        writeln!(f, "  Unaccounted:      {:.6}", self.missing())?;
+        writeln!(f, "  External Diff:    {:.6}", self.ext_diff)
     }
 }
 
 /// A solvable physics problem.
 #[derive(Debug, PartialEq)] // Added Default derive
 pub struct Problem {
-    pub geom: Geom,                // geometry to trace beams in
-    pub beam_queue: Vec<Beam>,     // beams awaiting near-field propagation
-    pub out_beam_queue: Vec<Beam>, // beams awaiting diffraction
-    pub powers: Powers,            // different power contributions
+    pub geom: Geom,                     // geometry to trace beams in
+    pub beam_queue: Vec<Beam>,          // beams awaiting near-field propagation
+    pub out_beam_queue: Vec<Beam>,      // beams awaiting diffraction
+    pub ext_diff_beam_queue: Vec<Beam>, // beams awaiting external diffraction
+    pub powers: Powers,                 // different power contributions
 }
 
 impl Problem {
@@ -125,6 +129,7 @@ impl Problem {
             geom,
             beam_queue: vec![beam],
             out_beam_queue: vec![],
+            ext_diff_beam_queue: vec![],
             powers: Powers::new(),
         }
     }
@@ -149,7 +154,7 @@ impl Problem {
                     // println!("Press any key to start...");
                     // let _ = std::io::stdin().read_line(&mut String::new());
 
-                    let verts = face.exterior.clone();
+                    let verts = &face.exterior;
                     let ampl = outbeam.data().field.ampl;
                     let prop = outbeam.data().prop;
                     let vk7 = outbeam.data().field.e_perp;
@@ -158,7 +163,7 @@ impl Problem {
                     // println!("Propagation: {:?}", prop);
                     // println!("E_perp: {:?}", vk7);
                     let ampl_far_field =
-                        diff::diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations);
+                        diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations);
 
                     for (i, ampl) in ampl_far_field.iter().enumerate() {
                         total_ampl_far_field[i] += ampl;
@@ -219,16 +224,16 @@ impl Problem {
                         self.powers.trnc_ref += data.power();
                         Vec::new()
                     } else {
-                        Beam::process_beam_data(&mut self.geom, data)
+                        Beam::propagate(&mut self.geom, data)
                     }
                 } else if data.rec_count > config::MAX_REC {
                     self.powers.trnc_rec += data.power();
                     Vec::new()
                 } else {
-                    Beam::process_beam_data(&mut self.geom, data)
+                    Beam::propagate(&mut self.geom, data)
                 }
             }
-            Beam::Initial(data) => Beam::process_beam_data(&mut self.geom, data),
+            Beam::Initial(data) => Beam::propagate(&mut self.geom, data),
             _ => Vec::new(),
         };
 
@@ -252,6 +257,10 @@ impl Problem {
                 (Beam::Initial(..), Beam::Default { .. }) => {
                     self.powers.input += output.data().power();
                     self.insert_beam(output.clone());
+                }
+                (Beam::Initial(..), Beam::ExternalDiff(..)) => {
+                    self.powers.ext_diff += output.data().power();
+                    self.ext_diff_beam_queue.push(output.clone());
                 }
 
                 _ => {} // Ignore other cases

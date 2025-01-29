@@ -136,7 +136,8 @@ pub enum Beam {
         data: BeamData,       // a beam to be traced in the near-field
         variant: BeamVariant, // whether the beam was a refl, refraction, or tir,
     },
-    OutGoing(BeamData), // a beam to be mapped to the far-field
+    OutGoing(BeamData),     // a beam to be mapped to the far-field
+    ExternalDiff(BeamData), // a beam due to external diffraction to be mapped to the far-field
 }
 
 impl Beam {
@@ -175,12 +176,13 @@ impl Beam {
             Beam::Initial(data) => data,
             Beam::Default { data, .. } => data,
             Beam::OutGoing(data) => data,
+            Beam::ExternalDiff(data) => data,
         }
     }
 
     /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    pub fn process_beam_data(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
+    pub fn propagate(geom: &mut Geom, beam_data: &mut BeamData) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut beam_data.face, &beam_data.prop);
         let _ = clipping.clip();
 
@@ -264,6 +266,7 @@ fn create_beams(geom: &mut Geom, beam_data: &mut BeamData, intersections: Vec<Fa
                 Ok((ampl, absorbed_power)) => (ampl, absorbed_power),
                 Err(_) => return None, // skip this intersection if get_ampl() returns error
             };
+
             beam_data.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
