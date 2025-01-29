@@ -162,13 +162,60 @@ impl Beam {
             filter_faces(clipping.remaining),
         );
 
-        let remainder_beams = remainders_to_beams(self, remainders);
-        let beams = create_beams(geom, self, intersections);
+        let remainder_beams = self.remainders_to_beams(remainders);
+        let beams = self.create_beams(geom, intersections);
 
         let mut output_beams = Vec::new();
         output_beams.extend(beams);
         output_beams.extend(remainder_beams);
         output_beams
+    }
+
+    fn create_beams(&mut self, geom: &mut Geom, intersections: Vec<Face>) -> Vec<Beam> {
+        let n1 = self.refr_index;
+
+        // create beams
+        intersections
+            .iter()
+            .filter_map(|face| {
+                let normal = face.data().normal;
+                let theta_i = normal.dot(&self.prop).abs().acos();
+                let n2 = get_n2(geom, self, face, normal);
+                let e_perp = get_e_perp(normal, &self);
+                let rot = get_rotation_matrix(&self, e_perp);
+                let (ampl, absorbed_intensity) = match get_ampl(&self, rot, face, n1) {
+                    Ok((ampl, absorbed_power)) => (ampl, absorbed_power),
+                    Err(_) => return None, // skip this intersection if get_ampl() returns error
+                };
+
+                self.absorbed_power +=
+                    absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
+
+                let refracted =
+                    match create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2) {
+                        Ok(beam) => beam,
+                        Err(_) => {
+                            // count skipped beams
+                            None
+                        }
+                    };
+
+                let reflected =
+                    match create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2) {
+                        Ok(beam) => beam,
+                        Err(_) => {
+                            // count skipped beams
+                            None
+                        }
+                    };
+
+                Some((reflected, refracted))
+
+                // determine other BeamData values here later...
+            })
+            .into_iter()
+            .flat_map(|(refl, trans)| refl.into_iter().chain(trans))
+            .collect()
     }
 }
 
@@ -214,53 +261,6 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
     result.normalize_mut();
     assert!((result.dot(&n) - cti) < config::COLINEAR_THRESHOLD);
     result
-}
-
-fn create_beams(geom: &mut Geom, beam: &mut Beam, intersections: Vec<Face>) -> Vec<Beam> {
-    let n1 = beam.refr_index;
-
-    // create  beams
-    intersections
-        .iter()
-        .filter_map(|face| {
-            let normal = face.data().normal;
-            let theta_i = normal.dot(&beam.prop).abs().acos();
-            let n2 = get_n2(geom, beam, face, normal);
-            let e_perp = get_e_perp(normal, &beam);
-            let rot = get_rotation_matrix(&beam, e_perp);
-            let (ampl, absorbed_intensity) = match get_ampl(&beam, rot, face, n1) {
-                Ok((ampl, absorbed_power)) => (ampl, absorbed_power),
-                Err(_) => return None, // skip this intersection if get_ampl() returns error
-            };
-
-            beam.absorbed_power +=
-                absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
-
-            let refracted =
-                match create_refracted(face, ampl, e_perp, normal, beam, theta_i, n1, n2) {
-                    Ok(beam) => beam,
-                    Err(_) => {
-                        // count skipped beams
-                        None
-                    }
-                };
-
-            let reflected =
-                match create_reflected(face, ampl, e_perp, normal, beam, theta_i, n1, n2) {
-                    Ok(beam) => beam,
-                    Err(_) => {
-                        // count skipped beams
-                        None
-                    }
-                };
-
-            Some((reflected, refracted))
-
-            // determine other BeamData values here later...
-        })
-        .into_iter()
-        .flat_map(|(refl, trans)| refl.into_iter().chain(trans))
-        .collect()
 }
 
 /// Takes an amplitude matrix from the input beam data, rotates it into the new
@@ -417,24 +417,25 @@ fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
 
 /// Converts the remainder faces from a clipping into beams with the same field
 /// properties as the original beam.
-fn remainders_to_beams(beam: &mut Beam, remainders: Vec<Face>) -> Vec<Beam> {
-    let remainder_beams: Vec<_> = remainders
-        .into_iter()
-        .filter_map(|remainder| {
-            // let area = remainder.data().area.unwrap();
-            Some(Beam::new(
-                remainder,
-                beam.prop,
-                beam.refr_index,
-                beam.rec_count,
-                beam.tir_count,
-                beam.field.clone(),
-                None,
-                BeamType::OutGoing,
-            ))
-        })
-        .collect();
-    remainder_beams
+impl Beam {
+    fn remainders_to_beams(&mut self, remainders: Vec<Face>) -> Vec<Beam> {
+        let remainder_beams: Vec<_> = remainders
+            .into_iter()
+            .filter_map(|remainder| {
+                Some(Beam::new(
+                    remainder,
+                    self.prop,
+                    self.refr_index,
+                    self.rec_count,
+                    self.tir_count,
+                    self.field.clone(),
+                    None,
+                    BeamType::OutGoing,
+                ))
+            })
+            .collect();
+        remainder_beams
+    }
 }
 
 /// Contains information about a beam.
