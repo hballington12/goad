@@ -1,6 +1,6 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins, config, diff,
+    bins, config,
     geom::Geom,
     helpers::draw_face,
     output,
@@ -8,8 +8,6 @@ use crate::{
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2};
 use std::fmt;
-use std::thread;
-use std::time::Duration;
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
