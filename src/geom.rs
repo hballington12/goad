@@ -789,6 +789,29 @@ impl Geom {
                 self.shapes[parent_id].refr_index
             })
     }
+
+    pub fn bounds(&self) -> (Point3<f32>, Point3<f32>) {
+        let (min, max) = self.shapes.iter().fold(
+            ([f32::INFINITY; 3], [-f32::INFINITY; 3]),
+            |(min_acc, max_acc), shape| {
+                let aabb = shape.aabb.as_ref().unwrap();
+                (
+                    [
+                        min_acc[0].min(aabb.min[0]),
+                        min_acc[1].min(aabb.min[1]),
+                        min_acc[2].min(aabb.min[2]),
+                    ],
+                    [
+                        max_acc[0].max(aabb.max[0]),
+                        max_acc[1].max(aabb.max[1]),
+                        max_acc[2].max(aabb.max[2]),
+                    ],
+                )
+            },
+        );
+
+        (Point3::from(min), Point3::from(max))
+    }
 }
 
 pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {

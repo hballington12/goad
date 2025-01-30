@@ -1,12 +1,13 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins, config,
-    geom::Geom,
+    field::Field,
+    geom::{Face, Geom},
     helpers::draw_face,
     output,
 };
 use macroquad::prelude::*;
-use nalgebra::{Complex, Matrix2};
+use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use rayon::prelude::*;
 use std::fmt;
 
@@ -21,8 +22,6 @@ mod tests {
 
     #[test]
     fn cube_inside_ico() {
-        use nalgebra::Point3;
-
         let mut geom = Geom::from_file("./examples/data/cube_inside_ico.obj").unwrap();
         geom.shapes[0].refr_index = Complex {
             // modify the refractive index of the outer shape
@@ -36,25 +35,7 @@ mod tests {
             geom.shapes[geom.shapes[1].parent_id.unwrap()]
         );
 
-        let projection = Vector3::new(0.0, 0.0, -1.0);
-        let e_perp = Vector3::x(); // choose e_perp along x-axis for now
-
-        let lower_left = vec![-10.0, -3.0];
-        let upper_right = vec![10.0, 3.0];
-        let clip_vertices = vec![
-            Point3::new(lower_left[0], upper_right[1], 10.0),
-            Point3::new(lower_left[0], lower_left[1], 10.0),
-            Point3::new(upper_right[0], lower_left[1], 10.0),
-            Point3::new(upper_right[0], upper_right[1], 10.0),
-        ];
-        let mut clip = Face::new_simple(clip_vertices, None).unwrap();
-        clip.data_mut().area =
-            Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
-
-        let mut problem = Problem::new(
-            geom,
-            Beam::new_initial(clip, projection, Complex::new(1.31, 0.1), e_perp).unwrap(),
-        );
+        let mut problem = Problem::new(geom);
 
         problem.propagate_next();
     }
@@ -127,10 +108,13 @@ pub struct Problem {
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
-    pub fn new(geom: Geom, beam: Beam) -> Self {
+    pub fn new(geom: Geom) -> Self {
         let theta_phi_combinations = bins::generate_theta_phi_combinations();
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
+
+        let beam = basic_initial_beam(&geom);
+
         Self {
             geom,
             beam_queue: vec![beam],
@@ -359,4 +343,30 @@ impl Problem {
         // Or just push
         self.out_beam_queue.push(beam);
     }
+}
+
+/// Creates a basic initial beam for full illumination of the geometry along the z-axis.
+fn basic_initial_beam(geom: &Geom) -> Beam {
+    const FAC: f32 = 1.1;
+    let bounds = geom.bounds();
+    let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
+
+    let clip_vertices = vec![
+        Point3::new(max[0], max[1], max[2]),
+        Point3::new(max[0], min[1], max[2]),
+        Point3::new(min[0], min[1], max[2]),
+        Point3::new(min[0], max[1], max[2]),
+    ];
+
+    let mut clip = Face::new_simple(clip_vertices, None).unwrap();
+    clip.data_mut().area = Some((max[0] - min[0]) * (max[1] - min[1]));
+    let mut field = Field::new_identity(Vector3::x(), -Vector3::z()).unwrap();
+
+    // propagate field backwards so its as if the beam comes from z=0
+    let dist = bounds.1[2];
+    let arg = -dist * config::WAVENUMBER * config::MEDIUM_REFR_INDEX.re;
+    field.ampl *= Complex::new(arg.cos(), arg.sin());
+
+    let beam = Beam::new_from_field(clip, -Vector3::z(), config::MEDIUM_REFR_INDEX, field);
+    beam
 }

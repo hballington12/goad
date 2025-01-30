@@ -152,6 +152,15 @@ impl Beam {
         ))
     }
 
+    pub fn new_from_field(
+        face: Face,
+        prop: Vector3<f32>,
+        refr_index: Complex<f32>,
+        field: Field,
+    ) -> Self {
+        Beam::new(face, prop, refr_index, 0, 0, field, None, BeamType::Initial)
+    }
+
     /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
     pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
