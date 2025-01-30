@@ -157,7 +157,6 @@ impl Beam {
     pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
         let _ = clipping.clip();
-        println!("{}", clipping.stats.clone().unwrap());
 
         self.clipping_area = match clipping.stats {
             Some(stats) => stats.intersection_area + stats.remaining_area,
@@ -168,9 +167,6 @@ impl Beam {
             filter_faces(clipping.intersections),
             filter_faces(clipping.remaining),
         );
-
-        println!("number of intersections: {}", intersections.len());
-        println!("number of remainders: {}", remainders.len());
 
         let remainder_beams = self.remainders_to_beams(remainders);
         let beams = self.create_beams(geom, intersections);
@@ -233,8 +229,6 @@ impl Beam {
                             None
                         }
                     };
-
-                println!("refl ampl: {}", reflected.clone().unwrap().field.ampl);
 
                 Some((reflected, refracted, external_diff))
 
@@ -303,16 +297,12 @@ fn get_ampl(
     let mut ampl = rot * beam.field.ampl.clone();
     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
 
-    println!("distance: {}", dist);
-
     if dist < 0.0 {
         return Err(anyhow::anyhow!("distance less than 0: {}", dist));
     }
 
     let arg = dist * config::WAVENUMBER * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
-
-    println!("ampl after distance and rot: {}", ampl);
 
     let absorbed_intensity = Field::ampl_intensity(&ampl)
         * (1.0
@@ -390,9 +380,6 @@ fn create_reflected(
         let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
         let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
         let refl_ampl = fresnel * ampl;
-        println!("not tir");
-        println!("fresnel elements: {}", fresnel);
-        println!("refl_ampl elements: {}", refl_ampl);
 
         Ok(Some(Beam::new(
             face.clone(),
@@ -456,16 +443,24 @@ fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
 /// properties as the original beam.
 impl Beam {
     fn remainders_to_beams(&mut self, remainders: Vec<Face>) -> Vec<Beam> {
+        // need to account for distance along propagation direction from
+        // midpoint of remainder to midpoint of original face. Propagate
+        // the field back or forward by this distance.
+        let self_midpoint = self.face.data().midpoint;
         let remainder_beams: Vec<_> = remainders
             .into_iter()
             .filter_map(|remainder| {
+                let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
+                let arg = dist * config::WAVENUMBER * config::MEDIUM_REFR_INDEX.re;
+                // let arg: f32 = 0.0;
+                let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
                 Some(Beam::new(
                     remainder,
                     self.prop,
                     self.refr_index,
                     self.rec_count,
                     self.tir_count,
-                    self.field.clone(),
+                    Field::new(self.field.e_perp, self.prop, ampl).unwrap(),
                     None,
                     BeamType::OutGoing,
                 ))

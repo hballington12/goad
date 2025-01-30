@@ -6,7 +6,8 @@ use pbt::{
 };
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30_face.obj").unwrap();
+    // let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30_face.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30_spl1.obj").unwrap();
     // let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
     let projection = Vector3::new(0.0, 0.0, -1.0).normalize();

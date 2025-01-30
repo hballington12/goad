@@ -179,9 +179,9 @@ impl Problem {
 
             let outbeam = queue.pop().unwrap();
 
-            if queue.len() != 1 {
-                continue;
-            }
+            // if queue.len() != 3 && queue.len() != 1 {
+            //     continue;
+            // }
 
             diffracted_power += outbeam.power();
             outbeam.diffract(theta_phi_combinations, total_ampl_far_field);
@@ -245,6 +245,11 @@ impl Problem {
             println!("No beams left to pop!");
             return None;
         };
+
+        if beam.variant == Some(BeamVariant::Refr) {
+            println!("Beam is refracted, skipping...");
+            return None;
+        }
 
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam.type_ {

@@ -6,7 +6,7 @@ pub const WAVELENGTH: f32 = 0.532;
 /// Wavenumber, equal to 2π divided by `WAVELENGTH`.
 pub const WAVENUMBER: f32 = 2.0 * PI / WAVELENGTH;
 /// Minimum distance for vertices to be considered the same.
-pub const VERTEX_MERGE_DISTANCE: f32 = WAVELENGTH / 25.0;
+pub const VERTEX_MERGE_DISTANCE: f32 = 0.1;
 /// Minimum area for new beam to propagate, set by default to `WAVELENGTH`^2 / 4.
 pub const BEAM_AREA_THRESHOLD: f32 = WAVELENGTH * WAVELENGTH / 4.0;
 /// Minimum power for new beam to propagate.

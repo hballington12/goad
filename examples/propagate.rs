@@ -9,7 +9,8 @@ use std::io::{self, Write};
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30.obj").unwrap();
+    // let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30_face.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/face_test.obj").unwrap();
 
     // let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     // let e_perp = Vector3::z(); // choose e_perp along z-axis for now

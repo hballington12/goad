@@ -16,6 +16,8 @@ pub fn diffraction(
     // Translate to aperture system, rotate, and transform propagation and auxiliary vectors.
     let (center_of_mass, relative_vertices, rot3, prop2) = init_diff(verts, &mut ampl, prop, vk7);
 
+    println!("ampl in main: {}", ampl);
+
     // Define the output variables.
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
     let mut area_facs2 = vec![Complex::<f32>::default(); theta_phi_combinations.len()];
@@ -43,35 +45,28 @@ pub fn diffraction(
         let bvsk = bvs * config::WAVENUMBER;
         let ampl_far_field = &mut ampl_cs[index];
 
-        let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
-
         let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
-
-        if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
-            println!("hc: {:?}", hc);
-            println!("bvs: {:?}", bvs);
-            println!("k: {:?}", k);
-            println!("bvsk: {:?}", bvsk);
-            println!("karczewski: {}", karczewski);
-            println!("rot4: {:?}", rot4);
-            println!("prerotation: {}", prerotation);
-            println!();
-            println!("karczewski[0, 0]: {:?}", karczewski[(0, 0)]);
-            println!("karczewski[0, 1]: {:?}", karczewski[(0, 1)]);
-            println!("karczewski[1, 0]: {:?}", karczewski[(1, 0)]);
-            println!("karczewski[1, 1]: {:?}", karczewski[(1, 1)]);
-            // break;
-        }
 
         let ampl_temp = rot4.map(Complex::from)
             * karczewski.map(Complex::from)
             * ampl
             * prerotation.map(Complex::from);
 
+        // let ampl_temp = ampl; // remove later
+
         ampl_far_field[(0, 0)] = ampl_temp[(0, 0)];
         ampl_far_field[(1, 0)] = ampl_temp[(1, 0)];
         ampl_far_field[(0, 1)] = ampl_temp[(0, 1)];
         ampl_far_field[(1, 1)] = ampl_temp[(1, 1)];
+
+        if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
+            // println!("ampl_temp: {}", ampl_temp);
+            // println!("karczewski: {}", karczewski); // fine
+            // println!("rot4: {}", rot4); //  fine
+            // println!("prerotation: {}", prerotation); // fine
+            println!("theta, phi: {:?}", (theta, phi));
+            println!("ampl_far_field before contour: {}", ampl_far_field);
+        }
 
         let nv = relative_vertices.len();
         let mut v1 = Array2::<f32>::zeros((nv, 3));
@@ -160,7 +155,7 @@ pub fn diffraction(
                 println!("summand: {:?}", summand);
             }
 
-            fraunhofer_sum += summand.conj();
+            fraunhofer_sum += summand;
         }
 
         *fraunhofer = fraunhofer_sum;
@@ -208,10 +203,10 @@ fn init_diff(
     vk7: Vector3<f32>,
 ) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
     println!("Vertices: {:?}", verts);
-    println!("Amplitude matrix: {:?}", ampl);
-    println!("ampl intensity: {:?}", Field::ampl_intensity(&ampl));
-    println!("Propagation vector: {:?}", prop);
-    println!("Auxiliary vector: {:?}", vk7);
+    println!("Amplitude matrix: {}", ampl);
+    println!("ampl intensity: {}", Field::ampl_intensity(&ampl));
+    println!("Propagation vector: {}", prop);
+    println!("Auxiliary vector: {}", vk7);
     println!();
 
     // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
@@ -224,7 +219,7 @@ fn init_diff(
     .normalize();
 
     // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
-    *ampl *= Complex::new(config::WAVENUMBER, 0.0);
+    *ampl *= Complex::new(config::WAVENUMBER, 0.0); // // TODO add this back in
 
     // 1. Compute the center of mass
     let center_of_mass = geom::calculate_center_of_mass(verts);
@@ -469,7 +464,6 @@ pub fn calculate_summand(
     alpha: f32,
     beta: f32,
 ) -> Complex<f32> {
-    let bvsk: f32 = 1.0;
     let sumim = alpha * (delta.cos() - (delta + omega1).cos())
         - beta * (delta.cos() - (delta + omega2).cos());
     let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
