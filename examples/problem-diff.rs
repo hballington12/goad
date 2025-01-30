@@ -35,6 +35,6 @@ fn main() {
 
     problem.solve_near();
     // problem.solve_far_ext_diff();
-    problem.solve_far_outbeams();
-    // problem.solve_far();
+    // problem.solve_far_outbeams();
+    problem.solve_far();
 }

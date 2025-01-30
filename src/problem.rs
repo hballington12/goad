@@ -239,7 +239,6 @@ impl Problem {
 
     /// Propagates the next beam in the queue.
     pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
-        println!("propagating next beam...");
         // Try to pop the next beam from the queue
         let Some(mut beam) = self.beam_queue.pop() else {
             println!("No beams left to pop!");
@@ -251,31 +250,23 @@ impl Problem {
             BeamType::Default => {
                 // truncation conditions
                 if beam.power() < config::BEAM_POWER_THRESHOLD {
-                    println!("Beam power below threshold, truncating energy.");
                     self.powers.trnc_energy += beam.power();
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
                     if beam.tir_count > config::MAX_TIR {
-                        println!("Beam exceeded max TIR count, truncating reflections.");
                         self.powers.trnc_ref += beam.power();
                         Vec::new()
                     } else {
-                        println!("Propagating beam with TIR variant.");
                         beam.propagate(&mut self.geom)
                     }
                 } else if beam.rec_count > config::MAX_REC {
-                    println!("Beam exceeded max recursion count, truncating recursions.");
                     self.powers.trnc_rec += beam.power();
                     Vec::new()
                 } else {
-                    println!("Propagating default beam.");
                     beam.propagate(&mut self.geom)
                 }
             }
-            BeamType::Initial => {
-                println!("Propagating initial beam.");
-                beam.propagate(&mut self.geom)
-            }
+            BeamType::Initial => beam.propagate(&mut self.geom),
             _ => {
                 println!("Unknown beam type, returning empty outputs.");
                 Vec::new()
@@ -288,11 +279,9 @@ impl Problem {
         // Process each output beam
         for (i, output) in outputs.iter().enumerate() {
             let output_power = output.power();
-            println!("processing output beam {} with power {}", i, output_power);
             match (&beam.type_, &output.type_) {
                 (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
                 (BeamType::Default, BeamType::OutGoing) => {
-                    println!("Outgoing beam detected at index {}!", i);
                     self.powers.output += output_power;
                     self.insert_outbeam(output.clone());
                 }
