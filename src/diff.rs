@@ -16,8 +16,6 @@ pub fn diffraction(
     // Translate to aperture system, rotate, and transform propagation and auxiliary vectors.
     let (center_of_mass, relative_vertices, rot3, prop2) = init_diff(verts, &mut ampl, prop, vk7);
 
-    println!("ampl in main: {}", ampl);
-
     // Define the output variables.
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
     let mut area_facs2 = vec![Complex::<f32>::default(); theta_phi_combinations.len()];
@@ -52,21 +50,10 @@ pub fn diffraction(
             * ampl
             * prerotation.map(Complex::from);
 
-        // let ampl_temp = ampl; // remove later
-
         ampl_far_field[(0, 0)] = ampl_temp[(0, 0)];
         ampl_far_field[(1, 0)] = ampl_temp[(1, 0)];
         ampl_far_field[(0, 1)] = ampl_temp[(0, 1)];
         ampl_far_field[(1, 1)] = ampl_temp[(1, 1)];
-
-        if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
-            // println!("ampl_temp: {}", ampl_temp);
-            // println!("karczewski: {}", karczewski); // fine
-            // println!("rot4: {}", rot4); //  fine
-            // println!("prerotation: {}", prerotation); // fine
-            println!("theta, phi: {:?}", (theta, phi));
-            println!("ampl_far_field before contour: {}", ampl_far_field);
-        }
 
         let nv = relative_vertices.len();
         let mut v1 = Array2::<f32>::zeros((nv, 3));
@@ -134,35 +121,10 @@ pub fn diffraction(
 
             let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
 
-            if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
-                println!("mj: {:?}", mj);
-                println!("nj: {:?}", nj);
-                println!("xj: {:?}", xj);
-                println!("yj: {:?}", yj);
-                println!("xj_plus1: {:?}", xj_plus1);
-                println!("yj_plus1: {:?}", yj_plus1);
-                println!("dx: {:?}", dx);
-                println!("dy: {:?}", dy);
-                println!("kxx: {:?}", kxx);
-                println!("kyy: {:?}", kyy);
-                println!("delta: {:?}", delta);
-                println!("delta1: {:?}", delta1);
-                println!("delta2: {:?}", delta2);
-                println!("omega1: {:?}", omega1);
-                println!("omega2: {:?}", omega2);
-                println!("alpha: {:?}", alpha);
-                println!("beta: {:?}", beta);
-                println!("summand: {:?}", summand);
-            }
-
             fraunhofer_sum += summand;
         }
 
         *fraunhofer = fraunhofer_sum;
-        if (*theta - 1.72788).abs() < 0.01 && (*phi - 1.72788).abs() < 0.01 {
-            println!("fraunhofer: {:?}", fraunhofer);
-            println!();
-        }
 
         ampl_far_field[(0, 0)] *= *fraunhofer;
         ampl_far_field[(1, 0)] *= *fraunhofer;
@@ -202,13 +164,6 @@ fn init_diff(
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
 ) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
-    println!("Vertices: {:?}", verts);
-    println!("Amplitude matrix: {}", ampl);
-    println!("ampl intensity: {}", Field::ampl_intensity(&ampl));
-    println!("Propagation vector: {}", prop);
-    println!("Auxiliary vector: {}", vk7);
-    println!();
-
     // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
     let prop = (prop
         + Vector3::new(
@@ -238,10 +193,6 @@ fn init_diff(
     let prop2 = rot2 * prop1;
     let perp2 = rot2 * perp1;
     let e_par2 = perp2.cross(&prop2).normalize();
-
-    println!("prop2 is: {:?}", prop2);
-    println!("prop1 is: {:?}", prop1);
-    println!();
 
     // 5. Update amplitude based on anti-parallel condition
     if e_par2.z > config::COLINEAR_THRESHOLD {

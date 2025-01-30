@@ -246,11 +246,6 @@ impl Problem {
             return None;
         };
 
-        if beam.variant == Some(BeamVariant::Refr) {
-            println!("Beam is refracted, skipping...");
-            return None;
-        }
-
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam.type_ {
             BeamType::Default => {
