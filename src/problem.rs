@@ -126,6 +126,23 @@ impl Problem {
         }
     }
 
+    /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
+    pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
+        let theta_phi_combinations = bins::generate_theta_phi_combinations();
+        let total_ampl_far_field =
+            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
+
+        Self {
+            geom,
+            beam_queue: vec![beam],
+            out_beam_queue: vec![],
+            ext_diff_beam_queue: vec![],
+            powers: Powers::new(),
+            bins: theta_phi_combinations,
+            ampl: total_ampl_far_field,
+        }
+    }
+
     fn diffract_outbeams(
         queue: &mut Vec<Beam>,
         theta_phi_combinations: &[(f32, f32)],
