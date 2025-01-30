@@ -115,7 +115,7 @@ pub fn diffraction(
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
             let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
 
-            if alpha.is_infinite() || beta.is_infinite() {
+            if alpha.is_infinite() || beta.is_infinite() || alpha.is_nan() || beta.is_nan() {
                 continue;
             }
 
