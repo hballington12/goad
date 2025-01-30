@@ -17,8 +17,7 @@ use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 mod tests {
 
     use super::*;
-    use crate::geom::Face;
-    use nalgebra::{Complex, Vector3};
+    use nalgebra::Complex;
 
     #[test]
     fn cube_inside_ico() {
@@ -284,7 +283,7 @@ impl Problem {
         self.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power();
 
         // Process each output beam
-        for (i, output) in outputs.iter().enumerate() {
+        for output in outputs.iter() {
             let output_power = output.power();
             match (&beam.type_, &output.type_) {
                 (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
@@ -333,10 +332,10 @@ impl Problem {
             .unwrap_or_else(|e| e);
 
         // Insert the beam at the determined position
-        // self.beam_queue.insert(pos, beam);
+        self.beam_queue.insert(pos, beam);
 
         // Or just push
-        self.beam_queue.push(beam);
+        // self.beam_queue.push(beam);
     }
 
     /// Inserts a beam into the outbeam queue such that beams with greatest power
@@ -355,10 +354,10 @@ impl Problem {
             .unwrap_or_else(|e| e);
 
         // Insert the beam at the determined position
-        // self.out_beam_queue.insert(pos, beam);
+        self.out_beam_queue.insert(pos, beam);
 
         // Or just push
-        self.out_beam_queue.push(beam);
+        // self.out_beam_queue.push(beam);
     }
 }
 
