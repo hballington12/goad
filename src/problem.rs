@@ -347,8 +347,8 @@ impl Problem {
         let pos = self
             .out_beam_queue
             .binary_search_by(|x| {
-                x.power()
-                    .partial_cmp(&value)
+                value
+                    .partial_cmp(&x.power())
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
             .unwrap_or_else(|e| e);
@@ -358,6 +358,17 @@ impl Problem {
 
         // Or just push
         // self.out_beam_queue.push(beam);
+    }
+
+    /// Rescales the geometry so that the largest dimension is 1.
+    pub fn rescale_geom(&mut self) {
+        let bounds = self.geom.bounds();
+        let max_dim = bounds.1.iter().fold(0.0, |acc: f32, &x| acc.max(x));
+        let scale = 1.0 / max_dim;
+
+        for shape in self.geom.shapes.iter_mut() {
+            shape.rescale(scale);
+        }
     }
 }
 

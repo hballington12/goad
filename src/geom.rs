@@ -23,6 +23,19 @@ mod tests {
     use geo_types::{Coord, LineString, Polygon};
 
     #[test]
+    fn rescale_hex() {
+        let mut geom = Geom::from_file("./examples/data/hex2.obj").unwrap();
+        let x_dim = geom.shapes[0].aabb.as_ref().unwrap().max.x
+            - geom.shapes[0].aabb.as_ref().unwrap().min.x;
+
+        geom.shapes[0].rescale(0.5);
+        let rescaled_x_dim = geom.shapes[0].aabb.as_ref().unwrap().max.x
+            - geom.shapes[0].aabb.as_ref().unwrap().min.x;
+
+        assert!((rescaled_x_dim / x_dim - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
     fn load_hex_shape() {
         let shape = &Geom::from_file("./examples/data/hex.obj").unwrap().shapes[0];
         assert_eq!(shape.num_faces, 8);
@@ -621,8 +634,13 @@ impl Shape {
             next_face = end;
         }
 
-        // compute axis-aligned bounding box
-        let (min, max) = shape.vertices.iter().fold(
+        shape.set_aabb();
+
+        Ok(shape)
+    }
+
+    pub fn set_aabb(&mut self) {
+        let (min, max) = self.vertices.iter().fold(
             ([f32::INFINITY; 3], [-f32::INFINITY; 3]),
             |(min_acc, max_acc), v| {
                 (
@@ -643,9 +661,19 @@ impl Shape {
         let min = Point3::from(min);
         let max = Point3::from(max);
 
-        shape.aabb = Some(AABB { min, max });
+        self.aabb = Some(AABB { min, max });
+    }
 
-        Ok(shape)
+    pub fn rescale(&mut self, scale: f32) {
+        for vertex in &mut self.vertices {
+            vertex.coords *= scale;
+        }
+        for face in self.faces.iter_mut() {
+            for vertex in face.data_mut().exterior.iter_mut() {
+                vertex.coords *= scale;
+            }
+        }
+        self.set_aabb(); // recompute axis-aligned bounding box
     }
 
     /// Adds a vertex to the mesh.
