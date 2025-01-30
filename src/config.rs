@@ -2,7 +2,7 @@ use nalgebra::Complex;
 use std::f32::consts::PI;
 
 /// Wavelength of the electric field in the same units as the geometry coordinates.
-pub const WAVELENGTH: f32 = 0.532 * 0.5;
+pub const WAVELENGTH: f32 = 0.532 * 1.0;
 /// Wavenumber, equal to 2π divided by `WAVELENGTH`.
 pub const WAVENUMBER: f32 = 2.0 * PI / WAVELENGTH;
 /// Minimum distance for vertices to be considered the same.
@@ -32,4 +32,4 @@ pub const RADIUS: f32 = 1e4;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
 pub const DIFF_EPSILON: f32 = 1e-3;
 /// Base far-field binning reolution.
-pub const FAR_FIELD_RESOLUTION: usize = 360;
+pub const FAR_FIELD_RESOLUTION: usize = 600;

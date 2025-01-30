@@ -6,14 +6,14 @@ use pbt::{
 };
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/cube2.obj").unwrap();
     // let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
     let projection = Vector3::new(0.0, 0.0, -1.0).normalize();
     let e_perp = Vector3::x(); // choose e_perp along x-axis for now
 
-    let lower_left = vec![-10.0, -10.0];
-    let upper_right = vec![10.0, 10.0];
+    let lower_left = vec![-50.0, -50.0];
+    let upper_right = vec![50.0, 50.0];
     let mut clip_vertices = vec![
         Point3::new(lower_left[0], upper_right[1], 20.0),
         Point3::new(lower_left[0], lower_left[1], 20.0),

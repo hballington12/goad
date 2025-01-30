@@ -62,7 +62,7 @@ pub fn writeup(
     }
 
     // Open a file for writing
-    let file = File::create("output.txt").unwrap();
+    let file = File::create("mueller_scatgrid").unwrap();
     let mut writer = BufWriter::new(file);
 
     // Write header
