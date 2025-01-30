@@ -6,7 +6,7 @@ use pbt::{
 };
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/concave1.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
     // let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
     let projection = Vector3::new(0.0, 0.0, -1.0).normalize();

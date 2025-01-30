@@ -160,22 +160,26 @@ impl Problem {
             .progress_chars("➤➤➤➤➤➤➤➤"),
         );
         pb.set_message(description.to_string());
-        let pb2 = m.add(ProgressBar::new(100 as u64));
+        let pb2 = m.add(ProgressBar::new(1000 as u64));
         pb2.set_style(
             ProgressStyle::with_template(
-                "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {pos:>5}/{len:5} {msg}",
+                "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {percent:>6.1.white}%     {msg}",
             )
             .unwrap()
             .progress_chars("➤➤➤➤➤➤➤➤"),
         );
-        pb2.set_message("power diffracted (%)".to_string());
+        pb2.set_message("power diffracted".to_string());
 
-        let mut diffracted_power = 0.0;
         let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
 
         let ampl_far_field = queue
             .par_iter()
-            .map(|outbeam| outbeam.diffract(theta_phi_combinations))
+            .map(|outbeam| {
+                let outbeam_power = outbeam.power();
+                pb.inc(1);
+                pb2.inc((outbeam_power / total_power * 1000.0) as u64);
+                outbeam.diffract(theta_phi_combinations)
+            })
             .reduce(
                 || vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()],
                 |mut acc, local| {
@@ -186,11 +190,7 @@ impl Problem {
                 },
             );
 
-        // diffracted_power += outbeam.power();
-        // pb.inc(1);
-        // let progress = (diffracted_power / total_power) * 100.0;
-        // pb2.set_position(progress as u64);
-
+        // TODO move this outside the function
         for (i, ampl) in ampl_far_field.iter().enumerate() {
             total_ampl_far_field[i] += ampl;
         }

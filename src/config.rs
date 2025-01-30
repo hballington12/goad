@@ -24,10 +24,12 @@ pub const TOTAL_POWER_CUTOFF: f32 = 0.99;
 /// Surrounding medium refractive index.
 pub const MEDIUM_REFR_INDEX: Complex<f32> = Complex { re: 1.0, im: 0.0 };
 /// Maximum number of beam recursions before truncation.
-pub const MAX_REC: i32 = 8;
+pub const MAX_REC: i32 = 10;
 /// Maximum number of total internal reflections.
-pub const MAX_TIR: i32 = 8;
+pub const MAX_TIR: i32 = 10;
 /// Distance to far-field. 1e3 - 1e5 is a good range for single precision arithmetic.
 pub const RADIUS: f32 = 1e4;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
 pub const DIFF_EPSILON: f32 = 1e-3;
+/// Base far-field binning reolution.
+pub const FAR_FIELD_RESOLUTION: usize = 360;
