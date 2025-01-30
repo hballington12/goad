@@ -173,18 +173,28 @@ impl Problem {
         let mut diffracted_power = 0.0;
         let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
 
-        for outbeam in queue.iter() {
-            diffracted_power += outbeam.power();
-            let diff_far = outbeam.diffract(theta_phi_combinations);
-            if let Some(diff_far) = diff_far {
-                for (i, ampl) in diff_far.iter().enumerate() {
-                    total_ampl_far_field[i] += ampl;
-                }
-            }
-            pb.inc(1);
-            let progress = (diffracted_power / total_power) * 100.0;
-            pb2.set_position(progress as u64);
+        let ampl_far_field = queue
+            .par_iter()
+            .map(|outbeam| outbeam.diffract(theta_phi_combinations))
+            .reduce(
+                || vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()],
+                |mut acc, local| {
+                    for (a, l) in acc.iter_mut().zip(local) {
+                        *a += l;
+                    }
+                    acc
+                },
+            );
+
+        // diffracted_power += outbeam.power();
+        // pb.inc(1);
+        // let progress = (diffracted_power / total_power) * 100.0;
+        // pb2.set_position(progress as u64);
+
+        for (i, ampl) in ampl_far_field.iter().enumerate() {
+            total_ampl_far_field[i] += ampl;
         }
+
         queue.clear();
         let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
         pb.finish_with_message(format!("{} (done)", description));
