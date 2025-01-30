@@ -529,23 +529,24 @@ impl Beam {
     pub fn diffract(
         &self,
         theta_phi_combinations: &[(f32, f32)],
-        total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
-    ) {
+    ) -> Option<Vec<Matrix2<Complex<f32>>>> {
         match &self.face {
             Face::Simple(face) => {
                 let verts = &face.exterior;
                 let ampl = self.field.ampl;
                 let prop = self.prop;
                 let vk7 = self.field.e_perp;
-                let ampl_far_field =
-                    diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations);
-
-                for (i, ampl) in ampl_far_field.iter().enumerate() {
-                    total_ampl_far_field[i] += ampl;
-                }
+                Some(diff::diffraction(
+                    verts,
+                    ampl,
+                    prop,
+                    vk7,
+                    &theta_phi_combinations,
+                ))
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");
+                None
             }
         }
     }

@@ -7,6 +7,7 @@ use crate::{
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2};
+use rayon::prelude::*;
 use std::fmt;
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -174,8 +175,12 @@ impl Problem {
 
         for outbeam in queue.iter() {
             diffracted_power += outbeam.power();
-            outbeam.diffract(theta_phi_combinations, total_ampl_far_field);
-
+            let diff_far = outbeam.diffract(theta_phi_combinations);
+            if let Some(diff_far) = diff_far {
+                for (i, ampl) in diff_far.iter().enumerate() {
+                    total_ampl_far_field[i] += ampl;
+                }
+            }
             pb.inc(1);
             let progress = (diffracted_power / total_power) * 100.0;
             pb2.set_position(progress as u64);
