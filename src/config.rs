@@ -2,7 +2,7 @@ use nalgebra::Complex;
 use std::f32::consts::PI;
 
 /// Wavelength of the electric field in the same units as the geometry coordinates.
-pub const WAVELENGTH: f32 = 0.532;
+pub const WAVELENGTH: f32 = 0.532 * 0.1;
 /// Wavenumber, equal to 2π divided by `WAVELENGTH`.
 pub const WAVENUMBER: f32 = 2.0 * PI / WAVELENGTH;
 /// Minimum distance for vertices to be considered the same.

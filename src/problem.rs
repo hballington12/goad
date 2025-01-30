@@ -172,17 +172,7 @@ impl Problem {
         let mut diffracted_power = 0.0;
         let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
 
-        loop {
-            if queue.is_empty() {
-                break;
-            }
-
-            let outbeam = queue.pop().unwrap();
-
-            // if queue.len() != 3 && queue.len() != 1 {
-            //     continue;
-            // }
-
+        for outbeam in queue.iter() {
             diffracted_power += outbeam.power();
             outbeam.diffract(theta_phi_combinations, total_ampl_far_field);
 
@@ -190,6 +180,7 @@ impl Problem {
             let progress = (diffracted_power / total_power) * 100.0;
             pb2.set_position(progress as u64);
         }
+        queue.clear();
         let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
         pb.finish_with_message(format!("{} (done)", description));
         pb2.finish_with_message(format!("power diffracted (%)"));
