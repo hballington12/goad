@@ -311,8 +311,6 @@ pub fn karczewski(
         -bvk.y * bvk.z / sqrt_1_minus_k2y2,
     );
 
-    // println!("m is: {:?}", m);
-
     // Pre-calculate factor
     let frac = ((1.0 - bvk.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
     let frac = if frac.abs() < settings::DIFF_EPSILON {
@@ -335,19 +333,8 @@ pub fn karczewski(
     let b1em = 0.5 * b1m;
     let b2em = 0.5 * (b2m + b2e);
 
-    // println!("==");
-    // println!("a1em: {:?}", a1em);
-    // println!("a2em: {:?}", a2em);
-    // println!("b1em: {:?}", b1em);
-    // println!("b2em: {:?}", b2em);
-
     // Fill the diff_ampl matrix (e-m theory)
     let diff_ampl = Matrix2::new(a1em, b1em, a2em, b2em);
-
-    // println!("diff_ampl[0, 0]: {:?}", diff_ampl[(0, 0)]);
-    // println!("diff_ampl[0, 1]: {:?}", diff_ampl[(0, 1)]);
-    // println!("diff_ampl[1, 0]: {:?}", diff_ampl[(1, 0)]);
-    // println!("diff_ampl[1, 1]: {:?}", diff_ampl[(1, 1)]);
 
     // Return the outputs
     (diff_ampl, m)
