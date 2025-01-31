@@ -486,19 +486,31 @@ impl MultiProblem {
         let mut problem = Problem::new(self.geom.clone(), Some(self.settings));
 
         for (i,(alpha, beta, gamma)) in self.orientations.eulers.iter().enumerate() {
-            println!("orientation: {}",i);
+            println!("orientation: {}",i+1);
             if let Err(_) = problem.geom.euler_rotate(*alpha, *beta, *gamma) {
             panic!("an euler rotation failed.");
             }
 
             problem.solve();
 
-            // reduce ampl
+            // reduce
+            for (i, ampl) in problem.ampl.iter().enumerate() {
+                self.ampl[i] += ampl;
+            }
 
             problem.reset();
+        }
 
+        // reduce
+        for ampl in problem.ampl.iter_mut() {
+            *ampl /= Complex::new(self.orientations.num_orientations as f32,0.0);
         }
 
     }
+
+    pub fn writeup(&self) {
+        let _ = output::writeup(&self.bins, &self.ampl);
+    }
+
 
 }
