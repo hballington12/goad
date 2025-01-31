@@ -575,7 +575,7 @@ impl Face {
 }
 
 /// Represents a 3D surface mesh.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
     pub vertices: Vec<Point3<f32>>, // List of all vertices in the mesh
     pub num_vertices: usize,        // Number of vertices in the mesh
@@ -730,7 +730,7 @@ impl Shape {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Geom {
     pub shapes: Vec<Shape>,
     pub containment_graph: ContainmentGraph,
@@ -839,6 +839,20 @@ impl Geom {
         );
 
         (Point3::from(min), Point3::from(max))
+    }
+
+    /// Rescales the geometry so that the largest dimension is 1. Returns the
+    /// scaling factor.
+    pub fn rescale(&mut self) -> f32 {
+        let bounds = self.bounds();
+        let max_dim = bounds.1.iter().fold(0.0, |acc: f32, &x| acc.max(x));
+        let scale = 1.0 / max_dim;
+
+        for shape in self.shapes.iter_mut() {
+            shape.rescale(scale);
+        }
+
+        scale
     }
 }
 

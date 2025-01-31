@@ -112,9 +112,13 @@ impl Problem {
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
 
+        // rescale geometry so the max dimension is 1
+        let mut geom = geom.clone();
+        let scaling_factor = geom.rescale();
+
         let beam = basic_initial_beam(&geom);
 
-        Self {
+        let problem = Self {
             geom,
             beam_queue: vec![beam],
             out_beam_queue: vec![],
@@ -122,7 +126,9 @@ impl Problem {
             powers: Powers::new(),
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
-        }
+        };
+
+        problem
     }
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
@@ -358,17 +364,6 @@ impl Problem {
 
         // Or just push
         // self.out_beam_queue.push(beam);
-    }
-
-    /// Rescales the geometry so that the largest dimension is 1.
-    pub fn rescale_geom(&mut self) {
-        let bounds = self.geom.bounds();
-        let max_dim = bounds.1.iter().fold(0.0, |acc: f32, &x| acc.max(x));
-        let scale = 1.0 / max_dim;
-
-        for shape in self.geom.shapes.iter_mut() {
-            shape.rescale(scale);
-        }
     }
 }
 

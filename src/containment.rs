@@ -1,6 +1,6 @@
 use nalgebra::Point3;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ContainmentGraph {
     parent: Vec<Option<usize>>, // Maps each shape index to its containing shape
 }
@@ -36,7 +36,7 @@ impl ContainmentGraph {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AABB {
     pub min: Point3<f32>,
     pub max: Point3<f32>,
