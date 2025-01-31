@@ -175,9 +175,9 @@ fn init_diff(
     // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
     let prop = (prop
         + Vector3::new(
-            settings::DIFF_EPSILON,
-            settings::DIFF_EPSILON,
-            settings::DIFF_EPSILON,
+            settings::PROP_PERTURBATION,
+            settings::PROP_PERTURBATION,
+            settings::PROP_PERTURBATION,
         ))
     .normalize();
 

@@ -18,6 +18,8 @@ pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
 pub const RADIUS: f32 = 1e4;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
 pub const DIFF_EPSILON: f32 = 1e-5;
+/// Small perturbation for propagation distance to reduce errors in diffraction
+pub const PROP_PERTURBATION: f32 = 1e-3;
 
 /// Runtime configuration for the application.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]

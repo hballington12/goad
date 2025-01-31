@@ -188,7 +188,6 @@ impl Problem {
         description: &str,
     ) {
         let m = MultiProgress::new();
-
         let n = queue.len();
         let pb = m.add(ProgressBar::new(n as u64));
         pb.set_style(
