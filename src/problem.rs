@@ -1,11 +1,5 @@
 use crate::{
-    beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins,
-    field::Field,
-    geom::{Face, Geom},
-    helpers::draw_face,
-    output,
-    settings::{self, Settings},
+    beam::{Beam, BeamPropagation, BeamType, BeamVariant}, bins, field::Field, geom::{Face, Geom}, helpers::draw_face, orientation::{self, Orientations}, output, settings::{self, Settings}
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -35,7 +29,7 @@ mod tests {
             geom.shapes[geom.shapes[1].parent_id.unwrap()]
         );
 
-        let mut problem = Problem::new(geom);
+        let mut problem = Problem::new(geom, None);
 
         problem.propagate_next();
     }
@@ -114,20 +108,18 @@ pub struct Problem {
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
-    pub fn new(geom: Geom) -> Self {
-        let mut settings = settings::load_config();
+    pub fn new(mut geom: Geom, settings: Option<Settings>) -> Self {
 
-        println!("Settings: {:#?}", settings);
+        let mut settings = settings.unwrap_or_else(settings::load_config);
 
-        let theta_phi_combinations = bins::generate_theta_phi_combinations(
+        let bins = bins::generate_bins(
             settings.far_field_resolution,
             settings.far_field_resolution,
         );
         let total_ampl_far_field =
-            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
-
+            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+        
         // rescale geometry so the max dimension is 1
-        let mut geom = geom.clone();
         geom.recentre();
         let scale_factor = geom.rescale();
         settings.wavelength = settings.wavelength * scale_factor;
@@ -142,7 +134,7 @@ impl Problem {
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             powers: Powers::new(),
-            bins: theta_phi_combinations,
+            bins: bins,
             ampl: total_ampl_far_field,
             settings,
             scale_factor
@@ -151,16 +143,29 @@ impl Problem {
         problem
     }
 
+    /// Resets the problem and reilluminates it with a basic initial beam.
+    pub fn reset(&mut self) {
+        self.beam_queue.clear();
+        self.out_beam_queue.clear();    
+        self.ext_diff_beam_queue.clear();
+        self.powers = Powers::new();
+        self.ampl.iter_mut().for_each(|a| a.fill(Complex::ZERO));
+
+        let beam = basic_initial_beam(&self.geom, self.settings.wavelength, self.settings.medium_refr_index);
+
+        self.beam_queue.push(beam);
+    }
+
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
         let  settings = settings::load_config();
 
-        let theta_phi_combinations = bins::generate_theta_phi_combinations(
+        let bins = bins::generate_bins(
             settings.far_field_resolution,
             settings.far_field_resolution,
         );
         let total_ampl_far_field =
-            vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
+            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
 
         Self {
             geom,
@@ -168,7 +173,7 @@ impl Problem {
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             powers: Powers::new(),
-            bins: theta_phi_combinations,
+            bins: bins,
             ampl: total_ampl_far_field,
             settings,
             scale_factor: 1.0,
@@ -177,7 +182,7 @@ impl Problem {
 
     fn diffract_outbeams(
         queue: &mut Vec<Beam>,
-        theta_phi_combinations: &[(f32, f32)],
+        bins: &[(f32, f32)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         description: &str,
     ) {
@@ -211,10 +216,10 @@ impl Problem {
                 let outbeam_power = outbeam.power();
                 pb.inc(1);
                 pb2.inc((outbeam_power / total_power * 1000.0) as u64);
-                outbeam.diffract(theta_phi_combinations)
+                outbeam.diffract(bins)
             })
             .reduce(
-                || vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()],
+                || vec![Matrix2::<Complex<f32>>::zeros(); bins.len()],
                 |mut acc, local| {
                     for (a, l) in acc.iter_mut().zip(local) {
                         *a += l;
@@ -228,8 +233,6 @@ impl Problem {
             total_ampl_far_field[i] += ampl;
         }
 
-        queue.clear();
-        let _ = output::writeup(&theta_phi_combinations, &total_ampl_far_field);
         pb.finish_with_message(format!("{} (done)", description));
         pb2.finish_with_message(format!("power diffracted (%)"));
         // total write
@@ -257,6 +260,11 @@ impl Problem {
         self.solve_far_outbeams();
     }
 
+    pub fn solve(&mut self) {
+        self.solve_near();
+        self.solve_far();
+    }
+
     /// Trace beams to solve the near-field problem.
     pub fn solve_near(&mut self) {
         loop {
@@ -274,6 +282,10 @@ impl Problem {
         }
 
         println!("{}", self.powers);
+    }
+
+    pub fn writeup(&self) {
+        let _ = output::writeup(&self.bins, &self.ampl);
     }
 
     /// Propagates the next beam in the queue.
@@ -437,4 +449,56 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
         wavelength,
     );
     beam
+}
+
+/// A problem for a single geometry with multiple orientations.
+#[derive(Debug, PartialEq)] // Added Default derive
+pub struct MultiProblem {
+    pub geom: Geom,
+    pub problems: Vec<Problem>,
+    pub orientations: Orientations,
+    pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
+    pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
+    pub settings: Settings,               // runtime settings
+}
+
+/// Creates a new `MultiOrientProblem` from a `Geom` and an orientation scheme.
+impl MultiProblem {
+    pub fn new(geom: Geom, orientations: Orientations) -> Self {
+        let settings = settings::load_config();
+
+        let problems = Vec::new();
+        let bins = bins::generate_bins(
+            settings.far_field_resolution,
+            settings.far_field_resolution,
+        );
+        let total_ampl_far_field =
+            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+
+
+        Self { geom, problems, orientations, bins, ampl: total_ampl_far_field, settings }
+    }
+
+    /// Solves a `MultiOrientProblem` by averaging over the problems.
+    pub fn solve(&mut self) {
+
+        // init a base problem that can be reset
+        let mut problem = Problem::new(self.geom.clone(), Some(self.settings));
+
+        for (i,(alpha, beta, gamma)) in self.orientations.eulers.iter().enumerate() {
+            println!("orientation: {}",i);
+            if let Err(_) = problem.geom.euler_rotate(*alpha, *beta, *gamma) {
+            panic!("an euler rotation failed.");
+            }
+
+            problem.solve();
+
+            // reduce ampl
+
+            problem.reset();
+
+        }
+
+    }
+
 }

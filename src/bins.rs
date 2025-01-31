@@ -1,7 +1,7 @@
 use ndarray::Array1;
 
 /// Generate theta and phi combinations
-pub fn generate_theta_phi_combinations(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
+pub fn generate_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
     let thetas =
         Array1::linspace(0.0, std::f32::consts::PI, num_theta).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
 

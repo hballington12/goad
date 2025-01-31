@@ -7,7 +7,7 @@ fn main() {
     geom.shapes[0].refr_index.re = 1.5;
     geom.shapes[0].refr_index.im = 0.0001;
 
-    let mut problem = Problem::new(geom);
+    let mut problem = Problem::new(geom, None);
 
     problem.solve_near();
 }

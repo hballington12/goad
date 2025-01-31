@@ -19,7 +19,7 @@ fn main() {
     let vk7: Vector3<f32> = Vector3::new(1.0, 0.0, 0.0);
     let vk7 = vk7.cross(&prop).normalize();
     let verts = face.data().exterior.clone();
-    let theta_phi_combinations = bins::generate_theta_phi_combinations(180, 180);
+    let theta_phi_combinations = bins::generate_bins(180, 180);
     let ampl_far_field = diff::diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations, 1.0);
     let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
 }

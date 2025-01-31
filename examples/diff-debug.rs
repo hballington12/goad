@@ -25,7 +25,7 @@ fn main() {
         Point3::new(-16.952244, 4.2973986, 5.4249063),
     ];
 
-    let theta_phi_combinations = bins::generate_theta_phi_combinations(100, 100);
+    let theta_phi_combinations = bins::generate_bins(100, 100);
     let ampl_far_field = diff::diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations, 1.0);
     let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
 }

@@ -7,10 +7,12 @@ use geo_types::Coord;
 use geo_types::LineString;
 use geo_types::Polygon;
 use nalgebra::Complex;
+use nalgebra::Matrix3;
 use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
+use std::f32::consts::PI;
 use std::path::Path;
 use tobj;
 use tobj::Model;
@@ -41,11 +43,13 @@ mod tests {
         let com = geom.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
+        assert!(geom.is_centered());
 
         let geom = Geom::from_file("./examples/data/multiple2.obj").unwrap();
         let com = geom.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
+        assert!(geom.is_centered());
 
         let geom = Geom::from_file("./examples/data/multiple3.obj").unwrap();
         let com = geom.centre_of_mass();
@@ -53,12 +57,14 @@ mod tests {
         assert!(com.coords.norm() - 5.0 < 1e-6);
         assert!(com.y.abs() - 5.0 < 1e-6);
         assert!(com.z.abs() < 1e-6);
+        assert!(!geom.is_centered());
 
         let mut recentred = geom.clone();
         recentred.recentre();
         let com = recentred.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
+        assert!(recentred.is_centered());
     }
 
     #[test]
@@ -454,7 +460,6 @@ impl FaceData {
 /// An enum for 2 different types of polygon in 3D.
 /// `Face::Simple` represents a polygon with only exterior vertices.
 /// `Face::Complex` represents a polygon that may also contain interior vertices (holes).
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Face {
     Simple(FaceData),
@@ -923,6 +928,71 @@ impl Geom {
                 }
             }
         }
+    }
+
+    pub fn is_centered(&self) -> bool {
+        self.centre_of_mass().coords.norm() < 1e-6
+    }
+
+    /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in radians)
+    /// Uses Mishchenko's Euler rotation matrix convention.
+    pub fn euler_rotate(&mut self, alpha: f32, beta: f32, gamma: f32) -> Result<()> {
+        if !self.is_centered() {
+            return Err(anyhow::anyhow!(
+                "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
+            ));
+        }
+        let alpha = alpha * PI / 180.0;
+        let beta = beta * PI / 180.0;
+        let gamma = gamma * PI / 180.0;
+
+        let s1 = alpha.sin();
+        let s2 = beta.sin();
+        let s3 = gamma.sin();
+        let c1 = alpha.cos();
+        let c2 = beta.cos();
+        let c3 = gamma.cos();
+
+        let rot = Matrix3::new(
+            c1 * c2 * c3 - s1 * s3,
+            -c1 * c2 * s3 - s1 * c3,
+            c1 * s2,
+            s1 * c2 * c3 + c1 * s3,
+            -s1 * c2 * s3 + c1 * c3,
+            s1 * s2,
+            -s2 * c3,
+            s2 * s3,
+            c2,
+        );
+
+        for shape in self.shapes.iter_mut() {
+            for vertex in shape.vertices.iter_mut() {
+                vertex.coords = rot * vertex.coords;
+            }
+
+            for face in shape.faces.iter_mut() {
+                match face {
+                    Face::Simple(data) => {
+                        for vertex in data.exterior.iter_mut() {
+                            vertex.coords = rot * vertex.coords;
+                        }
+                    }
+                    Face::Complex { data, interiors } => {
+                        for vertex in data.exterior.iter_mut() {
+                            vertex.coords = rot * vertex.coords;
+                        }
+
+                        for interior in interiors.iter_mut() {
+                            for vertex in interior.iter_mut() {
+                                vertex.coords = rot * vertex.coords;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

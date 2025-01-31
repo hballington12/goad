@@ -20,7 +20,7 @@ pub const RADIUS: f32 = 1e4;
 pub const DIFF_EPSILON: f32 = 1e-5;
 
 /// Runtime configuration for the application.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub struct Settings {
     pub wavelength: f32,
     pub beam_power_threshold: f32,

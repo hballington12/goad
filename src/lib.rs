@@ -7,6 +7,7 @@ pub mod field;
 pub mod fresnel;
 pub mod geom;
 pub mod helpers;
+pub mod orientation;
 pub mod output;
 pub mod problem;
 pub mod settings;
