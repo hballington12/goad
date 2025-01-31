@@ -1,26 +1,26 @@
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
 use ndarray::Array2;
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 
 use crate::field::Field;
 use crate::{geom, settings};
 
 // Diffraction. Face must be convex.
 pub fn diffraction(
-    verts: &[Point3<f32>],
-    mut ampl: Matrix2<Complex<f32>>,
-    prop: Vector3<f32>,
-    vk7: Vector3<f32>,
-    theta_phi_combinations: &[(f32, f32)],
-    wavenumber: f32,
-) -> Vec<Matrix2<Complex<f32>>> {
+    verts: &[Point3<f64>],
+    mut ampl: Matrix2<Complex<f64>>,
+    prop: Vector3<f64>,
+    vk7: Vector3<f64>,
+    theta_phi_combinations: &[(f64, f64)],
+    wavenumber: f64,
+) -> Vec<Matrix2<Complex<f64>>> {
     // Translate to aperture system, rotate, and transform propagation and auxiliary vectors.
     let (center_of_mass, relative_vertices, rot3, prop2) =
         init_diff(verts, &mut ampl, prop, vk7, wavenumber);
 
     // Define the output variables.
-    let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
-    let mut area_facs2 = vec![Complex::<f32>::default(); theta_phi_combinations.len()];
+    let mut ampl_cs = vec![Matrix2::<Complex<f64>>::default(); theta_phi_combinations.len()];
+    let mut area_facs2 = vec![Complex::<f64>::default(); theta_phi_combinations.len()];
 
     // Iterate over the flattened combinations
     for (index, (theta, phi)) in theta_phi_combinations.iter().enumerate() {
@@ -58,7 +58,7 @@ pub fn diffraction(
         ampl_far_field[(1, 1)] = ampl_temp[(1, 1)];
 
         let nv = relative_vertices.len();
-        let mut v1 = Array2::<f32>::zeros((nv, 3));
+        let mut v1 = Array2::<f64>::zeros((nv, 3));
         for (i, vertex) in relative_vertices.iter().enumerate() {
             let transformed_vertex = rot3 * vertex;
             v1[[i, 0]] = transformed_vertex.x;
@@ -67,9 +67,9 @@ pub fn diffraction(
         }
 
         let kinc = prop2 * wavenumber;
-        let x: Vec<f32> = v1.column(0).iter().cloned().collect();
-        let y: Vec<f32> = v1.column(1).iter().cloned().collect();
-        let m: Vec<f32> = (0..nv)
+        let x: Vec<f64> = v1.column(0).iter().cloned().collect();
+        let y: Vec<f64> = v1.column(1).iter().cloned().collect();
+        let m: Vec<f64> = (0..nv)
             .map(|j| {
                 if j == nv - 1 {
                     (y[0] - y[j]) / (x[0] - x[j])
@@ -78,7 +78,7 @@ pub fn diffraction(
                 }
             })
             .collect();
-        let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
+        let n: Vec<f64> = m.iter().map(|&mj| 1.0 / mj).collect();
 
         let fraunhofer = &mut area_facs2[index];
         let mut fraunhofer_sum = Complex::new(0.0, 0.0); // Example, modify as needed
@@ -142,12 +142,12 @@ pub fn diffraction(
 }
 
 fn get_rotations(
-    rot3: Matrix3<f32>,
-    prop2: Vector3<f32>,
-    sin_phi: f32,
-    cos_phi: f32,
-    k: Vector3<f32>,
-) -> (Matrix2<f32>, Matrix2<f32>, Matrix2<f32>) {
+    rot3: Matrix3<f64>,
+    prop2: Vector3<f64>,
+    sin_phi: f64,
+    cos_phi: f64,
+    k: Vector3<f64>,
+) -> (Matrix2<f64>, Matrix2<f64>, Matrix2<f64>) {
     // Compute Karczewski polarisation matrix for each element
     let (karczewski, m) = karczewski(&prop2, &k);
 
@@ -166,12 +166,12 @@ fn get_rotations(
 }
 
 fn init_diff(
-    verts: &[Point3<f32>],
-    ampl: &mut Matrix2<Complex<f32>>,
-    prop: Vector3<f32>,
-    vk7: Vector3<f32>,
-    wavenumber: f32,
-) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
+    verts: &[Point3<f64>],
+    ampl: &mut Matrix2<Complex<f64>>,
+    prop: Vector3<f64>,
+    vk7: Vector3<f64>,
+    wavenumber: f64,
+) -> (Point3<f64>, Vec<Vector3<f64>>, Matrix3<f64>, Vector3<f64>) {
     // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
     let prop = (prop
         + Vector3::new(
@@ -209,7 +209,7 @@ fn init_diff(
     (center_of_mass, relative_vertices, rot3, prop2)
 }
 
-pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
+pub fn get_rotation_matrix2(verts: &Vec<Vector3<f64>>) -> Matrix3<f64> {
     let a1 = verts[0];
     let b1 = verts[1];
 
@@ -287,9 +287,9 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
 }
 
 pub fn karczewski(
-    prop2: &Vector3<f32>, // Outgoing propagation direction in aperture system
-    bvk: &Vector3<f32>,   // bin unit vector
-) -> (Matrix2<f32>, Vector3<f32>) {
+    prop2: &Vector3<f64>, // Outgoing propagation direction in aperture system
+    bvk: &Vector3<f64>,   // bin unit vector
+) -> (Matrix2<f64>, Vector3<f64>) {
     // Compute the diff ampl matrix for polarisation of far-field diffraction at a far-field bin
 
     // Propagation direction in aperture system
@@ -340,7 +340,7 @@ pub fn karczewski(
     (diff_ampl, m)
 }
 
-pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
+pub fn calculate_rotation_matrix(prop1: Vector3<f64>) -> Matrix3<f64> {
     let angle = -prop1.y.atan2(prop1.x);
     let (sin_angle, cos_angle) = angle.sin_cos();
 
@@ -349,26 +349,26 @@ pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
     )
 }
 
-pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
+pub fn adjust_mj_nj(mj: f64, nj: f64) -> (f64, f64) {
     if mj.abs() > 1e6 || nj.abs() < 1e-6 {
         (1e6, 1e6)
-    } else if nj.abs() > f32::MAX || mj.abs() < 1e-6 {
+    } else if nj.abs() > f64::MAX || mj.abs() < 1e-6 {
         (1e6, 1e6)
     } else {
         (mj, nj)
     }
 }
 
-pub fn calculate_bvsk(rotated_pos: &Vector3<f32>, wavenumber: f32) -> f32 {
+pub fn calculate_bvsk(rotated_pos: &Vector3<f64>, wavenumber: f64) -> f64 {
     wavenumber * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
 }
 
 pub fn calculate_kxx_kyy(
-    kinc: &[f32; 2],
-    rotated_pos: &Vector3<f32>,
-    bvsk: f32,
-    wavenumber: f32,
-) -> (f32, f32) {
+    kinc: &[f64; 2],
+    rotated_pos: &Vector3<f64>,
+    bvsk: f64,
+    wavenumber: f64,
+) -> (f64, f64) {
     let kxx = kinc[0] - wavenumber.powi(2) * rotated_pos.x / bvsk;
     let kyy = kinc[1] - wavenumber.powi(2) * rotated_pos.y / bvsk;
 
@@ -387,34 +387,34 @@ pub fn calculate_kxx_kyy(
     (kxx, kyy)
 }
 
-pub fn calculate_deltas(kxx: f32, kyy: f32, xj: f32, yj: f32, mj: f32, nj: f32) -> (f32, f32, f32) {
+pub fn calculate_deltas(kxx: f64, kyy: f64, xj: f64, yj: f64, mj: f64, nj: f64) -> (f64, f64, f64) {
     let delta = kxx * xj + kyy * yj;
     let delta1 = kyy * mj + kxx;
     let delta2 = kxx * nj + kyy;
     (delta, delta1, delta2)
 }
 
-pub fn calculate_omegas(dx: f32, dy: f32, delta1: f32, delta2: f32) -> (f32, f32) {
+pub fn calculate_omegas(dx: f64, dy: f64, delta1: f64, delta2: f64) -> (f64, f64) {
     let omega1 = dx * delta1;
     let omega2 = dy * delta2;
     (omega1, omega2)
 }
 
-pub fn calculate_alpha_beta(delta1: f32, delta2: f32, kxx: f32, kyy: f32) -> (f32, f32) {
+pub fn calculate_alpha_beta(delta1: f64, delta2: f64, kxx: f64, kyy: f64) -> (f64, f64) {
     let alpha = 1.0 / (2.0 * kyy * delta1);
     let beta = 1.0 / (2.0 * kxx * delta2);
     (alpha, beta)
 }
 
 pub fn calculate_summand(
-    bvsk: f32,
-    delta: f32,
-    omega1: f32,
-    omega2: f32,
-    alpha: f32,
-    beta: f32,
-    wavenumber: f32,
-) -> Complex<f32> {
+    bvsk: f64,
+    delta: f64,
+    omega1: f64,
+    omega2: f64,
+    alpha: f64,
+    beta: f64,
+    wavenumber: f64,
+) -> Complex<f64> {
     let sumim = alpha * (delta.cos() - (delta + omega1).cos())
         - beta * (delta.cos() - (delta + omega2).cos());
     let sumre = -alpha * (delta.sin() - (delta + omega1).sin())

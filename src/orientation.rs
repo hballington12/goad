@@ -4,12 +4,12 @@ use anyhow::Result;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Orientations {
     pub num_orientations: usize,
-    pub eulers: Vec<(f32, f32, f32)>,
+    pub eulers: Vec<(f64, f64, f64)>,
 }
 
 impl Orientations {
     /// Creates a new orientation scheme with the given discrete angles.
-    pub fn new_discrete(alphas: Vec<f32>, betas: Vec<f32>, gammas: Vec<f32>) -> Result<Self> {
+    pub fn new_discrete(alphas: Vec<f64>, betas: Vec<f64>, gammas: Vec<f64>) -> Result<Self> {
         if alphas.is_empty() || betas.is_empty() || gammas.is_empty() {
             return Err(anyhow::anyhow!("Empty angle list"));
         }

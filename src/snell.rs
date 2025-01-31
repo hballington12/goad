@@ -6,7 +6,7 @@ mod tests {
     use nalgebra::Complex;
 
     use super::*;
-    use std::f32::consts::PI;
+    use std::f64::consts::PI;
 
     #[test]
     fn normal_incidence_same_media() {
@@ -24,7 +24,7 @@ mod tests {
         let m2 = Complex::new(1.31, 0.0);
         let theta_t = get_theta_t(theta_i, m1, m2);
         let abs_difference = (theta_i - theta_t).abs();
-        assert!(abs_difference < f32::EPSILON)
+        assert!(abs_difference < f64::EPSILON)
     }
 
     #[test]
@@ -51,7 +51,7 @@ mod tests {
 /// Returns the sine of the transmitted angle according to Snell's Law.
 /// Port from Fortran code rt_c.f90, Macke 1996.
 /// All angles are in radians.
-pub fn get_theta_t(theta_i: f32, m1: Complex<f32>, m2: Complex<f32>) -> f32 {
+pub fn get_theta_t(theta_i: f64, m1: Complex<f64>, m2: Complex<f64>) -> f64 {
     let k1 = m1.im / m1.re; // imag(inc) / real(inc)
     let k2 = m2.im / m2.re; // imag(trans) / real(trans)
     let krel = (k2 - k1) / (1.0 + k1 * k2);

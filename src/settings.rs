@@ -5,37 +5,37 @@ use serde::Deserialize;
 use std::fmt;
 
 /// Minimum distance for vertices to be considered the same.
-pub const VERTEX_MERGE_DISTANCE: f32 = 0.01;
+pub const VERTEX_MERGE_DISTANCE: f64 = 0.01;
 /// Scaling factor for integer coordinates during clipping.
-pub const CLIP_TOLERANCE: f32 = 1e10;
+pub const CLIP_TOLERANCE: f64 = 1e10;
 /// Minimum absolute value of the dot product of two vectors to be considered colinear.
-pub const COLINEAR_THRESHOLD: f32 = 0.001;
+pub const COLINEAR_THRESHOLD: f64 = 0.001;
 /// Minimum vector length (in geometry units) to be considered non-degenerate.
-pub const VEC_LENGTH_THRESHOLD: f32 = 0.01;
+pub const VEC_LENGTH_THRESHOLD: f64 = 0.01;
 /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
-pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
+pub const RAYCAST_MINIMUM_DISTANCE: f64 = 0.01;
 /// Distance to far-field. 1e3 - 1e5 is a good range for single precision arithmetic.
-pub const RADIUS: f32 = 1e4;
+pub const RADIUS: f64 = 1e4;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
-pub const DIFF_EPSILON: f32 = 1e-5;
+pub const DIFF_EPSILON: f64 = 1e-6;
 /// Small perturbation for propagation distance to reduce errors in diffraction
-pub const PROP_PERTURBATION: f32 = 1e-3;
+pub const PROP_PERTURBATION: f64 = 1e-3;
 
 /// Runtime configuration for the application.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
 pub struct Settings {
-    pub wavelength: f32,
-    pub beam_power_threshold: f32,
-    pub beam_area_threshold_fac: f32,
-    pub total_power_cutoff: f32,
-    pub medium_refr_index: Complex<f32>,
+    pub wavelength: f64,
+    pub beam_power_threshold: f64,
+    pub beam_area_threshold_fac: f64,
+    pub total_power_cutoff: f64,
+    pub medium_refr_index: Complex<f64>,
     pub max_rec: i32,
     pub max_tir: i32,
     pub far_field_resolution: usize,
 }
 
 impl Settings {
-    pub fn beam_area_threshold(&self) -> f32 {
+    pub fn beam_area_threshold(&self) -> f64 {
         self.wavelength * self.wavelength * self.beam_area_threshold_fac
     }
 }
@@ -70,11 +70,11 @@ pub fn load_config() -> Settings {
 pub struct CliArgs {
     /// Override wavelength
     #[arg(long)]
-    wavelength: Option<f32>,
+    wavelength: Option<f64>,
 
     /// Override vertex merge distance
     #[arg(long)]
-    vertex_merge_distance: Option<f32>,
+    vertex_merge_distance: Option<f64>,
 }
 
 impl fmt::Display for Settings {

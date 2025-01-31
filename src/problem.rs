@@ -38,15 +38,15 @@ mod tests {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Powers {
-    pub input: f32,       // near-field input power
-    pub output: f32,      // near-field output power
-    pub absorbed: f32,    // near-field absorbed power
-    pub trnc_ref: f32,    // truncated power due to max reflections
-    pub trnc_rec: f32,    // truncated power due to max recursions
-    pub trnc_clip: f32,   // truncated power due to clipping
-    pub trnc_energy: f32, // truncated power due to threshold beam power
-    pub trnc_area: f32,   // truncated power due to area threshold
-    pub ext_diff: f32,    // external diffraction power
+    pub input: f64,       // near-field input power
+    pub output: f64,      // near-field output power
+    pub absorbed: f64,    // near-field absorbed power
+    pub trnc_ref: f64,    // truncated power due to max reflections
+    pub trnc_rec: f64,    // truncated power due to max recursions
+    pub trnc_clip: f64,   // truncated power due to clipping
+    pub trnc_energy: f64, // truncated power due to threshold beam power
+    pub trnc_area: f64,   // truncated power due to area threshold
+    pub ext_diff: f64,    // external diffraction power
 }
 
 impl Powers {
@@ -65,7 +65,7 @@ impl Powers {
     }
 
     /// Returns the power unaccounted for.
-    pub fn missing(&self) -> f32 {
+    pub fn missing(&self) -> f64 {
         self.input
             - (self.output
                 + self.absorbed
@@ -101,10 +101,10 @@ pub struct Problem {
     pub out_beam_queue: Vec<Beam>,        // beams awaiting diffraction
     pub ext_diff_beam_queue: Vec<Beam>,   // beams awaiting external diffraction
     pub powers: Powers,                   // different power contributions
-    pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
-    pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
+    pub bins: Vec<(f64, f64)>,            // bins for far-field diffraction
+    pub ampl: Vec<Matrix2<Complex<f64>>>, // total amplitude in far-field
     pub settings: Settings,               // runtime settings
-    scale_factor: f32, // scaling factor for geometry
+    scale_factor: f64, // scaling factor for geometry
 }
 
 impl Problem {
@@ -118,7 +118,7 @@ impl Problem {
             settings.far_field_resolution,
         );
         let total_ampl_far_field =
-            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+            vec![Matrix2::<Complex<f64>>::zeros(); bins.len()];
         
         // rescale geometry so the max dimension is 1
         geom.recentre();
@@ -166,7 +166,7 @@ impl Problem {
             settings.far_field_resolution,
         );
         let total_ampl_far_field =
-            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+            vec![Matrix2::<Complex<f64>>::zeros(); bins.len()];
 
         Self {
             geom,
@@ -183,8 +183,8 @@ impl Problem {
 
     fn diffract_outbeams(
         queue: &mut Vec<Beam>,
-        bins: &[(f32, f32)],
-        total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
+        bins: &[(f64, f64)],
+        total_ampl_far_field: &mut [Matrix2<Complex<f64>>],
         description: &str,
     ) {
         let m = MultiProgress::new();
@@ -208,7 +208,7 @@ impl Problem {
         );
         pb2.set_message("power diffracted".to_string());
 
-        let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
+        let total_power = queue.iter().map(|beam| beam.power()).sum::<f64>();
 
         let ampl_far_field = queue
             .par_iter()
@@ -219,7 +219,7 @@ impl Problem {
                 outbeam.diffract(bins)
             })
             .reduce(
-                || vec![Matrix2::<Complex<f32>>::zeros(); bins.len()],
+                || vec![Matrix2::<Complex<f64>>::zeros(); bins.len()],
                 |mut acc, local| {
                     for (a, l) in acc.iter_mut().zip(local) {
                         *a += l;
@@ -420,8 +420,8 @@ impl Problem {
 }
 
 /// Creates a basic initial beam for full illumination of the geometry along the z-axis.
-fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
-    const FAC: f32 = 1.1;
+fn basic_initial_beam(geom: &Geom, wavelength: f64, medium_refractive_index: Complex<f64>) -> Beam {
+    const FAC: f64 = 1.1;
     let bounds = geom.bounds();
     let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
 
@@ -438,7 +438,7 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
 
     // propagate field backwards so its as if the beam comes from z=0
     let dist = bounds.1[2];
-    let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
+    let wavenumber = 2.0 * std::f64::consts::PI / wavelength;
     let arg = -dist * wavenumber * medium_refractive_index.re;
     field.ampl *= Complex::new(arg.cos(), arg.sin());
 
@@ -458,8 +458,8 @@ pub struct MultiProblem {
     pub geom: Geom,
     pub problems: Vec<Problem>,
     pub orientations: Orientations,
-    pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
-    pub mueller: Array2::<f32>, // total mueller in far-field
+    pub bins: Vec<(f64, f64)>,            // bins for far-field diffraction
+    pub mueller: Array2::<f64>, // total mueller in far-field
     pub settings: Settings,               // runtime settings
 }
 
@@ -474,7 +474,7 @@ impl MultiProblem {
             settings.far_field_resolution,
         );
 
-        let  mueller = Array2::<f32>::zeros((bins.len(), 16));
+        let  mueller = Array2::<f64>::zeros((bins.len(), 16));
 
         Self { geom, problems, orientations, bins, mueller, settings }
     }
@@ -507,7 +507,7 @@ impl MultiProblem {
         // reduce
         for mut row in self.mueller.outer_iter_mut() {
             for val in row.iter_mut() {
-                *val /= self.orientations.num_orientations as f32;
+                *val /= self.orientations.num_orientations as f64;
             }
         }
 

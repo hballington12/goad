@@ -11,11 +11,11 @@ use nalgebra::{Complex, Matrix2, Vector2};
 /// # Returns
 /// A 2x2 diagonal matrix representing the Fresnel reflection coefficients.
 pub fn refl(
-    n1: Complex<f32>,
-    n2: Complex<f32>,
-    theta_i: f32,
-    theta_t: f32,
-) -> Matrix2<Complex<f32>> {
+    n1: Complex<f64>,
+    n2: Complex<f64>,
+    theta_i: f64,
+    theta_t: f64,
+) -> Matrix2<Complex<f64>> {
     let cti = theta_i.cos();
     let ctt = theta_t.cos();
     let f11 = (n2 * cti - n1 * ctt) / (n1 * ctt + n2 * cti);
@@ -34,11 +34,11 @@ pub fn refl(
 /// # Returns
 /// A 2x2 diagonal matrix representing the Fresnel transmission coefficients.
 pub fn refr(
-    n1: Complex<f32>,
-    n2: Complex<f32>,
-    theta_i: f32,
-    theta_t: f32,
-) -> Matrix2<Complex<f32>> {
+    n1: Complex<f64>,
+    n2: Complex<f64>,
+    theta_i: f64,
+    theta_t: f64,
+) -> Matrix2<Complex<f64>> {
     let cti = theta_i.cos();
     let ctt = theta_t.cos();
     let f11 = (2.0 * n1 * cti) / (n1 * ctt + n2 * cti);

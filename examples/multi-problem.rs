@@ -18,13 +18,13 @@ fn main() {
 
     let mut rng = rand::rng();
     // need to include mapping here for beta
-    let alphas: Vec<f32> = (0..num_orient)
+    let alphas: Vec<f64> = (0..num_orient)
         .map(|_| rng.random_range(-1.0..1.0) * 180.0)
         .collect();
-    let betas: Vec<f32> = (0..num_orient)
+    let betas: Vec<f64> = (0..num_orient)
         .map(|_| rng.random_range(-1.0..1.0) * 180.0)
         .collect();
-    let gammas: Vec<f32> = (0..num_orient)
+    let gammas: Vec<f64> = (0..num_orient)
         .map(|_| rng.random_range(-1.0..1.0) * 180.0)
         .collect();
 

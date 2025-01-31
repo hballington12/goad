@@ -12,7 +12,7 @@ use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 use std::path::Path;
 use tobj;
 use tobj::Model;
@@ -204,13 +204,13 @@ mod tests {
 }
 
 trait Point3Extensions {
-    fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()>;
-    fn to_xy(&self) -> Coord<f32>;
+    fn transform(&mut self, model_view: &Matrix4<f64>) -> Result<()>;
+    fn to_xy(&self) -> Coord<f64>;
 }
 
-impl Point3Extensions for Point3<f32> {
+impl Point3Extensions for Point3<f64> {
     /// Transforms a Point3 type to another coordinate system.
-    fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()> {
+    fn transform(&mut self, model_view: &Matrix4<f64>) -> Result<()> {
         let vertex4 = Vector4::new(self.x, self.y, self.z, 1.0);
         let projected_vertex = model_view * vertex4;
         self.x = projected_vertex.x;
@@ -220,7 +220,7 @@ impl Point3Extensions for Point3<f32> {
         Ok(())
     }
 
-    fn to_xy(&self) -> Coord<f32> {
+    fn to_xy(&self) -> Coord<f64> {
         Coord {
             x: self.x,
             y: self.y,
@@ -234,23 +234,23 @@ impl Point3Extensions for Point3<f32> {
 /// The plane is then defined by `ax + by + cz + d = 0`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Plane {
-    pub normal: Vector3<f32>,
-    pub offset: f32,
+    pub normal: Vector3<f64>,
+    pub offset: f64,
 }
 
 /// Represents a closed line of exterior points of a polygon 3D.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FaceData {
-    pub exterior: Vec<Point3<f32>>, // List of exterior vertices
-    pub normal: Vector3<f32>,       // Normal vector of the facet
-    pub midpoint: Point3<f32>,      // Midpoint
+    pub exterior: Vec<Point3<f64>>, // List of exterior vertices
+    pub normal: Vector3<f64>,       // Normal vector of the facet
+    pub midpoint: Point3<f64>,      // Midpoint
     pub num_vertices: usize,        // Number of vertices
-    pub area: Option<f32>,          // Unsigned area
+    pub area: Option<f64>,          // Unsigned area
     pub shape_id: Option<usize>,    // An optional parent shape id number
 }
 
 impl FaceData {
-    pub fn new(vertices: Vec<Point3<f32>>, shape_id: Option<usize>) -> Result<Self> {
+    pub fn new(vertices: Vec<Point3<f64>>, shape_id: Option<usize>) -> Result<Self> {
         let vertices = vertices.clone();
         let num_vertices = vertices.len();
 
@@ -335,9 +335,9 @@ impl FaceData {
     /// Compute the midpoint of the facet.
     fn set_midpoint(&mut self) {
         let vertices = &self.exterior;
-        let len = vertices.len() as f32;
+        let len = vertices.len() as f64;
         // let mut mid = vertices.iter().copied();
-        let mut sum: Point3<f32> = vertices
+        let mut sum: Point3<f64> = vertices
             .iter()
             .fold(Point3::origin(), |acc, point| acc + point.coords);
 
@@ -360,14 +360,14 @@ impl FaceData {
     /// This is defined as the dot product of the position vector between
     ///     their centroids and a given projection vector.
     #[allow(dead_code)]
-    fn z_distance(&self, other: &FaceData, proj: &Vector3<f32>) -> f32 {
+    fn z_distance(&self, other: &FaceData, proj: &Vector3<f64>) -> f64 {
         let vec = &other.midpoint - &self.midpoint;
         vec.dot(&proj)
     }
 
     /// Returns the minimum value of the vertices in a `FaceData` along the
     /// specified dimension.
-    pub fn vert_min(&self, dim: usize) -> Result<f32> {
+    pub fn vert_min(&self, dim: usize) -> Result<f64> {
         if dim > 2 {
             return Err(anyhow::anyhow!("Dimension must be 0, 1, or 2"));
         }
@@ -376,9 +376,9 @@ impl FaceData {
             .exterior
             .iter()
             .map(|v| v[dim])
-            .collect::<Vec<f32>>()
+            .collect::<Vec<f64>>()
             .into_iter()
-            .reduce(f32::min);
+            .reduce(f64::min);
 
         match min {
             Some(val) => Ok(val),
@@ -388,7 +388,7 @@ impl FaceData {
 
     /// Returns the maximum value of the vertices in a `FaceData` along the
     /// specified dimension.
-    pub fn vert_max(&self, dim: usize) -> Result<f32> {
+    pub fn vert_max(&self, dim: usize) -> Result<f64> {
         if dim > 2 {
             return Err(anyhow::anyhow!("Dimension must be 0, 1, or 2"));
         }
@@ -397,9 +397,9 @@ impl FaceData {
             .exterior
             .iter()
             .map(|v| v[dim])
-            .collect::<Vec<f32>>()
+            .collect::<Vec<f64>>()
             .into_iter()
-            .reduce(f32::max);
+            .reduce(f64::max);
 
         match min {
             Some(val) => Ok(val),
@@ -412,23 +412,23 @@ impl FaceData {
     /// vertex in the other.
     /// This is used to determine if any part of the other is visible along
     /// the projection direction, in which case the result is positive
-    pub fn z_max(&self, other: &FaceData, proj: &Vector3<f32>) -> f32 {
+    pub fn z_max(&self, other: &FaceData, proj: &Vector3<f64>) -> f64 {
         let lowest = self
             .exterior
             .iter()
             .map(|v| v.coords.dot(&proj))
-            .collect::<Vec<f32>>()
+            .collect::<Vec<f64>>()
             .into_iter()
-            .reduce(f32::min)
+            .reduce(f64::min)
             .unwrap();
 
         let highest = other
             .exterior
             .iter()
             .map(|v| v.coords.dot(&proj))
-            .collect::<Vec<f32>>()
+            .collect::<Vec<f64>>()
             .into_iter()
-            .reduce(f32::max)
+            .reduce(f64::max)
             .unwrap();
 
         highest - lowest
@@ -448,7 +448,7 @@ impl FaceData {
     }
 
     /// Transforms a Face in place using a `nalgebra` matrix transformation.
-    pub fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()> {
+    pub fn transform(&mut self, model_view: &Matrix4<f64>) -> Result<()> {
         for point in &mut self.exterior {
             point.transform(model_view)?;
         }
@@ -465,18 +465,18 @@ pub enum Face {
     Simple(FaceData),
     Complex {
         data: FaceData,
-        interiors: Vec<Vec<Point3<f32>>>,
+        interiors: Vec<Vec<Point3<f64>>>,
     },
 }
 
 impl Face {
-    pub fn new_simple(exterior: Vec<Point3<f32>>, parent_id: Option<usize>) -> Result<Self> {
+    pub fn new_simple(exterior: Vec<Point3<f64>>, parent_id: Option<usize>) -> Result<Self> {
         Ok(Face::Simple(FaceData::new(exterior, parent_id)?))
     }
 
     pub fn new_complex(
-        exterior: Vec<Point3<f32>>,
-        interiors: Vec<Vec<Point3<f32>>>,
+        exterior: Vec<Point3<f64>>,
+        interiors: Vec<Vec<Point3<f64>>>,
         parent_id: Option<usize>,
     ) -> Result<Self> {
         Ok(Face::Complex {
@@ -486,7 +486,7 @@ impl Face {
     }
 
     /// Transform a `Face` to another coordinate system.
-    pub fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()> {
+    pub fn transform(&mut self, model_view: &Matrix4<f64>) -> Result<()> {
         match self {
             Face::Simple(data) => data.transform(model_view),
             Face::Complex { data, interiors } => {
@@ -502,14 +502,14 @@ impl Face {
         }
     }
 
-    pub fn midpoint(&self) -> Point3<f32> {
+    pub fn midpoint(&self) -> Point3<f64> {
         match self {
             Face::Simple(data) => data.midpoint,
             Face::Complex { data, .. } => data.midpoint,
         }
     }
 
-    pub fn to_polygon(&self) -> Polygon<f32> {
+    pub fn to_polygon(&self) -> Polygon<f64> {
         match self {
             Face::Simple(data) => {
                 let mut exterior = Vec::new();
@@ -546,7 +546,7 @@ impl Face {
     }
 
     /// Setter for the area of a `Face`.
-    pub fn set_area(&mut self, area: f32) {
+    pub fn set_area(&mut self, area: f64) {
         match self {
             Face::Simple(data) => data.area = Some(area),
             Face::Complex { data, .. } => data.area = Some(area),
@@ -555,7 +555,7 @@ impl Face {
 
     /// Creates a `Face` struct from a `Polygon`
     #[allow(dead_code)]
-    fn from_polygon(polygon: &Polygon<f32>) -> Result<Self> {
+    fn from_polygon(polygon: &Polygon<f64>) -> Result<Self> {
         // do the exterior
         let mut exterior = Vec::new();
         for coord in polygon
@@ -608,11 +608,11 @@ impl Face {
 /// Represents a 3D surface mesh.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
-    pub vertices: Vec<Point3<f32>>, // List of all vertices in the mesh
+    pub vertices: Vec<Point3<f64>>, // List of all vertices in the mesh
     pub num_vertices: usize,        // Number of vertices in the mesh
     pub faces: Vec<Face>,           // List of all facets in the mesh
     pub num_faces: usize,           // Number of facets in the mesh
-    pub refr_index: Complex<f32>,   // Refractive index of this shape
+    pub refr_index: Complex<f64>,   // Refractive index of this shape
     pub id: Option<usize>,          // an id number
     pub parent_id: Option<usize>,   // An optional parent shape index, which encompasses this one
     pub aabb: Option<AABB>,         // axis-aligned bounding box
@@ -638,7 +638,7 @@ impl Shape {
         let vertices = mesh
             .positions
             .chunks_exact(3)
-            .map(|v| Point3::new(v[0], v[1], v[2]))
+            .map(|v| Point3::new(v[0] as f64, v[1] as f64, v[2] as f64))
             .collect::<Vec<_>>();
 
         let mut shape = Shape::new(id, None);
@@ -672,7 +672,7 @@ impl Shape {
 
     pub fn set_aabb(&mut self) {
         let (min, max) = self.vertices.iter().fold(
-            ([f32::INFINITY; 3], [-f32::INFINITY; 3]),
+            ([f64::INFINITY; 3], [-f64::INFINITY; 3]),
             |(min_acc, max_acc), v| {
                 (
                     [
@@ -695,7 +695,7 @@ impl Shape {
         self.aabb = Some(AABB { min, max });
     }
 
-    pub fn rescale(&mut self, scale: f32) {
+    pub fn rescale(&mut self, scale: f64) {
         for vertex in &mut self.vertices {
             vertex.coords *= scale;
         }
@@ -708,7 +708,7 @@ impl Shape {
     }
 
     /// Adds a vertex to the mesh.
-    pub fn add_vertex(&mut self, vertex: Point3<f32>) {
+    pub fn add_vertex(&mut self, vertex: Point3<f64>) {
         self.vertices.push(vertex);
         self.num_vertices += 1;
     }
@@ -719,7 +719,7 @@ impl Shape {
         self.num_faces += 1;
     }
 
-    pub fn transform(&mut self, transform: &Matrix4<f32>) -> Result<()> {
+    pub fn transform(&mut self, transform: &Matrix4<f64>) -> Result<()> {
         for face in &mut self.faces {
             // Iterate mutably
             face.transform(transform)?; // Call the in-place project method
@@ -833,25 +833,25 @@ impl Geom {
             .collect()
     }
 
-    pub fn transform(&mut self, transform: &Matrix4<f32>) -> Result<()> {
+    pub fn transform(&mut self, transform: &Matrix4<f64>) -> Result<()> {
         for shape in &mut self.shapes {
             shape.transform(transform)?;
         }
         Ok(())
     }
 
-    pub fn centre_of_mass(&self) -> Point3<f32> {
+    pub fn centre_of_mass(&self) -> Point3<f64> {
         let mut centre = Point3::origin();
 
         for shape in &self.shapes {
             centre += calculate_center_of_mass(&shape.vertices).coords;
         }
 
-        centre / self.num_shapes as f32
+        centre / self.num_shapes as f64
     }
 
     /// Returns the refractive outside a shape
-    pub fn n_out(&self, shape_id: usize, medium_refr_index: Complex<f32>) -> Complex<f32> {
+    pub fn n_out(&self, shape_id: usize, medium_refr_index: Complex<f64>) -> Complex<f64> {
         self.containment_graph
             .get_parent(shape_id)
             .map_or(medium_refr_index, |parent_id| {
@@ -859,9 +859,9 @@ impl Geom {
             })
     }
 
-    pub fn bounds(&self) -> (Point3<f32>, Point3<f32>) {
+    pub fn bounds(&self) -> (Point3<f64>, Point3<f64>) {
         let (min, max) = self.shapes.iter().fold(
-            ([f32::INFINITY; 3], [-f32::INFINITY; 3]),
+            ([f64::INFINITY; 3], [-f64::INFINITY; 3]),
             |(min_acc, max_acc), shape| {
                 let aabb = shape.aabb.as_ref().unwrap();
                 (
@@ -884,9 +884,9 @@ impl Geom {
 
     /// Rescales the geometry so that the largest dimension is 1. Returns the
     /// scaling factor.
-    pub fn rescale(&mut self) -> f32 {
+    pub fn rescale(&mut self) -> f64 {
         let bounds = self.bounds();
-        let max_dim = bounds.1.iter().fold(0.0, |acc: f32, &x| acc.max(x));
+        let max_dim = bounds.1.iter().fold(0.0, |acc: f64, &x| acc.max(x));
         let scale = 1.0 / max_dim;
 
         for shape in self.shapes.iter_mut() {
@@ -936,7 +936,7 @@ impl Geom {
 
     /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in radians)
     /// Uses Mishchenko's Euler rotation matrix convention.
-    pub fn euler_rotate(&mut self, alpha: f32, beta: f32, gamma: f32) -> Result<()> {
+    pub fn euler_rotate(&mut self, alpha: f64, beta: f64, gamma: f64) -> Result<()> {
         if !self.is_centered() {
             return Err(anyhow::anyhow!(
                 "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
@@ -1000,17 +1000,17 @@ impl Geom {
 /// This is done by averaging the coordinates of all vertices.
 /// This is not a true center of mass calculation, but it is sufficient for
 /// most purposes in this application.
-pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
+pub fn calculate_center_of_mass(verts: &[Point3<f64>]) -> Point3<f64> {
     Point3::from(
         verts
             .iter()
             .map(|vert| vert.coords)
             .fold(Vector3::zeros(), |acc, coords| acc + coords)
-            / verts.len() as f32,
+            / verts.len() as f64,
     )
 }
 
-pub fn translate(verts: &[Point3<f32>], center_of_mass: &Point3<f32>) -> Vec<Vector3<f32>> {
+pub fn translate(verts: &[Point3<f64>], center_of_mass: &Point3<f64>) -> Vec<Vector3<f64>> {
     verts
         .iter()
         .map(|point| point.coords - center_of_mass.coords)

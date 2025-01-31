@@ -10,7 +10,7 @@ use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
 use std::fmt;
 
-const AREA_THRESHOLD: f32 = 1e-2;
+const AREA_THRESHOLD: f64 = 1e-2;
 
 #[cfg(test)]
 mod tests {
@@ -60,22 +60,22 @@ mod tests {
     }
 }
 trait Point3Extensions {
-    fn ray_cast_z(&self, plane: &Plane) -> f32;
+    fn ray_cast_z(&self, plane: &Plane) -> f64;
 }
 
-impl Point3Extensions for Point3<f32> {
+impl Point3Extensions for Point3<f64> {
     /// Returns the ray-cast distance along the -z axis from a point to its intersection with a plane in 3D
-    fn ray_cast_z(&self, plane: &Plane) -> f32 {
+    fn ray_cast_z(&self, plane: &Plane) -> f64 {
         -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
             - self.z
     }
 }
 trait Coord3Extensions {
-    fn projected_z(&self, plane: &Plane) -> f32;
+    fn projected_z(&self, plane: &Plane) -> f64;
 }
-impl Coord3Extensions for Coord<f32> {
+impl Coord3Extensions for Coord<f64> {
     /// Returns the z-coordinate of a `Coord` projected onto a plane in 3D
-    fn projected_z(&self, plane: &Plane) -> f32 {
+    fn projected_z(&self, plane: &Plane) -> f64 {
         -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
     }
 }
@@ -84,7 +84,7 @@ trait PolygonExtensions {
     fn project(&self, plane: &Plane) -> Result<Face>;
 }
 
-impl PolygonExtensions for Polygon<f32> {
+impl PolygonExtensions for Polygon<f64> {
     /// Projects the xy coordinates of a polygon onto a plane in 3D
     ///  the last vertex, which is a duplicate of the first
     fn project(&self, plane: &Plane) -> Result<Face> {
@@ -94,7 +94,7 @@ impl PolygonExtensions for Polygon<f32> {
         // assuming the initial planes were correctly oriented
         let reverse = if plane.normal.z < 0.0 { true } else { false };
 
-        let project_coords = |coords: &Vec<Coord<f32>>| -> Vec<Point3<f32>> {
+        let project_coords = |coords: &Vec<Coord<f64>>| -> Vec<Point3<f64>> {
             coords
                 .iter()
                 .take(coords.len() - 1)
@@ -131,11 +131,11 @@ impl PolygonExtensions for Polygon<f32> {
 /// Statistics for a `Clipping` object.
 #[derive(Debug, PartialEq, Clone, Default)] // Added Default derive
 pub struct Stats {
-    pub clipping_area: f32,     // the total input clipping area
-    pub intersection_area: f32, // the total intersection area
-    pub remaining_area: f32,    // the total remaining area
-    pub consvtn: f32,           // the ratio of intersection to clipping area
-    pub total_consvtn: f32,     // the ratio of (intersection + remaining) to clipping area
+    pub clipping_area: f64,     // the total input clipping area
+    pub intersection_area: f64, // the total intersection area
+    pub remaining_area: f64,    // the total remaining area
+    pub consvtn: f64,           // the ratio of intersection to clipping area
+    pub total_consvtn: f64,     // the ratio of (intersection + remaining) to clipping area
 }
 
 impl Stats {
@@ -188,11 +188,11 @@ impl fmt::Display for Stats {
 pub struct Clipping<'a> {
     pub geom: &'a mut Geom,       // a geometry holding subjects to clip against
     pub clip: &'a mut Face,       // a clipping face
-    pub proj: &'a Vector3<f32>,   // a projection vector
+    pub proj: &'a Vector3<f64>,   // a projection vector
     pub intersections: Vec<Face>, // a list of intersection faces
     pub remaining: Vec<Face>,     // a list of remaining clips
-    transform: Matrix4<f32>,      // a transform matrix to the clipping system
-    itransform: Matrix4<f32>,     // a transform matrix from the clipping system
+    transform: Matrix4<f64>,      // a transform matrix to the clipping system
+    itransform: Matrix4<f64>,     // a transform matrix from the clipping system
     is_done: bool,                // whether or not the clipping has been computed
     pub stats: Option<Stats>,     // statistics about the clipping result
 }
@@ -200,7 +200,7 @@ pub struct Clipping<'a> {
 impl<'a> Clipping<'a> {
     /// A new clipping object.
     /// If `clip` exists inside `geom`, it is ommitted from the subjects.
-    pub fn new(geom: &'a mut Geom, clip: &'a mut Face, proj: &'a Vector3<f32>) -> Self {
+    pub fn new(geom: &'a mut Geom, clip: &'a mut Face, proj: &'a Vector3<f64>) -> Self {
         let mut clipping = Self {
             geom,
             clip,
@@ -223,7 +223,7 @@ impl<'a> Clipping<'a> {
         let origin = Point3::origin(); // camera location
         let target = Point3::new(self.proj.x, self.proj.y, self.proj.z); // projection direction, defines negative z-axis in new coords
 
-        let up: Vector3<f32> =
+        let up: Vector3<f64> =
             if self.proj.cross(&Vector3::y()).norm() < settings::COLINEAR_THRESHOLD {
                 Vector3::x()
             } else {
