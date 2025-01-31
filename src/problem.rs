@@ -1,5 +1,5 @@
 use crate::{
-    beam::{Beam, BeamPropagation, BeamType, BeamVariant}, bins, field::Field, geom::{Face, Geom}, helpers::draw_face, orientation::{self, Orientations}, output, settings::{self, Settings}
+    beam::{Beam, BeamPropagation, BeamType, BeamVariant}, bins, field::Field, geom::{Face, Geom}, helpers::draw_face, orientation::Orientations, output, settings::{self, Settings}
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -212,7 +212,6 @@ impl Problem {
 
         let ampl_far_field = queue
             .par_iter()
-            .take(1)
             .map(|outbeam| {
                 let outbeam_power = outbeam.power();
                 pb.inc(1);

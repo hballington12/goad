@@ -17,9 +17,12 @@ pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
 /// Distance to far-field. 1e3 - 1e5 is a good range for single precision arithmetic.
 pub const RADIUS: f32 = 1e4;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
-pub const DIFF_EPSILON: f32 = 1e-6;
+pub const DIFF_EPSILON: f32 = 1e-3;
+/// Minimum dx or dy
+pub const DIFF_DMIN: f32 = 1e-5;
+pub const KXY_EPSILON: f32 = 1e-3;
 /// Small perturbation for propagation distance to reduce errors in diffraction
-pub const PROP_PERTURBATION: f32 = 1e-8;
+pub const PROP_PERTURBATION: f32 = 1e-5;
 
 /// Runtime configuration for the application.
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq)]

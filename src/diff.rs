@@ -83,7 +83,7 @@ pub fn diffraction(
         let fraunhofer = &mut area_facs2[index];
         let mut fraunhofer_sum = Complex::new(0.0, 0.0); // Example, modify as needed
 
-        for (j, vertex) in v1.rows().into_iter().take(1).enumerate() {
+        for (j, vertex) in v1.rows().into_iter().enumerate() {
             let mj = m[j];
             let nj = n[j];
             let xj = vertex[0];
@@ -101,13 +101,13 @@ pub fn diffraction(
             let dx = xj_plus1 - xj;
             let dy = yj_plus1 - yj;
 
-            let dx = if dx.abs() < settings::DIFF_EPSILON {
-                settings::DIFF_EPSILON
+            let dx = if dx.abs() < settings::DIFF_DMIN {
+                settings::DIFF_DMIN
             } else {
                 dx
             };
-            let dy = if dy.abs() < settings::DIFF_EPSILON {
-                settings::DIFF_EPSILON
+            let dy = if dy.abs() < settings::DIFF_DMIN {
+                settings::DIFF_DMIN
             } else {
                 dy
             };
@@ -373,13 +373,13 @@ pub fn calculate_kxx_kyy(
     let kyy = kinc[1] - wavenumber.powi(2) * rotated_pos.y / bvsk;
 
     // numerical fix for kxx and kyy
-    let kxx = if kxx.abs() < settings::DIFF_EPSILON {
-        settings::DIFF_EPSILON
+    let kxx = if kxx.abs() < settings::KXY_EPSILON {
+        settings::KXY_EPSILON
     } else {
         kxx
     };
-    let kyy = if kyy.abs() < settings::DIFF_EPSILON {
-        settings::DIFF_EPSILON
+    let kyy = if kyy.abs() < settings::KXY_EPSILON {
+        settings::KXY_EPSILON
     } else {
         kyy
     };
