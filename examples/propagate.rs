@@ -31,10 +31,18 @@ async fn main() {
     // geom.shapes[0].refr_index.im = 1e-3;
     // geom.shapes[1].refr_index.re = 2.0;
     // geom.shapes[2].refr_index.re = 2.5;
+    let wavelength = 0.532;
 
     let mut problem = Problem::new_with_field(
         geom,
-        Beam::new_initial(clip, projection, Complex::new(1.00, 0.0), e_perp).unwrap(),
+        Beam::new_initial(
+            clip,
+            projection,
+            Complex::new(1.00, 0.0),
+            e_perp,
+            wavelength,
+        )
+        .unwrap(),
     );
 
     println!(

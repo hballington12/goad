@@ -951,7 +951,6 @@ dependencies = [
  "nalgebra",
  "ndarray",
  "num-complex",
- "once_cell",
  "rayon",
  "serde",
  "tobj",
