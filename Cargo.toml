@@ -5,12 +5,16 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.95"
+clap = {version = "4.5.27", features = ["derive"] }
+config = "0.15.7"
 geo = "0.29.3"
 geo-clipper = "0.8.0"
 geo-types = "0.7.14"
 indicatif = "0.17.9"
 macroquad = "0.4.13"
-nalgebra = "0.33.2"
+nalgebra = { version = "0.33.2", features = ["serde"] }
 ndarray = "0.16.1"
+num-complex = { version = "0.4.6", features = ["serde"] }
 rayon = "1.10.0"
+serde = { version = "1.0.217", features = ["derive"]}
 tobj = "4.0.2"

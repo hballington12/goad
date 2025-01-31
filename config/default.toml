@@ -1,0 +1,14 @@
+wavelength = 0.532
+medium_refr_index =[1.0,0.0]
+vertex_merge_distance = 0.01
+beam_power_threshold = 0.1
+clip_tolerance = 0.001
+colinear_threshold = 0.001
+vec_length_threshold = 1.0
+raycast_minimum_distance = 0.0
+total_power_cutoff = 1.0
+max_rec = 10
+max_tir = 5
+radius = 1.0
+diff_epsilon = 0.0001
+far_field_resolution = 100

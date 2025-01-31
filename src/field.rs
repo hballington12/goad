@@ -1,5 +1,5 @@
 #[cfg(debug_assertions)]
-use crate::config;
+use crate::settings;
 
 use anyhow::Result;
 use std::fmt::Debug;
@@ -16,7 +16,7 @@ mod tests {
         let e_perp = Vector3::x();
         let prop = Vector3::z();
         let field = Field::new_identity(e_perp, prop).unwrap();
-        assert!((field.intensity() - 1.0).abs() < config::COLINEAR_THRESHOLD);
+        assert!((field.intensity() - 1.0).abs() < settings::COLINEAR_THRESHOLD);
     }
 
     #[test]
@@ -25,7 +25,7 @@ mod tests {
         let prop = Vector3::z();
         let mut field = Field::new_identity(e_perp, prop).unwrap();
         field.ampl *= Complex::ZERO;
-        assert!((field.intensity()).abs() < config::COLINEAR_THRESHOLD);
+        assert!((field.intensity()).abs() < settings::COLINEAR_THRESHOLD);
     }
 }
 
@@ -43,12 +43,12 @@ impl Field {
         #[cfg(debug_assertions)]
         {
             let norm_e_perp_diff = e_perp.norm() - 1.0;
-            if norm_e_perp_diff.abs() >= config::COLINEAR_THRESHOLD {
+            if norm_e_perp_diff.abs() >= settings::COLINEAR_THRESHOLD {
                 return Err(anyhow::anyhow!("e-perp is not normalised: {:?}", e_perp));
             }
 
             let norm_prop_diff = prop.norm() - 1.0;
-            if norm_prop_diff.abs() >= config::COLINEAR_THRESHOLD {
+            if norm_prop_diff.abs() >= settings::COLINEAR_THRESHOLD {
                 return Err(anyhow::anyhow!(
                     "propagation vector is not normalised: {:?}",
                     prop
@@ -56,7 +56,7 @@ impl Field {
             }
 
             let dot_product = e_perp.dot(&prop);
-            if dot_product.abs() >= config::COLINEAR_THRESHOLD {
+            if dot_product.abs() >= settings::COLINEAR_THRESHOLD {
                 return Err(anyhow::anyhow!(
                 "e-perp and propagation vector are not perpendicular, e_perp is: {:?}, prop is: {:?}, dot product is: {:?}",
                 e_perp,
@@ -85,12 +85,12 @@ impl Field {
         #[cfg(debug_assertions)]
         {
             let norm_e_perp_diff = e_perp.norm() - 1.0;
-            if norm_e_perp_diff.abs() >= config::COLINEAR_THRESHOLD {
+            if norm_e_perp_diff.abs() >= settings::COLINEAR_THRESHOLD {
                 return Err(anyhow::anyhow!("e-perp is not normalised: {:?}", e_perp));
             }
 
             let norm_prop_diff = prop.norm() - 1.0;
-            if norm_prop_diff.abs() >= config::COLINEAR_THRESHOLD {
+            if norm_prop_diff.abs() >= settings::COLINEAR_THRESHOLD {
                 return Err(anyhow::anyhow!(
                     "propagation vector is not normalised: {:?}",
                     prop
@@ -98,7 +98,7 @@ impl Field {
             }
 
             let dot_product = e_perp.dot(&prop);
-            if dot_product.abs() >= config::COLINEAR_THRESHOLD {
+            if dot_product.abs() >= settings::COLINEAR_THRESHOLD {
                 return Err(anyhow::anyhow!(
                 "e-perp and propagation vector are not perpendicular, e_perp is: {:?}, prop is: {:?}, dot product is: {:?}",
                 e_perp,

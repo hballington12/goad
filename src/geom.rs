@@ -1,6 +1,6 @@
-use crate::config;
 use crate::containment::ContainmentGraph;
 use crate::containment::AABB;
+use crate::settings;
 use anyhow::Result;
 use geo::Area;
 use geo_types::Coord;
@@ -252,7 +252,7 @@ impl FaceData {
         let mut v2 = None;
         for i in 0..vertices.len() {
             for j in (i + 1)..vertices.len() {
-                if (vertices[j] - vertices[i]).magnitude() > config::VEC_LENGTH_THRESHOLD {
+                if (vertices[j] - vertices[i]).magnitude() > settings::VEC_LENGTH_THRESHOLD {
                     v1 = Some(&vertices[i]);
                     v2 = Some(&vertices[j]);
                     break;
@@ -813,7 +813,7 @@ impl Geom {
     pub fn n_out(&self, shape_id: usize) -> Complex<f32> {
         self.containment_graph
             .get_parent(shape_id)
-            .map_or(config::MEDIUM_REFR_INDEX, |parent_id| {
+            .map_or(settings::MEDIUM_REFR_INDEX, |parent_id| {
                 self.shapes[parent_id].refr_index
             })
     }

@@ -9,7 +9,6 @@ use nalgebra::Point3;
 use nalgebra::Vector3;
 
 use crate::clip::Clipping;
-use crate::config;
 use crate::diff;
 use crate::field::Field;
 use crate::fresnel;
@@ -17,6 +16,7 @@ use crate::geom::Face;
 use crate::geom::Geom;
 use crate::helpers::draw_face;
 use crate::helpers::lines_to_screen;
+use crate::settings;
 use crate::snell::get_theta_t;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -255,7 +255,7 @@ pub fn get_refraction_vector(
     theta_i: f32,
     theta_t: f32,
 ) -> Vector3<f32> {
-    if theta_t.sin() < config::COLINEAR_THRESHOLD {
+    if theta_t.sin() < settings::COLINEAR_THRESHOLD {
         return *prop;
     }
     // upward facing normal
@@ -273,7 +273,7 @@ pub fn get_refraction_vector(
 
     result.normalize_mut();
 
-    debug_assert!((theta_t.cos() - result.dot(&norm).abs()).abs() < config::COLINEAR_THRESHOLD);
+    debug_assert!((theta_t.cos() - result.dot(&norm).abs()).abs() < settings::COLINEAR_THRESHOLD);
 
     result
 }
@@ -288,7 +288,7 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
     let cti = n.dot(&prop); // cos theta_i
     let mut result = prop - 2.0 * cti * n;
     result.normalize_mut();
-    assert!((result.dot(&n) - cti) < config::COLINEAR_THRESHOLD);
+    assert!((result.dot(&n) - cti) < settings::COLINEAR_THRESHOLD);
     result
 }
 
@@ -309,16 +309,16 @@ fn get_ampl(
         return Err(anyhow::anyhow!("distance less than 0: {}", dist));
     }
 
-    let arg = dist * config::WAVENUMBER * n1.re; // optical path length
+    let arg = dist * settings::WAVENUMBER * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
 
     let absorbed_intensity = Field::ampl_intensity(&ampl)
         * (1.0
-            - (-2.0 * config::WAVENUMBER * n1.im * dist.sqrt())
+            - (-2.0 * settings::WAVENUMBER * n1.im * dist.sqrt())
                 .exp()
                 .powi(2));
 
-    let exp_absorption = (-2.0 * config::WAVENUMBER * n1.im * dist.sqrt()).exp(); // absorption
+    let exp_absorption = (-2.0 * settings::WAVENUMBER * n1.im * dist.sqrt()).exp(); // absorption
 
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
 
@@ -334,7 +334,7 @@ fn get_rotation_matrix(beam: &Beam, e_perp: Vector3<f32>) -> Matrix2<Complex<f32
 
 /// Determines the new `e_perp` vector for an intersection at a `face``.
 fn get_e_perp(normal: Vector3<f32>, beam: &Beam) -> Vector3<f32> {
-    if normal.dot(&beam.prop).abs() > 1.0 - config::COLINEAR_THRESHOLD {
+    if normal.dot(&beam.prop).abs() > 1.0 - settings::COLINEAR_THRESHOLD {
         -beam.field.e_perp
     } else {
         normal.cross(&beam.prop).normalize() // new e_perp
@@ -365,7 +365,7 @@ fn create_reflected(
 ) -> Result<Option<Beam>> {
     let prop = get_reflection_vector(&normal, &beam.prop);
 
-    debug_assert!((prop.dot(&normal) - theta_i.cos()) < config::COLINEAR_THRESHOLD);
+    debug_assert!((prop.dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
     debug_assert!(!Field::ampl_intensity(&ampl).is_nan());
 
     if theta_i > (n2.re / n1.re).asin() {
@@ -423,7 +423,9 @@ fn create_refracted(
         let refr_ampl = fresnel * ampl.clone();
 
         debug_assert!(beam.prop.dot(&prop) > 0.0);
-        debug_assert!((prop.dot(&normal).abs() - theta_t.cos()).abs() < config::COLINEAR_THRESHOLD);
+        debug_assert!(
+            (prop.dot(&normal).abs() - theta_t.cos()).abs() < settings::COLINEAR_THRESHOLD
+        );
 
         Ok(Some(Beam::new(
             face.clone(),
@@ -443,7 +445,7 @@ fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
     // remove intersections with below threshold area
     faces
         .into_iter()
-        .filter(|x| x.data().area.unwrap() > config::BEAM_AREA_THRESHOLD)
+        .filter(|x| x.data().area.unwrap() > settings::BEAM_AREA_THRESHOLD)
         .collect()
 }
 
@@ -459,7 +461,7 @@ impl Beam {
             .into_iter()
             .filter_map(|remainder| {
                 let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
-                let arg = dist * config::WAVENUMBER * config::MEDIUM_REFR_INDEX.re;
+                let arg = dist * settings::WAVENUMBER * settings::MEDIUM_REFR_INDEX.re;
                 // let arg: f32 = 0.0;
                 let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
                 Some(Beam::new(

@@ -1,5 +1,5 @@
-use super::config;
 use super::geom::{Face, Geom, Plane};
+use super::settings;
 use anyhow::Result;
 use geo::{Area, Simplify};
 use geo_clipper::Clipper;
@@ -223,12 +223,12 @@ impl<'a> Clipping<'a> {
         let origin = Point3::origin(); // camera location
         let target = Point3::new(self.proj.x, self.proj.y, self.proj.z); // projection direction, defines negative z-axis in new coords
 
-        let up: Vector3<f32> = if self.proj.cross(&Vector3::y()).norm() < config::COLINEAR_THRESHOLD
-        {
-            Vector3::x()
-        } else {
-            Vector3::y()
-        };
+        let up: Vector3<f32> =
+            if self.proj.cross(&Vector3::y()).norm() < settings::COLINEAR_THRESHOLD {
+                Vector3::x()
+            } else {
+                Vector3::y()
+            };
 
         let view = Isometry3::look_at_rh(&origin, &target, &up);
 
@@ -354,12 +354,12 @@ pub fn clip_faces<'a>(
 
         for clip in &remaining_clips {
             let mut intersection = Simplify::simplify(
-                &subject_poly.intersection(clip, config::CLIP_TOLERANCE),
-                &config::VERTEX_MERGE_DISTANCE,
+                &subject_poly.intersection(clip, settings::CLIP_TOLERANCE),
+                &settings::VERTEX_MERGE_DISTANCE,
             );
             let mut difference = Simplify::simplify(
-                &clip.difference(&subject_poly, config::CLIP_TOLERANCE),
-                &config::VERTEX_MERGE_DISTANCE,
+                &clip.difference(&subject_poly, settings::CLIP_TOLERANCE),
+                &settings::VERTEX_MERGE_DISTANCE,
             );
 
             // Retain only meaningful intersections and differences.
@@ -377,7 +377,7 @@ pub fn clip_faces<'a>(
 
                 // cast a ray to determine if the intersection was in front
                 if face.data().midpoint.ray_cast_z(&clip_in.plane())
-                    > config::RAYCAST_MINIMUM_DISTANCE
+                    > settings::RAYCAST_MINIMUM_DISTANCE
                 {
                     face.data_mut().shape_id = subject.data().shape_id;
                     intersections.push(face);

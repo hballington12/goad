@@ -1,16 +1,16 @@
 use ndarray::Array1;
 
-use crate::config;
+use crate::settings;
 
 /// Generate theta and phi combinations
 pub fn generate_theta_phi_combinations() -> Vec<(f32, f32)> {
-    let thetas = Array1::linspace(0.0, std::f32::consts::PI, config::FAR_FIELD_RESOLUTION)
+    let thetas = Array1::linspace(0.0, std::f32::consts::PI, settings::FAR_FIELD_RESOLUTION)
         .insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
 
     let phis = Array1::linspace(
         0.0,
         2.0 * std::f32::consts::PI,
-        config::FAR_FIELD_RESOLUTION,
+        settings::FAR_FIELD_RESOLUTION,
     )
     .insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
 

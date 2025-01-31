@@ -3,7 +3,7 @@ use ndarray::Array2;
 use std::f32::consts::PI;
 
 use crate::field::Field;
-use crate::{config, geom};
+use crate::{geom, settings};
 
 // Diffraction. Face must be convex.
 pub fn diffraction(
@@ -29,18 +29,18 @@ pub fn diffraction(
         let cos_phi = phi.cos();
 
         // Calculate pos (xfar, yfar, zfar) for the current (theta, phi)
-        let r_sin_theta = config::RADIUS * sin_theta;
+        let r_sin_theta = settings::RADIUS * sin_theta;
         let rotated_pos = rot3
             * (Vector3::new(
                 r_sin_theta * cos_phi,
                 r_sin_theta * sin_phi,
-                -config::RADIUS * cos_theta,
+                -settings::RADIUS * cos_theta,
             ) - center_of_mass.coords);
 
         // Calculate distance to bins and bin unit vectors
         let bvs = rotated_pos.norm();
         let k = rotated_pos / bvs;
-        let bvsk = bvs * config::WAVENUMBER;
+        let bvsk = bvs * settings::WAVENUMBER;
         let ampl_far_field = &mut ampl_cs[index];
 
         let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
@@ -64,7 +64,7 @@ pub fn diffraction(
             v1[[i, 2]] = transformed_vertex.z;
         }
 
-        let kinc = prop2 * config::WAVENUMBER;
+        let kinc = prop2 * settings::WAVENUMBER;
         let x: Vec<f32> = v1.column(0).iter().cloned().collect();
         let y: Vec<f32> = v1.column(1).iter().cloned().collect();
         let m: Vec<f32> = (0..nv)
@@ -99,13 +99,13 @@ pub fn diffraction(
             let dx = xj_plus1 - xj;
             let dy = yj_plus1 - yj;
 
-            let dx = if dx.abs() < config::DIFF_EPSILON {
-                config::DIFF_EPSILON
+            let dx = if dx.abs() < settings::DIFF_EPSILON {
+                settings::DIFF_EPSILON
             } else {
                 dx
             };
-            let dy = if dy.abs() < config::DIFF_EPSILON {
-                config::DIFF_EPSILON
+            let dy = if dy.abs() < settings::DIFF_EPSILON {
+                settings::DIFF_EPSILON
             } else {
                 dy
             };
@@ -167,14 +167,14 @@ fn init_diff(
     // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
     let prop = (prop
         + Vector3::new(
-            config::DIFF_EPSILON,
-            config::DIFF_EPSILON,
-            config::DIFF_EPSILON,
+            settings::DIFF_EPSILON,
+            settings::DIFF_EPSILON,
+            settings::DIFF_EPSILON,
         ))
     .normalize();
 
     // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
-    *ampl *= Complex::new(config::WAVENUMBER, 0.0); // // TODO add this back in
+    *ampl *= Complex::new(settings::WAVENUMBER, 0.0); // // TODO add this back in
 
     // 1. Compute the center of mass
     let center_of_mass = geom::calculate_center_of_mass(verts);
@@ -195,7 +195,7 @@ fn init_diff(
     let e_par2 = perp2.cross(&prop2).normalize();
 
     // 5. Update amplitude based on anti-parallel condition
-    if e_par2.z > config::COLINEAR_THRESHOLD {
+    if e_par2.z > settings::COLINEAR_THRESHOLD {
         *ampl = -*ampl;
     }
     (center_of_mass, relative_vertices, rot3, prop2)
@@ -205,7 +205,7 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     let a1 = verts[0];
     let b1 = verts[1];
 
-    let theta1 = if a1.y.abs() > config::COLINEAR_THRESHOLD {
+    let theta1 = if a1.y.abs() > settings::COLINEAR_THRESHOLD {
         (a1[0] / a1[1]).atan()
     } else {
         PI / 4.0
@@ -226,7 +226,7 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     let a2 = rot1 * a1;
     let b2 = rot1 * b1;
 
-    let theta2 = if a2.y.abs() > config::COLINEAR_THRESHOLD {
+    let theta2 = if a2.y.abs() > settings::COLINEAR_THRESHOLD {
         -(a2[2] / a2[1]).atan()
     } else {
         -PI / 4.0
@@ -247,7 +247,7 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     let a3 = rot2 * a2;
     let b3 = rot2 * b2;
 
-    let theta3 = if b3.x.abs() > config::COLINEAR_THRESHOLD {
+    let theta3 = if b3.x.abs() > settings::COLINEAR_THRESHOLD {
         (b3[2] / b3[0]).atan()
     } else {
         PI / 4.0
@@ -291,8 +291,8 @@ pub fn karczewski(
 
     // Perpendicular field direction
     let sqrt_1_minus_k2y2 = (1.0 - bvk.y.powi(2)).sqrt();
-    let sqrt_1_minus_k2y2 = if sqrt_1_minus_k2y2.abs() < config::DIFF_EPSILON {
-        config::DIFF_EPSILON
+    let sqrt_1_minus_k2y2 = if sqrt_1_minus_k2y2.abs() < settings::DIFF_EPSILON {
+        settings::DIFF_EPSILON
     } else {
         sqrt_1_minus_k2y2
     };
@@ -307,8 +307,8 @@ pub fn karczewski(
 
     // Pre-calculate factor
     let frac = ((1.0 - bvk.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
-    let frac = if frac.abs() < config::DIFF_EPSILON {
-        config::DIFF_EPSILON
+    let frac = if frac.abs() < settings::DIFF_EPSILON {
+        settings::DIFF_EPSILON
     } else {
         frac
     };
@@ -365,22 +365,22 @@ pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
 }
 
 pub fn calculate_bvsk(rotated_pos: &Vector3<f32>) -> f32 {
-    config::WAVENUMBER
+    settings::WAVENUMBER
         * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
 }
 
 pub fn calculate_kxx_kyy(kinc: &[f32; 2], rotated_pos: &Vector3<f32>, bvsk: f32) -> (f32, f32) {
-    let kxx = kinc[0] - config::WAVENUMBER.powi(2) * rotated_pos.x / bvsk;
-    let kyy = kinc[1] - config::WAVENUMBER.powi(2) * rotated_pos.y / bvsk;
+    let kxx = kinc[0] - settings::WAVENUMBER.powi(2) * rotated_pos.x / bvsk;
+    let kyy = kinc[1] - settings::WAVENUMBER.powi(2) * rotated_pos.y / bvsk;
 
     // numerical fix for kxx and kyy
-    let kxx = if kxx.abs() < config::DIFF_EPSILON {
-        config::DIFF_EPSILON
+    let kxx = if kxx.abs() < settings::DIFF_EPSILON {
+        settings::DIFF_EPSILON
     } else {
         kxx
     };
-    let kyy = if kyy.abs() < config::DIFF_EPSILON {
-        config::DIFF_EPSILON
+    let kyy = if kyy.abs() < settings::DIFF_EPSILON {
+        settings::DIFF_EPSILON
     } else {
         kyy
     };
@@ -421,5 +421,5 @@ pub fn calculate_summand(
         + beta * (delta.sin() - (delta + omega2).sin());
 
     Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
-        / Complex::new(config::WAVELENGTH, 0.0)
+        / Complex::new(settings::WAVELENGTH, 0.0)
 }

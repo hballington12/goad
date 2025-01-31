@@ -1,16 +1,18 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins, config,
+    bins,
     field::Field,
     geom::{Face, Geom},
     helpers::draw_face,
     output,
+    settings::{self, Settings},
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use rayon::prelude::*;
 use std::fmt;
 
+use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 #[cfg(test)]
@@ -103,11 +105,17 @@ pub struct Problem {
     pub powers: Powers,                   // different power contributions
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
     pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
+    pub settings: Settings,               // runtime settings
 }
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom) -> Self {
+        let mut settings = settings::load_config();
+        // let args = settings::CliArgs::parse();
+
+        println!("Settings: {:#?}", settings);
+
         let theta_phi_combinations = bins::generate_theta_phi_combinations();
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
@@ -126,6 +134,7 @@ impl Problem {
             powers: Powers::new(),
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
+            settings,
         };
 
         problem
@@ -133,6 +142,9 @@ impl Problem {
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
+        let mut settings = settings::load_config();
+        // let args = settings::CliArgs::parse();
+
         let theta_phi_combinations = bins::generate_theta_phi_combinations();
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
@@ -145,6 +157,7 @@ impl Problem {
             powers: Powers::new(),
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
+            settings,
         }
     }
 
@@ -238,7 +251,7 @@ impl Problem {
                 break;
             }
 
-            if self.powers.output / self.powers.input > config::TOTAL_POWER_CUTOFF {
+            if self.powers.output / self.powers.input > settings::TOTAL_POWER_CUTOFF {
                 println!("cut off power out reached...");
                 break;
             }
@@ -261,17 +274,17 @@ impl Problem {
         let outputs = match &mut beam.type_ {
             BeamType::Default => {
                 // truncation conditions
-                if beam.power() < config::BEAM_POWER_THRESHOLD {
+                if beam.power() < settings::BEAM_POWER_THRESHOLD {
                     self.powers.trnc_energy += beam.power();
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
-                    if beam.tir_count > config::MAX_TIR {
+                    if beam.tir_count > settings::MAX_TIR {
                         self.powers.trnc_ref += beam.power();
                         Vec::new()
                     } else {
                         beam.propagate(&mut self.geom)
                     }
-                } else if beam.rec_count > config::MAX_REC {
+                } else if beam.rec_count > settings::MAX_REC {
                     self.powers.trnc_rec += beam.power();
                     Vec::new()
                 } else {
@@ -386,9 +399,9 @@ fn basic_initial_beam(geom: &Geom) -> Beam {
 
     // propagate field backwards so its as if the beam comes from z=0
     let dist = bounds.1[2];
-    let arg = -dist * config::WAVENUMBER * config::MEDIUM_REFR_INDEX.re;
+    let arg = -dist * settings::WAVENUMBER * settings::MEDIUM_REFR_INDEX.re;
     field.ampl *= Complex::new(arg.cos(), arg.sin());
 
-    let beam = Beam::new_from_field(clip, -Vector3::z(), config::MEDIUM_REFR_INDEX, field);
+    let beam = Beam::new_from_field(clip, -Vector3::z(), settings::MEDIUM_REFR_INDEX, field);
     beam
 }
