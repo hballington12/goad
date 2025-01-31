@@ -188,7 +188,7 @@ fn init_diff(
     let center_of_mass = geom::calculate_center_of_mass(verts);
 
     // 2. Transform vertices relative to the center of mass
-    let relative_vertices = geom::transform_to_center_of_mass(verts, &center_of_mass);
+    let relative_vertices = geom::translate(verts, &center_of_mass);
 
     // 3. Compute rotation matrices
     let rot1 = get_rotation_matrix2(&relative_vertices);

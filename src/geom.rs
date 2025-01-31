@@ -36,6 +36,32 @@ mod tests {
     }
 
     #[test]
+    fn test_com() {
+        let geom = Geom::from_file("./examples/data/hex.obj").unwrap();
+        let com = geom.centre_of_mass();
+        println!("{:?}", com);
+        assert!(com.coords.norm() < 1e-6);
+
+        let geom = Geom::from_file("./examples/data/multiple2.obj").unwrap();
+        let com = geom.centre_of_mass();
+        println!("{:?}", com);
+        assert!(com.coords.norm() < 1e-6);
+
+        let geom = Geom::from_file("./examples/data/multiple3.obj").unwrap();
+        let com = geom.centre_of_mass();
+        println!("{:?}", com);
+        assert!(com.coords.norm() - 5.0 < 1e-6);
+        assert!(com.y.abs() - 5.0 < 1e-6);
+        assert!(com.z.abs() < 1e-6);
+
+        let mut recentred = geom.clone();
+        recentred.recentre();
+        let com = recentred.centre_of_mass();
+        println!("{:?}", com);
+        assert!(com.coords.norm() < 1e-6);
+    }
+
+    #[test]
     fn load_hex_shape() {
         let shape = &Geom::from_file("./examples/data/hex.obj").unwrap().shapes[0];
         assert_eq!(shape.num_faces, 8);
@@ -809,6 +835,16 @@ impl Geom {
         Ok(())
     }
 
+    pub fn centre_of_mass(&self) -> Point3<f32> {
+        let mut centre = Point3::origin();
+
+        for shape in &self.shapes {
+            centre += calculate_center_of_mass(&shape.vertices).coords;
+        }
+
+        centre / self.num_shapes as f32
+    }
+
     /// Returns the refractive outside a shape
     pub fn n_out(&self, shape_id: usize, medium_refr_index: Complex<f32>) -> Complex<f32> {
         self.containment_graph
@@ -854,8 +890,46 @@ impl Geom {
 
         scale
     }
+
+    /// Recentres the geometry so that the centre of mass is at the origin.
+    /// This is done by translating all vertices in each shape and all copies of
+    /// these vertices in the faces.
+    pub fn recentre(&mut self) {
+        let com = self.centre_of_mass();
+
+        for shape in self.shapes.iter_mut() {
+            for vertex in shape.vertices.iter_mut() {
+                vertex.coords -= com.coords;
+            }
+
+            for face in shape.faces.iter_mut() {
+                match face {
+                    Face::Simple(data) => {
+                        for vertex in data.exterior.iter_mut() {
+                            vertex.coords -= com.coords;
+                        }
+                    }
+                    Face::Complex { data, interiors } => {
+                        for vertex in data.exterior.iter_mut() {
+                            vertex.coords -= com.coords;
+                        }
+
+                        for interior in interiors.iter_mut() {
+                            for vertex in interior.iter_mut() {
+                                vertex.coords -= com.coords;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
+/// Calculates, rather inaccurately, the center of mass of a set of vertices.
+/// This is done by averaging the coordinates of all vertices.
+/// This is not a true center of mass calculation, but it is sufficient for
+/// most purposes in this application.
 pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
     Point3::from(
         verts
@@ -866,10 +940,7 @@ pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
     )
 }
 
-pub fn transform_to_center_of_mass(
-    verts: &[Point3<f32>],
-    center_of_mass: &Point3<f32>,
-) -> Vec<Vector3<f32>> {
+pub fn translate(verts: &[Point3<f32>], center_of_mass: &Point3<f32>) -> Vec<Vector3<f32>> {
     verts
         .iter()
         .map(|point| point.coords - center_of_mass.coords)

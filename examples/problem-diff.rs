@@ -2,7 +2,7 @@ use pbt::geom::{self};
 use pbt::problem::Problem;
 
 fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/8col.obj").unwrap();
 
     // geom.shapes[0].rescale(2.0);
 
