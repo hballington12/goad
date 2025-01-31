@@ -109,12 +109,13 @@ pub struct Problem {
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
     pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
     pub settings: Settings,               // runtime settings
+    scale_factor: f32, // scaling factor for geometry
 }
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom) -> Self {
-        let settings = settings::load_config();
+        let mut settings = settings::load_config();
 
         println!("Settings: {:#?}", settings);
 
@@ -126,9 +127,12 @@ impl Problem {
             vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
 
         // rescale geometry so the max dimension is 1
-        // let mut geom = geom.clone();
-        // let scaling_factor = geom.rescale();
-        // settings.wavelength = settings.wavelength / scaling_factor;
+        let mut geom = geom.clone();
+        geom.recentre();
+        let scale_factor = geom.rescale();
+        settings.wavelength = settings.wavelength * scale_factor;
+        settings.beam_power_threshold *= scale_factor.powi(2); // power scales with area
+        settings.beam_area_threshold_fac *= scale_factor.powi(2); // area scales with length^2
 
         let beam = basic_initial_beam(&geom, settings.wavelength, settings.medium_refr_index);
 
@@ -141,6 +145,7 @@ impl Problem {
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
             settings,
+            scale_factor
         };
 
         problem
@@ -166,6 +171,7 @@ impl Problem {
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
             settings,
+            scale_factor: 1.0,
         }
     }
 
@@ -283,14 +289,14 @@ impl Problem {
             BeamType::Default => {
                 // truncation conditions
                 if beam.power() < self.settings.beam_power_threshold {
-                    self.powers.trnc_energy += beam.power();
+                    self.powers.trnc_energy += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
-                    self.powers.trnc_area += beam.power();
+                    self.powers.trnc_area += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
                     if beam.tir_count > self.settings.max_tir {
-                        self.powers.trnc_ref += beam.power();
+                        self.powers.trnc_ref += beam.power() / self.scale_factor.powi(2);
                         Vec::new()
                     } else {
                         beam.propagate(
@@ -299,7 +305,7 @@ impl Problem {
                         )
                     }
                 } else if beam.rec_count > self.settings.max_rec {
-                    self.powers.trnc_rec += beam.power();
+                    self.powers.trnc_rec += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 } else {
                     beam.propagate(
@@ -318,12 +324,12 @@ impl Problem {
             }
         };
 
-        self.powers.absorbed += beam.absorbed_power;
-        self.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power();
+        self.powers.absorbed += beam.absorbed_power / self.scale_factor.powi(2);
+        self.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power() / self.scale_factor.powi(2);
 
         // Process each output beam
         for output in outputs.iter() {
-            let output_power = output.power();
+            let output_power = output.power() / self.scale_factor.powi(2);
             match (&beam.type_, &output.type_) {
                 (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
                 (BeamType::Default, BeamType::OutGoing) => {
@@ -358,7 +364,7 @@ impl Problem {
     /// Inserts a beam into the beam queue such that beams with greatest power
     /// are prioritised for dequeueing.
     pub fn insert_beam(&mut self, beam: Beam) {
-        let value = beam.power();
+        let value = beam.power() ;
 
         // Find the position to insert the beam using binary search
         let pos = self

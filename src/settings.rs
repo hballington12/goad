@@ -4,20 +4,20 @@ use nalgebra::Complex;
 use serde::Deserialize;
 use std::fmt;
 
-// /// Minimum distance for vertices to be considered the same.
+/// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.01;
-// /// Scaling factor for integer coordinates during clipping.
+/// Scaling factor for integer coordinates during clipping.
 pub const CLIP_TOLERANCE: f32 = 1e10;
-// /// Minimum absolute value of the dot product of two vectors to be considered colinear.
+/// Minimum absolute value of the dot product of two vectors to be considered colinear.
 pub const COLINEAR_THRESHOLD: f32 = 0.001;
-// /// Minimum vector length (in geometry units) to be considered non-degenerate.
+/// Minimum vector length (in geometry units) to be considered non-degenerate.
 pub const VEC_LENGTH_THRESHOLD: f32 = 0.01;
-// /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
+/// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
 pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
-// /// Distance to far-field. 1e3 - 1e5 is a good range for single precision arithmetic.
+/// Distance to far-field. 1e3 - 1e5 is a good range for single precision arithmetic.
 pub const RADIUS: f32 = 1e4;
-// /// Tolerance for diffraction computations, used to avoid divide by zero errors.
-pub const DIFF_EPSILON: f32 = 1e-4;
+/// Tolerance for diffraction computations, used to avoid divide by zero errors.
+pub const DIFF_EPSILON: f32 = 1e-5;
 
 /// Runtime configuration for the application.
 #[derive(Debug, Deserialize, PartialEq)]
