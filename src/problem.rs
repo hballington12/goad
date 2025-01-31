@@ -10,9 +10,8 @@ use crate::{
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use rayon::prelude::*;
-use std::{fmt, sync::Arc};
+use std::fmt;
 
-use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 #[cfg(test)]
@@ -115,8 +114,7 @@ pub struct Problem {
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom) -> Self {
-        let mut settings = settings::load_config();
-        // let args = settings::CliArgs::parse();
+        let settings = settings::load_config();
 
         println!("Settings: {:#?}", settings);
 
@@ -150,8 +148,7 @@ impl Problem {
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        let mut settings = settings::load_config();
-        // let args = settings::CliArgs::parse();
+        let  settings = settings::load_config();
 
         let theta_phi_combinations = bins::generate_theta_phi_combinations(
             settings.far_field_resolution,

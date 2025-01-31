@@ -2,9 +2,7 @@ use clap::Parser;
 use config::{Config, Environment, File};
 use nalgebra::Complex;
 use serde::Deserialize;
-use std::f32::consts::PI;
 use std::fmt;
-use std::sync::Mutex;
 
 // /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.01;
