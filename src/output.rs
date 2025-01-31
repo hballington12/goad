@@ -5,10 +5,28 @@ use nalgebra::{Complex, Matrix2};
 use ndarray::Array2;
 use std::io::Write;
 
-pub fn writeup(
+pub fn writeup(bins: &[(f32, f32)], mueller: &Array2<f32>) -> Result<()> {
+    // Open a file for writing
+    let file = File::create("mueller_scatgrid").unwrap();
+    let mut writer = BufWriter::new(file);
+
+    // Iterate over the array and write data to the file
+    for (index, row) in mueller.outer_iter().enumerate() {
+        let (theta, phi) = bins[index];
+        write!(writer, "{} {} ", theta * 180.0 / PI, phi * 180.0 / PI)?;
+        for value in row.iter() {
+            write!(writer, "{} ", value)?;
+        }
+        writeln!(writer)?;
+    }
+
+    Ok(())
+}
+
+pub fn ampl_to_mueller(
     theta_phi_combinations: &[(f32, f32)],
     ampl_cs: &[Matrix2<Complex<f32>>],
-) -> Result<()> {
+) -> Array2<f32> {
     let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
 
     for (index, amplc) in ampl_cs.iter().enumerate() {
@@ -60,22 +78,5 @@ pub fn writeup(
         mueller[[index, 15]] =
             (amplc[(1, 1)] * amplc[(0, 0)].conj() - amplc[(0, 1)] * amplc[(1, 0)].conj()).re;
     }
-
-    // Open a file for writing
-    let file = File::create("mueller_scatgrid").unwrap();
-    let mut writer = BufWriter::new(file);
-
-    // Write header
-
-    // Iterate over the array and write data to the file
-    for (index, row) in mueller.outer_iter().enumerate() {
-        let (theta, phi) = theta_phi_combinations[index];
-        write!(writer, "{} {} ", theta * 180.0 / PI, phi * 180.0 / PI)?;
-        for value in row.iter() {
-            write!(writer, "{} ", value)?;
-        }
-        writeln!(writer)?;
-    }
-
-    Ok(())
+    mueller
 }

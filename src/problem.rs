@@ -3,6 +3,7 @@ use crate::{
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
+use ndarray::Array2;
 use rayon::prelude::*;
 use std::fmt;
 
@@ -35,7 +36,7 @@ mod tests {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Powers {
     pub input: f32,       // near-field input power
     pub output: f32,      // near-field output power
@@ -93,7 +94,7 @@ impl fmt::Display for Powers {
 }
 
 /// A solvable physics problem.
-#[derive(Debug, PartialEq)] // Added Default derive
+#[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Problem {
     pub geom: Geom,                       // geometry to trace beams in
     pub beam_queue: Vec<Beam>,            // beams awaiting near-field propagation
@@ -269,23 +270,24 @@ impl Problem {
     pub fn solve_near(&mut self) {
         loop {
             if self.beam_queue.len() == 0 {
-                println!("all beams traced...");
+                // println!("all beams traced...");
                 break;
             }
 
             if self.powers.output / self.powers.input > self.settings.total_power_cutoff {
-                println!("cut off power out reached...");
+                // println!("cut off power out reached...");
                 break;
             }
 
             self.propagate_next();
         }
 
-        println!("{}", self.powers);
+        // println!("{}", self.powers);
     }
 
     pub fn writeup(&self) {
-        let _ = output::writeup(&self.bins, &self.ampl);
+        let mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
+        let _ = output::writeup(&self.bins, &mueller);
     }
 
     /// Propagates the next beam in the queue.
@@ -458,7 +460,7 @@ pub struct MultiProblem {
     pub problems: Vec<Problem>,
     pub orientations: Orientations,
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
-    pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
+    pub mueller: Array2::<f32>, // total mueller in far-field
     pub settings: Settings,               // runtime settings
 }
 
@@ -472,18 +474,18 @@ impl MultiProblem {
             settings.far_field_resolution,
             settings.far_field_resolution,
         );
-        let total_ampl_far_field =
-            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
 
+        let  mueller = Array2::<f32>::zeros((bins.len(), 16));
 
-        Self { geom, problems, orientations, bins, ampl: total_ampl_far_field, settings }
+        Self { geom, problems, orientations, bins, mueller, settings }
     }
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
 
         // init a base problem that can be reset
-        let mut problem = Problem::new(self.geom.clone(), Some(self.settings));
+        let problem_base = Problem::new(self.geom.clone(), Some(self.settings));
+        let mut problem = problem_base.clone();
 
         for (i,(alpha, beta, gamma)) in self.orientations.eulers.iter().enumerate() {
             println!("orientation: {}",i+1);
@@ -493,23 +495,27 @@ impl MultiProblem {
 
             problem.solve();
 
-            // reduce
-            for (i, ampl) in problem.ampl.iter().enumerate() {
-                self.ampl[i] += ampl;
+            let mueller = output::ampl_to_mueller(&self.bins, &problem.ampl);
+            for (i, row) in mueller.outer_iter().enumerate() {
+                for (j, val) in row.iter().enumerate() {
+                    self.mueller[[i,j]] += val;
+                }
             }
 
-            problem.reset();
+            problem.clone_from(&problem_base);
         }
 
         // reduce
-        for ampl in problem.ampl.iter_mut() {
-            *ampl /= Complex::new(self.orientations.num_orientations as f32,0.0);
+        for mut row in self.mueller.outer_iter_mut() {
+            for val in row.iter_mut() {
+                *val /= self.orientations.num_orientations as f32;
+            }
         }
 
     }
 
     pub fn writeup(&self) {
-        let _ = output::writeup(&self.bins, &self.ampl);
+        let _ = output::writeup(&self.bins, &self.mueller);
     }
 
 
