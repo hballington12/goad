@@ -21,5 +21,6 @@ fn main() {
     let verts = face.data().exterior.clone();
     let theta_phi_combinations = bins::generate_bins(180, 180);
     let ampl_far_field = diff::diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations, 1.0);
-    let _ = output::writeup(&theta_phi_combinations, &ampl_far_field);
+    let mueller = output::ampl_to_mueller(&theta_phi_combinations, &ampl_far_field);
+    let _ = output::writeup(&theta_phi_combinations, &mueller);
 }
