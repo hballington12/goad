@@ -1,11 +1,11 @@
-use std::{f64::consts::PI, fs::File, io::BufWriter};
+use std::{f32::consts::PI, fs::File, io::BufWriter};
 
 use anyhow::Result;
 use nalgebra::{Complex, Matrix2};
 use ndarray::Array2;
 use std::io::Write;
 
-pub fn writeup(bins: &[(f64, f64)], mueller: &Array2<f64>) -> Result<()> {
+pub fn writeup(bins: &[(f32, f32)], mueller: &Array2<f32>) -> Result<()> {
     // Open a file for writing
     let file = File::create("mueller_scatgrid").unwrap();
     let mut writer = BufWriter::new(file);
@@ -24,10 +24,10 @@ pub fn writeup(bins: &[(f64, f64)], mueller: &Array2<f64>) -> Result<()> {
 }
 
 pub fn ampl_to_mueller(
-    theta_phi_combinations: &[(f64, f64)],
-    ampl_cs: &[Matrix2<Complex<f64>>],
-) -> Array2<f64> {
-    let mut mueller = Array2::<f64>::zeros((theta_phi_combinations.len(), 16));
+    theta_phi_combinations: &[(f32, f32)],
+    ampl_cs: &[Matrix2<Complex<f32>>],
+) -> Array2<f32> {
+    let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
 
     for (index, amplc) in ampl_cs.iter().enumerate() {
         mueller[[index, 0]] = (Complex::new(0.5, 0.0)

@@ -31,15 +31,15 @@ mod tests {
 
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Field {
-    pub ampl: Matrix2<Complex<f64>>,
-    pub e_perp: Vector3<f64>,
-    pub e_par: Vector3<f64>,
+    pub ampl: Matrix2<Complex<f32>>,
+    pub e_perp: Vector3<f32>,
+    pub e_par: Vector3<f32>,
 }
 
 impl Field {
     /// Creates a new unit electric field with the given input perpendicular
     /// and propagation vectors.
-    pub fn new_identity(e_perp: Vector3<f64>, prop: Vector3<f64>) -> Result<Self> {
+    pub fn new_identity(e_perp: Vector3<f32>, prop: Vector3<f32>) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
             let norm_e_perp_diff = e_perp.norm() - 1.0;
@@ -78,9 +78,9 @@ impl Field {
     /// Creates an electric field with the given input perpendicular field
     /// vector, propagation vector, and amplitude matrix.
     pub fn new(
-        e_perp: Vector3<f64>,
-        prop: Vector3<f64>,
-        ampl: Matrix2<Complex<f64>>,
+        e_perp: Vector3<f32>,
+        prop: Vector3<f32>,
+        ampl: Matrix2<Complex<f32>>,
     ) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
@@ -137,11 +137,11 @@ impl Field {
     }
 
     /// Returns the field intensity.
-    pub fn intensity(&self) -> f64 {
+    pub fn intensity(&self) -> f32 {
         Self::ampl_intensity(&self.ampl)
     }
 
-    pub fn ampl_intensity(ampl: &Matrix2<Complex<f64>>) -> f64 {
+    pub fn ampl_intensity(ampl: &Matrix2<Complex<f32>>) -> f32 {
         0.5 * ampl.norm_squared()
     }
 }

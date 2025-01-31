@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::f64::consts::PI;
+use std::f32::consts::PI;
 
 use geo::Coord;
 use macroquad::prelude::*;
@@ -22,7 +22,7 @@ use crate::snell::get_theta_t;
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
     pub input: Beam,
-    pub refr_index: Complex<f64>,
+    pub refr_index: Complex<f32>,
     pub outputs: Vec<Beam>,
 }
 
@@ -97,7 +97,7 @@ impl BeamPropagation {
         lines_to_screen(normal_line, WHITE, 2.5);
     }
 
-    fn get_line(point: &Point3<f64>, input: &Beam) -> Vec<Coord<f64>> {
+    fn get_line(point: &Point3<f32>, input: &Beam) -> Vec<Coord<f32>> {
         let output_mid = point;
         let input_mid = input.face.data().midpoint;
         let vec = input_mid - output_mid;
@@ -118,11 +118,11 @@ impl BeamPropagation {
         ]
     }
 
-    pub fn input_power(&self) -> f64 {
+    pub fn input_power(&self) -> f32 {
         self.input.power()
     }
 
-    pub fn output_power(&self) -> f64 {
+    pub fn output_power(&self) -> f32 {
         let total = self.outputs.iter().fold(0.0, |acc, x| acc + x.power());
 
         total
@@ -134,10 +134,10 @@ impl Beam {
     /// with the specified perpendicular field vector.
     pub fn new_initial(
         face: Face,
-        prop: Vector3<f64>,
-        refr_index: Complex<f64>,
-        e_perp: Vector3<f64>,
-        wavelength: f64,
+        prop: Vector3<f32>,
+        refr_index: Complex<f32>,
+        e_perp: Vector3<f32>,
+        wavelength: f32,
     ) -> Result<Self> {
         let field = Field::new_identity(e_perp, prop)?;
         Ok(Beam::new(
@@ -155,10 +155,10 @@ impl Beam {
 
     pub fn new_from_field(
         face: Face,
-        prop: Vector3<f64>,
-        refr_index: Complex<f64>,
+        prop: Vector3<f32>,
+        refr_index: Complex<f32>,
         field: Field,
-        wavelength: f64,
+        wavelength: f32,
     ) -> Self {
         Beam::new(
             face,
@@ -175,7 +175,7 @@ impl Beam {
 
     /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    pub fn propagate(&mut self, geom: &mut Geom, medium_refr_index: Complex<f64>) -> Vec<Beam> {
+    pub fn propagate(&mut self, geom: &mut Geom, medium_refr_index: Complex<f32>) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
         let _ = clipping.clip();
 
@@ -202,7 +202,7 @@ impl Beam {
         &mut self,
         geom: &mut Geom,
         intersections: Vec<Face>,
-        medium_refr_index: Complex<f64>,
+        medium_refr_index: Complex<f32>,
     ) -> Vec<Beam> {
         let n1 = self.refr_index;
 
@@ -269,11 +269,11 @@ impl Beam {
 
 /// Returns a transmitted propagation vector, where `stt` is the sine of the angle of transmission.
 pub fn get_refraction_vector(
-    norm: &Vector3<f64>,
-    prop: &Vector3<f64>,
-    theta_i: f64,
-    theta_t: f64,
-) -> Vector3<f64> {
+    norm: &Vector3<f32>,
+    prop: &Vector3<f32>,
+    theta_i: f32,
+    theta_t: f32,
+) -> Vector3<f32> {
     if theta_t.sin() < settings::COLINEAR_THRESHOLD {
         return *prop;
     }
@@ -297,7 +297,7 @@ pub fn get_refraction_vector(
     result
 }
 
-fn get_reflection_vector(norm: &Vector3<f64>, prop: &Vector3<f64>) -> Vector3<f64> {
+fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f32> {
     // upward facing normal
     let n = if norm.dot(&prop) > 0.0 {
         *norm
@@ -317,10 +317,10 @@ fn get_reflection_vector(norm: &Vector3<f64>, prop: &Vector3<f64>) -> Vector3<f6
 /// factors.
 fn get_ampl(
     beam: &Beam,
-    rot: Matrix2<Complex<f64>>,
+    rot: Matrix2<Complex<f32>>,
     face: &Face,
-    n1: Complex<f64>,
-) -> Result<(Matrix2<Complex<f64>>, f64)> {
+    n1: Complex<f32>,
+) -> Result<(Matrix2<Complex<f32>>, f32)> {
     let mut ampl = rot * beam.field.ampl.clone();
     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
     let wavenumber = beam.wavenumber();
@@ -344,13 +344,13 @@ fn get_ampl(
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
 /// in `beam` to the plane perpendicular to `e_perp`.
-fn get_rotation_matrix(beam: &Beam, e_perp: Vector3<f64>) -> Matrix2<Complex<f64>> {
+fn get_rotation_matrix(beam: &Beam, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
     Field::rotation_matrix(beam.field.e_perp, e_perp, beam.prop)
         .map(|x| nalgebra::Complex::new(x, 0.0))
 }
 
 /// Determines the new `e_perp` vector for an intersection at a `face``.
-fn get_e_perp(normal: Vector3<f64>, beam: &Beam) -> Vector3<f64> {
+fn get_e_perp(normal: Vector3<f32>, beam: &Beam) -> Vector3<f32> {
     if normal.dot(&beam.prop).abs() > 1.0 - settings::COLINEAR_THRESHOLD {
         -beam.field.e_perp
     } else {
@@ -364,9 +364,9 @@ fn get_n2(
     geom: &mut Geom,
     beam: &mut Beam,
     face: &Face,
-    normal: Vector3<f64>,
-    medium_refr_index: Complex<f64>,
-) -> Complex<f64> {
+    normal: Vector3<f32>,
+    medium_refr_index: Complex<f32>,
+) -> Complex<f32> {
     let id = face.data().shape_id.unwrap();
     if normal.dot(&beam.prop) < 0.0 {
         geom.shapes[id].refr_index
@@ -378,13 +378,13 @@ fn get_n2(
 /// Creates a new reflected beam
 fn create_reflected(
     face: &Face,
-    ampl: Matrix2<Complex<f64>>,
-    e_perp: Vector3<f64>,
-    normal: Vector3<f64>,
+    ampl: Matrix2<Complex<f32>>,
+    e_perp: Vector3<f32>,
+    normal: Vector3<f32>,
     beam: &Beam,
-    theta_i: f64,
-    n1: Complex<f64>,
-    n2: Complex<f64>,
+    theta_i: f32,
+    n1: Complex<f32>,
+    n2: Complex<f32>,
 ) -> Result<Option<Beam>> {
     let prop = get_reflection_vector(&normal, &beam.prop);
 
@@ -430,13 +430,13 @@ fn create_reflected(
 /// Creates a new refracted beam.
 fn create_refracted(
     face: &Face,
-    ampl: Matrix2<Complex<f64>>,
-    e_perp: Vector3<f64>,
-    normal: Vector3<f64>,
+    ampl: Matrix2<Complex<f32>>,
+    e_perp: Vector3<f32>,
+    normal: Vector3<f32>,
     beam: &Beam,
-    theta_i: f64,
-    n1: Complex<f64>,
-    n2: Complex<f64>,
+    theta_i: f32,
+    n1: Complex<f32>,
+    n2: Complex<f32>,
 ) -> Result<Option<Beam>> {
     if theta_i > (n2.re / n1.re).asin() {
         // if total internal reflection
@@ -472,7 +472,7 @@ impl Beam {
     fn remainders_to_beams(
         &mut self,
         remainders: Vec<Face>,
-        medium_refr_index: Complex<f64>,
+        medium_refr_index: Complex<f32>,
     ) -> Vec<Beam> {
         // need to account for distance along propagation direction from
         // midpoint of remainder to midpoint of original face. Propagate
@@ -483,7 +483,7 @@ impl Beam {
             .filter_map(|remainder| {
                 let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
                 let arg = dist * self.wavenumber() * medium_refr_index.re;
-                // let arg: f64 = 0.0;
+                // let arg: f32 = 0.0;
                 let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
                 Some(Beam::new(
                     remainder,
@@ -506,30 +506,30 @@ impl Beam {
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Beam {
     pub face: Face,
-    pub prop: Vector3<f64>,
-    pub refr_index: Complex<f64>,
+    pub prop: Vector3<f32>,
+    pub refr_index: Complex<f32>,
     pub rec_count: i32,
     pub tir_count: i32,
     pub field: Field,
-    pub absorbed_power: f64,          // power absorbed by the medium
-    pub clipping_area: f64,           // total area accounted for by intersections and remainders
+    pub absorbed_power: f32,          // power absorbed by the medium
+    pub clipping_area: f32,           // total area accounted for by intersections and remainders
     pub variant: Option<BeamVariant>, // variant of beam, e.g. reflection, refraction, total internal reflection
     pub type_: BeamType, // type of beam, e.g. initial, default, outgoing, external diff
-    pub wavelength: f64,
+    pub wavelength: f32,
 }
 
 /// Creates a new beam
 impl Beam {
     pub fn new(
         face: Face,
-        prop: Vector3<f64>,
-        refr_index: Complex<f64>,
+        prop: Vector3<f32>,
+        refr_index: Complex<f32>,
         rec_count: i32,
         tir_count: i32,
         field: Field,
         variant: Option<BeamVariant>,
         type_: BeamType,
-        wavelength: f64,
+        wavelength: f32,
     ) -> Self {
         let prop = prop.normalize();
         Self {
@@ -548,7 +548,7 @@ impl Beam {
     }
 
     /// Returns the cross sectional area of the beam.
-    pub fn csa(&self) -> f64 {
+    pub fn csa(&self) -> f32 {
         let area = self.face.data().area.unwrap();
         let norm = self.face.data().normal;
         let cosine = self.prop.dot(&norm).abs();
@@ -557,15 +557,15 @@ impl Beam {
     }
 
     /// Returns the power of a beam.
-    pub fn power(&self) -> f64 {
+    pub fn power(&self) -> f32 {
         self.field.intensity() * self.refr_index.re * self.csa()
     }
 
-    pub fn wavenumber(&self) -> f64 {
+    pub fn wavenumber(&self) -> f32 {
         2.0 * PI / self.wavelength
     }
 
-    pub fn diffract(&self, theta_phi_combinations: &[(f64, f64)]) -> Vec<Matrix2<Complex<f64>>> {
+    pub fn diffract(&self, theta_phi_combinations: &[(f32, f32)]) -> Vec<Matrix2<Complex<f32>>> {
         match &self.face {
             Face::Simple(face) => {
                 let verts = &face.exterior;

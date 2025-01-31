@@ -2,22 +2,22 @@ use crate::geom::Face;
 use geo_types::{Coord, Polygon};
 use macroquad::prelude::*;
 
-const SCALE: f64 = 25.0; // modify this depending on widget size
-const OFFSET_X: f64 = 400.0;
-const OFFSET_Y: f64 = 300.0;
+const SCALE: f32 = 25.0; // modify this depending on widget size
+const OFFSET_X: f32 = 400.0;
+const OFFSET_Y: f32 = 300.0;
 /// Draws the polygons from a MultiPolygon result onto the screen.
 ///
 /// # Arguments
 /// * `multi_polygon` - A reference to a `MultiPolygon` containing the polygons to draw.
-pub fn draw_multipolygon(polygon: &Polygon<f64>, color: Color) {
+pub fn draw_multipolygon(polygon: &Polygon<f32>, color: Color) {
     // Extract the exterior LineString
     let points = &polygon.exterior().0;
 
     // Convert the points into macroquad-compatible coordinates
     let mut screen_points = Vec::new();
     for coord in points {
-        let screen_x = -coord.x as f64 * SCALE + OFFSET_X; // Scale and center
-        let screen_y = coord.y as f64 * SCALE + OFFSET_Y; // Scale and center
+        let screen_x = -coord.x as f32 * SCALE + OFFSET_X; // Scale and center
+        let screen_y = coord.y as f32 * SCALE + OFFSET_Y; // Scale and center
         screen_points.push((screen_x as f32, screen_y as f32));
     }
 
@@ -33,7 +33,7 @@ pub fn draw_multipolygon(polygon: &Polygon<f64>, color: Color) {
 ///
 /// # Arguments
 /// * `face` - A reference to a `Face` containing the polygon to draw.
-pub fn draw_face(face: &Face, color: Color, thickness: f64) {
+pub fn draw_face(face: &Face, color: Color, thickness: f32) {
     // Extract the exterior LineString
     let mut line_strings = Vec::new();
     match face {
@@ -73,13 +73,13 @@ pub fn draw_face(face: &Face, color: Color, thickness: f64) {
     lines_to_screen(line_strings, color, thickness);
 }
 
-pub fn lines_to_screen(line_strings: Vec<Vec<Coord<f64>>>, color: Color, thickness: f64) {
+pub fn lines_to_screen(line_strings: Vec<Vec<Coord<f32>>>, color: Color, thickness: f32) {
     // Convert the points into macroquad-compatible coordinates
     for points in line_strings {
         let mut screen_points = Vec::new();
         for coord in points {
-            let screen_x = -coord.x as f64 * SCALE + OFFSET_X; // Scale and center
-            let screen_y = coord.y as f64 * SCALE + OFFSET_Y; // Scale and center
+            let screen_x = -coord.x as f32 * SCALE + OFFSET_X; // Scale and center
+            let screen_y = coord.y as f32 * SCALE + OFFSET_Y; // Scale and center
             screen_points.push((screen_x as f32, screen_y as f32));
         }
 
