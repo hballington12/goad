@@ -12,9 +12,11 @@ pub fn diffraction(
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
     theta_phi_combinations: &[(f32, f32)],
+    wavenumber: f32,
 ) -> Vec<Matrix2<Complex<f32>>> {
     // Translate to aperture system, rotate, and transform propagation and auxiliary vectors.
-    let (center_of_mass, relative_vertices, rot3, prop2) = init_diff(verts, &mut ampl, prop, vk7);
+    let (center_of_mass, relative_vertices, rot3, prop2) =
+        init_diff(verts, &mut ampl, prop, vk7, wavenumber);
 
     // Define the output variables.
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
@@ -40,7 +42,7 @@ pub fn diffraction(
         // Calculate distance to bins and bin unit vectors
         let bvs = rotated_pos.norm();
         let k = rotated_pos / bvs;
-        let bvsk = bvs * settings::WAVENUMBER;
+        let bvsk = bvs * wavenumber;
         let ampl_far_field = &mut ampl_cs[index];
 
         let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
@@ -64,7 +66,7 @@ pub fn diffraction(
             v1[[i, 2]] = transformed_vertex.z;
         }
 
-        let kinc = prop2 * settings::WAVENUMBER;
+        let kinc = prop2 * wavenumber;
         let x: Vec<f32> = v1.column(0).iter().cloned().collect();
         let y: Vec<f32> = v1.column(1).iter().cloned().collect();
         let m: Vec<f32> = (0..nv)
@@ -110,7 +112,12 @@ pub fn diffraction(
                 dy
             };
 
-            let (kxx, kyy) = calculate_kxx_kyy(&kinc.fixed_rows::<2>(0).into(), &rotated_pos, bvsk);
+            let (kxx, kyy) = calculate_kxx_kyy(
+                &kinc.fixed_rows::<2>(0).into(),
+                &rotated_pos,
+                bvsk,
+                wavenumber,
+            );
             let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
             let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
@@ -119,7 +126,7 @@ pub fn diffraction(
                 continue;
             }
 
-            let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta);
+            let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, wavenumber);
 
             fraunhofer_sum += summand;
         }
@@ -163,6 +170,7 @@ fn init_diff(
     ampl: &mut Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
+    wavenumber: f32,
 ) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
     // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
     let prop = (prop
@@ -174,7 +182,7 @@ fn init_diff(
     .normalize();
 
     // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
-    *ampl *= Complex::new(settings::WAVENUMBER, 0.0); // // TODO add this back in
+    *ampl *= Complex::new(wavenumber, 0.0); // // TODO add this back in
 
     // 1. Compute the center of mass
     let center_of_mass = geom::calculate_center_of_mass(verts);
@@ -364,14 +372,18 @@ pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
     }
 }
 
-pub fn calculate_bvsk(rotated_pos: &Vector3<f32>) -> f32 {
-    settings::WAVENUMBER
-        * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
+pub fn calculate_bvsk(rotated_pos: &Vector3<f32>, wavenumber: f32) -> f32 {
+    wavenumber * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
 }
 
-pub fn calculate_kxx_kyy(kinc: &[f32; 2], rotated_pos: &Vector3<f32>, bvsk: f32) -> (f32, f32) {
-    let kxx = kinc[0] - settings::WAVENUMBER.powi(2) * rotated_pos.x / bvsk;
-    let kyy = kinc[1] - settings::WAVENUMBER.powi(2) * rotated_pos.y / bvsk;
+pub fn calculate_kxx_kyy(
+    kinc: &[f32; 2],
+    rotated_pos: &Vector3<f32>,
+    bvsk: f32,
+    wavenumber: f32,
+) -> (f32, f32) {
+    let kxx = kinc[0] - wavenumber.powi(2) * rotated_pos.x / bvsk;
+    let kyy = kinc[1] - wavenumber.powi(2) * rotated_pos.y / bvsk;
 
     // numerical fix for kxx and kyy
     let kxx = if kxx.abs() < settings::DIFF_EPSILON {
@@ -414,6 +426,7 @@ pub fn calculate_summand(
     omega2: f32,
     alpha: f32,
     beta: f32,
+    wavenumber: f32,
 ) -> Complex<f32> {
     let sumim = alpha * (delta.cos() - (delta + omega1).cos())
         - beta * (delta.cos() - (delta + omega2).cos());
@@ -421,5 +434,5 @@ pub fn calculate_summand(
         + beta * (delta.sin() - (delta + omega2).sin());
 
     Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
-        / Complex::new(settings::WAVELENGTH, 0.0)
+        / Complex::new(2.0 * PI / wavenumber, 0.0)
 }

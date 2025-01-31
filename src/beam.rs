@@ -137,6 +137,7 @@ impl Beam {
         prop: Vector3<f32>,
         refr_index: Complex<f32>,
         e_perp: Vector3<f32>,
+        wavelength: f32,
     ) -> Result<Self> {
         let field = Field::new_identity(e_perp, prop)?;
         Ok(Beam::new(
@@ -148,6 +149,7 @@ impl Beam {
             field,
             None,
             BeamType::Initial,
+            wavelength,
         ))
     }
 
@@ -156,13 +158,29 @@ impl Beam {
         prop: Vector3<f32>,
         refr_index: Complex<f32>,
         field: Field,
+        wavelength: f32,
     ) -> Self {
-        Beam::new(face, prop, refr_index, 0, 0, field, None, BeamType::Initial)
+        Beam::new(
+            face,
+            prop,
+            refr_index,
+            0,
+            0,
+            field,
+            None,
+            BeamType::Initial,
+            wavelength,
+        )
     }
 
     /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    pub fn propagate(&mut self, geom: &mut Geom) -> Vec<Beam> {
+    pub fn propagate(
+        &mut self,
+        geom: &mut Geom,
+        area_threshold: f32,
+        medium_refr_index: Complex<f32>,
+    ) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
         let _ = clipping.clip();
 
@@ -172,12 +190,12 @@ impl Beam {
         };
 
         let (intersections, remainders) = (
-            filter_faces(clipping.intersections),
-            filter_faces(clipping.remaining),
+            filter_faces(clipping.intersections, area_threshold),
+            filter_faces(clipping.remaining, area_threshold),
         );
 
-        let remainder_beams = self.remainders_to_beams(remainders);
-        let beams = self.create_beams(geom, intersections);
+        let remainder_beams = self.remainders_to_beams(remainders, medium_refr_index);
+        let beams = self.create_beams(geom, intersections, medium_refr_index);
 
         let mut output_beams = Vec::new();
         output_beams.extend(beams);
@@ -185,7 +203,12 @@ impl Beam {
         output_beams
     }
 
-    fn create_beams(&mut self, geom: &mut Geom, intersections: Vec<Face>) -> Vec<Beam> {
+    fn create_beams(
+        &mut self,
+        geom: &mut Geom,
+        intersections: Vec<Face>,
+        medium_refr_index: Complex<f32>,
+    ) -> Vec<Beam> {
         let n1 = self.refr_index;
 
         // create beams
@@ -194,7 +217,7 @@ impl Beam {
             .filter_map(|face| {
                 let normal = face.data().normal;
                 let theta_i = normal.dot(&self.prop).abs().acos();
-                let n2 = get_n2(geom, self, face, normal);
+                let n2 = get_n2(geom, self, face, normal, medium_refr_index);
                 let e_perp = get_e_perp(normal, &self);
                 let rot = get_rotation_matrix(&self, e_perp);
                 let (ampl, absorbed_intensity) = match get_ampl(&self, rot, face, n1) {
@@ -212,6 +235,7 @@ impl Beam {
                         Field::new(e_perp, self.prop, ampl).unwrap(),
                         None,
                         BeamType::ExternalDiff,
+                        self.wavelength,
                     ))
                 } else {
                     None
@@ -304,21 +328,19 @@ fn get_ampl(
 ) -> Result<(Matrix2<Complex<f32>>, f32)> {
     let mut ampl = rot * beam.field.ampl.clone();
     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
+    let wavenumber = beam.wavenumber();
 
     if dist < 0.0 {
         return Err(anyhow::anyhow!("distance less than 0: {}", dist));
     }
 
-    let arg = dist * settings::WAVENUMBER * n1.re; // optical path length
+    let arg = dist * wavenumber * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
 
     let absorbed_intensity = Field::ampl_intensity(&ampl)
-        * (1.0
-            - (-2.0 * settings::WAVENUMBER * n1.im * dist.sqrt())
-                .exp()
-                .powi(2));
+        * (1.0 - (-2.0 * wavenumber * n1.im * dist.sqrt()).exp().powi(2));
 
-    let exp_absorption = (-2.0 * settings::WAVENUMBER * n1.im * dist.sqrt()).exp(); // absorption
+    let exp_absorption = (-2.0 * wavenumber * n1.im * dist.sqrt()).exp(); // absorption
 
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
 
@@ -343,12 +365,18 @@ fn get_e_perp(normal: Vector3<f32>, beam: &Beam) -> Vector3<f32> {
 
 /// Determines the refractive index of the second medium when a beam intersects
 /// with a face.
-fn get_n2(geom: &mut Geom, beam: &mut Beam, face: &Face, normal: Vector3<f32>) -> Complex<f32> {
+fn get_n2(
+    geom: &mut Geom,
+    beam: &mut Beam,
+    face: &Face,
+    normal: Vector3<f32>,
+    medium_refr_index: Complex<f32>,
+) -> Complex<f32> {
     let id = face.data().shape_id.unwrap();
     if normal.dot(&beam.prop) < 0.0 {
         geom.shapes[id].refr_index
     } else {
-        geom.n_out(id)
+        geom.n_out(id, medium_refr_index)
     }
 }
 
@@ -383,6 +411,7 @@ fn create_reflected(
             Field::new(e_perp, prop, refl_ampl).unwrap(),
             Some(BeamVariant::Tir),
             BeamType::Default,
+            beam.wavelength,
         )))
     } else {
         let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
@@ -398,6 +427,7 @@ fn create_reflected(
             Field::new(e_perp, prop, refl_ampl)?,
             Some(BeamVariant::Refl),
             BeamType::Default,
+            beam.wavelength,
         )))
     }
 }
@@ -436,23 +466,28 @@ fn create_refracted(
             Field::new(e_perp, prop, refr_ampl)?,
             Some(BeamVariant::Refr),
             BeamType::Default,
+            beam.wavelength,
         )))
     }
 }
 
 /// Filter faces by threshold area.
-fn filter_faces(faces: Vec<Face>) -> Vec<Face> {
+fn filter_faces(faces: Vec<Face>, area_threshold: f32) -> Vec<Face> {
     // remove intersections with below threshold area
     faces
         .into_iter()
-        .filter(|x| x.data().area.unwrap() > settings::BEAM_AREA_THRESHOLD)
+        .filter(|x| x.data().area.unwrap() > area_threshold)
         .collect()
 }
 
 /// Converts the remainder faces from a clipping into beams with the same field
 /// properties as the original beam.
 impl Beam {
-    fn remainders_to_beams(&mut self, remainders: Vec<Face>) -> Vec<Beam> {
+    fn remainders_to_beams(
+        &mut self,
+        remainders: Vec<Face>,
+        medium_refr_index: Complex<f32>,
+    ) -> Vec<Beam> {
         // need to account for distance along propagation direction from
         // midpoint of remainder to midpoint of original face. Propagate
         // the field back or forward by this distance.
@@ -461,7 +496,7 @@ impl Beam {
             .into_iter()
             .filter_map(|remainder| {
                 let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
-                let arg = dist * settings::WAVENUMBER * settings::MEDIUM_REFR_INDEX.re;
+                let arg = dist * self.wavenumber() * medium_refr_index.re;
                 // let arg: f32 = 0.0;
                 let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
                 Some(Beam::new(
@@ -473,6 +508,7 @@ impl Beam {
                     Field::new(self.field.e_perp, self.prop, ampl).unwrap(),
                     None,
                     BeamType::OutGoing,
+                    self.wavelength,
                 ))
             })
             .collect();
@@ -493,6 +529,7 @@ pub struct Beam {
     pub clipping_area: f32,           // total area accounted for by intersections and remainders
     pub variant: Option<BeamVariant>, // variant of beam, e.g. reflection, refraction, total internal reflection
     pub type_: BeamType, // type of beam, e.g. initial, default, outgoing, external diff
+    pub wavelength: f32,
 }
 
 /// Creates a new beam
@@ -506,6 +543,7 @@ impl Beam {
         field: Field,
         variant: Option<BeamVariant>,
         type_: BeamType,
+        wavelength: f32,
     ) -> Self {
         let prop = prop.normalize();
         Self {
@@ -519,6 +557,7 @@ impl Beam {
             clipping_area: 0.0,
             variant,
             type_,
+            wavelength,
         }
     }
 
@@ -536,6 +575,10 @@ impl Beam {
         self.field.intensity() * self.refr_index.re * self.csa()
     }
 
+    pub fn wavenumber(&self) -> f32 {
+        2.0 * PI / self.wavelength
+    }
+
     pub fn diffract(&self, theta_phi_combinations: &[(f32, f32)]) -> Vec<Matrix2<Complex<f32>>> {
         match &self.face {
             Face::Simple(face) => {
@@ -543,7 +586,14 @@ impl Beam {
                 let ampl = self.field.ampl;
                 let prop = self.prop;
                 let vk7 = self.field.e_perp;
-                diff::diffraction(verts, ampl, prop, vk7, &theta_phi_combinations)
+                diff::diffraction(
+                    verts,
+                    ampl,
+                    prop,
+                    vk7,
+                    &theta_phi_combinations,
+                    self.wavenumber(),
+                )
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");

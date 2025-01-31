@@ -5,7 +5,7 @@ use crate::{
     geom::{Face, Geom},
     helpers::draw_face,
     output,
-    settings::{self, GLOBAL_SETTINGS},
+    settings::{self, Settings},
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -105,25 +105,30 @@ pub struct Problem {
     pub powers: Powers,                   // different power contributions
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
     pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
+    pub settings: Settings,               // runtime settings
 }
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom) -> Self {
-        // let mut settings = settings::load_config();
+        let mut settings = settings::load_config();
         // let args = settings::CliArgs::parse();
 
-        println!("Settings: {}", GLOBAL_SETTINGS.lock().unwrap());
+        println!("Settings: {:#?}", settings);
 
-        let theta_phi_combinations = bins::generate_theta_phi_combinations();
+        let theta_phi_combinations = bins::generate_theta_phi_combinations(
+            settings.far_field_resolution,
+            settings.far_field_resolution,
+        );
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
 
         // rescale geometry so the max dimension is 1
-        let mut geom = geom.clone();
-        let scaling_factor = geom.rescale();
+        // let mut geom = geom.clone();
+        // let scaling_factor = geom.rescale();
+        // settings.wavelength = settings.wavelength / scaling_factor;
 
-        let beam = basic_initial_beam(&geom);
+        let beam = basic_initial_beam(&geom, settings.wavelength, settings.medium_refr_index);
 
         let problem = Self {
             geom,
@@ -133,6 +138,7 @@ impl Problem {
             powers: Powers::new(),
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
+            settings,
         };
 
         problem
@@ -140,10 +146,13 @@ impl Problem {
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        // let mut settings = settings::load_config();
+        let mut settings = settings::load_config();
         // let args = settings::CliArgs::parse();
 
-        let theta_phi_combinations = bins::generate_theta_phi_combinations();
+        let theta_phi_combinations = bins::generate_theta_phi_combinations(
+            settings.far_field_resolution,
+            settings.far_field_resolution,
+        );
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); theta_phi_combinations.len()];
 
@@ -155,6 +164,7 @@ impl Problem {
             powers: Powers::new(),
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
+            settings,
         }
     }
 
@@ -248,7 +258,7 @@ impl Problem {
                 break;
             }
 
-            if self.powers.output / self.powers.input > settings::TOTAL_POWER_CUTOFF {
+            if self.powers.output / self.powers.input > self.settings.total_power_cutoff {
                 println!("cut off power out reached...");
                 break;
             }
@@ -271,24 +281,36 @@ impl Problem {
         let outputs = match &mut beam.type_ {
             BeamType::Default => {
                 // truncation conditions
-                if beam.power() < settings::BEAM_POWER_THRESHOLD {
+                if beam.power() < self.settings.beam_power_threshold {
                     self.powers.trnc_energy += beam.power();
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
-                    if beam.tir_count > settings::MAX_TIR {
+                    if beam.tir_count > self.settings.max_tir {
                         self.powers.trnc_ref += beam.power();
                         Vec::new()
                     } else {
-                        beam.propagate(&mut self.geom)
+                        beam.propagate(
+                            &mut self.geom,
+                            self.settings.beam_area_threshold(),
+                            self.settings.medium_refr_index,
+                        )
                     }
-                } else if beam.rec_count > settings::MAX_REC {
+                } else if beam.rec_count > self.settings.max_rec {
                     self.powers.trnc_rec += beam.power();
                     Vec::new()
                 } else {
-                    beam.propagate(&mut self.geom)
+                    beam.propagate(
+                        &mut self.geom,
+                        self.settings.beam_area_threshold(),
+                        self.settings.medium_refr_index,
+                    )
                 }
             }
-            BeamType::Initial => beam.propagate(&mut self.geom),
+            BeamType::Initial => beam.propagate(
+                &mut self.geom,
+                self.settings.beam_area_threshold(),
+                self.settings.medium_refr_index,
+            ),
             _ => {
                 println!("Unknown beam type, returning empty outputs.");
                 Vec::new()
@@ -378,7 +400,7 @@ impl Problem {
 }
 
 /// Creates a basic initial beam for full illumination of the geometry along the z-axis.
-fn basic_initial_beam(geom: &Geom) -> Beam {
+fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
     const FAC: f32 = 1.1;
     let bounds = geom.bounds();
     let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
@@ -396,9 +418,16 @@ fn basic_initial_beam(geom: &Geom) -> Beam {
 
     // propagate field backwards so its as if the beam comes from z=0
     let dist = bounds.1[2];
-    let arg = -dist * settings::WAVENUMBER * settings::MEDIUM_REFR_INDEX.re;
+    let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
+    let arg = -dist * wavenumber * medium_refractive_index.re;
     field.ampl *= Complex::new(arg.cos(), arg.sin());
 
-    let beam = Beam::new_from_field(clip, -Vector3::z(), settings::MEDIUM_REFR_INDEX, field);
+    let beam = Beam::new_from_field(
+        clip,
+        -Vector3::z(),
+        medium_refractive_index,
+        field,
+        wavelength,
+    );
     beam
 }

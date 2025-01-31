@@ -810,10 +810,10 @@ impl Geom {
     }
 
     /// Returns the refractive outside a shape
-    pub fn n_out(&self, shape_id: usize) -> Complex<f32> {
+    pub fn n_out(&self, shape_id: usize, medium_refr_index: Complex<f32>) -> Complex<f32> {
         self.containment_graph
             .get_parent(shape_id)
-            .map_or(settings::MEDIUM_REFR_INDEX, |parent_id| {
+            .map_or(medium_refr_index, |parent_id| {
                 self.shapes[parent_id].refr_index
             })
     }
