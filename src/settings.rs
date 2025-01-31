@@ -1,9 +1,11 @@
 use clap::Parser;
 use config::{Config, File};
 use nalgebra::Complex;
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::f32::consts::PI;
 use std::fmt;
+use std::sync::Mutex;
 
 /// Wavelength of the electric field in the same units as the geometry coordinates.
 pub const WAVELENGTH: f32 = 0.532 * 0.1;
@@ -62,7 +64,7 @@ pub fn load_config() -> Settings {
         .build()
         .unwrap();
 
-    println!("settings: {:#?}", settings);
+    // println!("settings: {:#?}", settings);
 
     settings.try_deserialize().unwrap()
 }
@@ -99,6 +101,12 @@ pub fn load_config() -> Settings {
 //     #[arg(long)]
 //     vertex_merge_distance: Option<f32>,
 // }
+
+// Global settings instance, wrapped in a Mutex for thread safety
+pub static GLOBAL_SETTINGS: Lazy<Mutex<Settings>> = Lazy::new(|| {
+    // Load settings from a file or elsewhere
+    Mutex::new(load_config())
+});
 
 impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

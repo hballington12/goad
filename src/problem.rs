@@ -5,7 +5,7 @@ use crate::{
     geom::{Face, Geom},
     helpers::draw_face,
     output,
-    settings::{self, Settings},
+    settings::{self, GLOBAL_SETTINGS},
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -105,16 +105,15 @@ pub struct Problem {
     pub powers: Powers,                   // different power contributions
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
     pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
-    pub settings: Settings,               // runtime settings
 }
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(geom: Geom) -> Self {
-        let mut settings = settings::load_config();
+        // let mut settings = settings::load_config();
         // let args = settings::CliArgs::parse();
 
-        println!("Settings: {:#?}", settings);
+        println!("Settings: {}", GLOBAL_SETTINGS.lock().unwrap());
 
         let theta_phi_combinations = bins::generate_theta_phi_combinations();
         let total_ampl_far_field =
@@ -134,7 +133,6 @@ impl Problem {
             powers: Powers::new(),
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
-            settings,
         };
 
         problem
@@ -142,7 +140,7 @@ impl Problem {
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        let mut settings = settings::load_config();
+        // let mut settings = settings::load_config();
         // let args = settings::CliArgs::parse();
 
         let theta_phi_combinations = bins::generate_theta_phi_combinations();
@@ -157,7 +155,6 @@ impl Problem {
             powers: Powers::new(),
             bins: theta_phi_combinations,
             ampl: total_ampl_far_field,
-            settings,
         }
     }
 
