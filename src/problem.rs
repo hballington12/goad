@@ -187,26 +187,26 @@ impl Problem {
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         description: &str,
     ) {
-        let m = MultiProgress::new();
-        let n = queue.len();
-        let pb = m.add(ProgressBar::new(n as u64));
-        pb.set_style(
-            ProgressStyle::with_template(
-                "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg}",
-            )
-            .unwrap()
-            .progress_chars("➤➤➤➤➤➤➤➤"),
-        );
-        pb.set_message(description.to_string());
-        let pb2 = m.add(ProgressBar::new(1000 as u64));
-        pb2.set_style(
-            ProgressStyle::with_template(
-                "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {percent:>6.1.white}%     {msg}",
-            )
-            .unwrap()
-            .progress_chars("➤➤➤➤➤➤➤➤"),
-        );
-        pb2.set_message("power diffracted".to_string());
+        // let m = MultiProgress::new();
+        // let n = queue.len();
+        // let pb = m.add(ProgressBar::new(n as u64));
+        // pb.set_style(
+        //     ProgressStyle::with_template(
+        //         "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg}",
+        //     )
+        //     .unwrap()
+        //     .progress_chars("➤➤➤➤➤➤➤➤"),
+        // );
+        // pb.set_message(description.to_string());
+        // let pb2 = m.add(ProgressBar::new(1000 as u64));
+        // pb2.set_style(
+        //     ProgressStyle::with_template(
+        //         "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {percent:>6.1.white}%     {msg}",
+        //     )
+        //     .unwrap()
+        //     .progress_chars("➤➤➤➤➤➤➤➤"),
+        // );
+        // pb2.set_message("power diffracted".to_string());
 
         let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
 
@@ -214,8 +214,8 @@ impl Problem {
             .par_iter()
             .map(|outbeam| {
                 let outbeam_power = outbeam.power();
-                pb.inc(1);
-                pb2.inc((outbeam_power / total_power * 1000.0) as u64);
+                // pb.inc(1);
+                // pb2.inc((outbeam_power / total_power * 1000.0) as u64);
                 outbeam.diffract(bins)
             })
             .reduce(
@@ -233,8 +233,8 @@ impl Problem {
             total_ampl_far_field[i] += ampl;
         }
 
-        pb.finish_with_message(format!("{} (done)", description));
-        pb2.finish_with_message(format!("power diffracted (%)"));
+        // pb.finish_with_message(format!("{} (done)", description));
+        // pb2.finish_with_message(format!("power diffracted (%)"));
         // total write
     }
 

@@ -14,7 +14,7 @@ fn main() {
     // let betas = vec![0.0, 0.0];
     // let gammas = vec![0.0, 0.0];
 
-    let num_orient = 500;
+    let num_orient = 5000;
 
     let mut rng = rand::rng();
     // need to include mapping here for beta
