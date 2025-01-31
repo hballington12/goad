@@ -10,7 +10,7 @@ use crate::{
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use rayon::prelude::*;
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use clap::Parser;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -51,6 +51,7 @@ pub struct Powers {
     pub trnc_rec: f32,    // truncated power due to max recursions
     pub trnc_clip: f32,   // truncated power due to clipping
     pub trnc_energy: f32, // truncated power due to threshold beam power
+    pub trnc_area: f32,   // truncated power due to area threshold
     pub ext_diff: f32,    // external diffraction power
 }
 
@@ -64,6 +65,7 @@ impl Powers {
             trnc_rec: 0.0,
             trnc_clip: 0.0,
             trnc_energy: 0.0,
+            trnc_area: 0.0,
             ext_diff: 0.0,
         }
     }
@@ -76,6 +78,7 @@ impl Powers {
                 + self.trnc_ref
                 + self.trnc_rec
                 // + self.trnc_clip
+                + self.trnc_area    
                 + self.trnc_energy)
     }
 }
@@ -90,6 +93,7 @@ impl fmt::Display for Powers {
         writeln!(f, "  Truncated Rec:    {:.6}", self.trnc_rec)?;
         // writeln!(f, "  Truncated Clip:   {:.6}", self.trnc_clip)?;
         writeln!(f, "  Truncated Energy: {:.6}", self.trnc_energy)?;
+        writeln!(f, "  Truncated Area:   {:.6}", self.trnc_area)?;
         writeln!(f, "  Other:            {:.6}", self.missing())?;
         writeln!(f, "  External Diff:    {:.6}", self.ext_diff)
     }
@@ -284,6 +288,9 @@ impl Problem {
                 if beam.power() < self.settings.beam_power_threshold {
                     self.powers.trnc_energy += beam.power();
                     Vec::new()
+                } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
+                    self.powers.trnc_area += beam.power();
+                    Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
                     if beam.tir_count > self.settings.max_tir {
                         self.powers.trnc_ref += beam.power();
@@ -291,7 +298,6 @@ impl Problem {
                     } else {
                         beam.propagate(
                             &mut self.geom,
-                            self.settings.beam_area_threshold(),
                             self.settings.medium_refr_index,
                         )
                     }
@@ -301,14 +307,12 @@ impl Problem {
                 } else {
                     beam.propagate(
                         &mut self.geom,
-                        self.settings.beam_area_threshold(),
                         self.settings.medium_refr_index,
                     )
                 }
             }
             BeamType::Initial => beam.propagate(
                 &mut self.geom,
-                self.settings.beam_area_threshold(),
                 self.settings.medium_refr_index,
             ),
             _ => {

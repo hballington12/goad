@@ -175,12 +175,7 @@ impl Beam {
 
     /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    pub fn propagate(
-        &mut self,
-        geom: &mut Geom,
-        area_threshold: f32,
-        medium_refr_index: Complex<f32>,
-    ) -> Vec<Beam> {
+    pub fn propagate(&mut self, geom: &mut Geom, medium_refr_index: Complex<f32>) -> Vec<Beam> {
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
         let _ = clipping.clip();
 
@@ -190,8 +185,8 @@ impl Beam {
         };
 
         let (intersections, remainders) = (
-            filter_faces(clipping.intersections, area_threshold),
-            filter_faces(clipping.remaining, area_threshold),
+            clipping.intersections.into_iter().collect(),
+            clipping.remaining.into_iter().collect(),
         );
 
         let remainder_beams = self.remainders_to_beams(remainders, medium_refr_index);
@@ -469,15 +464,6 @@ fn create_refracted(
             beam.wavelength,
         )))
     }
-}
-
-/// Filter faces by threshold area.
-fn filter_faces(faces: Vec<Face>, area_threshold: f32) -> Vec<Face> {
-    // remove intersections with below threshold area
-    faces
-        .into_iter()
-        .filter(|x| x.data().area.unwrap() > area_threshold)
-        .collect()
 }
 
 /// Converts the remainder faces from a clipping into beams with the same field
