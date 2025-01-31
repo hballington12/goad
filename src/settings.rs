@@ -1,7 +1,6 @@
 use clap::Parser;
 use config::{Config, File};
 use nalgebra::Complex;
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::f32::consts::PI;
 use std::fmt;
@@ -62,7 +61,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn beam_area_threshold(&self) -> f32 {
-        self.wavelength * self.wavelength / self.beam_area_threshold_fac
+        self.wavelength * self.wavelength * self.beam_area_threshold_fac
     }
 }
 

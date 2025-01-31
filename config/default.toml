@@ -1,4 +1,4 @@
-wavelength = 0.532
+wavelength = 0.266
 medium_refr_index =[1.0,0.0]
 vertex_merge_distance = 0.01
 beam_power_threshold = 0.005
@@ -12,4 +12,4 @@ max_rec = 10
 max_tir = 10
 radius = 1.0
 diff_epsilon = 1e-4
-far_field_resolution = 100
+far_field_resolution = 180
