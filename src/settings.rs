@@ -36,7 +36,7 @@ pub struct Settings {
     pub total_power_cutoff: f32,
     pub medium_refr_index: Complex<f32>,
     pub particle_refr_index: Vec<Complex<f32>>,
-    pub orient_scheme: OrientationScheme,
+    pub orientation: OrientationScheme,
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,

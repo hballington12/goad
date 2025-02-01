@@ -6,9 +6,9 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum OrientationScheme {
-    Uniform {
-        num_orients: usize,
-    },
+    /// Uniform distribution of angles.
+    Uniform { num_orients: usize },
+    /// Discrete list of angles in degrees.
     Discrete {
         alphas: Vec<f32>,
         betas: Vec<f32>,
@@ -39,7 +39,12 @@ impl Orientations {
                 alphas,
                 betas,
                 gammas,
-            } => Orientations::new_discrete(alphas.clone(), betas.clone(), gammas.clone()).unwrap(),
+            } => {
+                let alphas = alphas.clone().iter().map(|x| x * PI / 180.0).collect();
+                let betas = betas.clone().iter().map(|x| x * PI / 180.0).collect();
+                let gammas = gammas.clone().iter().map(|x| x * PI / 180.0).collect();
+                Orientations::new_discrete(alphas, betas, gammas).unwrap()
+            }
         }
     }
 
