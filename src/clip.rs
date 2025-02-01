@@ -396,8 +396,8 @@ pub fn clip_faces<'a>(
 
     let remaining: Vec<_> = remaining_clips
         .into_iter()
-        .map(|poly| poly.project(&clip_in.plane()).unwrap())
-        .collect();
+        .map(|poly| poly.project(&clip_in.plane()))
+        .collect::<Result<Vec<_>>>()?;
 
     Ok((intersections, remaining))
 }

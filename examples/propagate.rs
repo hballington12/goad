@@ -12,7 +12,7 @@ async fn main() {
     // let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30_face.obj").unwrap();
     let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
-    geom.euler_rotate(0.0, 30.0, 0.0);
+    let _ = geom.euler_rotate(0.0, 30.0, 0.0);
 
     let projection = Vector3::new(0.0, 0.0, -1.0).normalize();
     let e_perp = Vector3::x(); // choose e_perp along z-axis for now
@@ -66,22 +66,21 @@ async fn main() {
 
         // Check if "Enter" is pressed
         if is_key_pressed(KeyCode::Enter) {
-            if let Some(next_propagation) = problem.propagate_next() {
-                propagation = Some(next_propagation);
-                // Print the number of beams in the queue without a new line and flush the output
-                println!(
-                    "\rnumber of beams in beam queue: {:?}    ", // Add spaces to overwrite previous text
-                    problem.beam_queue.len()
-                );
-                println!(
-                    "number of beams in outbeams: {:?}    ",
-                    problem.out_beam_queue.len()
-                );
-                io::stdout().flush().unwrap();
-            } else {
-                println!("No more beams to propagate.");
-                break;
-            }
+            let next_propagation = problem.propagate_next().unwrap();
+            propagation = Some(next_propagation);
+            // Print the number of beams in the queue without a new line and flush the output
+            println!(
+                "\rnumber of beams in beam queue: {:?}    ", // Add spaces to overwrite previous text
+                problem.beam_queue.len()
+            );
+            println!(
+                "number of beams in outbeams: {:?}    ",
+                problem.out_beam_queue.len()
+            );
+            io::stdout().flush().unwrap();
+        } else {
+            println!("No more beams to propagate.");
+            break;
         }
 
         next_frame().await;

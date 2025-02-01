@@ -4,7 +4,7 @@ use nalgebra::Complex;
 use serde::Deserialize;
 use std::fmt;
 
-use crate::orientation::{self, OrientationScheme, Orientations};
+use crate::orientation::OrientationScheme;
 
 /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.01;

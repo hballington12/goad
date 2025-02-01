@@ -1,4 +1,4 @@
-wavelength = 0.266
+wavelength = 0.532
 medium_refr_index = [1.0,0.0]
 particle_refr_index = [[1.31,0.0]]
 geom_name = "./examples/data/hex.obj"
@@ -10,5 +10,5 @@ max_tir = 10
 far_field_resolution = 180
 
 [[orientation]]
-#Discrete = { alphas = [182], betas = [20], gammas = [20]}
-Uniform = { num_orients = 25000}
+Discrete = { alphas = [182], betas = [20], gammas = [20]}
+#Uniform = { num_orients = 2}

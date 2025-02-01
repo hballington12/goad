@@ -175,9 +175,13 @@ impl Beam {
 
     /// Processes data from a beam. The beam is propagated, the remainders, reflected,
     /// and refracted beams are computed and output.
-    pub fn propagate(&mut self, geom: &mut Geom, medium_refr_index: Complex<f32>) -> Vec<Beam> {
+    pub fn propagate(
+        &mut self,
+        geom: &mut Geom,
+        medium_refr_index: Complex<f32>,
+    ) -> Result<Vec<Beam>> {
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
-        let _ = clipping.clip();
+        clipping.clip()?;
 
         self.clipping_area = match clipping.stats {
             Some(stats) => stats.intersection_area + stats.remaining_area,
@@ -195,7 +199,7 @@ impl Beam {
         let mut output_beams = Vec::new();
         output_beams.extend(beams);
         output_beams.extend(remainder_beams);
-        output_beams
+        Ok(output_beams)
     }
 
     fn create_beams(

@@ -12,7 +12,6 @@ use nalgebra::Matrix4;
 use nalgebra::Point3;
 use nalgebra::Vector3;
 use nalgebra::Vector4;
-use std::f32::consts::PI;
 use std::path::Path;
 use tobj;
 use tobj::Model;

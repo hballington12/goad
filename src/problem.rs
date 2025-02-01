@@ -5,7 +5,8 @@ use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use ndarray::Array2;
 use rayon::prelude::*;
-use std::fmt;
+use std::{fmt, ops::{Div, DivAssign}};
+use std::ops::Add;
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
@@ -36,7 +37,7 @@ mod tests {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy,  Clone, PartialEq)]
 pub struct Powers {
     pub input: f32,       // near-field input power
     pub output: f32,      // near-field output power
@@ -45,8 +46,62 @@ pub struct Powers {
     pub trnc_rec: f32,    // truncated power due to max recursions
     pub trnc_clip: f32,   // truncated power due to clipping
     pub trnc_energy: f32, // truncated power due to threshold beam power
+    pub trnc_clip_err: f32, // truncated power due to clipping error
     pub trnc_area: f32,   // truncated power due to area threshold
     pub ext_diff: f32,    // external diffraction power
+}
+
+impl DivAssign<f32> for Powers {
+    fn div_assign(&mut self, rhs: f32) {
+        self.input /= rhs;
+        self.output /= rhs;
+        self.absorbed /= rhs;
+        self.trnc_ref /= rhs;
+        self.trnc_rec /= rhs;
+        self.trnc_clip /= rhs;
+        self.trnc_energy /= rhs;
+        self.trnc_clip_err /= rhs;
+        self.trnc_area /= rhs;
+        self.ext_diff /= rhs;
+    }
+}
+
+impl Add for Powers {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            input: self.input + other.input,
+            output: self.output + other.output,
+            absorbed: self.absorbed + other.absorbed,
+            trnc_ref: self.trnc_ref + other.trnc_ref,
+            trnc_rec: self.trnc_rec + other.trnc_rec,
+            trnc_clip: self.trnc_clip + other.trnc_clip,
+            trnc_energy: self.trnc_energy + other.trnc_energy,
+            trnc_clip_err: self.trnc_clip_err + other.trnc_clip_err,
+            trnc_area: self.trnc_area + other.trnc_area,
+            ext_diff: self.ext_diff + other.ext_diff,
+        }
+    }
+}
+
+use std::ops::AddAssign;
+
+impl AddAssign for Powers {
+    fn add_assign(&mut self, other: Self) {
+        *self = Self {
+            input: self.input + other.input,
+            output: self.output + other.output,
+            absorbed: self.absorbed + other.absorbed,
+            trnc_ref: self.trnc_ref + other.trnc_ref,
+            trnc_rec: self.trnc_rec + other.trnc_rec,
+            trnc_clip: self.trnc_clip + other.trnc_clip,
+            trnc_energy: self.trnc_energy + other.trnc_energy,
+            trnc_clip_err: self.trnc_clip_err + other.trnc_clip_err,
+            trnc_area: self.trnc_area + other.trnc_area,
+            ext_diff: self.ext_diff + other.ext_diff,
+        };
+    }
 }
 
 impl Powers {
@@ -59,6 +114,7 @@ impl Powers {
             trnc_rec: 0.0,
             trnc_clip: 0.0,
             trnc_energy: 0.0,
+            trnc_clip_err: 0.0,
             trnc_area: 0.0,
             ext_diff: 0.0,
         }
@@ -73,6 +129,7 @@ impl Powers {
                 + self.trnc_rec
                 // + self.trnc_clip
                 + self.trnc_area    
+                + self.trnc_clip_err
                 + self.trnc_energy)
     }
 }
@@ -83,11 +140,12 @@ impl fmt::Display for Powers {
         writeln!(f, "  Input:            {:.6}", self.input)?;
         writeln!(f, "  Output:           {:.6}", self.output)?;
         writeln!(f, "  Absorbed:         {:.6}", self.absorbed)?;
-        writeln!(f, "  Truncated Ref:    {:.6}", self.trnc_ref)?;
-        writeln!(f, "  Truncated Rec:    {:.6}", self.trnc_rec)?;
-        // writeln!(f, "  Truncated Clip:   {:.6}", self.trnc_clip)?;
-        writeln!(f, "  Truncated Energy: {:.6}", self.trnc_energy)?;
-        writeln!(f, "  Truncated Area:   {:.6}", self.trnc_area)?;
+        writeln!(f, "  Trunc. Ref:       {:.6}", self.trnc_ref)?;
+        writeln!(f, "  Trunc. Rec:       {:.6}", self.trnc_rec)?;
+        // writeln!(f, "  Trunc. Clip:   {:.6}", self.trnc_clip)?;
+        writeln!(f, "  Trunc. Clip Err:  {:.6}", self.trnc_clip_err)?;
+        writeln!(f, "  Trunc. Energy:    {:.6}", self.trnc_energy)?;
+        writeln!(f, "  Trunc. Area:      {:.6}", self.trnc_area)?;
         writeln!(f, "  Other:            {:.6}", self.missing())?;
         writeln!(f, "  External Diff:    {:.6}", self.ext_diff)
     }
@@ -185,7 +243,7 @@ impl Problem {
         queue: &mut Vec<Beam>,
         bins: &[(f32, f32)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
-        description: &str,
+        // description: &str,
     ) {
         // let m = MultiProgress::new();
         // let n = queue.len();
@@ -243,7 +301,7 @@ impl Problem {
             &mut self.ext_diff_beam_queue,
             &self.bins,
             &mut self.ampl,
-            "external diffraction",
+            // "external diffraction",
         );
     }
 
@@ -252,7 +310,7 @@ impl Problem {
             &mut self.out_beam_queue,
             &self.bins,
             &mut self.ampl,
-            "outgoing beams",
+            // "outgoing beams",
         );
     }
     pub fn solve_far(&mut self) {
@@ -312,25 +370,43 @@ impl Problem {
                         self.powers.trnc_ref += beam.power() / self.scale_factor.powi(2);
                         Vec::new()
                     } else {
-                        beam.propagate(
+                        match beam.propagate(
                             &mut self.geom,
                             self.settings.medium_refr_index,
-                        )
+                        ) {
+                            Ok(outputs) => outputs,
+                            Err(_) => {
+                                self.powers.trnc_clip_err += beam.power() / self.scale_factor.powi(2);
+                                Vec::new()
+                            }
+                        }
                     }
                 } else if beam.rec_count > self.settings.max_rec {
                     self.powers.trnc_rec += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 } else {
-                    beam.propagate(
+                    match beam.propagate(
                         &mut self.geom,
                         self.settings.medium_refr_index,
-                    )
+                    ) {
+                        Ok(outputs) => outputs,
+                        Err(_) => {
+                            self.powers.trnc_clip_err += beam.power() / self.scale_factor.powi(2);
+                            Vec::new()
+                        }
+                    }
                 }
             }
-            BeamType::Initial => beam.propagate(
+            BeamType::Initial => match beam.propagate(
                 &mut self.geom,
                 self.settings.medium_refr_index,
-            ),
+            ) {
+                Ok(outputs) => outputs,
+                Err(_) => {
+                    self.powers.trnc_clip_err += beam.power() / self.scale_factor.powi(2);
+                    Vec::new()
+                }
+            },
             _ => {
                 println!("Unknown beam type, returning empty outputs.");
                 Vec::new()
@@ -461,6 +537,7 @@ pub struct MultiProblem {
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
     pub mueller: Array2::<f32>, // total mueller in far-field
     pub settings: Settings,               // runtime settings
+    pub powers: Powers,                   // different power contributions
 }
 
 impl MultiProblem {
@@ -479,8 +556,9 @@ impl MultiProblem {
             settings.far_field_resolution,
         );
         let  mueller = Array2::<f32>::zeros((bins.len(), 16));
+        let powers = Powers::new();
 
-        Self { geom, problems, orientations, bins, mueller, settings }
+        Self { geom, problems, orientations, bins, mueller, settings, powers }
     }
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
@@ -504,33 +582,39 @@ impl MultiProblem {
         pb.set_message("orientation".to_string());
 
 
-        for (i,(alpha, beta, gamma)) in self.orientations.eulers.iter().enumerate() {
-            // println!("orientation: {}",i+1);
+        for (alpha, beta, gamma) in self.orientations.eulers.iter() {
             if let Err(_) = problem.geom.euler_rotate(*alpha, *beta, *gamma) {
             panic!("an euler rotation failed.");
             }
 
+            // solve
             problem.solve();
 
             let mueller = output::ampl_to_mueller(&self.bins, &problem.ampl);
+
+            // reduce
             for (i, row) in mueller.outer_iter().enumerate() {
                 for (j, val) in row.iter().enumerate() {
                     self.mueller[[i,j]] += val;
                 }
             }
+            self.powers += problem.powers;
 
+            // reset
             problem.clone_from(&problem_base);
             pb.inc(1);
         }
 
-        // reduce
+        // normalise
         for mut row in self.mueller.outer_iter_mut() {
             for val in row.iter_mut() {
                 *val /= self.orientations.num_orientations as f32;
             }
         }
-        pb.finish_with_message(format!("(done)"));
+        self.powers /= self.orientations.num_orientations as f32;
 
+        pb.finish_with_message(format!("(done)"));
+        println!("Average {}", self.powers);
     }
 
     pub fn writeup(&self) {
