@@ -1,5 +1,8 @@
 wavelength = 0.532
-medium_refr_index =[1.0,0.0]
+medium_refr_index = [1.0,0.0]
+particle_refr_index = [[1.31,0.0]]
+geom_name = "./examples/data/hex2.obj"
+num_orient = 1
 beam_power_threshold = 0.005
 beam_area_threshold_fac = 1 
 total_power_cutoff = 0.99

@@ -18,20 +18,24 @@ pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
 pub const RADIUS: f32 = 1e4;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
 pub const DIFF_EPSILON: f32 = 1e-3;
-/// Minimum dx or dy
+/// Minimum dx or dy in diffraction computation.
 pub const DIFF_DMIN: f32 = 1e-5;
+/// Tolerance for kxx or kyy in diffraction computation.
 pub const KXY_EPSILON: f32 = 1e-3;
 /// Small perturbation for propagation distance to reduce errors in diffraction
 pub const PROP_PERTURBATION: f32 = 1e-5;
 
 /// Runtime configuration for the application.
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Settings {
     pub wavelength: f32,
     pub beam_power_threshold: f32,
     pub beam_area_threshold_fac: f32,
     pub total_power_cutoff: f32,
     pub medium_refr_index: Complex<f32>,
+    pub particle_refr_index: Vec<Complex<f32>>,
+    pub num_orient: usize,
+    pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,
     pub far_field_resolution: usize,
@@ -46,7 +50,7 @@ impl Settings {
 pub fn load_config() -> Settings {
     let settings = Config::builder()
         .add_source(File::with_name("config/default"))
-        .add_source(File::with_name("config/local"))
+        .add_source(File::with_name("config/local").required(false))
         .add_source(Environment::with_prefix("app"))
         .build()
         .unwrap_or_else(|err| {

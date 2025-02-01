@@ -942,10 +942,6 @@ impl Geom {
                 "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
             ));
         }
-        let alpha = alpha * PI / 180.0;
-        let beta = beta * PI / 180.0;
-        let gamma = gamma * PI / 180.0;
-
         let s1 = alpha.sin();
         let s2 = beta.sin();
         let s3 = gamma.sin();

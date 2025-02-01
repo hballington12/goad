@@ -187,26 +187,26 @@ impl Problem {
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         description: &str,
     ) {
-        // let m = MultiProgress::new();
-        // let n = queue.len();
-        // let pb = m.add(ProgressBar::new(n as u64));
-        // pb.set_style(
-        //     ProgressStyle::with_template(
-        //         "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg}",
-        //     )
-        //     .unwrap()
-        //     .progress_chars("➤➤➤➤➤➤➤➤"),
-        // );
-        // pb.set_message(description.to_string());
-        // let pb2 = m.add(ProgressBar::new(1000 as u64));
-        // pb2.set_style(
-        //     ProgressStyle::with_template(
-        //         "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {percent:>6.1.white}%     {msg}",
-        //     )
-        //     .unwrap()
-        //     .progress_chars("➤➤➤➤➤➤➤➤"),
-        // );
-        // pb2.set_message("power diffracted".to_string());
+        let m = MultiProgress::new();
+        let n = queue.len();
+        let pb = m.add(ProgressBar::new(n as u64));
+        pb.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg}",
+            )
+            .unwrap()
+            .progress_chars("➤➤➤➤➤➤➤➤"),
+        );
+        pb.set_message(description.to_string());
+        let pb2 = m.add(ProgressBar::new(1000 as u64));
+        pb2.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {percent:>6.1.white}%     {msg}",
+            )
+            .unwrap()
+            .progress_chars("➤➤➤➤➤➤➤➤"),
+        );
+        pb2.set_message("power diffracted".to_string());
 
         let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
 
@@ -214,8 +214,8 @@ impl Problem {
             .par_iter()
             .map(|outbeam| {
                 let outbeam_power = outbeam.power();
-                // pb.inc(1);
-                // pb2.inc((outbeam_power / total_power * 1000.0) as u64);
+                pb.inc(1);
+                pb2.inc((outbeam_power / total_power * 1000.0) as u64);
                 outbeam.diffract(bins)
             })
             .reduce(
@@ -465,15 +465,14 @@ pub struct MultiProblem {
 
 /// Creates a new `MultiOrientProblem` from a `Geom` and an orientation scheme.
 impl MultiProblem {
-    pub fn new(geom: Geom, orientations: Orientations) -> Self {
-        let settings = settings::load_config();
-
+    pub fn new(settings: Settings) -> Self {
+        let geom = Geom::from_file(&settings.geom_name).unwrap();
+        let orientations = Orientations::random_uniform(settings.num_orient);
         let problems = Vec::new();
         let bins = bins::generate_bins(
             settings.far_field_resolution,
             settings.far_field_resolution,
         );
-
         let  mueller = Array2::<f32>::zeros((bins.len(), 16));
 
         Self { geom, problems, orientations, bins, mueller, settings }
@@ -483,11 +482,11 @@ impl MultiProblem {
     pub fn solve(&mut self) {
 
         // init a base problem that can be reset
-        let problem_base = Problem::new(self.geom.clone(), Some(self.settings));
+        let problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
         let mut problem = problem_base.clone();
 
         for (i,(alpha, beta, gamma)) in self.orientations.eulers.iter().enumerate() {
-            println!("orientation: {}",i+1);
+            // println!("orientation: {}",i+1);
             if let Err(_) = problem.geom.euler_rotate(*alpha, *beta, *gamma) {
             panic!("an euler rotation failed.");
             }
