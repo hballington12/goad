@@ -466,8 +466,13 @@ pub struct MultiProblem {
 impl MultiProblem {
     /// Creates a new `MultiOrientProblem` from a `settings: Settings` configuration.
     pub fn new(settings: Settings) -> Self {
-        let geom = Geom::from_file(&settings.geom_name).unwrap();
-        let orientations = Orientations::generate(&settings.orient_config);
+        let mut geom = Geom::from_file(&settings.geom_name).unwrap();
+        // set the refractive index of the shapes in geometry from settings.particle_refr_index
+        for (i, shape) in geom.shapes.iter_mut().enumerate() {
+            shape.refr_index = settings.particle_refr_index[i];
+        }
+
+        let orientations = Orientations::generate(&settings.orientation);
         let problems = Vec::new();
         let bins = bins::generate_bins(
             settings.far_field_resolution,

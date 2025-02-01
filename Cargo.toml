@@ -19,3 +19,4 @@ rand = "0.9.0"
 rayon = "1.10.0"
 serde = { version = "1.0.217", features = ["derive"]}
 tobj = "4.0.2"
+toml = "0.8.19"

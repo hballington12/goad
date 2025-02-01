@@ -4,7 +4,7 @@ use nalgebra::Complex;
 use serde::Deserialize;
 use std::fmt;
 
-use crate::orientation::{self, Orientations};
+use crate::orientation::{self, OrientationScheme, Orientations};
 
 /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.01;
@@ -36,8 +36,7 @@ pub struct Settings {
     pub total_power_cutoff: f32,
     pub medium_refr_index: Complex<f32>,
     pub particle_refr_index: Vec<Complex<f32>>,
-    pub num_orientations: usize,
-    pub orient_config: orientation::Config,
+    pub orientation: OrientationScheme,
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,

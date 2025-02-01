@@ -967,6 +967,7 @@ dependencies = [
  "rayon",
  "serde",
  "tobj",
+ "toml",
 ]
 
 [[package]]

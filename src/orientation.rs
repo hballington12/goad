@@ -2,12 +2,29 @@ use std::f32::consts::PI;
 
 use anyhow::Result;
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+// #[derive(Debug, Clone, Deserialize, PartialEq)]
+// pub struct Config {
+//     pub scheme: String,
+//     pub num_orientations: usize,
+// }
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum OrientationScheme {
+    Uniform {
+        num_orients: usize,
+    },
+    Discrete {
+        alphas: Vec<f32>,
+        betas: Vec<f32>,
+        gammas: Vec<f32>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Config {
-    pub scheme: String,
-    pub num_orientations: usize,
+    pub orientation: OrientationScheme,
 }
 
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles
@@ -19,10 +36,16 @@ pub struct Orientations {
 }
 
 impl Orientations {
-    pub fn generate(config: &Config) -> Orientations {
-        match config.scheme.as_str() {
-            "uniform" => Orientations::random_uniform(config.num_orientations),
-            _ => panic!("Unknown orientation scheme"),
+    pub fn generate(scheme: &OrientationScheme) -> Orientations {
+        match &scheme {
+            OrientationScheme::Uniform {
+                num_orients: num_orientations,
+            } => Orientations::random_uniform(*num_orientations),
+            OrientationScheme::Discrete {
+                alphas,
+                betas,
+                gammas,
+            } => Orientations::new_discrete(alphas.clone(), betas.clone(), gammas.clone()).unwrap(),
         }
     }
 
