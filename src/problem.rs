@@ -5,7 +5,7 @@ use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use ndarray::Array2;
 use rayon::prelude::*;
-use std::{fmt, ops::{Div, DivAssign}};
+use std::{fmt, ops::DivAssign};
 use std::ops::Add;
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -46,7 +46,7 @@ pub struct Powers {
     pub trnc_rec: f32,    // truncated power due to max recursions
     pub trnc_clip: f32,   // truncated power due to clipping
     pub trnc_energy: f32, // truncated power due to threshold beam power
-    pub trnc_clip_err: f32, // truncated power due to clipping error
+    pub clip_err: f32, // truncated power due to clipping error
     pub trnc_area: f32,   // truncated power due to area threshold
     pub ext_diff: f32,    // external diffraction power
 }
@@ -60,7 +60,7 @@ impl DivAssign<f32> for Powers {
         self.trnc_rec /= rhs;
         self.trnc_clip /= rhs;
         self.trnc_energy /= rhs;
-        self.trnc_clip_err /= rhs;
+        self.clip_err /= rhs;
         self.trnc_area /= rhs;
         self.ext_diff /= rhs;
     }
@@ -78,7 +78,7 @@ impl Add for Powers {
             trnc_rec: self.trnc_rec + other.trnc_rec,
             trnc_clip: self.trnc_clip + other.trnc_clip,
             trnc_energy: self.trnc_energy + other.trnc_energy,
-            trnc_clip_err: self.trnc_clip_err + other.trnc_clip_err,
+            clip_err: self.clip_err + other.clip_err,
             trnc_area: self.trnc_area + other.trnc_area,
             ext_diff: self.ext_diff + other.ext_diff,
         }
@@ -97,7 +97,7 @@ impl AddAssign for Powers {
             trnc_rec: self.trnc_rec + other.trnc_rec,
             trnc_clip: self.trnc_clip + other.trnc_clip,
             trnc_energy: self.trnc_energy + other.trnc_energy,
-            trnc_clip_err: self.trnc_clip_err + other.trnc_clip_err,
+            clip_err: self.clip_err + other.clip_err,
             trnc_area: self.trnc_area + other.trnc_area,
             ext_diff: self.ext_diff + other.ext_diff,
         };
@@ -114,7 +114,7 @@ impl Powers {
             trnc_rec: 0.0,
             trnc_clip: 0.0,
             trnc_energy: 0.0,
-            trnc_clip_err: 0.0,
+            clip_err: 0.0,
             trnc_area: 0.0,
             ext_diff: 0.0,
         }
@@ -129,7 +129,7 @@ impl Powers {
                 + self.trnc_rec
                 // + self.trnc_clip
                 + self.trnc_area    
-                + self.trnc_clip_err
+                + self.clip_err
                 + self.trnc_energy)
     }
 }
@@ -140,10 +140,10 @@ impl fmt::Display for Powers {
         writeln!(f, "  Input:            {:.6}", self.input)?;
         writeln!(f, "  Output:           {:.6}", self.output)?;
         writeln!(f, "  Absorbed:         {:.6}", self.absorbed)?;
-        writeln!(f, "  Trunc. Ref:       {:.6}", self.trnc_ref)?;
+        writeln!(f, "  Trunc. Refl:      {:.6}", self.trnc_ref)?;
         writeln!(f, "  Trunc. Rec:       {:.6}", self.trnc_rec)?;
         // writeln!(f, "  Trunc. Clip:   {:.6}", self.trnc_clip)?;
-        writeln!(f, "  Trunc. Clip Err:  {:.6}", self.trnc_clip_err)?;
+        writeln!(f, "  Clip Err:         {:.6}", self.clip_err)?;
         writeln!(f, "  Trunc. Energy:    {:.6}", self.trnc_energy)?;
         writeln!(f, "  Trunc. Area:      {:.6}", self.trnc_area)?;
         writeln!(f, "  Other:            {:.6}", self.missing())?;
@@ -374,9 +374,11 @@ impl Problem {
                             &mut self.geom,
                             self.settings.medium_refr_index,
                         ) {
-                            Ok(outputs) => outputs,
+                            Ok((outputs,area_power_loss)) => {
+                                self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                                outputs},
                             Err(_) => {
-                                self.powers.trnc_clip_err += beam.power() / self.scale_factor.powi(2);
+                                self.powers.clip_err += beam.power() / self.scale_factor.powi(2);
                                 Vec::new()
                             }
                         }
@@ -389,9 +391,11 @@ impl Problem {
                         &mut self.geom,
                         self.settings.medium_refr_index,
                     ) {
-                        Ok(outputs) => outputs,
+                        Ok((outputs,area_power_loss)) => {
+                                self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                                outputs},
                         Err(_) => {
-                            self.powers.trnc_clip_err += beam.power() / self.scale_factor.powi(2);
+                            self.powers.clip_err += beam.power() / self.scale_factor.powi(2);
                             Vec::new()
                         }
                     }
@@ -401,9 +405,12 @@ impl Problem {
                 &mut self.geom,
                 self.settings.medium_refr_index,
             ) {
-                Ok(outputs) => outputs,
+                Ok((outputs,area_power_loss)) => {
+                self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                outputs},
+
                 Err(_) => {
-                    self.powers.trnc_clip_err += beam.power() / self.scale_factor.powi(2);
+                    self.powers.clip_err += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 }
             },

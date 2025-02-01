@@ -136,6 +136,7 @@ pub struct Stats {
     pub remaining_area: f32,    // the total remaining area
     pub consvtn: f32,           // the ratio of intersection to clipping area
     pub total_consvtn: f32,     // the ratio of (intersection + remaining) to clipping area
+    pub area_loss: f32,         // the total area loss
 }
 
 impl Stats {
@@ -159,12 +160,16 @@ impl Stats {
         } else {
             (intersection_area + remaining_area) / clipping_area
         };
+
+        let area_loss = clipping_area - intersection_area - remaining_area;
+
         Self {
             clipping_area,
             intersection_area,
             remaining_area,
             consvtn,
             total_consvtn,
+            area_loss,
         }
     }
 }
