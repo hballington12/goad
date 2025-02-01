@@ -2,6 +2,13 @@ use std::f32::consts::PI;
 
 use anyhow::Result;
 use rand::Rng;
+use serde::Deserialize;
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct Config {
+    pub scheme: String,
+    pub num_orientations: usize,
+}
 
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles
 /// or a distribution.
@@ -12,6 +19,13 @@ pub struct Orientations {
 }
 
 impl Orientations {
+    pub fn generate(config: &Config) -> Orientations {
+        match config.scheme.as_str() {
+            "uniform" => Orientations::random_uniform(config.num_orientations),
+            _ => panic!("Unknown orientation scheme"),
+        }
+    }
+
     /// Creates a new orientation scheme with the given discrete angles.
     pub fn new_discrete(alphas: Vec<f32>, betas: Vec<f32>, gammas: Vec<f32>) -> Result<Self> {
         if alphas.is_empty() || betas.is_empty() || gammas.is_empty() {

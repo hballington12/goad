@@ -4,6 +4,8 @@ use nalgebra::Complex;
 use serde::Deserialize;
 use std::fmt;
 
+use crate::orientation::{self, Orientations};
+
 /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.01;
 /// Scaling factor for integer coordinates during clipping.
@@ -34,7 +36,8 @@ pub struct Settings {
     pub total_power_cutoff: f32,
     pub medium_refr_index: Complex<f32>,
     pub particle_refr_index: Vec<Complex<f32>>,
-    pub num_orient: usize,
+    pub num_orientations: usize,
+    pub orient_config: orientation::Config,
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,

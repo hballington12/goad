@@ -463,11 +463,11 @@ pub struct MultiProblem {
     pub settings: Settings,               // runtime settings
 }
 
-/// Creates a new `MultiOrientProblem` from a `Geom` and an orientation scheme.
 impl MultiProblem {
+    /// Creates a new `MultiOrientProblem` from a `settings: Settings` configuration.
     pub fn new(settings: Settings) -> Self {
         let geom = Geom::from_file(&settings.geom_name).unwrap();
-        let orientations = Orientations::random_uniform(settings.num_orient);
+        let orientations = Orientations::generate(&settings.orient_config);
         let problems = Vec::new();
         let bins = bins::generate_bins(
             settings.far_field_resolution,
