@@ -2,15 +2,9 @@ use std::f32::consts::PI;
 
 use anyhow::Result;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-// #[derive(Debug, Clone, Deserialize, PartialEq)]
-// pub struct Config {
-//     pub scheme: String,
-//     pub num_orientations: usize,
-// }
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum OrientationScheme {
     Uniform {
         num_orients: usize,
@@ -22,9 +16,9 @@ pub enum OrientationScheme {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Config {
-    pub orientation: OrientationScheme,
+    pub orient_scheme: OrientationScheme,
 }
 
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles
