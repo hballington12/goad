@@ -250,7 +250,7 @@ impl Beam {
                 // determine other BeamData values here later...
             })
             .into_iter()
-            .flat_map(|(refl, trans, ext)| refl.into_iter().chain(trans).chain(ext))
+            .flat_map(|(refl, refr, ext)| refl.into_iter().chain(refr).chain(ext))
             .collect()
     }
 }
