@@ -10,5 +10,5 @@ max_tir = 10
 far_field_resolution = 180
 
 #Orientation = [ {uniform = { num_orients = 1 }}]
-orientation = [ {Discrete = { alphas = [60], betas = [0], gammas = [20]}}]
+orientation = [ {Discrete = { alphas = [0], betas = [0], gammas = [20]}}]
 #orientation = {Discrete = { alphas = [0,20], betas = [20,20], gammas = [0,0]}}

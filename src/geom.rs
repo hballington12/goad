@@ -974,10 +974,13 @@ impl Geom {
             for face in shape.faces.iter_mut() {
                 match face {
                     Face::Simple(data) => {
+                        data.midpoint = rot * data.midpoint;
+                        data.normal = rot * data.normal;
                         for vertex in data.exterior.iter_mut() {
                             vertex.coords = rot * vertex.coords;
                         }
                     }
+
                     Face::Complex { data, interiors } => {
                         for vertex in data.exterior.iter_mut() {
                             vertex.coords = rot * vertex.coords;
@@ -991,6 +994,7 @@ impl Geom {
                     }
                 }
             }
+            shape.set_aabb();
         }
 
         Ok(())
