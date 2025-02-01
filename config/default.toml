@@ -9,6 +9,6 @@ max_rec = 10
 max_tir = 10
 far_field_resolution = 180
 
-[orientation]
-Uniform = { num_orients = 10 }
-#Discrete = { alphas = [0,20], betas = [20,20], gammas = [0,0]}
+#Orientation = [ {uniform = { num_orients = 1 }}]
+orientation = [ {Discrete = { alphas = [30], betas = [10], gammas = [0]}}]
+#orientation = {Discrete = { alphas = [0,20], betas = [20,20], gammas = [0,0]}}

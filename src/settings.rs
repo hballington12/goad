@@ -60,8 +60,6 @@ pub fn load_config() -> Settings {
             std::process::exit(1);
         });
 
-    println!(" confid is {:#?}", settings);
-
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
         std::process::exit(1);

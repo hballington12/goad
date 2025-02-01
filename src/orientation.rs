@@ -5,7 +5,7 @@ use rand::Rng;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-pub enum OrientationScheme {
+pub enum Scheme {
     /// Uniform distribution of angles.
     Uniform { num_orients: usize },
     /// Discrete list of angles in degrees.
@@ -17,8 +17,8 @@ pub enum OrientationScheme {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-pub struct Config {
-    pub orient_scheme: OrientationScheme,
+pub struct OrientationScheme {
+    pub scheme: Scheme,
 }
 
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles
@@ -30,19 +30,19 @@ pub struct Orientations {
 }
 
 impl Orientations {
-    pub fn generate(scheme: &OrientationScheme) -> Orientations {
+    pub fn generate(scheme: &Scheme) -> Orientations {
         match &scheme {
-            OrientationScheme::Uniform {
+            Scheme::Uniform {
                 num_orients: num_orientations,
             } => Orientations::random_uniform(*num_orientations),
-            OrientationScheme::Discrete {
+            Scheme::Discrete {
                 alphas,
                 betas,
                 gammas,
             } => {
-                let alphas = alphas.clone().iter().map(|x| x * PI / 180.0).collect();
-                let betas = betas.clone().iter().map(|x| x * PI / 180.0).collect();
-                let gammas = gammas.clone().iter().map(|x| x * PI / 180.0).collect();
+                let alphas = alphas.clone();
+                let betas = betas.clone();
+                let gammas = gammas.clone();
                 Orientations::new_discrete(alphas, betas, gammas).unwrap()
             }
         }
@@ -70,13 +70,13 @@ impl Orientations {
     pub fn random_uniform(num_orient: usize) -> Orientations {
         let mut rng = rand::rng();
         let alphas: Vec<f32> = (0..num_orient)
-            .map(|_| rng.random_range(0.0..1.0) as f32 * 2.0 * PI)
+            .map(|_| rng.random_range(0.0..1.0) as f32 * 360.0)
             .collect();
         let betas: Vec<f32> = (0..num_orient)
-            .map(|_| (1.0 - rng.random_range(0.0..1.0) as f32 * 2.0).acos())
+            .map(|_| (1.0 - rng.random_range(0.0..1.0) as f32 * 2.0).acos() * 180.0 / PI)
             .collect();
         let gammas: Vec<f32> = (0..num_orient)
-            .map(|_| rng.random_range(0.0..1.0) as f32 * 2.0 * PI)
+            .map(|_| rng.random_range(0.0..1.0) as f32 * 360.0)
             .collect();
 
         let orientations = Orientations::new_discrete(alphas, betas, gammas).unwrap();

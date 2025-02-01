@@ -934,7 +934,7 @@ impl Geom {
         self.centre_of_mass().coords.norm() < 1e-6
     }
 
-    /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in radians)
+    /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in degrees)
     /// Uses Mishchenko's Euler rotation matrix convention.
     pub fn euler_rotate(&mut self, alpha: f32, beta: f32, gamma: f32) -> Result<()> {
         if !self.is_centered() {
@@ -942,6 +942,11 @@ impl Geom {
                 "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
             ));
         }
+
+        let alpha = alpha.to_radians();
+        let beta = beta.to_radians();
+        let gamma = gamma.to_radians();
+
         let s1 = alpha.sin();
         let s2 = beta.sin();
         let s3 = gamma.sin();

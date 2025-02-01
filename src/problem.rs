@@ -281,7 +281,7 @@ impl Problem {
             self.propagate_next();
         }
 
-        // println!("{}", self.powers);
+        println!("{}", self.powers);
     }
 
     pub fn writeup(&self) {
@@ -472,7 +472,7 @@ impl MultiProblem {
             shape.refr_index = settings.particle_refr_index[i];
         }
 
-        let orientations = Orientations::generate(&settings.orientation);
+        let orientations = Orientations::generate(&settings.orientation.scheme);
         let problems = Vec::new();
         let bins = bins::generate_bins(
             settings.far_field_resolution,
