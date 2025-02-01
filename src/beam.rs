@@ -221,10 +221,7 @@ impl Beam {
                 let n2 = get_n2(geom, self, face, normal, medium_refr_index);
                 let e_perp = get_e_perp(normal, &self);
                 let rot = get_rotation_matrix(&self, e_perp);
-                let (ampl, absorbed_intensity) = match get_ampl(&self, rot, face, n1) {
-                    Ok((ampl, absorbed_power)) => (ampl, absorbed_power),
-                    Err(_) => return None, // skip this intersection if get_ampl() returns error
-                };
+                let (ampl, absorbed_intensity) = get_ampl(&self, rot, face, n1);
 
                 let external_diff = if self.type_ == BeamType::Initial {
                     Some(Beam::new(
@@ -245,23 +242,8 @@ impl Beam {
                 self.absorbed_power +=
                     absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
-                let refracted =
-                    match create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2) {
-                        Ok(beam) => beam,
-                        Err(_) => {
-                            // count skipped beams
-                            None
-                        }
-                    };
-
-                let reflected =
-                    match create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2) {
-                        Ok(beam) => beam,
-                        Err(_) => {
-                            // count skipped beams
-                            None
-                        }
-                    };
+                let refracted = create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2);
+                let reflected = create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2);
 
                 Some((reflected, refracted, external_diff))
 
@@ -326,26 +308,24 @@ fn get_ampl(
     rot: Matrix2<Complex<f32>>,
     face: &Face,
     n1: Complex<f32>,
-) -> Result<(Matrix2<Complex<f32>>, f32)> {
+) -> (Matrix2<Complex<f32>>, f32) {
     let mut ampl = rot * beam.field.ampl.clone();
     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
     let wavenumber = beam.wavenumber();
 
-    if dist < 0.0 {
-        return Err(anyhow::anyhow!("distance less than 0: {}", dist));
-    }
-
     let arg = dist * wavenumber * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
 
-    let absorbed_intensity = Field::ampl_intensity(&ampl)
-        * (1.0 - (-2.0 * wavenumber * n1.im * dist.sqrt()).exp().powi(2));
+    let dist_sqrt = dist.signum() * dist.abs().sqrt(); // TODO: improve this
 
-    let exp_absorption = (-2.0 * wavenumber * n1.im * dist.sqrt()).exp(); // absorption
+    let absorbed_intensity = Field::ampl_intensity(&ampl)
+        * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
+
+    let exp_absorption = (-2.0 * wavenumber * n1.im * dist_sqrt).exp(); // absorption
 
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
 
-    Ok((ampl, absorbed_intensity))
+    (ampl, absorbed_intensity)
 }
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
@@ -391,7 +371,7 @@ fn create_reflected(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
-) -> Result<Option<Beam>> {
+) -> Option<Beam> {
     let prop = get_reflection_vector(&normal, &beam.prop);
 
     debug_assert!((prop.dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
@@ -403,7 +383,7 @@ fn create_reflected(
         let refl_ampl = fresnel * ampl;
         debug_assert!(!Field::ampl_intensity(&refl_ampl).is_nan());
 
-        Ok(Some(Beam::new(
+        Some(Beam::new(
             face.clone(),
             prop,
             n1,
@@ -413,23 +393,23 @@ fn create_reflected(
             Some(BeamVariant::Tir),
             BeamType::Default,
             beam.wavelength,
-        )))
+        ))
     } else {
         let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
         let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
         let refl_ampl = fresnel * ampl;
 
-        Ok(Some(Beam::new(
+        Some(Beam::new(
             face.clone(),
             prop,
             n1,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refl_ampl)?,
+            Field::new(e_perp, prop, refl_ampl).unwrap(),
             Some(BeamVariant::Refl),
             BeamType::Default,
             beam.wavelength,
-        )))
+        ))
     }
 }
 
@@ -443,10 +423,10 @@ fn create_refracted(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
-) -> Result<Option<Beam>> {
+) -> Option<Beam> {
     if theta_i > (n2.re / n1.re).asin() {
         // if total internal reflection
-        Ok(None)
+        None
     } else {
         let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
         let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
@@ -458,17 +438,17 @@ fn create_refracted(
             (prop.dot(&normal).abs() - theta_t.cos()).abs() < settings::COLINEAR_THRESHOLD
         );
 
-        Ok(Some(Beam::new(
+        Some(Beam::new(
             face.clone(),
             prop,
             n2,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refr_ampl)?,
+            Field::new(e_perp, prop, refr_ampl).unwrap(),
             Some(BeamVariant::Refr),
             BeamType::Default,
             beam.wavelength,
-        )))
+        ))
     }
 }
 
