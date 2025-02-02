@@ -16,7 +16,6 @@ use crate::geom::Face;
 use crate::geom::Geom;
 use crate::helpers::draw_face;
 use crate::helpers::lines_to_screen;
-use crate::output;
 use crate::settings;
 use crate::snell::get_theta_t;
 
@@ -242,8 +241,11 @@ impl Beam {
                 outputs.push(external_diff);
             }
 
-            let refracted = create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2);
-            let reflected = create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2);
+            // untracked energy leaks can occur here if the amplitude matrix contains NaN values
+            let refracted =
+                create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2).unwrap_or(None);
+            let reflected =
+                create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2).unwrap_or(None);
 
             if refracted.is_some() {
                 outputs.push(refracted.unwrap().clone());
@@ -312,6 +314,7 @@ fn get_ampl(
     n1: Complex<f32>,
 ) -> (Matrix2<Complex<f32>>, f32) {
     let mut ampl = rot * beam.field.ampl.clone();
+
     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
     let wavenumber = beam.wavenumber();
 
@@ -373,7 +376,7 @@ fn create_reflected(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
-) -> Option<Beam> {
+) -> Result<Option<Beam>> {
     let prop = get_reflection_vector(&normal, &beam.prop);
 
     debug_assert!((prop.dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
@@ -385,7 +388,7 @@ fn create_reflected(
         let refl_ampl = fresnel * ampl;
         debug_assert!(!Field::ampl_intensity(&refl_ampl).is_nan());
 
-        Some(Beam::new(
+        Ok(Some(Beam::new(
             face.clone(),
             prop,
             n1,
@@ -395,13 +398,13 @@ fn create_reflected(
             Some(BeamVariant::Tir),
             BeamType::Default,
             beam.wavelength,
-        ))
+        )))
     } else {
-        let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
+        let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
         let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
         let refl_ampl = fresnel * ampl;
 
-        Some(Beam::new(
+        Ok(Some(Beam::new(
             face.clone(),
             prop,
             n1,
@@ -411,7 +414,7 @@ fn create_reflected(
             Some(BeamVariant::Refl),
             BeamType::Default,
             beam.wavelength,
-        ))
+        )))
     }
 }
 
@@ -425,12 +428,12 @@ fn create_refracted(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
-) -> Option<Beam> {
-    if theta_i > (n2.re / n1.re).asin() {
+) -> Result<Option<Beam>> {
+    if theta_i >= (n2.re / n1.re).asin() {
         // if total internal reflection
-        None
+        Ok(None)
     } else {
-        let theta_t = get_theta_t(theta_i, n1, n2); // sin(theta_t)
+        let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
         let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
         let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
         let refr_ampl = fresnel * ampl.clone();
@@ -440,7 +443,7 @@ fn create_refracted(
             (prop.dot(&normal).abs() - theta_t.cos()).abs() < settings::COLINEAR_THRESHOLD
         );
 
-        Some(Beam::new(
+        Ok(Some(Beam::new(
             face.clone(),
             prop,
             n2,
@@ -450,7 +453,7 @@ fn create_refracted(
             Some(BeamVariant::Refr),
             BeamType::Default,
             beam.wavelength,
-        ))
+        )))
     }
 }
 

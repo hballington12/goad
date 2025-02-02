@@ -2,6 +2,7 @@ use std::f32::consts::PI;
 
 use anyhow::Result;
 use rand::Rng;
+use rand::SeedableRng;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -68,7 +69,8 @@ impl Orientations {
     }
 
     pub fn random_uniform(num_orient: usize) -> Orientations {
-        let mut rng = rand::rng();
+        // let mut rng = rand::rng();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(41);
         let alphas: Vec<f32> = (0..num_orient)
             .map(|_| rng.random_range(0.0..1.0) as f32 * 360.0)
             .collect();
