@@ -577,7 +577,6 @@ impl MultiProblem {
         let problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
         let mut problem = problem_base.clone();
 
-
         let m = MultiProgress::new();
         let n = self.orientations.num_orientations;
         let pb = m.add(ProgressBar::new(n as u64));
@@ -590,29 +589,25 @@ impl MultiProblem {
         );
         pb.set_message("orientation".to_string());
 
-
-        for (alpha, beta, gamma) in self.orientations.eulers.iter() {
-            if let Err(error) = problem.geom.euler_rotate(*alpha, *beta, *gamma) {
+        (self.mueller,self.powers) = self.orientations.eulers.par_iter().map(|(a,b,g)| {
+            let mut problem = problem_base.clone();
+            if let Err(error) = problem.geom.euler_rotate(*a, *b, *g) {
                 panic!("Error rotating geometry: {}", error);
             }
 
-            // solve
             problem.solve();
 
             let mueller = output::ampl_to_mueller(&self.bins, &problem.ampl);
 
-            // reduce
-            for (i, row) in mueller.outer_iter().enumerate() {
-                for (j, val) in row.iter().enumerate() {
-                    self.mueller[[i,j]] += val;
-                }
-            }
-            self.powers += problem.powers;
-
-            // reset
-            problem.clone_from(&problem_base);
             pb.inc(1);
-        }
+            (mueller, problem.powers)
+        }).reduce(|| (Array2::<f32>::zeros((self.bins.len(), 16)), Powers::new()), |(mut acc_mueller, mut acc_powers), (local_mueller, local_powers)| {
+            for (a, l) in acc_mueller.iter_mut().zip(local_mueller) {
+                *a += l;
+            }
+            acc_powers += local_powers;
+            (acc_mueller, acc_powers)
+        });
 
         // normalise
         for mut row in self.mueller.outer_iter_mut() {
