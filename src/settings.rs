@@ -71,6 +71,11 @@ pub fn load_config() -> Settings {
         config.wavelength = wavelength;
     }
 
+    assert!(
+        config.beam_area_threshold_fac > 1e-5,
+        "Beam area threshold factor must be greater than 1e-5"
+    );
+
     config
 }
 

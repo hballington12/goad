@@ -183,7 +183,7 @@ impl Beam {
         area_threshold: f32,
     ) -> Result<(Vec<Beam>, f32)> {
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
-        clipping.clip(area_threshold).unwrap();
+        clipping.clip(area_threshold)?;
 
         self.clipping_area = match clipping.stats {
             Some(stats) => stats.intersection_area + stats.remaining_area,
