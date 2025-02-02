@@ -556,6 +556,7 @@ impl MultiProblem {
         for (i, shape) in geom.shapes.iter_mut().enumerate() {
             shape.refr_index = settings.particle_refr_index[i];
         }
+        geom.recentre();
 
         let orientations = Orientations::generate(&settings.orientation.scheme);
         let problems = Vec::new();
@@ -591,8 +592,8 @@ impl MultiProblem {
 
 
         for (alpha, beta, gamma) in self.orientations.eulers.iter() {
-            if let Err(_) = problem.geom.euler_rotate(*alpha, *beta, *gamma) {
-            panic!("an euler rotation failed.");
+            if let Err(error) = problem.geom.euler_rotate(*alpha, *beta, *gamma) {
+                panic!("Error rotating geometry: {}", error);
             }
 
             // solve
