@@ -216,64 +216,48 @@ impl Beam {
 
         let n1 = self.refr_index;
 
-        // create beams
-        let outputs: Vec<_> = intersections
-            .iter()
-            .filter_map(|face| {
-                let normal = face.data().normal;
-                let theta_i = normal.dot(&self.prop).abs().acos();
-                let n2 = get_n2(geom, self, face, normal, medium_refr_index);
-                let e_perp = get_e_perp(normal, &self);
-                let rot = get_rotation_matrix(&self, e_perp);
-                let (ampl, absorbed_intensity) = get_ampl(&self, rot, face, n1);
+        let mut outputs = Vec::new();
+        for face in &intersections {
+            let normal = face.data().normal;
+            let theta_i = normal.dot(&self.prop).abs().acos();
+            let n2 = get_n2(geom, self, face, normal, medium_refr_index);
+            let e_perp = get_e_perp(normal, &self);
+            let rot = get_rotation_matrix(&self, e_perp);
+            let (ampl, absorbed_intensity) = get_ampl(&self, rot, face, n1);
 
-                let external_diff = if self.type_ == BeamType::Initial {
-                    Some(Beam::new(
-                        face.clone(),
-                        self.prop,
-                        n1,
-                        self.rec_count + 1,
-                        self.tir_count,
-                        Field::new(e_perp, self.prop, ampl).unwrap(),
-                        None,
-                        BeamType::ExternalDiff,
-                        self.wavelength,
-                    ))
-                } else {
-                    None
-                };
+            self.absorbed_power +=
+                absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
-                self.absorbed_power +=
-                    absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
+            if self.type_ == BeamType::Initial {
+                let external_diff = Beam::new(
+                    face.clone(),
+                    self.prop,
+                    n1,
+                    self.rec_count + 1,
+                    self.tir_count,
+                    Field::new(e_perp, self.prop, ampl).unwrap(),
+                    None,
+                    BeamType::ExternalDiff,
+                    self.wavelength,
+                );
+                manual_output_power += external_diff.power();
+                outputs.push(external_diff);
+            }
 
-                let refracted = create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2);
-                let reflected = create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2);
+            let refracted = create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2);
+            let reflected = create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2);
 
-                // manual power summation
-                if let Some(refracted) = &refracted {
-                    manual_output_power += refracted.power();
-                }
-                if let Some(reflected) = &reflected {
-                    manual_output_power += reflected.power();
-                }
-                if let Some(external_diff) = &external_diff {
-                    manual_output_power += external_diff.power();
-                }
+            if refracted.is_some() {
+                manual_output_power += refracted.as_ref().unwrap().power();
+                outputs.push(refracted.unwrap().clone());
+            }
+            if reflected.is_some() {
+                manual_output_power += reflected.as_ref().unwrap().power();
+                outputs.push(reflected.unwrap().clone());
+            }
+        }
 
-                Some(
-                    vec![reflected, refracted, external_diff]
-                        .into_iter()
-                        .filter_map(|x| x)
-                        .collect::<Vec<_>>(),
-                )
-
-                // determine other BeamData values here later...
-            })
-            .collect();
-
-        let output_power = outputs.iter().fold(0.0, |acc, x| {
-            acc + x.iter().fold(0.0, |acc, x| acc + x.power())
-        });
+        let output_power = outputs.iter().fold(0.0, |acc, x| acc + x.power());
         let power_loss = input_power - output_power;
         // println!("power loss: {}", power_loss);
         println!(
@@ -281,8 +265,6 @@ impl Beam {
             power_loss / input_power,
             manual_output_power / input_power
         );
-
-        let outputs: Vec<_> = outputs.into_iter().flatten().collect();
 
         outputs
     }
