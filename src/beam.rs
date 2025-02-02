@@ -16,6 +16,7 @@ use crate::geom::Face;
 use crate::geom::Geom;
 use crate::helpers::draw_face;
 use crate::helpers::lines_to_screen;
+use crate::output;
 use crate::settings;
 use crate::snell::get_theta_t;
 
@@ -210,10 +211,13 @@ impl Beam {
         intersections: Vec<Face>,
         medium_refr_index: Complex<f32>,
     ) -> Vec<Beam> {
+        let input_power = self.power();
+        let mut manual_output_power = 0.0;
+
         let n1 = self.refr_index;
 
         // create beams
-        intersections
+        let outputs: Vec<_> = intersections
             .iter()
             .filter_map(|face| {
                 let normal = face.data().normal;
@@ -245,13 +249,42 @@ impl Beam {
                 let refracted = create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2);
                 let reflected = create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2);
 
-                Some((reflected, refracted, external_diff))
+                // manual power summation
+                if let Some(refracted) = &refracted {
+                    manual_output_power += refracted.power();
+                }
+                if let Some(reflected) = &reflected {
+                    manual_output_power += reflected.power();
+                }
+                if let Some(external_diff) = &external_diff {
+                    manual_output_power += external_diff.power();
+                }
+
+                Some(
+                    vec![reflected, refracted, external_diff]
+                        .into_iter()
+                        .filter_map(|x| x)
+                        .collect::<Vec<_>>(),
+                )
 
                 // determine other BeamData values here later...
             })
-            .into_iter()
-            .flat_map(|(refl, refr, ext)| refl.into_iter().chain(refr).chain(ext))
-            .collect()
+            .collect();
+
+        let output_power = outputs.iter().fold(0.0, |acc, x| {
+            acc + x.iter().fold(0.0, |acc, x| acc + x.power())
+        });
+        let power_loss = input_power - output_power;
+        // println!("power loss: {}", power_loss);
+        println!(
+            "power conservation: final {}, manual {}",
+            power_loss / input_power,
+            manual_output_power / input_power
+        );
+
+        let outputs: Vec<_> = outputs.into_iter().flatten().collect();
+
+        outputs
     }
 }
 

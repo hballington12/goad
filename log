@@ -1,3925 +1,481 @@
-Settings {
-    wavelength: 0.532,
-    beam_power_threshold: 0.005,
-    beam_area_threshold_fac: 1.0,
-    total_power_cutoff: 0.99,
-    medium_refr_index: Complex {
-        re: 1.0,
-        im: 0.0,
-    },
-    particle_refr_index: [
-        Complex {
-            re: 1.31,
-            im: 0.0,
-        },
-    ],
-    orientation: OrientationScheme {
-        scheme: Discrete {
-            alphas: [
-                182.0,
-            ],
-            betas: [
-                50.0,
-            ],
-            gammas: [
-                20.0,
-            ],
-        },
-    },
-    geom_name: "./examples/data/hex_indented.obj",
-    max_rec: 1,
-    max_tir: 10,
-    far_field_resolution: 205,
-}
-power in: 4.191563
-clipping stats: Some(
-    Stats {
-        clipping_area: 4.191563,
-        intersection_area: 3.5303302,
-        remaining_area: 0.6612325,
-        consvtn: 0.8422467,
-        total_consvtn: 0.9999999,
-        area_loss: 4.7683716e-7,
-    },
-)
-power in during create_beams: 4.191563
-Beam type: Initial
-external diff power: 0.062381342
-refracted power: 0.032703105
-reflected power: 0.032703105
-external diff power: 0.10228801
-refracted power: 0.071559474
-reflected power: 0.071559474
-external diff power: 1.1337368
-refracted power: 1.106272
-reflected power: 1.106272
-external diff power: 0.23618162
-refracted power: 0.21964851
-reflected power: 0.21964851
-external diff power: 0.97546506
-refracted power: 0.9387854
-reflected power: 0.9387854
-external diff power: 0.29487252
-refracted power: 0.28451875
-reflected power: 0.28451875
-external diff power: 0.24289003
-refracted power: 0.23826207
-reflected power: 0.23826207
-external diff power: 0.2600675
-refracted power: 0.14693208
-reflected power: 0.14693208
-external diff power: 0.22244751
-refracted power: 0.21840213
-reflected power: 0.21840213
-output_iter len: 27
-output len: 27
-power out during create_beams: 10.044497
-Beam power: 0.029678235
-Beam power: 0.032703105
-Beam power: 0.062381342
-Beam power: 0.030728515
-Beam power: 0.071559474
-Beam power: 0.10228801
-Beam power: 0.027464746
-Beam power: 1.106272
-Beam power: 1.1337368
-Beam power: 0.016533127
-Beam power: 0.21964851
-Beam power: 0.23618162
-Beam power: 0.03667976
-Beam power: 0.9387854
-Beam power: 0.97546506
-Beam power: 0.0103537645
-Beam power: 0.28451875
-Beam power: 0.29487252
-Beam power: 0.004627933
-Beam power: 0.23826207
-Beam power: 0.24289003
-Beam power: 0.113135435
-Beam power: 0.14693208
-Beam power: 0.2600675
-Beam power: 0.0040453793
-Beam power: 0.21840213
-Beam power: 0.22244751
-power of output beams: 7.0606604
-power in remainders: 0.6612325, in intersections: 7.0606604
-power out: 7.7218924
-power loss: -3.5303292
-power in of beam: 104.78907
-power in of beam (no scaling): 4.191563
-power out of beam: 193.0473
-power out of beam (no scaling): 7.7218924
-input power: 88.25825
-output power: 0
-Total power in beam queue: 88.258255
-conservation incl. errors: 1.0000013
-power in: 1.106272
-clipping stats: Some(
-    Stats {
-        clipping_area: 1.3356965,
-        intersection_area: 1.3356963,
-        remaining_area: 0.0,
-        consvtn: 0.99999994,
-        total_consvtn: 0.99999994,
-        area_loss: 1.1920929e-7,
-    },
-)
-power in during create_beams: 1.106272
-Beam type: Default
-refracted power: 0.13472581
-reflected power: 0.13472581
-refracted power: 0.06187765
-reflected power: 0.06187765
-refracted power: 0.3574331
-reflected power: 0.3574331
-output_iter len: 11
-output len: 11
-power out during create_beams: 1.1080731
-Beam power: 0.03474734
-Beam power: 0.002850537
-Beam power: 0.13472581
-Beam power: 0.0038995682
-Beam power: 0.06187765
-Beam power: 0.14855683
-Beam power: 0.3197625
-Beam power: 0.014117208
-Beam power: 0.008697406
-Beam power: 0.3574331
-Beam power: 0.019604152
-power of output beams: 1.1062721
-power in remainders: 0, in intersections: 1.1062721
-power out: 1.1062721
-power loss: -0.00000011920929
-power in of beam: 27.656797
-power in of beam (no scaling): 1.106272
-power out of beam: 27.656801
-power out of beam (no scaling): 1.1062721
-input power: 88.25825
-output power: 0
-Total power in beam queue: 88.258255
-conservation incl. errors: 1.0000013
-power in: 0.9387854
-clipping stats: Some(
-    Stats {
-        clipping_area: 1.3067132,
-        intersection_area: 1.304895,
-        remaining_area: 0.0,
-        consvtn: 0.9986086,
-        total_consvtn: 0.9986086,
-        area_loss: 0.0018181801,
-    },
-)
-power in during create_beams: 0.9387854
-Beam type: Default
-refracted power: 0.1377847
-reflected power: 0.1377847
-refracted power: 0.018724218
-reflected power: 0.018724218
-refracted power: 0.48262843
-reflected power: 0.48262843
-refracted power: 0.07748688
-reflected power: 0.07748688
-output_iter len: 10
-output len: 10
-power out during create_beams: 1.4332485
-Beam power: 0.016782325
-Beam power: 0.0034649104
-Beam power: 0.1377847
-Beam power: 0.0005611626
-Beam power: 0.018724218
-Beam power: 0.15005937
-Beam power: 0.047081746
-Beam power: 0.48262843
-Beam power: 0.0029056107
-Beam power: 0.07748688
-power of output beams: 0.9374794
-power in remainders: 0, in intersections: 0.9374794
-power out: 0.9374794
-power loss: 0.0013059974
-power in of beam: 23.469633
-power in of beam (no scaling): 0.9387854
-power out of beam: 23.436983
-power out of beam (no scaling): 0.9374794
-input power: 88.25825
-output power: 0
-Total power in beam queue: 88.22561
-conservation incl. errors: 1.0005983
-power in of beam: 12.06571
-power in of beam (no scaling): 0.48262843
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 0
-Total power in beam queue: 76.1599
-conservation incl. errors: 1.058435
-power in of beam: 8.935827
-power in of beam (no scaling): 0.3574331
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 0
-Total power in beam queue: 67.22407
-conservation incl. errors: 1.0964246
-power in: 0.3197625
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.3860764,
-        intersection_area: 0.3860764,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.3197625
-Beam type: Default
-refracted power: 0.0722919
-reflected power: 0.0722919
-refracted power: 0.037171867
-reflected power: 0.037171867
-output_iter len: 6
-output len: 6
-power out during create_beams: 0.21892755
-Beam power: 0.004558583
-Beam power: 0.0722919
-Beam power: 0.14765382
-Beam power: 0.057181817
-Beam power: 0.0009045364
-Beam power: 0.037171867
-power of output beams: 0.31976253
-power in remainders: 0, in intersections: 0.31976253
-power out: 0.31976253
-power loss: -0.000000029802322
-power in of beam: 7.994062
-power in of beam (no scaling): 0.3197625
-power out of beam: 7.9940624
-power out of beam (no scaling): 0.31976253
-input power: 88.25825
-output power: 0
-Total power in beam queue: 67.22407
-conservation incl. errors: 1.0964246
-power in: 0.28451875
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.38740325,
-        intersection_area: 0.38740307,
-        remaining_area: 0.0,
-        consvtn: 0.9999995,
-        total_consvtn: 0.9999995,
-        area_loss: 1.7881393e-7,
-    },
-)
-power in during create_beams: 0.2845188
-Beam type: Default
-output_iter len: 2
-output len: 2
-power out during create_beams: 0
-Beam power: 0.12691268
-Beam power: 0.15760596
-power of output beams: 0.28451866
-power in remainders: 0, in intersections: 0.28451866
-power out: 0.28451866
-power loss: 0.00000008940697
-power in of beam: 7.11297
-power in of beam (no scaling): 0.2845188
-power out of beam: 7.112966
-power out of beam (no scaling): 0.28451866
-input power: 88.25825
-output power: 0
-Total power in beam queue: 67.22407
-conservation incl. errors: 1.0964246
-power in: 0.23826207
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.2597416,
-        intersection_area: 0.25974154,
-        remaining_area: 0.0,
-        consvtn: 0.99999976,
-        total_consvtn: 0.99999976,
-        area_loss: 5.9604645e-8,
-    },
-)
-power in during create_beams: 0.23826204
-Beam type: Default
-output_iter len: 2
-output len: 2
-power out during create_beams: 0
-Beam power: 0.22271225
-Beam power: 0.015549871
-power of output beams: 0.23826212
-power in remainders: 0, in intersections: 0.23826212
-power out: 0.23826212
-power loss: -0.000000044703484
-power in of beam: 5.9565506
-power in of beam (no scaling): 0.23826204
-power out of beam: 5.9565525
-power out of beam (no scaling): 0.23826212
-input power: 88.25825
-output power: 0
-Total power in beam queue: 67.22406
-conservation incl. errors: 1.0964246
-power in: 0.22271225
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.24278983,
-        intersection_area: 0.2403716,
-        remaining_area: 0.0,
-        consvtn: 0.9900398,
-        total_consvtn: 0.9900398,
-        area_loss: 0.002418235,
-    },
-)
-power in during create_beams: 0.2227123
-Beam type: Default
-output_iter len: 4
-output len: 4
-power out during create_beams: 0
-Beam power: 0.015667023
-Beam power: 0.0769338
-Beam power: 0.07842392
-Beam power: 0.04946924
-power of output beams: 0.22049397
-power in remainders: 0, in intersections: 0.22049397
-power out: 0.22049397
-power loss: 0.0022182763
-power in of beam: 5.5678067
-power in of beam (no scaling): 0.2227123
-power out of beam: 5.512349
-power out of beam (no scaling): 0.22049397
-input power: 88.25825
-output power: 0
-Total power in beam queue: 67.16861
-conservation incl. errors: 1.0961014
-power in: 0.21964851
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.38226813,
-        intersection_area: 0.38226807,
-        remaining_area: 0.0,
-        consvtn: 0.9999998,
-        total_consvtn: 0.9999998,
-        area_loss: 5.9604645e-8,
-    },
-)
-power in during create_beams: 0.21964853
-Beam type: Default
-output_iter len: 2
-output len: 2
-power out during create_beams: 0
-Beam power: 0.046744294
-Beam power: 0.17290416
-power of output beams: 0.21964845
-power in remainders: 0, in intersections: 0.21964845
-power out: 0.21964845
-power loss: 0.000000059604645
-power in of beam: 5.491213
-power in of beam (no scaling): 0.21964853
-power out of beam: 5.491211
-power out of beam (no scaling): 0.21964845
-input power: 88.25825
-output power: 0
-Total power in beam queue: 67.16861
-conservation incl. errors: 1.0961014
-power in: 0.21840213
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.22866328,
-        intersection_area: 0.22866324,
-        remaining_area: 0.0,
-        consvtn: 0.9999998,
-        total_consvtn: 0.9999998,
-        area_loss: 4.4703484e-8,
-    },
-)
-power in during create_beams: 0.21840215
-Beam type: Default
-refracted power: 0.18712328
-reflected power: 0.18712328
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.37424657
-Beam power: 0.031278808
-Beam power: 0.18712328
-power of output beams: 0.21840209
-power in remainders: 0, in intersections: 0.21840209
-power out: 0.21840209
-power loss: 0.000000044703484
-power in of beam: 5.4600534
-power in of beam (no scaling): 0.21840215
-power out of beam: 5.460052
-power out of beam (no scaling): 0.21840209
-input power: 88.25825
-output power: 0
-Total power in beam queue: 67.16861
-conservation incl. errors: 1.0961014
-power in of beam: 4.678082
-power in of beam (no scaling): 0.18712328
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 0
-Total power in beam queue: 62.49053
-conservation incl. errors: 1.1017325
-power in: 0.17290416
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.30091596,
-        intersection_area: 0.2966835,
-        remaining_area: 0.0,
-        consvtn: 0.98593473,
-        total_consvtn: 0.98593473,
-        area_loss: 0.004232466,
-    },
-)
-power in during create_beams: 0.17290422
-Beam type: Default
-refracted power: 0.12089847
-reflected power: 0.12089847
-refracted power: 0.04646522
-reflected power: 0.04646522
-output_iter len: 4
-output len: 4
-power out during create_beams: 0.33472738
-Beam power: 0.0022087945
-Beam power: 0.12089847
-Beam power: 0.00089972577
-Beam power: 0.04646522
-power of output beams: 0.1704722
-power in remainders: 0, in intersections: 0.1704722
-power out: 0.1704722
-power loss: 0.002431959
-power in of beam: 4.322605
-power in of beam (no scaling): 0.17290422
-power out of beam: 4.2618046
-power out of beam (no scaling): 0.1704722
-input power: 88.25825
-output power: 0
-Total power in beam queue: 62.42973
-conservation incl. errors: 1.1014582
-power in: 0.15760596
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.21459761,
-        intersection_area: 0.21459758,
-        remaining_area: 0.0,
-        consvtn: 0.9999999,
-        total_consvtn: 0.9999999,
-        area_loss: 2.9802322e-8,
-    },
-)
-power in during create_beams: 0.15760592
-Beam type: Default
-refracted power: 0.051163822
-reflected power: 0.051163822
-refracted power: 0.08648756
-reflected power: 0.08648756
-output_iter len: 5
-output len: 5
-power out during create_beams: 0.27530277
-Beam power: 0.0009394159
-Beam power: 0.051163822
-Beam power: 0.0023126525
-Beam power: 0.08648756
-Beam power: 0.016702482
-power of output beams: 0.15760595
-power in remainders: 0, in intersections: 0.15760595
-power out: 0.15760595
-power loss: 0.000000014901161
-power in of beam: 3.9401476
-power in of beam (no scaling): 0.15760592
-power out of beam: 3.9401484
-power out of beam (no scaling): 0.15760595
-input power: 88.25825
-output power: 0
-Total power in beam queue: 62.42973
-conservation incl. errors: 1.1014582
-power in: 0.15005937
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.2088705,
-        intersection_area: 0.20887032,
-        remaining_area: 0.0,
-        consvtn: 0.99999917,
-        total_consvtn: 0.99999917,
-        area_loss: 1.7881393e-7,
-    },
-)
-power in during create_beams: 0.15005934
-Beam type: Default
-refracted power: 0.038468666
-reflected power: 0.038468666
-refracted power: 0.018475953
-reflected power: 0.018475953
-refracted power: 0.007607585
-reflected power: 0.007607585
-refracted power: 0.024552649
-reflected power: 0.024552649
-output_iter len: 10
-output len: 10
-power out during create_beams: 0.17820969
-Beam power: 0.04499056
-Beam power: 0.014322227
-Beam power: 0.0007087393
-Beam power: 0.038468666
-Beam power: 0.0003403973
-Beam power: 0.018475953
-Beam power: 0.0001401606
-Beam power: 0.007607585
-Beam power: 0.00045235304
-Beam power: 0.024552649
-power of output beams: 0.15005928
-power in remainders: 0, in intersections: 0.15005928
-power out: 0.15005928
-power loss: 0.00000008940697
-power in of beam: 3.7514832
-power in of beam (no scaling): 0.15005934
-power out of beam: 3.7514818
-power out of beam (no scaling): 0.15005928
-input power: 88.25825
-output power: 0
-Total power in beam queue: 62.429726
-conservation incl. errors: 1.1014582
-power in: 0.14855683
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.17936538,
-        intersection_area: 0.17936534,
-        remaining_area: 0.0,
-        consvtn: 0.99999976,
-        total_consvtn: 0.99999976,
-        area_loss: 4.4703484e-8,
-    },
-)
-power in during create_beams: 0.14855689
-Beam type: Default
-refracted power: 0.099792734
-reflected power: 0.099792734
-refracted power: 0.017663602
-reflected power: 0.017663602
-output_iter len: 5
-output len: 5
-power out during create_beams: 0.23491266
-Beam power: 0.028780272
-Beam power: 0.0019713305
-Beam power: 0.099792734
-Beam power: 0.0003489311
-Beam power: 0.017663602
-power of output beams: 0.14855686
-power in remainders: 0, in intersections: 0.14855686
-power out: 0.14855686
-power loss: -0.000000029802322
-power in of beam: 3.713922
-power in of beam (no scaling): 0.14855689
-power out of beam: 3.7139213
-power out of beam (no scaling): 0.14855686
-input power: 88.25825
-output power: 0
-Total power in beam queue: 62.429726
-conservation incl. errors: 1.1014582
-power in: 0.14765382
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.17827508,
-        intersection_area: 0.17413907,
-        remaining_area: 0.0,
-        consvtn: 0.97679985,
-        total_consvtn: 0.97679985,
-        area_loss: 0.004136011,
-    },
-)
-power in during create_beams: 0.14765382
-Beam type: Default
-output_iter len: 2
-output len: 2
-power out during create_beams: 0
-Beam power: 0.07048073
-Beam power: 0.07374763
-power of output beams: 0.14422835
-power in remainders: 0, in intersections: 0.14422835
-power out: 0.14422835
-power loss: 0.003425464
-power in of beam: 3.6913452
-power in of beam (no scaling): 0.14765382
-power out of beam: 3.6057086
-power out of beam (no scaling): 0.14422835
-input power: 88.25825
-output power: 0
-Total power in beam queue: 62.34409
-conservation incl. errors: 1.1008339
-power in: 0.14693208
-clipping stats: Some(
-    Stats {
-        clipping_area: 1.2784332,
-        intersection_area: 1.2784328,
-        remaining_area: 0.0,
-        consvtn: 0.9999997,
-        total_consvtn: 0.9999997,
-        area_loss: 3.5762787e-7,
-    },
-)
-power in during create_beams: 0.14693208
-Beam type: Default
-refracted power: 0.032489225
-reflected power: 0.032489225
-refracted power: 0.060547307
-reflected power: 0.060547307
-output_iter len: 6
-output len: 6
-power out during create_beams: 0.18607306
-Beam power: 0.0016581275
-Beam power: 0.032489225
-Beam power: 0.032740746
-Beam power: 0.017485853
-Beam power: 0.0020107627
-Beam power: 0.060547307
-power of output beams: 0.14693202
-power in remainders: 0, in intersections: 0.14693202
-power out: 0.14693202
-power loss: 0.000000059604645
-power in of beam: 3.6733017
-power in of beam (no scaling): 0.14693208
-power out of beam: 3.6733003
-power out of beam (no scaling): 0.14693202
-input power: 88.25825
-output power: 0
-Total power in beam queue: 62.344086
-conservation incl. errors: 1.1008338
-power in of beam: 3.4446173
-power in of beam (no scaling): 0.1377847
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 0
-Total power in beam queue: 58.899467
-conservation incl. errors: 1.107378
-power in of beam: 3.368145
-power in of beam (no scaling): 0.13472581
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 0
-Total power in beam queue: 55.531322
-conservation incl. errors: 1.1130636
-power in: 0.12691268
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.17280532,
-        intersection_area: 0.17280522,
-        remaining_area: 0.0,
-        consvtn: 0.9999994,
-        total_consvtn: 0.9999994,
-        area_loss: 1.0430813e-7,
-    },
-)
-power in during create_beams: 0.12691261
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.12691256
-power of output beams: 0.12691256
-power in remainders: 0, in intersections: 0.12691256
-power out: 0.12691256
-power loss: 0.00000011920929
-power in of beam: 3.172815
-power in of beam (no scaling): 0.12691261
-power out of beam: 3.172814
-power out of beam (no scaling): 0.12691256
-input power: 88.25825
-output power: 0
-Total power in beam queue: 55.53132
-conservation incl. errors: 1.1130636
-power in: 0.12691256
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.17280522,
-        intersection_area: 0.17280519,
-        remaining_area: 0.0,
-        consvtn: 0.9999998,
-        total_consvtn: 0.9999998,
-        area_loss: 2.9802322e-8,
-    },
-)
-power in during create_beams: 0.12691253
-Beam type: Default
-refracted power: 0.0780068
-reflected power: 0.0780068
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.1560136
-Beam power: 0.0021015445
-Beam power: 0.0780068
-Beam power: 0.04680423
-power of output beams: 0.12691258
-power in remainders: 0, in intersections: 0.12691258
-power out: 0.12691258
-power loss: -0.000000014901161
-power in of beam: 3.1728132
-power in of beam (no scaling): 0.12691253
-power out of beam: 3.1728141
-power out of beam (no scaling): 0.12691258
-input power: 88.25825
-output power: 0
-Total power in beam queue: 55.53132
-conservation incl. errors: 1.1130636
-power in of beam: 3.0224617
-power in of beam (no scaling): 0.12089847
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 0
-Total power in beam queue: 52.508858
-conservation incl. errors: 1.1203071
-power in: 0.113135435
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.26006746,
-        intersection_area: 0.0,
-        remaining_area: 0.25578156,
-        consvtn: 0.0,
-        total_consvtn: 0.98352003,
-        area_loss: 0.004285902,
-    },
-)
-power in during create_beams: 0.11313542
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0.11127098, in intersections: 0
-power out: 0.11127098
-power loss: 0.0018644556
-power in of beam: 2.8283854
-power in of beam (no scaling): 0.11313542
-power out of beam: 2.7817743
-power out of beam (no scaling): 0.11127098
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 49.680473
-conservation incl. errors: 1.1200536
-power in of beam: 2.4948182
-power in of beam (no scaling): 0.099792734
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 47.185654
-conservation incl. errors: 1.1232523
-power in of beam: 2.1621888
-power in of beam (no scaling): 0.08648756
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 45.023464
-conservation incl. errors: 1.1256851
-power in: 0.07842392
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.08549387,
-        intersection_area: 0.08549376,
-        remaining_area: 0.0,
-        consvtn: 0.9999987,
-        total_consvtn: 0.9999987,
-        area_loss: 1.1175871e-7,
-    },
-)
-power in during create_beams: 0.07842391
-Beam type: Default
-refracted power: 0.0429778
-reflected power: 0.0429778
-refracted power: 0.022392323
-reflected power: 0.022392323
-output_iter len: 4
-output len: 4
-power out during create_beams: 0.13074024
-Beam power: 0.012634186
-Beam power: 0.0429778
-Beam power: 0.00041947654
-Beam power: 0.022392323
-power of output beams: 0.07842378
-power in remainders: 0, in intersections: 0.07842378
-power out: 0.07842378
-power loss: 0.00000013411045
-power in of beam: 1.9605976
-power in of beam (no scaling): 0.07842391
-power out of beam: 1.9605944
-power out of beam (no scaling): 0.07842378
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 45.023457
-conservation incl. errors: 1.1256851
-power in of beam: 1.9501698
-power in of beam (no scaling): 0.0780068
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 43.073288
-conservation incl. errors: 1.1276647
-power in of beam: 1.9371718
-power in of beam (no scaling): 0.07748688
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 41.136116
-conservation incl. errors: 1.1294982
-power in: 0.0769338
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.08386947,
-        intersection_area: 0.0829018,
-        remaining_area: 0.0,
-        consvtn: 0.98846215,
-        total_consvtn: 0.98846215,
-        area_loss: 0.00096767396,
-    },
-)
-power in during create_beams: 0.07693381
-Beam type: Default
-refracted power: 0.07462463
-reflected power: 0.07462463
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.14924926
-Beam power: 0.0014215878
-Beam power: 0.07462463
-power of output beams: 0.07604621
-power in remainders: 0, in intersections: 0.07604621
-power out: 0.07604621
-power loss: 0.00088758767
-power in of beam: 1.9233451
-power in of beam (no scaling): 0.07693381
-power out of beam: 1.9011552
-power out of beam (no scaling): 0.07604621
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 41.11393
-conservation incl. errors: 1.129289
-power in of beam: 1.8656156
-power in of beam (no scaling): 0.07462463
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 39.248314
-conservation incl. errors: 1.1309525
-power in: 0.07374763
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.08904172,
-        intersection_area: 0.08904172,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.07374763
-Beam type: Default
-refracted power: 0.06927593
-reflected power: 0.06927593
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.13855186
-Beam power: 0.004471657
-Beam power: 0.06927593
-power of output beams: 0.07374759
-power in remainders: 0, in intersections: 0.07374759
-power out: 0.07374759
-power loss: 0.000000037252903
-power in of beam: 1.8436905
-power in of beam (no scaling): 0.07374763
-power out of beam: 1.8436897
-power out of beam (no scaling): 0.07374759
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 39.248314
-conservation incl. errors: 1.1309525
-power in of beam: 1.8072975
-power in of beam (no scaling): 0.0722919
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 37.441017
-conservation incl. errors: 1.1321847
-power in: 0.071559474
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.3491318,
-        intersection_area: 0.3431033,
-        remaining_area: 0.0,
-        consvtn: 0.9827329,
-        total_consvtn: 0.9827329,
-        area_loss: 0.006028503,
-    },
-)
-power in during create_beams: 0.071559474
-Beam type: Default
-output_iter len: 3
-output len: 3
-power out during create_beams: 0
-Beam power: 0.023679746
-Beam power: 0.042260848
-Beam power: 0.004383266
-power of output beams: 0.07032386
-power in remainders: 0, in intersections: 0.07032386
-power out: 0.07032386
-power loss: 0.0012356117
-power in of beam: 1.7889867
-power in of beam (no scaling): 0.071559474
-power out of beam: 1.7580965
-power out of beam (no scaling): 0.07032386
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 37.410126
-conservation incl. errors: 1.132079
-power in: 0.07048073
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.0850973,
-        intersection_area: 0.08509719,
-        remaining_area: 0.0,
-        consvtn: 0.99999875,
-        total_consvtn: 0.99999875,
-        area_loss: 1.0430813e-7,
-    },
-)
-power in during create_beams: 0.07048072
-Beam type: Default
-refracted power: 0.02070337
-reflected power: 0.02070337
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.04140674
-Beam power: 0.049362246
-Beam power: 0.00041495857
-Beam power: 0.02070337
-power of output beams: 0.07048058
-power in remainders: 0, in intersections: 0.07048058
-power out: 0.07048058
-power loss: 0.00000014901161
-power in of beam: 1.7620178
-power in of beam (no scaling): 0.07048072
-power out of beam: 1.7620143
-power out of beam (no scaling): 0.07048058
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 37.410126
-conservation incl. errors: 1.132079
-power in of beam: 1.7318982
-power in of beam (no scaling): 0.06927593
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 35.678226
-conservation incl. errors: 1.1332122
-power in of beam: 1.5469412
-power in of beam (no scaling): 0.06187765
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 34.131287
-conservation incl. errors: 1.1341149
-power in of beam: 1.5136826
-power in of beam (no scaling): 0.060547307
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 32.617603
-conservation incl. errors: 1.1417316
-power in: 0.057181817
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.069040455,
-        intersection_area: 0.06418634,
-        remaining_area: 0.0,
-        consvtn: 0.92969173,
-        total_consvtn: 0.92969173,
-        area_loss: 0.004854113,
-    },
-)
-power in during create_beams: 0.057181798
-Beam type: Default
-output_iter len: 2
-output len: 2
-power out during create_beams: 0
-Beam power: 0.011975144
-Beam power: 0.04118632
-power of output beams: 0.053161465
-power in remainders: 0, in intersections: 0.053161465
-power out: 0.053161465
-power loss: 0.004020352
-power in of beam: 1.4295448
-power in of beam (no scaling): 0.057181798
-power out of beam: 1.3290365
-power out of beam (no scaling): 0.053161465
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 32.517094
-conservation incl. errors: 1.14075
-power in of beam: 1.2790954
-power in of beam (no scaling): 0.051163822
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 31.237997
-conservation incl. errors: 1.1417744
-power in: 0.04946924
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.053928882,
-        intersection_area: 0.05392879,
-        remaining_area: 0.0,
-        consvtn: 0.9999983,
-        total_consvtn: 0.9999983,
-        area_loss: 9.313226e-8,
-    },
-)
-power in during create_beams: 0.049469206
-Beam type: Default
-refracted power: 0.019718118
-reflected power: 0.019718118
-refracted power: 0.028716728
-reflected power: 0.028716728
-output_iter len: 4
-output len: 4
-power out during create_beams: 0.09686969
-Beam power: 0.0004210695
-Beam power: 0.019718118
-Beam power: 0.0006132304
-Beam power: 0.028716728
-power of output beams: 0.049469147
-power in remainders: 0, in intersections: 0.049469147
-power out: 0.049469147
-power loss: 0.00000009313226
-power in of beam: 1.2367301
-power in of beam (no scaling): 0.049469206
-power out of beam: 1.2367285
-power out of beam (no scaling): 0.049469147
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 31.237995
-conservation incl. errors: 1.1417744
-power in: 0.049362246
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.059599206,
-        intersection_area: 0.059599206,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.049362227
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.049362242
-power of output beams: 0.049362242
-power in remainders: 0, in intersections: 0.049362242
-power out: 0.049362242
-power loss: 0.0000000037252903
-power in of beam: 1.2340556
-power in of beam (no scaling): 0.049362227
-power out of beam: 1.234056
-power out of beam (no scaling): 0.049362242
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 31.237995
-conservation incl. errors: 1.1417744
-power in: 0.049362242
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.059599183,
-        intersection_area: 0.059599146,
-        remaining_area: 0.0,
-        consvtn: 0.9999994,
-        total_consvtn: 0.9999994,
-        area_loss: 3.7252903e-8,
-    },
-)
-power in during create_beams: 0.049362246
-Beam type: Default
-refracted power: 0.03357657
-reflected power: 0.03357657
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.06715314
-Beam power: 0.015123232
-Beam power: 0.0006623918
-Beam power: 0.03357657
-power of output beams: 0.049362194
-power in remainders: 0, in intersections: 0.049362194
-power out: 0.049362194
-power loss: 0.000000048428774
-power in of beam: 1.2340561
-power in of beam (no scaling): 0.049362246
-power out of beam: 1.2340548
-power out of beam (no scaling): 0.049362194
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 31.237995
-conservation incl. errors: 1.1417744
-power in of beam: 1.1770436
-power in of beam (no scaling): 0.047081746
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 30.060951
-conservation incl. errors: 1.1516074
-power in: 0.04680423
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.06372902,
-        intersection_area: 0.06372901,
-        remaining_area: 0.0,
-        consvtn: 0.9999999,
-        total_consvtn: 0.9999999,
-        area_loss: 7.450581e-9,
-    },
-)
-power in during create_beams: 0.046804238
-Beam type: Default
-refracted power: 0.03558816
-reflected power: 0.03558816
-refracted power: 0.009822869
-reflected power: 0.009822869
-output_iter len: 4
-output len: 4
-power out during create_beams: 0.090822056
-Beam power: 0.0010918118
-Beam power: 0.03558816
-Beam power: 0.00030135692
-Beam power: 0.009822869
-power of output beams: 0.046804197
-power in remainders: 0, in intersections: 0.046804197
-power out: 0.046804197
-power loss: 0.000000033527613
-power in of beam: 1.1701058
-power in of beam (no scaling): 0.046804238
-power out of beam: 1.1701049
-power out of beam (no scaling): 0.046804197
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 30.060951
-conservation incl. errors: 1.1516074
-power in: 0.046744294
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.08135199,
-        intersection_area: 0.081351936,
-        remaining_area: 0.0,
-        consvtn: 0.99999934,
-        total_consvtn: 0.99999934,
-        area_loss: 5.2154064e-8,
-    },
-)
-power in during create_beams: 0.046744287
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.046744224
-power of output beams: 0.046744224
-power in remainders: 0, in intersections: 0.046744224
-power out: 0.046744224
-power loss: 0.000000070780516
-power in of beam: 1.1686071
-power in of beam (no scaling): 0.046744287
-power out of beam: 1.1686056
-power out of beam (no scaling): 0.046744224
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 30.06095
-conservation incl. errors: 1.1516074
-power in: 0.046744224
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.08135184,
-        intersection_area: 0.078268565,
-        remaining_area: 0.0,
-        consvtn: 0.9620995,
-        total_consvtn: 0.9620995,
-        area_loss: 0.0030832738,
-    },
-)
-power in during create_beams: 0.04674421
-Beam type: Default
-refracted power: 0.044124693
-reflected power: 0.044124693
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.088249385
-Beam power: 0.0008478626
-Beam power: 0.044124693
-power of output beams: 0.044972554
-power in remainders: 0, in intersections: 0.044972554
-power out: 0.044972554
-power loss: 0.0017716698
-power in of beam: 1.1686051
-power in of beam (no scaling): 0.04674421
-power out of beam: 1.1243137
-power out of beam (no scaling): 0.044972554
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 30.016657
-conservation incl. errors: 1.1511873
-power in of beam: 1.1616305
-power in of beam (no scaling): 0.04646522
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 28.855026
-conservation incl. errors: 1.1521939
-power in: 0.04499056
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.06262318,
-        intersection_area: 0.060861602,
-        remaining_area: 0.0,
-        consvtn: 0.9718702,
-        total_consvtn: 0.9718702,
-        area_loss: 0.001761578,
-    },
-)
-power in during create_beams: 0.044990566
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.043724973
-power of output beams: 0.043724973
-power in remainders: 0, in intersections: 0.043724973
-power out: 0.043724973
-power loss: 0.0012655854
-power in of beam: 1.1247641
-power in of beam (no scaling): 0.044990566
-power out of beam: 1.0931243
-power out of beam (no scaling): 0.043724973
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 28.823387
-conservation incl. errors: 1.1518803
-power in of beam: 1.1031172
-power in of beam (no scaling): 0.044124693
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 27.72027
-conservation incl. errors: 1.1527879
-power in: 0.043724973
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.06086159,
-        intersection_area: 0.060101457,
-        remaining_area: 0.0,
-        consvtn: 0.98751044,
-        total_consvtn: 0.98751044,
-        area_loss: 0.0007601343,
-    },
-)
-power in during create_beams: 0.043724988
-Beam type: Default
-refracted power: 0.017926995
-reflected power: 0.017926995
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.03585399
-Beam power: 0.024919344
-Beam power: 0.00033249776
-Beam power: 0.017926995
-power of output beams: 0.043178834
-power in remainders: 0, in intersections: 0.043178834
-power out: 0.043178834
-power loss: 0.00054613873
-power in of beam: 1.0931246
-power in of beam (no scaling): 0.043724988
-power out of beam: 1.0794708
-power out of beam (no scaling): 0.043178834
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 27.706615
-conservation incl. errors: 1.152652
-power in of beam: 1.0744449
-power in of beam (no scaling): 0.0429778
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 26.63217
-conservation incl. errors: 1.1529176
-power in: 0.042260848
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.20618655,
-        intersection_area: 0.2061865,
-        remaining_area: 0.0,
-        consvtn: 0.99999976,
-        total_consvtn: 0.99999976,
-        area_loss: 4.4703484e-8,
-    },
-)
-power in during create_beams: 0.04226086
-Beam type: Default
-refracted power: 0.04151415
-reflected power: 0.04151415
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.0830283
-Beam power: 0.00074668525
-Beam power: 0.04151415
-power of output beams: 0.042260837
-power in remainders: 0, in intersections: 0.042260837
-power out: 0.042260837
-power loss: 0.000000011175871
-power in of beam: 1.0565214
-power in of beam (no scaling): 0.04226086
-power out of beam: 1.0565208
-power out of beam (no scaling): 0.042260837
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 26.63217
-conservation incl. errors: 1.1529176
-power in of beam: 1.0378537
-power in of beam (no scaling): 0.04151415
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 25.594316
-conservation incl. errors: 1.1552305
-power in: 0.04118632
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.04972774,
-        intersection_area: 0.04049535,
-        remaining_area: 0.0,
-        consvtn: 0.81434125,
-        total_consvtn: 0.81434125,
-        area_loss: 0.009232391,
-    },
-)
-power in during create_beams: 0.04118633
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.033539716
-power of output beams: 0.033539716
-power in remainders: 0, in intersections: 0.033539716
-power out: 0.033539716
-power loss: 0.0076466054
-power in of beam: 1.0296582
-power in of beam (no scaling): 0.04118633
-power out of beam: 0.8384929
-power out of beam (no scaling): 0.033539716
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 25.403152
-conservation incl. errors: 1.15328
-power in of beam: 0.9617166
-power in of beam (no scaling): 0.038468666
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 24.441437
-conservation incl. errors: 1.1538607
-power in of beam: 0.9292966
-power in of beam (no scaling): 0.037171867
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 2.7817743
-Total power in beam queue: 23.51214
-conservation incl. errors: 1.1542716
-power in: 0.03667976
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.97546506,
-        intersection_area: 0.0,
-        remaining_area: 0.9754649,
-        consvtn: 0.0,
-        total_consvtn: 0.9999998,
-        area_loss: 1.7881393e-7,
-    },
-)
-power in during create_beams: 0.036679756
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0.036679752, in intersections: 0
-power out: 0.036679752
-power loss: 0.000000007450581
-power in of beam: 0.91699386
-power in of beam (no scaling): 0.036679756
-power out of beam: 0.91699374
-power out of beam (no scaling): 0.036679752
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 22.595146
-conservation incl. errors: 1.1542716
-power in of beam: 0.8897039
-power in of beam (no scaling): 0.03558816
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 21.705442
-conservation incl. errors: 1.1546758
-power in: 0.03474734
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.04195343,
-        intersection_area: 0.04195331,
-        remaining_area: 0.0,
-        consvtn: 0.99999714,
-        total_consvtn: 0.99999714,
-        area_loss: 1.1920929e-7,
-    },
-)
-power in during create_beams: 0.034747362
-Beam type: Default
-refracted power: 0.023538461
-reflected power: 0.023538461
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.047076922
-Beam power: 0.009975822
-Beam power: 0.0012329662
-Beam power: 0.023538461
-power of output beams: 0.03474725
-power in remainders: 0, in intersections: 0.03474725
-power out: 0.03474725
-power loss: 0.00000008940697
-power in of beam: 0.868684
-power in of beam (no scaling): 0.034747362
-power out of beam: 0.8686812
-power out of beam (no scaling): 0.03474725
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 21.705444
-conservation incl. errors: 1.1546758
-power in of beam: 0.8394142
-power in of beam (no scaling): 0.03357657
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 20.86603
-conservation incl. errors: 1.155038
-power in: 0.033539716
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.04049538,
-        intersection_area: 0.04049537,
-        remaining_area: 0.0,
-        consvtn: 0.9999997,
-        total_consvtn: 0.9999997,
-        area_loss: 1.1175871e-8,
-    },
-)
-power in during create_beams: 0.033539727
-Beam type: Default
-refracted power: 0.02010173
-reflected power: 0.02010173
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.04020346
-Beam power: 0.01343799
-Beam power: 0.02010173
-power of output beams: 0.03353972
-power in remainders: 0, in intersections: 0.03353972
-power out: 0.03353972
-power loss: -0.0000000037252903
-power in of beam: 0.8384931
-power in of beam (no scaling): 0.033539727
-power out of beam: 0.83849293
-power out of beam (no scaling): 0.03353972
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 20.866028
-conservation incl. errors: 1.1550379
-power in: 0.032740746
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.28487247,
-        intersection_area: 0.28398165,
-        remaining_area: 0.0,
-        consvtn: 0.9968729,
-        total_consvtn: 0.9968729,
-        area_loss: 0.0008908212,
-    },
-)
-power in during create_beams: 0.032740753
-Beam type: Default
-refracted power: 0.014524281
-reflected power: 0.014524281
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.029048562
-Beam power: 0.0063124006
-Beam power: 0.011801719
-Beam power: 0.014524281
-power of output beams: 0.0326384
-power in remainders: 0, in intersections: 0.0326384
-power out: 0.0326384
-power loss: 0.0001023449
-power in of beam: 0.81851876
-power in of beam (no scaling): 0.032740753
-power out of beam: 0.81596
-power out of beam (no scaling): 0.0326384
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 20.863472
-conservation incl. errors: 1.1550255
-power in: 0.032703105
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.34360403,
-        intersection_area: 0.33698547,
-        remaining_area: 0.0,
-        consvtn: 0.9807378,
-        total_consvtn: 0.9807378,
-        area_loss: 0.0066185594,
-    },
-)
-power in during create_beams: 0.032703105
-Beam type: Default
-refracted power: 0.008077192
-reflected power: 0.008077192
-refracted power: 0.019215964
-reflected power: 0.019215964
-output_iter len: 5
-output len: 5
-power out during create_beams: 0.054586314
-Beam power: 0.00015543142
-Beam power: 0.008077192
-Beam power: 0.0013380749
-Beam power: 0.019215964
-Beam power: 0.0032865102
-power of output beams: 0.032073174
-power in remainders: 0, in intersections: 0.032073174
-power out: 0.032073174
-power loss: 0.0006299317
-power in of beam: 0.8175776
-power in of beam (no scaling): 0.032703105
-power out of beam: 0.8018293
-power out of beam (no scaling): 0.032073174
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 20.847723
-conservation incl. errors: 1.1549697
-power in of beam: 0.8122306
-power in of beam (no scaling): 0.032489225
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 20.035492
-conservation incl. errors: 1.1569529
-power in of beam: 0.78197014
-power in of beam (no scaling): 0.031278808
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 19.253521
-conservation incl. errors: 1.1589788
-power in: 0.030728515
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.10228801,
-        intersection_area: 0.09795943,
-        remaining_area: 0.0,
-        consvtn: 0.95768243,
-        total_consvtn: 0.95768243,
-        area_loss: 0.0043285787,
-    },
-)
-power in during create_beams: 0.030728515
-Beam type: Default
-refracted power: 0.014361962
-reflected power: 0.014361962
-refracted power: 0.01098123
-reflected power: 0.01098123
-output_iter len: 4
-output len: 4
-power out during create_beams: 0.05068638
-Beam power: 0.003749908
-Beam power: 0.014361962
-Beam power: 0.00033506387
-Beam power: 0.01098123
-power of output beams: 0.029428164
-power in remainders: 0, in intersections: 0.029428164
-power out: 0.029428164
-power loss: 0.0013003517
-power in of beam: 0.76821285
-power in of beam (no scaling): 0.030728515
-power out of beam: 0.73570406
-power out of beam (no scaling): 0.029428164
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 19.221012
-conservation incl. errors: 1.1586858
-power in: 0.029678235
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.06238138,
-        intersection_area: 0.045724645,
-        remaining_area: 0.0,
-        consvtn: 0.7329855,
-        total_consvtn: 0.7329855,
-        area_loss: 0.016656734,
-    },
-)
-power in during create_beams: 0.029678235
-Beam type: Default
-refracted power: 0.012045273
-reflected power: 0.012045273
-refracted power: 0.006096725
-reflected power: 0.006096725
-output_iter len: 4
-output len: 4
-power out during create_beams: 0.036283996
-Beam power: 0.003452254
-Beam power: 0.012045273
-Beam power: 0.00015946315
-Beam power: 0.006096725
-power of output beams: 0.021753713
-power in remainders: 0, in intersections: 0.021753713
-power out: 0.021753713
-power loss: 0.007924521
-power in of beam: 0.7419558
-power in of beam (no scaling): 0.029678235
-power out of beam: 0.5438428
-power out of beam (no scaling): 0.021753713
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 19.022898
-conservation incl. errors: 1.1567212
-power in: 0.028780272
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.034748882,
-        intersection_area: 0.034748882,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.02878026
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.028780293
-power of output beams: 0.028780293
-power in remainders: 0, in intersections: 0.028780293
-power out: 0.028780293
-power loss: -0.000000020489097
-power in of beam: 0.71950644
-power in of beam (no scaling): 0.02878026
-power out of beam: 0.7195073
-power out of beam (no scaling): 0.028780293
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 19.022898
-conservation incl. errors: 1.1567212
-power in: 0.028780293
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.034748904,
-        intersection_area: 0.034487933,
-        remaining_area: 0.0,
-        consvtn: 0.9924898,
-        total_consvtn: 0.9924898,
-        area_loss: 0.0002609715,
-    },
-)
-power in during create_beams: 0.028780308
-Beam type: Default
-refracted power: 0.028000055
-reflected power: 0.028000055
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.05600011
-Beam power: 0.0005640979
-Beam power: 0.028000055
-power of output beams: 0.028564153
-power in remainders: 0, in intersections: 0.028564153
-power out: 0.028564153
-power loss: 0.00021613948
-power in of beam: 0.71950763
-power in of beam (no scaling): 0.028780308
-power out of beam: 0.71410376
-power out of beam (no scaling): 0.028564153
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 19.017494
-conservation incl. errors: 1.1566643
-power in of beam: 0.71791816
-power in of beam (no scaling): 0.028716728
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 18.299576
-conservation incl. errors: 1.1568962
-power in of beam: 0.7000013
-power in of beam (no scaling): 0.028000055
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 3.6987681
-Total power in beam queue: 17.599575
-conservation incl. errors: 1.1571481
-power in: 0.027464746
-clipping stats: Some(
-    Stats {
-        clipping_area: 1.1337368,
-        intersection_area: 0.0,
-        remaining_area: 1.1337359,
-        consvtn: 0.0,
-        total_consvtn: 0.99999917,
-        area_loss: 9.536743e-7,
-    },
-)
-power in during create_beams: 0.027464746
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0.02746473, in intersections: 0
-power out: 0.02746473
-power loss: 0.000000014901161
-power in of beam: 0.68661857
-power in of beam (no scaling): 0.027464746
-power out of beam: 0.6866182
-power out of beam (no scaling): 0.02746473
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 16.912956
-conservation incl. errors: 1.1571481
-power in: 0.024919344
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.034685694,
-        intersection_area: 0.034685694,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.024919344
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.024919325
-power of output beams: 0.024919325
-power in remainders: 0, in intersections: 0.024919325
-power out: 0.024919325
-power loss: 0.000000018626451
-power in of beam: 0.6229836
-power in of beam (no scaling): 0.024919344
-power out of beam: 0.6229831
-power out of beam (no scaling): 0.024919325
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 16.912956
-conservation incl. errors: 1.1571481
-power in: 0.024919325
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.03468567,
-        intersection_area: 0.034685668,
-        remaining_area: 0.0,
-        consvtn: 0.9999999,
-        total_consvtn: 0.9999999,
-        area_loss: 3.7252903e-9,
-    },
-)
-power in during create_beams: 0.024919325
-Beam type: Default
-refracted power: 0.013738559
-reflected power: 0.013738559
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.027477117
-Beam power: 0.010925459
-Beam power: 0.00025531245
-Beam power: 0.013738559
-power of output beams: 0.024919331
-power in remainders: 0, in intersections: 0.024919331
-power out: 0.024919331
-power loss: -0.0000000055879354
-power in of beam: 0.6229831
-power in of beam (no scaling): 0.024919325
-power out of beam: 0.6229832
-power out of beam (no scaling): 0.024919331
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 16.912956
-conservation incl. errors: 1.1571481
-power in of beam: 0.6138162
-power in of beam (no scaling): 0.024552649
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 16.29914
-conservation incl. errors: 1.1573848
-power in: 0.023679746
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.11553115,
-        intersection_area: 0.11553115,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.023679744
-Beam type: Default
-refracted power: 0.023170855
-reflected power: 0.023170855
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.04634171
-Beam power: 0.0005088952
-Beam power: 0.023170855
-power of output beams: 0.02367975
-power in remainders: 0, in intersections: 0.02367975
-power out: 0.02367975
-power loss: -0.0000000037252903
-power in of beam: 0.5919936
-power in of beam (no scaling): 0.023679744
-power out of beam: 0.5919937
-power out of beam (no scaling): 0.02367975
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 16.29914
-conservation incl. errors: 1.1573848
-power in of beam: 0.58846146
-power in of beam (no scaling): 0.023538461
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 15.710679
-conservation incl. errors: 1.1575211
-power in of beam: 0.5792713
-power in of beam (no scaling): 0.023170855
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 15.131408
-conservation incl. errors: 1.1582063
-power in of beam: 0.559808
-power in of beam (no scaling): 0.022392323
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 14.5716
-conservation incl. errors: 1.1583575
-power in of beam: 0.5175842
-power in of beam (no scaling): 0.02070337
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 14.054016
-conservation incl. errors: 1.1584952
-power in of beam: 0.5025432
-power in of beam (no scaling): 0.02010173
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 13.551473
-conservation incl. errors: 1.158547
-power in of beam: 0.4929529
-power in of beam (no scaling): 0.019718118
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 13.058519
-conservation incl. errors: 1.1586564
-power in: 0.019604152
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.023669744,
-        intersection_area: 0.021068826,
-        remaining_area: 0.0,
-        consvtn: 0.89011633,
-        total_consvtn: 0.89011633,
-        area_loss: 0.0026009176,
-    },
-)
-power in during create_beams: 0.019604115
-Beam type: Default
-refracted power: 0.013156061
-reflected power: 0.013156061
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.026312122
-Beam power: 0.004293906
-Beam power: 0.013156061
-power of output beams: 0.017449968
-power in remainders: 0, in intersections: 0.017449968
-power out: 0.017449968
-power loss: 0.0021541845
-power in of beam: 0.49010283
-power in of beam (no scaling): 0.019604115
-power out of beam: 0.43624917
-power out of beam (no scaling): 0.017449968
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 13.004664
-conservation incl. errors: 1.158075
-power in of beam: 0.48039907
-power in of beam (no scaling): 0.019215964
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 12.524265
-conservation incl. errors: 1.1588565
-power in of beam: 0.4681054
-power in of beam (no scaling): 0.018724218
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 12.05616
-conservation incl. errors: 1.1589698
-power in of beam: 0.4618988
-power in of beam (no scaling): 0.018475953
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 11.594261
-conservation incl. errors: 1.1591038
-power in of beam: 0.44817483
-power in of beam (no scaling): 0.017926995
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 11.146087
-conservation incl. errors: 1.1592299
-power in of beam: 0.44159
-power in of beam (no scaling): 0.017663602
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 10.704496
-conservation incl. errors: 1.15933
-power in: 0.017485853
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.15214175,
-        intersection_area: 0.14582951,
-        remaining_area: 0.0,
-        consvtn: 0.9585108,
-        total_consvtn: 0.9585108,
-        area_loss: 0.006312236,
-    },
-)
-power in during create_beams: 0.017485857
-Beam type: Default
-refracted power: 0.0016349255
-reflected power: 0.0016349255
-refracted power: 0.0060923677
-reflected power: 0.0060923677
-output_iter len: 6
-output len: 6
-power out during create_beams: 0.015454587
-Beam power: 0.0012238115
-Beam power: 0.007667525
-Beam power: 0.000029993134
-Beam power: 0.0016349255
-Beam power: 0.00011176604
-Beam power: 0.0060923677
-power of output beams: 0.01676039
-power in remainders: 0, in intersections: 0.01676039
-power out: 0.01676039
-power loss: 0.00072546303
-power in of beam: 0.4371464
-power in of beam (no scaling): 0.017485857
-power out of beam: 0.41900972
-power out of beam (no scaling): 0.01676039
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 10.68636
-conservation incl. errors: 1.1591871
-power in: 0.016782325
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.023359612,
-        intersection_area: 0.01941397,
-        remaining_area: 0.0,
-        consvtn: 0.83109134,
-        total_consvtn: 0.83109134,
-        area_loss: 0.003945641,
-    },
-)
-power in during create_beams: 0.016782325
-Beam type: Default
-refracted power: 0.012005909
-reflected power: 0.012005909
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.024011819
-Beam power: 0.0019417139
-Beam power: 0.012005909
-power of output beams: 0.013947623
-power in remainders: 0, in intersections: 0.013947623
-power out: 0.013947623
-power loss: 0.002834702
-power in of beam: 0.41955808
-power in of beam (no scaling): 0.016782325
-power out of beam: 0.34869054
-power out of beam (no scaling): 0.013947623
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 10.615492
-conservation incl. errors: 1.1584216
-power in: 0.016702482
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.022742245,
-        intersection_area: 0.018877354,
-        remaining_area: 0.0,
-        consvtn: 0.8300567,
-        total_consvtn: 0.8300567,
-        area_loss: 0.0038648918,
-    },
-)
-power in during create_beams: 0.016702482
-Beam type: Default
-refracted power: 0.013463823
-reflected power: 0.013463823
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.026927646
-Beam power: 0.00040018832
-Beam power: 0.013463823
-power of output beams: 0.0138640115
-power in remainders: 0, in intersections: 0.0138640115
-power out: 0.0138640115
-power loss: 0.002838471
-power in of beam: 0.41756204
-power in of beam (no scaling): 0.016702482
-power out of beam: 0.34660026
-power out of beam (no scaling): 0.0138640115
-input power: 88.25825
-output power: 4.3853865
-Total power in beam queue: 10.544529
-conservation incl. errors: 1.1576542
-power in: 0.016533127
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.23618163,
-        intersection_area: 0.14765249,
-        remaining_area: 0.071476415,
-        consvtn: 0.625165,
-        total_consvtn: 0.9277983,
-        area_loss: 0.017052725,
-    },
-)
-power in during create_beams: 0.016533129
-Beam type: Default
-refracted power: 0.0012506082
-reflected power: 0.0012506082
-refracted power: 0.00253997
-reflected power: 0.00253997
-refracted power: 0.003998091
-reflected power: 0.003998091
-output_iter len: 6
-output len: 6
-power out during create_beams: 0.015577339
-Beam power: 0.0018503016
-Beam power: 0.0012506082
-Beam power: 0.00027076635
-Beam power: 0.00253997
-Beam power: 0.00042620563
-Beam power: 0.003998091
-power of output beams: 0.010335943
-power in remainders: 0.005003477, in intersections: 0.010335943
-power out: 0.015339419
-power loss: 0.0011937078
-power in of beam: 0.4133282
-power in of beam (no scaling): 0.016533129
-power out of beam: 0.38348547
-power out of beam (no scaling): 0.015339419
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 10.389601
-conservation incl. errors: 1.1574758
-power in: 0.015667023
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.017079419,
-        intersection_area: 0.0,
-        remaining_area: 0.0,
-        consvtn: 0.0,
-        total_consvtn: 0.0,
-        area_loss: 0.017079419,
-    },
-)
-power in during create_beams: 0.015667023
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0, in intersections: 0
-power out: 0
-power loss: 0.015667023
-power in of beam: 0.39167556
-power in of beam (no scaling): 0.015667023
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.997925
-conservation incl. errors: 1.1531895
-power in: 0.015549871
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.016951742,
-        intersection_area: 0.012415184,
-        remaining_area: 0.0,
-        consvtn: 0.73238397,
-        total_consvtn: 0.73238397,
-        area_loss: 0.004536558,
-    },
-)
-power in during create_beams: 0.015549881
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.011388504
-power of output beams: 0.011388504
-power in remainders: 0, in intersections: 0.011388504
-power out: 0.011388504
-power loss: 0.004161367
-power in of beam: 0.388747
-power in of beam (no scaling): 0.015549881
-power out of beam: 0.28471258
-power out of beam (no scaling): 0.011388504
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.89389
-conservation incl. errors: 1.1520507
-power in: 0.015123232
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.018259564,
-        intersection_area: 0.01825956,
-        remaining_area: 0.0,
-        consvtn: 0.9999998,
-        total_consvtn: 0.9999998,
-        area_loss: 3.7252903e-9,
-    },
-)
-power in during create_beams: 0.015123216
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.015123244
-power of output beams: 0.015123244
-power in remainders: 0, in intersections: 0.015123244
-power out: 0.015123244
-power loss: -0.0000000121071935
-power in of beam: 0.3780804
-power in of beam (no scaling): 0.015123216
-power out of beam: 0.37808108
-power out of beam (no scaling): 0.015123244
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.893891
-conservation incl. errors: 1.1520507
-power in: 0.015123244
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.018259576,
-        intersection_area: 0.017576877,
-        remaining_area: 0.0,
-        consvtn: 0.9626115,
-        total_consvtn: 0.9626115,
-        area_loss: 0.00068269856,
-    },
-)
-power in during create_beams: 0.015123254
-Beam type: Default
-refracted power: 0.014271648
-reflected power: 0.014271648
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.028543295
-Beam power: 0.00028617473
-Beam power: 0.014271648
-power of output beams: 0.014557823
-power in remainders: 0, in intersections: 0.014557823
-power out: 0.014557823
-power loss: 0.00056542177
-power in of beam: 0.37808132
-power in of beam (no scaling): 0.015123254
-power out of beam: 0.36394554
-power out of beam (no scaling): 0.014557823
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.879755
-conservation incl. errors: 1.1518965
-power in of beam: 0.363107
-power in of beam (no scaling): 0.014524281
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.516648
-conservation incl. errors: 1.152088
-power in of beam: 0.35904902
-power in of beam (no scaling): 0.014361962
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.157599
-conservation incl. errors: 1.1526865
-power in: 0.014322227
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.019935355,
-        intersection_area: 0.019935356,
-        remaining_area: 0.0,
-        consvtn: 1.0000001,
-        total_consvtn: 1.0000001,
-        area_loss: -1.8626451e-9,
-    },
-)
-power in during create_beams: 0.014322219
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.014322227
-power of output beams: 0.014322227
-power in remainders: 0, in intersections: 0.014322227
-power out: 0.014322227
-power loss: 0
-power in of beam: 0.35805547
-power in of beam (no scaling): 0.014322219
-power out of beam: 0.35805565
-power out of beam (no scaling): 0.014322227
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.157599
-conservation incl. errors: 1.1526865
-power in: 0.014322227
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.01993538,
-        intersection_area: 0.0113480305,
-        remaining_area: 0.0,
-        consvtn: 0.56924075,
-        total_consvtn: 0.56924075,
-        area_loss: 0.00858735,
-    },
-)
-power in during create_beams: 0.014322238
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.008152793
-power of output beams: 0.008152793
-power in remainders: 0, in intersections: 0.008152793
-power out: 0.008152793
-power loss: 0.0061694337
-power in of beam: 0.35805592
-power in of beam (no scaling): 0.014322238
-power out of beam: 0.20381981
-power out of beam (no scaling): 0.008152793
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 9.003364
-conservation incl. errors: 1.1510086
-power in of beam: 0.35679117
-power in of beam (no scaling): 0.014271648
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 8.646572
-conservation incl. errors: 1.151074
-power in: 0.014117208
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.0170449,
-        intersection_area: 0.016671509,
-        remaining_area: 0.0,
-        consvtn: 0.9780937,
-        total_consvtn: 0.9780937,
-        area_loss: 0.00037339143,
-    },
-)
-power in during create_beams: 0.014117207
-Beam type: Default
-refracted power: 0.013559194
-reflected power: 0.013559194
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.027118389
-Beam power: 0.00024875576
-Beam power: 0.013559194
-power of output beams: 0.01380795
-power in remainders: 0, in intersections: 0.01380795
-power out: 0.01380795
-power loss: 0.0003092587
-power in of beam: 0.35293016
-power in of beam (no scaling): 0.014117207
-power out of beam: 0.34519872
-power out of beam (no scaling): 0.01380795
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 8.638841
-conservation incl. errors: 1.1509894
-power in of beam: 0.34346393
-power in of beam (no scaling): 0.013738559
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 8.295377
-conservation incl. errors: 1.1510636
-power in of beam: 0.33897984
-power in of beam (no scaling): 0.013559194
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 7.9563966
-conservation incl. errors: 1.1511275
-power in of beam: 0.33659557
-power in of beam (no scaling): 0.013463823
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 7.619801
-conservation incl. errors: 1.1511853
-power in of beam: 0.33594972
-power in of beam (no scaling): 0.01343799
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 7.283851
-conservation incl. errors: 1.1513394
-power in of beam: 0.3289015
-power in of beam (no scaling): 0.013156061
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 6.95495
-conservation incl. errors: 1.1513662
-power in of beam: 0.31585464
-power in of beam (no scaling): 0.012634186
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 6.6390953
-conservation incl. errors: 1.1515832
-power in of beam: 0.30113178
-power in of beam (no scaling): 0.012045273
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 6.3379636
-conservation incl. errors: 1.1518782
-power in of beam: 0.3001477
-power in of beam (no scaling): 0.012005909
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 6.037816
-conservation incl. errors: 1.1519097
-power in: 0.011975144
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.014458606,
-        intersection_area: 0.011048086,
-        remaining_area: 0.0,
-        consvtn: 0.7641183,
-        total_consvtn: 0.7641183,
-        area_loss: 0.00341052,
-    },
-)
-power in during create_beams: 0.01197515
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.009150443
-power of output beams: 0.009150443
-power in remainders: 0, in intersections: 0.009150443
-power out: 0.009150443
-power loss: 0.0028247014
-power in of beam: 0.29937872
-power in of beam (no scaling): 0.01197515
-power out of beam: 0.22876105
-power out of beam (no scaling): 0.009150443
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 5.967199
-conservation incl. errors: 1.1511327
-power in of beam: 0.29504296
-power in of beam (no scaling): 0.011801719
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 5.672156
-conservation incl. errors: 1.1518984
-power in: 0.011388504
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.01241518,
-        intersection_area: 0.012019229,
-        remaining_area: 0.0,
-        consvtn: 0.9681075,
-        total_consvtn: 0.9681075,
-        area_loss: 0.00039595086,
-    },
-)
-power in during create_beams: 0.01138851
-Beam type: Default
-refracted power: 0.006065941
-reflected power: 0.006065941
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.012131882
-Beam power: 0.0049593584
-Beam power: 0.006065941
-power of output beams: 0.011025299
-power in remainders: 0, in intersections: 0.011025299
-power out: 0.011025299
-power loss: 0.00036320463
-power in of beam: 0.28471273
-power in of beam (no scaling): 0.01138851
-power out of beam: 0.27563247
-power out of beam (no scaling): 0.011025299
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 5.6630754
-conservation incl. errors: 1.151798
-power in of beam: 0.27453074
-power in of beam (no scaling): 0.01098123
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 5.3885446
-conservation incl. errors: 1.151934
-power in: 0.010925459
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.015207352,
-        intersection_area: 0.0152073465,
-        remaining_area: 0.0,
-        consvtn: 0.99999964,
-        total_consvtn: 0.99999964,
-        area_loss: 5.5879354e-9,
-    },
-)
-power in during create_beams: 0.010925445
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.0109254625
-power of output beams: 0.0109254625
-power in remainders: 0, in intersections: 0.0109254625
-power out: 0.0109254625
-power loss: -0.0000000037252903
-power in of beam: 0.2731361
-power in of beam (no scaling): 0.010925445
-power out of beam: 0.27313656
-power out of beam (no scaling): 0.0109254625
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 5.3885446
-conservation incl. errors: 1.151934
-power in: 0.0109254625
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.015207363,
-        intersection_area: 0.012492552,
-        remaining_area: 0.0,
-        consvtn: 0.8214805,
-        total_consvtn: 0.8214805,
-        area_loss: 0.002714811,
-    },
-)
-power in during create_beams: 0.01092547
-Beam type: Default
-refracted power: 0.0088120885
-reflected power: 0.0088120885
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.017624177
-Beam power: 0.0001629702
-Beam power: 0.0088120885
-power of output beams: 0.008975059
-power in remainders: 0, in intersections: 0.008975059
-power out: 0.008975059
-power loss: 0.0019504037
-power in of beam: 0.27313673
-power in of beam (no scaling): 0.01092547
-power out of beam: 0.22437645
-power out of beam (no scaling): 0.008975059
-input power: 88.25825
-output power: 4.5104733
-Total power in beam queue: 5.3397846
-conservation incl. errors: 1.1513984
-power in: 0.0103537645
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.2948725,
-        intersection_area: 0.04222658,
-        remaining_area: 0.25186113,
-        consvtn: 0.14320284,
-        total_consvtn: 0.99733853,
-        area_loss: 0.00078478456,
-    },
-)
-power in during create_beams: 0.0103537645
-Beam type: Default
-refracted power: 0.0014826887
-reflected power: 0.0014826887
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.0029653774
-Beam power: 0
-Beam power: 0.0014826887
-power of output beams: 0.0014826887
-power in remainders: 0.008843522, in intersections: 0.0014826887
-power out: 0.01032621
-power loss: 0.00002755411
-power in of beam: 0.2588441
-power in of beam (no scaling): 0.0103537645
-power out of beam: 0.25815526
-power out of beam (no scaling): 0.01032621
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 5.1180077
-conservation incl. errors: 1.1513951
-power in: 0.009975822
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.012044652,
-        intersection_area: 0.0,
-        remaining_area: 0.0,
-        consvtn: 0.0,
-        total_consvtn: 0.0,
-        area_loss: 0.012044652,
-    },
-)
-power in during create_beams: 0.009975805
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0, in intersections: 0
-power out: 0
-power loss: 0.009975822
-power in of beam: 0.2493951
-power in of beam (no scaling): 0.009975805
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 4.8686123
-conservation incl. errors: 1.1486375
-power in of beam: 0.2455717
-power in of beam (no scaling): 0.009822869
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 4.6230407
-conservation incl. errors: 1.1486684
-power in: 0.009150443
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.01104811,
-        intersection_area: 0.011048107,
-        remaining_area: 0.0,
-        consvtn: 0.99999976,
-        total_consvtn: 0.99999976,
-        area_loss: 2.7939677e-9,
-    },
-)
-power in during create_beams: 0.009150444
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.009150448
-power of output beams: 0.009150448
-power in remainders: 0, in intersections: 0.009150448
-power out: 0.009150448
-power loss: -0.0000000055879354
-power in of beam: 0.22876108
-power in of beam (no scaling): 0.009150444
-power out of beam: 0.2287612
-power out of beam (no scaling): 0.009150448
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 4.6230407
-conservation incl. errors: 1.1486684
-power in: 0.009150448
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.011048114,
-        intersection_area: 0.011048114,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.009150447
-Beam type: Default
-refracted power: 0.008392216
-reflected power: 0.008392216
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.016784431
-Beam power: 0.0007582358
-Beam power: 0.008392216
-power of output beams: 0.009150451
-power in remainders: 0, in intersections: 0.009150451
-power out: 0.009150451
-power loss: -0.0000000027939677
-power in of beam: 0.22876117
-power in of beam (no scaling): 0.009150447
-power out of beam: 0.22876126
-power out of beam (no scaling): 0.009150451
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 4.6230407
-conservation incl. errors: 1.1486684
-power in of beam: 0.2203022
-power in of beam (no scaling): 0.0088120885
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 4.4027386
-conservation incl. errors: 1.1486988
-power in of beam: 0.21743515
-power in of beam (no scaling): 0.008697406
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 4.185303
-conservation incl. errors: 1.1497879
-power in of beam: 0.20980538
-power in of beam (no scaling): 0.008392216
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.975498
-conservation incl. errors: 1.1498034
-power in: 0.008152793
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.011348029,
-        intersection_area: 0.011348017,
-        remaining_area: 0.0,
-        consvtn: 0.9999989,
-        total_consvtn: 0.9999989,
-        area_loss: 1.21071935e-8,
-    },
-)
-power in during create_beams: 0.008152791
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.008152795
-power of output beams: 0.008152795
-power in remainders: 0, in intersections: 0.008152795
-power out: 0.008152795
-power loss: -0.0000000018626451
-power in of beam: 0.20381977
-power in of beam (no scaling): 0.008152791
-power out of beam: 0.20381986
-power out of beam (no scaling): 0.008152795
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.975498
-conservation incl. errors: 1.1498034
-power in: 0.008152795
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.011348029,
-        intersection_area: 0.0,
-        remaining_area: 0.0,
-        consvtn: 0.0,
-        total_consvtn: 0.0,
-        area_loss: 0.011348029,
-    },
-)
-power in during create_beams: 0.008152795
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0, in intersections: 0
-power out: 0
-power loss: 0.008152795
-power in of beam: 0.20381986
-power in of beam (no scaling): 0.008152795
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.7716782
-conservation incl. errors: 1.1475464
-power in of beam: 0.2019298
-power in of beam (no scaling): 0.008077192
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.5697484
-conservation incl. errors: 1.1477298
-power in: 0.007667525
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.06671391,
-        intersection_area: 0.06627464,
-        remaining_area: 0.0,
-        consvtn: 0.9934157,
-        total_consvtn: 0.9934157,
-        area_loss: 0.00043926388,
-    },
-)
-power in during create_beams: 0.0076675243
-Beam type: Default
-output_iter len: 2
-output len: 2
-power out during create_beams: 0
-Beam power: 0.0040184166
-Beam power: 0.003598618
-power of output beams: 0.007617035
-power in remainders: 0, in intersections: 0.007617035
-power out: 0.007617035
-power loss: 0.000050490256
-power in of beam: 0.19168809
-power in of beam (no scaling): 0.0076675243
-power out of beam: 0.19042586
-power out of beam (no scaling): 0.007617035
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.5684865
-conservation incl. errors: 1.1477172
-power in of beam: 0.1901896
-power in of beam (no scaling): 0.007607585
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.3782969
-conservation incl. errors: 1.14774
-power in: 0.0063124006
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.054923207,
-        intersection_area: 0.05492314,
-        remaining_area: 0.0,
-        consvtn: 0.9999988,
-        total_consvtn: 0.9999988,
-        area_loss: 6.7055225e-8,
-    },
-)
-power in during create_beams: 0.0063124006
-Beam type: Default
-refracted power: 0.0013618432
-reflected power: 0.0013618432
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.0027236864
-Beam power: 0.0049251136
-Beam power: 0.000025436391
-Beam power: 0.0013618432
-power of output beams: 0.006312393
-power in remainders: 0, in intersections: 0.006312393
-power out: 0.006312393
-power loss: 0.000000007450581
-power in of beam: 0.15781
-power in of beam (no scaling): 0.0063124006
-power out of beam: 0.15780982
-power out of beam (no scaling): 0.006312393
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.3782969
-conservation incl. errors: 1.14774
-power in of beam: 0.1524181
-power in of beam (no scaling): 0.006096725
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.2258787
-conservation incl. errors: 1.1477664
-power in of beam: 0.15230918
-power in of beam (no scaling): 0.0060923677
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 3.0735695
-conservation incl. errors: 1.1478595
-power in of beam: 0.1516485
-power in of beam (no scaling): 0.006065941
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 2.921921
-conservation incl. errors: 1.1478635
-power in of beam: 0.12398395
-power in of beam (no scaling): 0.0049593584
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 2.7979372
-conservation incl. errors: 1.1478804
-power in: 0.0049251136
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.04285264,
-        intersection_area: 0.042852633,
-        remaining_area: 0.0,
-        consvtn: 0.9999998,
-        total_consvtn: 0.9999998,
-        area_loss: 7.450581e-9,
-    },
-)
-power in during create_beams: 0.0049251136
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.004925115
-power of output beams: 0.004925115
-power in remainders: 0, in intersections: 0.004925115
-power out: 0.004925115
-power loss: -0.0000000013969839
-power in of beam: 0.12312783
-power in of beam (no scaling): 0.0049251136
-power out of beam: 0.12312787
-power out of beam (no scaling): 0.004925115
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 2.7979372
-conservation incl. errors: 1.1478804
-power in: 0.004925115
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.042852648,
-        intersection_area: 0.042343274,
-        remaining_area: 0.0,
-        consvtn: 0.98811334,
-        total_consvtn: 0.98811334,
-        area_loss: 0.00050937384,
-    },
-)
-power in during create_beams: 0.004925115
-Beam type: Default
-refracted power: 0.002755375
-reflected power: 0.002755375
-output_iter len: 3
-output len: 3
-power out during create_beams: 0.00551075
-Beam power: 0.0020557677
-Beam power: 0.000055428245
-Beam power: 0.002755375
-power of output beams: 0.004866571
-power in remainders: 0, in intersections: 0.004866571
-power out: 0.004866571
-power loss: 0.00005854387
-power in of beam: 0.12312787
-power in of beam (no scaling): 0.004925115
-power out of beam: 0.12166427
-power out of beam (no scaling): 0.004866571
-input power: 88.25825
-output power: 4.731561
-Total power in beam queue: 2.7964735
-conservation incl. errors: 1.1478653
-power in: 0.004627933
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.24288997,
-        intersection_area: 0.0,
-        remaining_area: 0.24288967,
-        consvtn: 0.0,
-        total_consvtn: 0.99999875,
-        area_loss: 2.9802322e-7,
-    },
-)
-power in during create_beams: 0.004627933
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0.0046279277, in intersections: 0
-power out: 0.0046279277
-power loss: 0.000000005122274
-power in of beam: 0.115698315
-power in of beam (no scaling): 0.004627933
-power out of beam: 0.11569818
-power out of beam (no scaling): 0.0046279277
-input power: 88.25825
-output power: 4.8472595
-Total power in beam queue: 2.6807752
-conservation incl. errors: 1.1478653
-power in of beam: 0.113964565
-power in of beam (no scaling): 0.004558583
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.8472595
-Total power in beam queue: 2.5668106
-conservation incl. errors: 1.1479851
-power in of beam: 0.11179142
-power in of beam (no scaling): 0.004471657
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.8472595
-Total power in beam queue: 2.4550192
-conservation incl. errors: 1.1480979
-power in: 0.004383266
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.021385536,
-        intersection_area: 0.021385428,
-        remaining_area: 0.0,
-        consvtn: 0.99999493,
-        total_consvtn: 0.99999493,
-        area_loss: 1.0803342e-7,
-    },
-)
-power in during create_beams: 0.004383266
-Beam type: Default
-refracted power: 0.004304483
-reflected power: 0.004304483
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.008608966
-Beam power: 0.00007876047
-Beam power: 0.004304483
-power of output beams: 0.0043832436
-power in remainders: 0, in intersections: 0.0043832436
-power out: 0.0043832436
-power loss: 0.000000022351742
-power in of beam: 0.10958164
-power in of beam (no scaling): 0.004383266
-power out of beam: 0.10958108
-power out of beam (no scaling): 0.0043832436
-input power: 88.25825
-output power: 4.8472595
-Total power in beam queue: 2.4550185
-conservation incl. errors: 1.1480979
-power in of beam: 0.107612066
-power in of beam (no scaling): 0.004304483
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.8472595
-Total power in beam queue: 2.3474064
-conservation incl. errors: 1.148124
-power in of beam: 0.107347645
-power in of beam (no scaling): 0.004293906
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.8472595
-Total power in beam queue: 2.2400587
-conservation incl. errors: 1.1481495
-power in: 0.0040453793
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.22244756,
-        intersection_area: 0.0,
-        remaining_area: 0.22244723,
-        consvtn: 0.0,
-        total_consvtn: 0.9999985,
-        area_loss: 3.2782555e-7,
-    },
-)
-power in during create_beams: 0.00404538
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0.004045374, in intersections: 0
-power out: 0.004045374
-power loss: 0.000000005122274
-power in of beam: 0.10113449
-power in of beam (no scaling): 0.00404538
-power out of beam: 0.101134345
-power out of beam (no scaling): 0.004045374
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 2.1389241
-conservation incl. errors: 1.1481495
-power in: 0.0040184166
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.03496361,
-        intersection_area: 0.03496361,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.004018415
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.0040184176
-power of output beams: 0.0040184176
-power in remainders: 0, in intersections: 0.0040184176
-power out: 0.0040184176
-power loss: -0.0000000009313226
-power in of beam: 0.10046037
-power in of beam (no scaling): 0.004018415
-power out of beam: 0.10046043
-power out of beam (no scaling): 0.0040184176
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 2.1389244
-conservation incl. errors: 1.1481495
-power in: 0.0040184176
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.03496362,
-        intersection_area: 0.03496362,
-        remaining_area: 0.0,
-        consvtn: 1.0,
-        total_consvtn: 1.0,
-        area_loss: 0.0,
-    },
-)
-power in during create_beams: 0.004018416
-Beam type: Default
-refracted power: 0.0038981615
-reflected power: 0.0038981615
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.007796323
-Beam power: 0.000120256176
-Beam power: 0.0038981615
-power of output beams: 0.0040184176
-power in remainders: 0, in intersections: 0.0040184176
-power out: 0.0040184176
-power loss: 0
-power in of beam: 0.100460395
-power in of beam (no scaling): 0.004018416
-power out of beam: 0.10046043
-power out of beam (no scaling): 0.0040184176
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 2.1389244
-conservation incl. errors: 1.1481495
-power in of beam: 0.099952266
-power in of beam (no scaling): 0.003998091
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 2.0389721
-conservation incl. errors: 1.1482614
-power in of beam: 0.0974892
-power in of beam (no scaling): 0.0038995682
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.9414829
-conservation incl. errors: 1.1483492
-power in of beam: 0.09745403
-power in of beam (no scaling): 0.0038981615
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.8440288
-conservation incl. errors: 1.1483812
-power in of beam: 0.09374769
-power in of beam (no scaling): 0.003749908
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.7502811
-conservation incl. errors: 1.1484454
-power in: 0.003598618
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.03131104,
-        intersection_area: 0.022074766,
-        remaining_area: 0.0,
-        consvtn: 0.7050155,
-        total_consvtn: 0.7050155,
-        area_loss: 0.009236272,
-    },
-)
-power in during create_beams: 0.0035986162
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.002537084
-power of output beams: 0.002537084
-power in remainders: 0, in intersections: 0.002537084
-power out: 0.002537084
-power loss: 0.001061534
-power in of beam: 0.089965396
-power in of beam (no scaling): 0.0035986162
-power out of beam: 0.0634271
-power out of beam (no scaling): 0.002537084
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.7237427
-conservation incl. errors: 1.1481636
-power in of beam: 0.08662275
-power in of beam (no scaling): 0.0034649104
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.63712
-conservation incl. errors: 1.1483564
-power in of beam: 0.08630634
-power in of beam (no scaling): 0.003452254
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.5508137
-conservation incl. errors: 1.1483883
-power in: 0.0032865102
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.034530614,
-        intersection_area: 0.03453052,
-        remaining_area: 0.0,
-        consvtn: 0.9999973,
-        total_consvtn: 0.9999973,
-        area_loss: 9.313226e-8,
-    },
-)
-power in during create_beams: 0.0032865102
-Beam type: Default
-refracted power: 0.0032276253
-reflected power: 0.0032276253
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.0064552506
-Beam power: 0.00005887593
-Beam power: 0.0032276253
-power of output beams: 0.0032865012
-power in remainders: 0, in intersections: 0.0032865012
-power out: 0.0032865012
-power loss: 0.000000009080395
-power in of beam: 0.08216275
-power in of beam (no scaling): 0.0032865102
-power out of beam: 0.08216252
-power out of beam (no scaling): 0.0032865012
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.5508134
-conservation incl. errors: 1.1483883
-power in of beam: 0.08069063
-power in of beam (no scaling): 0.0032276253
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.4701228
-conservation incl. errors: 1.1484196
-power in of beam: 0.07264026
-power in of beam (no scaling): 0.0029056107
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.3974825
-conservation incl. errors: 1.1485118
-power in of beam: 0.07126342
-power in of beam (no scaling): 0.002850537
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.3262191
-conservation incl. errors: 1.1486459
-power in of beam: 0.06888437
-power in of beam (no scaling): 0.002755375
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.2573347
-conservation incl. errors: 1.148664
-power in of beam: 0.06349924
-power in of beam (no scaling): 0.00253997
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.1938355
-conservation incl. errors: 1.1487093
-power in: 0.002537084
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.02207476,
-        intersection_area: 0.022074748,
-        remaining_area: 0.0,
-        consvtn: 0.9999994,
-        total_consvtn: 0.9999994,
-        area_loss: 1.3038516e-8,
-    },
-)
-power in during create_beams: 0.0025370833
-Beam type: Default
-refracted power: 0.0019756516
-reflected power: 0.0019756516
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.003951303
-Beam power: 0.00056143117
-Beam power: 0.0019756516
-power of output beams: 0.0025370829
-power in remainders: 0, in intersections: 0.0025370829
-power out: 0.0025370829
-power loss: 0.0000000011641532
-power in of beam: 0.063427076
-power in of beam (no scaling): 0.0025370833
-power out of beam: 0.06342707
-power out of beam (no scaling): 0.0025370829
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.1938355
-conservation incl. errors: 1.1487093
-power in of beam: 0.057816308
-power in of beam (no scaling): 0.0023126525
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.1360192
-conservation incl. errors: 1.1487885
-power in of beam: 0.05521986
-power in of beam (no scaling): 0.0022087945
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.0807993
-conservation incl. errors: 1.1489224
-power in of beam: 0.05253861
-power in of beam (no scaling): 0.0021015445
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.0282607
-conservation incl. errors: 1.1489874
-power in: 0.0020557677
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.017886909,
-        intersection_area: 0.017886912,
-        remaining_area: 0.0,
-        consvtn: 1.0000002,
-        total_consvtn: 1.0000002,
-        area_loss: -3.7252903e-9,
-    },
-)
-power in during create_beams: 0.0020557684
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.0020557682
-power of output beams: 0.0020557682
-power in remainders: 0, in intersections: 0.0020557682
-power out: 0.0020557682
-power loss: -0.0000000004656613
-power in of beam: 0.051394206
-power in of beam (no scaling): 0.0020557684
-power out of beam: 0.0513942
-power out of beam (no scaling): 0.0020557682
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.0282607
-conservation incl. errors: 1.1489874
-power in: 0.0020557682
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.017886937,
-        intersection_area: 0.014229981,
-        remaining_area: 0.0,
-        consvtn: 0.7955516,
-        total_consvtn: 0.7955516,
-        area_loss: 0.0036569554,
-    },
-)
-power in during create_beams: 0.002055769
-Beam type: Default
-refracted power: 0.0016044991
-reflected power: 0.0016044991
-output_iter len: 2
-output len: 2
-power out during create_beams: 0.0032089981
-Beam power: 0.00003097187
-Beam power: 0.0016044991
-power of output beams: 0.0016354709
-power in remainders: 0, in intersections: 0.0016354709
-power out: 0.0016354709
-power loss: 0.00042029726
-power in of beam: 0.051394224
-power in of beam (no scaling): 0.002055769
-power out of beam: 0.04088677
-power out of beam (no scaling): 0.0016354709
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 1.0177532
-conservation incl. errors: 1.1488726
-power in of beam: 0.050269064
-power in of beam (no scaling): 0.0020107627
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.96748424
-conservation incl. errors: 1.1491827
-power in of beam: 0.049391285
-power in of beam (no scaling): 0.0019756516
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.91809297
-conservation incl. errors: 1.149187
-power in of beam: 0.04928326
-power in of beam (no scaling): 0.0019713305
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.8688097
-conservation incl. errors: 1.1492555
-power in of beam: 0.048542842
-power in of beam (no scaling): 0.0019417139
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.82026684
-conservation incl. errors: 1.1492662
-power in of beam: 0.046257537
-power in of beam (no scaling): 0.0018503016
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.7740093
-conservation incl. errors: 1.1492895
-power in of beam: 0.041453186
-power in of beam (no scaling): 0.0016581275
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.7325561
-conservation incl. errors: 1.1494291
-power in of beam: 0.040873133
-power in of beam (no scaling): 0.0016349255
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.691683
-conservation incl. errors: 1.1494358
-power in of beam: 0.040112473
-power in of beam (no scaling): 0.0016044991
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.6515705
-conservation incl. errors: 1.1494418
-power in of beam: 0.037067216
-power in of beam (no scaling): 0.0014826887
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.61450326
-conservation incl. errors: 1.1494596
-power in of beam: 0.03553969
-power in of beam (no scaling): 0.0014215878
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.5789636
-conservation incl. errors: 1.149493
-power in of beam: 0.034046076
-power in of beam (no scaling): 0.0013618432
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.5449175
-conservation incl. errors: 1.1494974
-power in of beam: 0.03345187
-power in of beam (no scaling): 0.0013380749
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.51146567
-conservation incl. errors: 1.1495792
-power in of beam: 0.031265203
-power in of beam (no scaling): 0.0012506082
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.48020047
-conservation incl. errors: 1.1496773
-power in of beam: 0.030824153
-power in of beam (no scaling): 0.0012329662
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.4493763
-conservation incl. errors: 1.1496876
-power in: 0.0012238115
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.010648198,
-        intersection_area: 0.010571623,
-        remaining_area: 0.0,
-        consvtn: 0.99280864,
-        total_consvtn: 0.99280864,
-        area_loss: 7.6575205e-5,
-    },
-)
-power in during create_beams: 0.0012238125
-Beam type: Default
-output_iter len: 1
-output len: 1
-power out during create_beams: 0
-Beam power: 0.0012150113
-power of output beams: 0.0012150113
-power in remainders: 0, in intersections: 0.0012150113
-power out: 0.0012150113
-power loss: 0.000008800183
-power in of beam: 0.03059531
-power in of beam (no scaling): 0.0012238125
-power out of beam: 0.030375281
-power out of beam (no scaling): 0.0012150113
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.4491563
-conservation incl. errors: 1.1496853
-power in: 0.0012150113
-clipping stats: Some(
-    Stats {
-        clipping_area: 0.010571638,
-        intersection_area: 0.0,
-        remaining_area: 0.0,
-        consvtn: 0.0,
-        total_consvtn: 0.0,
-        area_loss: 0.010571638,
-    },
-)
-power in during create_beams: 0.0012150131
-Beam type: Default
-output_iter len: 0
-output len: 0
-power out during create_beams: 0
-power of output beams: 0
-power in remainders: 0, in intersections: 0
-power out: 0
-power loss: 0.0012150113
-power in of beam: 0.030375326
-power in of beam (no scaling): 0.0012150131
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.41878104
-conservation incl. errors: 1.1493484
-power in of beam: 0.027295293
-power in of beam (no scaling): 0.0010918118
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.39148575
-conservation incl. errors: 1.1493639
-power in of beam: 0.023485396
-power in of beam (no scaling): 0.0009394159
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.36800036
-conservation incl. errors: 1.1493827
-power in of beam: 0.022613408
-power in of beam (no scaling): 0.0009045364
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.34538695
-conservation incl. errors: 1.1493945
-power in of beam: 0.022493143
-power in of beam (no scaling): 0.00089972577
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.3228938
-conservation incl. errors: 1.1494155
-power in of beam: 0.021196565
-power in of beam (no scaling): 0.0008478626
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.30169722
-conservation incl. errors: 1.1494342
-power in of beam: 0.018955894
-power in of beam (no scaling): 0.0007582358
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.28274134
-conservation incl. errors: 1.1494367
-power in of beam: 0.01866713
-power in of beam (no scaling): 0.00074668525
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.2640742
-conservation incl. errors: 1.1494803
-power in of beam: 0.01771848
-power in of beam (no scaling): 0.0007087393
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.24635573
-conservation incl. errors: 1.1494912
-power in of beam: 0.016559793
-power in of beam (no scaling): 0.0006623918
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.22979593
-conservation incl. errors: 1.149499
-power in of beam: 0.015330759
-power in of beam (no scaling): 0.0006132304
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.21446517
-conservation incl. errors: 1.1495045
-power in of beam: 0.014102446
-power in of beam (no scaling): 0.0005640979
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.20036273
-conservation incl. errors: 1.14951
-power in of beam: 0.014035778
-power in of beam (no scaling): 0.00056143117
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.18632695
-conservation incl. errors: 1.1495136
-power in of beam: 0.014029064
-power in of beam (no scaling): 0.0005611626
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.17229788
-conservation incl. errors: 1.1495179
-power in of beam: 0.0127223795
-power in of beam (no scaling): 0.0005088952
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.1595755
-conservation incl. errors: 1.1495345
-power in of beam: 0.011308826
-power in of beam (no scaling): 0.00045235304
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.14826669
-conservation incl. errors: 1.149539
-power in of beam: 0.0106551405
-power in of beam (no scaling): 0.00042620563
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.13761155
-conservation incl. errors: 1.1495466
-power in of beam: 0.010526737
-power in of beam (no scaling): 0.0004210695
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.12708482
-conservation incl. errors: 1.1495492
-power in of beam: 0.010486913
-power in of beam (no scaling): 0.00041947654
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.11659791
-conservation incl. errors: 1.1495522
-power in of beam: 0.010373964
-power in of beam (no scaling): 0.00041495857
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.10622395
-conservation incl. errors: 1.1495553
-power in of beam: 0.010004708
-power in of beam (no scaling): 0.00040018832
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.09621924
-conservation incl. errors: 1.1495574
-power in of beam: 0.008723277
-power in of beam (no scaling): 0.0003489311
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.08749597
-conservation incl. errors: 1.1495595
-power in of beam: 0.008509932
-power in of beam (no scaling): 0.0003403973
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.078986034
-conservation incl. errors: 1.149562
-power in of beam: 0.0083765965
-power in of beam (no scaling): 0.00033506387
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.070609435
-conservation incl. errors: 1.1495656
-power in of beam: 0.008312443
-power in of beam (no scaling): 0.00033249776
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.062296994
-conservation incl. errors: 1.1495681
-power in of beam: 0.0075339223
-power in of beam (no scaling): 0.00030135692
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.05476307
-conservation incl. errors: 1.1495692
-power in of beam: 0.007154368
-power in of beam (no scaling): 0.00028617473
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.047608703
-conservation incl. errors: 1.1495707
-power in of beam: 0.0067691584
-power in of beam (no scaling): 0.00027076635
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.040839545
-conservation incl. errors: 1.1495737
-power in of beam: 0.006382811
-power in of beam (no scaling): 0.00025531245
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.034456734
-conservation incl. errors: 1.1495751
-power in of beam: 0.0062188935
-power in of beam (no scaling): 0.00024875576
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.02823784
-conservation incl. errors: 1.1495763
-power in of beam: 0.0040742545
-power in of beam (no scaling): 0.0001629702
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.024163585
-conservation incl. errors: 1.1495769
-power in of beam: 0.0039865784
-power in of beam (no scaling): 0.00015946315
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.020177007
-conservation incl. errors: 1.1495774
-power in of beam: 0.0038857854
-power in of beam (no scaling): 0.00015543142
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.016291222
-conservation incl. errors: 1.1495812
-power in of beam: 0.0035040148
-power in of beam (no scaling): 0.0001401606
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.012787206
-conservation incl. errors: 1.1495817
-power in of beam: 0.0030064043
-power in of beam (no scaling): 0.000120256176
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.009780802
-conservation incl. errors: 1.1495829
-power in of beam: 0.002794151
-power in of beam (no scaling): 0.00011176604
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.0069866506
-conservation incl. errors: 1.1495845
-power in of beam: 0.0019690117
-power in of beam (no scaling): 0.00007876047
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.0050176387
-conservation incl. errors: 1.149585
-power in of beam: 0.001471898
-power in of beam (no scaling): 0.00005887593
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.0035457406
-conservation incl. errors: 1.1495856
-power in of beam: 0.001385706
-power in of beam (no scaling): 0.000055428245
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.0021600346
-conservation incl. errors: 1.1495861
-power in of beam: 0.0007742967
-power in of beam (no scaling): 0.00003097187
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.001385738
-conservation incl. errors: 1.1495861
-power in of beam: 0.0007498283
-power in of beam (no scaling): 0.000029993134
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0.00063590973
-conservation incl. errors: 1.1495862
-power in of beam: 0.00063590973
-power in of beam (no scaling): 0.000025436391
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: 0
-conservation incl. errors: 1.1495864
-power in of beam: 0
-power in of beam (no scaling): 0
-power out of beam: 0
-power out of beam (no scaling): 0
-input power: 88.25825
-output power: 4.948394
-Total power in beam queue: -0
-conservation incl. errors: 1.1495864
+power conservation: final -0.68449336, manual 1.6844934
+power conservation: final -0.00000010775767, manual 1.0000001
+power conservation: final 0.0013911565, manual 0.9986088
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.00000018640286, manual 1.0000002
+power conservation: final 0.00000073322485, manual 0.9999993
+power conservation: final 0.00000025016425, manual 0.99999976
+power conservation: final 0.009959954, manual 0.99004006
+power conservation: final 0.00000047488655, manual 0.9999995
+power conservation: final 0.00000040936854, manual 0.9999996
+power conservation: final 1, manual 0
+power conservation: final 0.01406544, manual 0.9859347
+power conservation: final 0.0002877062, manual 0.9997123
+power conservation: final 0.0000009930179, manual 0.999999
+power conservation: final 0.00000040122438, manual 0.9999997
+power conservation: final 0.023199193, manual 0.9768008
+power conservation: final 0.0000005070765, manual 0.99999946
+power conservation: final 0.74798, manual 0.25202003
+power conservation: final 0.7586291, manual 0.2413709
+power conservation: final 0.0000005870636, manual 0.9999994
+power conservation: final 0.0000003522382, manual 0.99999964
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.00000009500378, manual 0.9999999
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.011538343, manual 0.9884617
+power conservation: final 1, manual 0
+power conservation: final 0.0000025257052, manual 0.9999975
+power conservation: final 0.797227, manual 0.20277297
+power conservation: final 0.017267337, manual 0.98273265
+power conservation: final 0.00000042284321, manual 0.9999996
+power conservation: final 1, manual 0
+power conservation: final 0.18224101, manual 0.817759
+power conservation: final 1, manual 0
+power conservation: final 0.07030697, manual 0.92969304
+power conservation: final 1, manual 0
+power conservation: final 0.000003388729, manual 0.9999966
+power conservation: final 0.0000007546808, manual 0.9999992
+power conservation: final 0.0000030187255, manual 0.99999696
+power conservation: final 0.003811476, manual 0.9961885
+power conservation: final -0.00000007959267, manual 1.0000001
+power conservation: final 0.000003506583, manual 0.9999965
+power conservation: final 0.03790138, manual 0.9620986
+power conservation: final 1, manual 0
+power conservation: final 0.028130632, manual 0.97186935
+power conservation: final 0.0000010800502, manual 0.9999989
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.012489911, manual 0.9875101
+power conservation: final 1, manual 0
+power conservation: final 0.0000003526002, manual 0.99999964
+power conservation: final 1, manual 0
+power conservation: final 0.18565948, manual 0.81434053
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000027874792, manual 0.9999973
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.036587793, manual 0.9634122
+power conservation: final 0.0031277374, manual 0.99687225
+power conservation: final 0.01926168, manual 0.98073834
+power conservation: final 1, manual 0
+power conservation: final 0.8321431, manual 0.16785683
+power conservation: final 0.060034417, manual 0.9399656
+power conservation: final 0.04232143, manual 0.9576786
+power conservation: final 0.27823028, manual 0.7217697
+power conservation: final 0.00000019415833, manual 0.9999998
+power conservation: final 0.0075139934, manual 0.992486
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.0000009717111, manual 1.000001
+power conservation: final 0.00000029898794, manual 0.9999997
+power conservation: final 1, manual 0
+power conservation: final 0.00000039329896, manual 0.9999996
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.9037475, manual 0.096252546
+power conservation: final 1, manual 0
+power conservation: final 0.10989665, manual 0.89010334
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.23073977, manual 0.7692602
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.041493453, manual 0.9585065
+power conservation: final 0.16892673, manual 0.8310733
+power conservation: final 0.16994663, manual 0.8300534
+power conservation: final 0.37483725, manual 0.62516266
+power conservation: final 1, manual 0
+power conservation: final 0.26761648, manual 0.73238355
+power conservation: final 0, manual 1
+power conservation: final 0.037386555, manual 0.96261346
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000018157134, manual 0.9999982
+power conservation: final -0.0000018857666, manual 1.0000019
+power conservation: final 0.43072847, manual 0.5692715
+power conservation: final 1, manual 0
+power conservation: final 0.021918315, manual 0.9780817
+power conservation: final 0.2779305, manual 0.7220695
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000010071485, manual 0.999999
+power conservation: final 0.000003980627, manual 0.999996
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.044116706, manual 0.9558834
+power conservation: final 1, manual 0
+power conservation: final 0.23587942, manual 0.7641206
+power conservation: final 0.044628095, manual 0.9553719
+power conservation: final 0.0000003945835, manual 0.9999996
+power conservation: final -0.00000071362217, manual 1.0000007
+power conservation: final 0.034929734, manual 0.96507025
+power conservation: final 1, manual 0
+power conservation: final 0.03189171, manual 0.9681083
+power conservation: final 0.09753803, manual 0.90246195
+power conservation: final 1, manual 0
+power conservation: final 0.013168281, manual 0.9868317
+power conservation: final 0.00000085243744, manual 0.99999917
+power conservation: final 0.17846744, manual 0.82153255
+power conservation: final 1, manual 0
+power conservation: final 0.8567969, manual 0.14320305
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000027870958, manual 0.9999972
+power conservation: final 0.000008854717, manual 0.9999911
+power conservation: final 0, manual 1
+power conservation: final 1, manual 0
+power conservation: final 0.00000053540236, manual 0.99999946
+power conservation: final 1, manual 0
+power conservation: final -0.000002627222, manual 1.0000026
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.006580635, manual 0.99341935
+power conservation: final 1, manual 0
+power conservation: final 0.79033476, manual 0.20966522
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000015491637, manual 0.99999845
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0, manual 1
+power conservation: final 0.011885293, manual 0.9881148
+power conservation: final 1, manual 0
+power conservation: final 0.017336974, manual 0.98266315
+power conservation: final 1, manual 0
+power conservation: final 0.06907264, manual 0.93092734
+power conservation: final 0.000008498864, manual 0.9999915
+power conservation: final 1, manual 0
+power conservation: final 0.09920346, manual 0.90079653
+power conservation: final -0.00000044744846, manual 1.0000005
+power conservation: final 0.00090328616, manual 0.9990967
+power conservation: final 1, manual 0
+power conservation: final 0.0000004635331, manual 0.9999995
+power conservation: final 0.00000011588333, manual 0.9999999
+power conservation: final 0.015888277, manual 0.9841117
+power conservation: final 1, manual 0
+power conservation: final 0.000005075076, manual 0.99999493
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.008237336, manual 0.99176264
+power conservation: final 0.12297937, manual 0.87702066
+power conservation: final 0.29498407, manual 0.7050159
+power conservation: final 1, manual 0
+power conservation: final 0.0015154878, manual 0.9984845
+power conservation: final -0.00000020317077, manual 1.0000002
+power conservation: final 0.0000052506334, manual 0.99999475
+power conservation: final 0.000005738374, manual 0.9999943
+power conservation: final 1, manual 0
+power conservation: final -0.00000092346727, manual 1.000001
+power conservation: final 0.00000042621514, manual 0.9999996
+power conservation: final -0.000000071035885, manual 1.0000001
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.16228786, manual 0.83771217
+power conservation: final 1, manual 0
+power conservation: final 0.07962809, manual 0.9203719
+power conservation: final -0.00000024346582, manual 1.0000002
+power conservation: final 0.0000022053484, manual 0.9999978
+power conservation: final 1, manual 0
+power conservation: final 0.0000024885076, manual 0.9999975
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.11355745, manual 0.8864425
+power conservation: final -0.0000004243164, manual 1.0000005
+power conservation: final 0.028236134, manual 0.97176385
+power conservation: final 0.33273712, manual 0.6672629
+power conservation: final 1, manual 0
+power conservation: final 0.000015373664, manual 0.99998474
+power conservation: final 0.0000029333496, manual 0.9999971
+power conservation: final 0.0000021107237, manual 0.9999979
+power conservation: final 1, manual 0
+power conservation: final 0.14521772, manual 0.8547823
+power conservation: final 0.04883986, manual 0.95116013
+power conservation: final 0.00000009604063, manual 0.9999999
+power conservation: final 1, manual 0
+power conservation: final 0.0000017123841, manual 0.9999982
+power conservation: final -0.00000010113904, manual 1.0000001
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.000002213625, manual 0.9999978
+power conservation: final 0.0023349586, manual 0.99766505
+power conservation: final 1, manual 0
+power conservation: final 0.000004369362, manual 0.99999565
+power conservation: final 0.1539107, manual 0.8460893
+power conservation: final 0.000000110790154, manual 0.9999999
+power conservation: final 1, manual 0
+power conservation: final 0.00000067955136, manual 0.99999934
+power conservation: final 0.20445868, manual 0.7955413
+power conservation: final 0.00000023022622, manual 0.99999976
+power conservation: final 0.16509612, manual 0.8349039
+power conservation: final 0.03996227, manual 0.9600377
+power conservation: final 1, manual 0
+power conservation: final 0.00000047243373, manual 0.9999995
+power conservation: final 0.12563986, manual 0.87436014
+power conservation: final 0.000000544262, manual 0.99999946
+power conservation: final 1, manual 0
+power conservation: final 0.06905485, manual 0.93094516
+power conservation: final 0.50354356, manual 0.49645647
+power conservation: final 0.0000003227629, manual 0.9999997
+power conservation: final 0.16161598, manual 0.83838403
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.000000066465134, manual 0.99999994
+power conservation: final 1, manual 0
+power conservation: final 0, manual 1
+power conservation: final 0.17027752, manual 0.82972246
+power conservation: final -0.00000013853668, manual 1.0000001
+power conservation: final 1, manual 0
+power conservation: final 0.0000015445986, manual 0.99999845
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.077476196, manual 0.9225238
+power conservation: final 0.0000012319439, manual 0.99999875
+power conservation: final 0.17996195, manual 0.820038
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000021098617, manual 0.9999979
+power conservation: final 0.022033261, manual 0.9779667
+power conservation: final 0.00000032756603, manual 0.9999997
+power conservation: final 0.052704126, manual 0.94729584
+power conservation: final 0.0000010837347, manual 0.9999989
+power conservation: final 0.127359, manual 0.872641
+power conservation: final 1, manual 0
+power conservation: final 0.00000008474301, manual 0.99999994
+power conservation: final 1, manual 0
+power conservation: final 0.1691364, manual 0.8308636
+power conservation: final 1, manual 0
+power conservation: final 0.13353093, manual 0.8664691
+power conservation: final 1, manual 0
+power conservation: final 0.06584911, manual 0.9341509
+power conservation: final 0.024992278, manual 0.9750077
+power conservation: final 1, manual 0
+power conservation: final 0.09663577, manual 0.90336424
+power conservation: final 0.015735924, manual 0.9842641
+power conservation: final 0.9334252, manual 0.06657481
+power conservation: final 0.008040443, manual 0.9919596
+power conservation: final 1, manual 0
+power conservation: final -0.00000037557552, manual 1.0000004
+power conservation: final 0.20589234, manual 0.7941077
+power conservation: final 0.0071901386, manual 0.99280983
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.00000059872616, manual 0.9999994
+power conservation: final -0.0000007983023, manual 1.0000008
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.00000081607163, manual 0.99999917
+power conservation: final -0.00000030602715, manual 1.0000004
+power conservation: final 0.0000007147245, manual 0.9999993
+power conservation: final 0.3220048, manual 0.6779952
+power conservation: final 0.40712354, manual 0.5928765
+power conservation: final 0.00000010620846, manual 0.9999999
+power conservation: final -0.00000021241692, manual 1.0000002
+power conservation: final 0.2116714, manual 0.7883286
+power conservation: final 0.0000004265039, manual 0.99999946
+power conservation: final 1, manual 0
+power conservation: final 0.00000044975454, manual 0.9999995
+power conservation: final 0.00000045256138, manual 0.9999995
+power conservation: final 1, manual 0
+power conservation: final 0.0000013078974, manual 0.9999987
+power conservation: final 0.0000015457007, manual 0.99999845
+power conservation: final 0, manual 1
+power conservation: final -0.00000011890058, manual 1.0000001
+power conservation: final 0.037652645, manual 0.9623473
+power conservation: final 0.00000055598673, manual 0.99999946
+power conservation: final 0.0000018532892, manual 0.9999981
+power conservation: final 0.005547786, manual 0.99445224
+power conservation: final 0.0000024164924, manual 0.99999756
+power conservation: final 0.014954034, manual 0.98504597
+power conservation: final 1, manual 0
+power conservation: final 0.004341749, manual 0.99565816
+power conservation: final 0.062127758, manual 0.93787223
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.032014396, manual 0.96798563
+power conservation: final 0.08146365, manual 0.91853637
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.00000021089448, manual 1.0000002
+power conservation: final 0.00434597, manual 0.99565405
+power conservation: final 0.16564906, manual 0.83435094
+power conservation: final -0.00000029044043, manual 1.0000004
+power conservation: final 0, manual 1
+power conservation: final 0.00000007308991, manual 0.99999994
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.000009412268, manual 0.9999906
+power conservation: final 1, manual 0
+power conservation: final 0.00000069092664, manual 0.9999993
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.047845986, manual 0.95215404
+power conservation: final 1, manual 0
+power conservation: final 0.0000017890897, manual 0.9999982
+power conservation: final 0.00000081920484, manual 0.99999917
+power conservation: final 0.22704053, manual 0.7729595
+power conservation: final 0.112711035, manual 0.887289
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.6348164, manual 0.36518362
+power conservation: final 0.009862656, manual 0.99013734
+power conservation: final 0.03518157, manual 0.96481836
+power conservation: final 1, manual 0
+power conservation: final 0.0000016652535, manual 0.99999833
+power conservation: final 0.000000092514256, manual 0.9999999
+power conservation: final 0.0000000936681, manual 0.9999999
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000013288809, manual 0.9999987
+power conservation: final 0.0000023179498, manual 0.9999977
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.00000059880915, manual 0.9999995
+power conservation: final 0.00020471285, manual 0.99979526
+power conservation: final 0.06884296, manual 0.93115705
+power conservation: final 1, manual 0
+power conservation: final 0.0000005183611, manual 0.99999946
+power conservation: final 0.00002074537, manual 0.99997926
+power conservation: final -0.00000010372912, manual 1.0000001
+power conservation: final 1, manual 0
+power conservation: final 0.0000012678393, manual 0.99999875
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.0000012717954, manual 1.0000013
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.00000079351213, manual 1.0000008
+power conservation: final 1, manual 0
+power conservation: final -0.00000034314127, manual 1.0000004
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000016176963, manual 0.9999984
+power conservation: final -0.0000007189773, manual 1.0000007
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.00000025735494, manual 1.0000002
+power conservation: final 0.021106552, manual 0.97889346
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000022809088, manual 0.99999774
+power conservation: final 0.00000020814419, manual 0.9999998
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.0000003506834, manual 1.0000004
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0, manual 1
+power conservation: final 0.19953613, manual 0.80046386
+power conservation: final 0.00000021817604, manual 0.99999976
+power conservation: final 1, manual 0
+power conservation: final 0.29828563, manual 0.7017144
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000010095548, manual 0.999999
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.00000032690917, manual 1.0000004
+power conservation: final 0.23594369, manual 0.7640563
+power conservation: final 0.000000832407, manual 0.99999917
+power conservation: final 1, manual 0
+power conservation: final 0.00000008340854, manual 0.99999994
+power conservation: final 0.25558236, manual 0.74441767
+power conservation: final 0.0000005984981, manual 0.9999994
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0, manual 1
+power conservation: final 0.00000026271428, manual 0.99999976
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.20671429, manual 0.7932857
+power conservation: final 0.06896739, manual 0.9310326
+power conservation: final 1, manual 0
+power conservation: final 0.00000029404205, manual 0.9999997
+power conservation: final -0.0582677, manual 1.0582677
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.39555684, manual 0.6044432
+power conservation: final 0.1268472, manual 0.8731528
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.0000006354878, manual 1.0000006
+power conservation: final 0.1800331, manual 0.8199669
+power conservation: final 0.059299503, manual 0.9407004
+power conservation: final 1, manual 0
+power conservation: final 0.000000534634, manual 0.99999946
+power conservation: final 0.13798346, manual 0.86201656
+power conservation: final 1, manual 0
+power conservation: final -0.0000022767692, manual 1.0000023
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.15420112, manual 0.84579885
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.00000022798528, manual 0.99999976
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.0000009359926, manual 0.99999905
+power conservation: final 0.23159869, manual 0.7684013
+power conservation: final 0.0000004177618, manual 0.9999996
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final -0.0000016434594, manual 1.0000017
+power conservation: final 1, manual 0
+power conservation: final 1, manual 0
+power conservation: final 0.21323192, manual 0.7867681
+power conservation: final 1, manual 0
+power conservation: final 0.028180884, manual 0.97181904
+power conservation: final 1, manual 0
+power conservation: final -0.00000019885839, manual 1.0000002
+power conservation: final 1, manual 0
 Average Powers:
   Input:            88.258247
-  Output:           4.948394
+  Output:           80.919212
   Absorbed:         0.000000
-  Trunc. Refl:      0.000000
-  Trunc. Rec:       80.743584
+  Trunc. Refl:      0.030997
+  Trunc. Rec:       0.022282
   Clip Err:         0.000000
-  Trunc. Energy:    0.028238
-  Trunc. Area:      0.194554
-  Other:            2.343475
+  Trunc. Energy:    0.199959
+  Trunc. Area:      0.338498
+  Other:            6.747292
   External Diff:    88.258255
 
