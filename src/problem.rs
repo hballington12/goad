@@ -633,6 +633,9 @@ fn init_geom(settings: &Settings, geom: &mut Geom) {
         shape.refr_index = settings.particle_refr_index[0]; // default refr index is first value
     }
     for (i,refr_index) in settings.particle_refr_index.iter().enumerate() {
+        if i >= geom.shapes.len() {
+            break;
+        }
         geom.shapes[i].refr_index = *refr_index;
     }
     geom.recentre();
