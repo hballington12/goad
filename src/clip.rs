@@ -1,5 +1,6 @@
 use super::geom::{Face, Geom, Plane};
 use super::settings;
+use crate::geom::PolygonExtensions;
 use anyhow::Result;
 use geo::{Area, Simplify};
 use geo_clipper::Clipper;
@@ -67,63 +68,6 @@ impl Point3Extensions for Point3<f32> {
     fn ray_cast_z(&self, plane: &Plane) -> f32 {
         -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
             - self.z
-    }
-}
-trait Coord3Extensions {
-    fn projected_z(&self, plane: &Plane) -> f32;
-}
-impl Coord3Extensions for Coord<f32> {
-    /// Returns the z-coordinate of a `Coord` projected onto a plane in 3D
-    fn projected_z(&self, plane: &Plane) -> f32 {
-        -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
-    }
-}
-
-trait PolygonExtensions {
-    fn project(&self, plane: &Plane) -> Result<Face>;
-}
-
-impl PolygonExtensions for Polygon<f32> {
-    /// Projects the xy coordinates of a polygon onto a plane in 3D
-    ///  the last vertex, which is a duplicate of the first
-    fn project(&self, plane: &Plane) -> Result<Face> {
-        let area = self.unsigned_area() / plane.normal.z.abs();
-
-        // condition to enforce that all normals point outwards,
-        // assuming the initial planes were correctly oriented
-        let reverse = if plane.normal.z < 0.0 { true } else { false };
-
-        let project_coords = |coords: &Vec<Coord<f32>>| -> Vec<Point3<f32>> {
-            coords
-                .iter()
-                .take(coords.len() - 1)
-                .map(|coord| Point3::new(coord.x, coord.y, coord.projected_z(plane)))
-                .collect()
-        };
-
-        let mut exterior = project_coords(&self.exterior().0);
-        if reverse {
-            exterior.reverse()
-        }
-
-        if self.interiors().is_empty() {
-            let mut face = Face::new_simple(exterior, None)?;
-            face.set_area(area);
-            Ok(face)
-        } else {
-            let mut interiors: Vec<_> = self
-                .interiors()
-                .iter()
-                .rev()
-                .map(|interior| project_coords(&interior.0))
-                .collect();
-            if reverse {
-                interiors.iter_mut().for_each(|interior| interior.reverse());
-            }
-            let mut face = Face::new_complex(exterior, interiors, None)?;
-            face.set_area(area);
-            Ok(face)
-        }
     }
 }
 

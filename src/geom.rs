@@ -3,15 +3,14 @@ use crate::containment::AABB;
 use crate::settings;
 use anyhow::Result;
 use geo::Area;
+use geo::TriangulateEarcut;
 use geo_types::Coord;
 use geo_types::LineString;
 use geo_types::Polygon;
 use nalgebra::Complex;
 use nalgebra::Matrix3;
-use nalgebra::Matrix4;
-use nalgebra::Point3;
-use nalgebra::Vector3;
 use nalgebra::Vector4;
+use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::path::Path;
 use tobj;
 use tobj::Model;
@@ -22,6 +21,34 @@ mod tests {
     use super::*;
     use geo_clipper::Clipper;
     use geo_types::{Coord, LineString, Polygon};
+
+    #[test]
+    fn earcut_xy() {
+        let mut geom = Geom::from_file("./examples/data/plane_xy.obj").unwrap();
+
+        let mut face = geom.shapes[0].faces.remove(0);
+        assert_eq!(face.data().exterior.len(), 4);
+        assert_eq!(face.data().exterior[0], Point3::new(1.0, 1.0, 0.0));
+
+        let triangles = face.earcut();
+
+        assert_eq!(triangles.len(), 2);
+        assert_eq!(triangles[0].data().normal, face.data().normal);
+    }
+
+    #[test]
+    fn earcut_zy() {
+        let mut geom = Geom::from_file("./examples/data/plane_yz.obj").unwrap();
+
+        let mut face = geom.shapes[0].faces.remove(0);
+        assert_eq!(face.data().exterior.len(), 4);
+        assert_eq!(face.data().exterior[0], Point3::new(0.0, 1.0, 1.0));
+
+        let triangles = face.earcut();
+
+        assert_eq!(triangles.len(), 2);
+        assert_eq!(triangles[0].data().normal, face.data().normal);
+    }
 
     #[test]
     fn rescale_hex() {
@@ -199,6 +226,64 @@ mod tests {
         assert!(geom.shapes[3].is_within(&geom, Some(1)));
         assert!(!geom.shapes[4].is_within(&geom, Some(0)));
         assert!(geom.shapes[5].is_within(&geom, Some(3)));
+    }
+}
+
+trait Coord3Extensions {
+    fn projected_z(&self, plane: &Plane) -> f32;
+}
+impl Coord3Extensions for Coord<f32> {
+    /// Returns the z-coordinate of a `Coord` projected onto a plane in 3D
+    fn projected_z(&self, plane: &Plane) -> f32 {
+        -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
+    }
+}
+
+pub trait PolygonExtensions {
+    fn project(&self, plane: &Plane) -> Result<Face>;
+}
+
+impl PolygonExtensions for Polygon<f32> {
+    /// Projects the xy coordinates of a polygon onto a plane in 3D
+    ///  the last vertex, which is a duplicate of the first
+    fn project(&self, plane: &Plane) -> Result<Face> {
+        let area = self.unsigned_area() / plane.normal.z.abs();
+
+        // condition to enforce that all normals point outwards,
+        // assuming the initial planes were correctly oriented
+        let reverse = if plane.normal.z < 0.0 { true } else { false };
+
+        let project_coords = |coords: &Vec<Coord<f32>>| -> Vec<Point3<f32>> {
+            coords
+                .iter()
+                .take(coords.len() - 1)
+                .map(|coord| Point3::new(coord.x, coord.y, coord.projected_z(plane)))
+                .collect()
+        };
+
+        let mut exterior = project_coords(&self.exterior().0);
+        if reverse {
+            exterior.reverse()
+        }
+
+        if self.interiors().is_empty() {
+            let mut face = Face::new_simple(exterior, None)?;
+            face.set_area(area);
+            Ok(face)
+        } else {
+            let mut interiors: Vec<_> = self
+                .interiors()
+                .iter()
+                .rev()
+                .map(|interior| project_coords(&interior.0))
+                .collect();
+            if reverse {
+                interiors.iter_mut().for_each(|interior| interior.reverse());
+            }
+            let mut face = Face::new_complex(exterior, interiors, None)?;
+            face.set_area(area);
+            Ok(face)
+        }
     }
 }
 
@@ -553,7 +638,6 @@ impl Face {
     }
 
     /// Creates a `Face` struct from a `Polygon`
-    #[allow(dead_code)]
     fn from_polygon(polygon: &Polygon<f32>) -> Result<Self> {
         // do the exterior
         let mut exterior = Vec::new();
@@ -601,6 +685,49 @@ impl Face {
             Face::Simple(data) => data,
             Face::Complex { data, .. } => data,
         }
+    }
+
+    pub fn earcut(&mut self) -> Vec<Face> {
+        // use nalgebra to get transform to xy plane
+        let model = Isometry3::new(Vector3::zeros(), na::zero()); // do some sort of projection - set to nothing
+        let origin = Point3::origin(); // camera location
+
+        let target = Point3::new(
+            self.data().normal.x,
+            self.data().normal.y,
+            self.data().normal.z,
+        ); // projection direction, defines negative z-axis in new coords
+
+        let up: Vector3<f32> =
+            if self.data().normal.cross(&Vector3::y()).norm() < settings::COLINEAR_THRESHOLD {
+                Vector3::x()
+            } else {
+                Vector3::y()
+            };
+
+        let view = Isometry3::look_at_rh(&origin, &target, &up);
+
+        let transform = (view * model).to_homogeneous(); // transform to clipping system
+        let itransform = transform.try_inverse().unwrap(); // inverse transform
+
+        self.transform(&transform).unwrap();
+        let poly = self.to_polygon();
+        let triangles = poly.earcut_triangles();
+        let outputs = triangles
+            .iter()
+            .map(|tri| {
+                let poly = tri.to_polygon();
+
+                let mut face = Face::from_polygon(&poly).unwrap();
+
+                face.transform(&itransform).unwrap();
+                face
+            })
+            .collect();
+
+        self.transform(&itransform).unwrap(); // transform back to original
+
+        outputs
     }
 }
 
