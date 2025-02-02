@@ -408,12 +408,10 @@ impl Problem {
                 self.settings.medium_refr_index,
                 self.settings.beam_area_threshold()
             ) {
-                Ok((outputs,area_power_loss)) => {
-                self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                Ok((outputs,..)) => {
                 outputs},
 
                 Err(_) => {
-                    self.powers.clip_err += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 }
             },

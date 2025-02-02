@@ -182,13 +182,8 @@ impl Beam {
         medium_refr_index: Complex<f32>,
         area_threshold: f32,
     ) -> Result<(Vec<Beam>, f32)> {
-        let power = self.power();
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
         clipping.clip(area_threshold).unwrap();
-        let area_power_loss = clipping.stats.as_ref().map_or(0.0, |stats| stats.area_loss) * power;
-
-        println!();
-        println!("clipping stats: {:?}", clipping.stats);
 
         self.clipping_area = match clipping.stats {
             Some(stats) => stats.intersection_area + stats.remaining_area,
@@ -203,17 +198,13 @@ impl Beam {
         let remainder_beams = self.remainders_to_beams(remainders, medium_refr_index);
         let beams = self.create_beams(geom, intersections, medium_refr_index);
 
-        let remainder_power = remainder_beams.iter().fold(0.0, |acc, x| acc + x.power());
-        let output_power = beams.iter().fold(0.0, |acc, x| acc + x.power());
-        println!(
-            "power conservation: {}",
-            (output_power + remainder_power) / self.power()
-        );
-
         let mut output_beams = Vec::new();
         output_beams.extend(beams);
         output_beams.extend(remainder_beams);
-        Ok((output_beams, area_power_loss))
+        let output_power = output_beams.iter().fold(0.0, |acc, x| acc + x.power());
+        let power_loss = self.power() - output_power;
+
+        Ok((output_beams, power_loss))
     }
 
     fn create_beams(
