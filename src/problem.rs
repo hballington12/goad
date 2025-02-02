@@ -552,11 +552,8 @@ impl MultiProblem {
     /// Creates a new `MultiOrientProblem` from a `settings: Settings` configuration.
     pub fn new(settings: Settings) -> Self {
         let mut geom = Geom::from_file(&settings.geom_name).unwrap();
-        // set the refractive index of the shapes in geometry from settings.particle_refr_index
-        for (i, shape) in geom.shapes.iter_mut().enumerate() {
-            shape.refr_index = settings.particle_refr_index[i];
-        }
-        geom.recentre();
+
+        init_geom(&settings, &mut geom);
 
         let orientations = Orientations::generate(&settings.orientation.scheme);
         let problems = Vec::new();
@@ -626,4 +623,17 @@ impl MultiProblem {
     }
 
 
+}
+
+/// Initialises the geometry with the refractive indices from the settings.
+/// In the future, this function will be extended to provide additional checks
+/// to ensure the geometry is well-defined.
+fn init_geom(settings: &Settings, geom: &mut Geom) {
+    for shape in geom.shapes.iter_mut() {
+        shape.refr_index = settings.particle_refr_index[0]; // default refr index is first value
+    }
+    for (i,refr_index) in settings.particle_refr_index.iter().enumerate() {
+        geom.shapes[i].refr_index = *refr_index;
+    }
+    geom.recentre();
 }

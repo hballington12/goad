@@ -201,7 +201,7 @@ impl Beam {
         output_beams.extend(beams);
         output_beams.extend(remainder_beams);
         let output_power = output_beams.iter().fold(0.0, |acc, x| acc + x.power());
-        let power_loss = self.power() - output_power;
+        let power_loss = self.power() - self.absorbed_power - output_power;
 
         Ok((output_beams, power_loss))
     }
