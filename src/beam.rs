@@ -180,11 +180,15 @@ impl Beam {
         &mut self,
         geom: &mut Geom,
         medium_refr_index: Complex<f32>,
+        area_threshold: f32,
     ) -> Result<(Vec<Beam>, f32)> {
         let power = self.power();
         let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
-        clipping.clip()?;
+        clipping.clip(area_threshold).unwrap();
         let area_power_loss = clipping.stats.as_ref().map_or(0.0, |stats| stats.area_loss) * power;
+
+        println!();
+        println!("clipping stats: {:?}", clipping.stats);
 
         self.clipping_area = match clipping.stats {
             Some(stats) => stats.intersection_area + stats.remaining_area,
@@ -199,6 +203,13 @@ impl Beam {
         let remainder_beams = self.remainders_to_beams(remainders, medium_refr_index);
         let beams = self.create_beams(geom, intersections, medium_refr_index);
 
+        let remainder_power = remainder_beams.iter().fold(0.0, |acc, x| acc + x.power());
+        let output_power = beams.iter().fold(0.0, |acc, x| acc + x.power());
+        println!(
+            "power conservation: {}",
+            (output_power + remainder_power) / self.power()
+        );
+
         let mut output_beams = Vec::new();
         output_beams.extend(beams);
         output_beams.extend(remainder_beams);
@@ -211,9 +222,6 @@ impl Beam {
         intersections: Vec<Face>,
         medium_refr_index: Complex<f32>,
     ) -> Vec<Beam> {
-        let input_power = self.power();
-        let mut manual_output_power = 0.0;
-
         let n1 = self.refr_index;
 
         let mut outputs = Vec::new();
@@ -240,7 +248,6 @@ impl Beam {
                     BeamType::ExternalDiff,
                     self.wavelength,
                 );
-                manual_output_power += external_diff.power();
                 outputs.push(external_diff);
             }
 
@@ -248,23 +255,12 @@ impl Beam {
             let reflected = create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2);
 
             if refracted.is_some() {
-                manual_output_power += refracted.as_ref().unwrap().power();
                 outputs.push(refracted.unwrap().clone());
             }
             if reflected.is_some() {
-                manual_output_power += reflected.as_ref().unwrap().power();
                 outputs.push(reflected.unwrap().clone());
             }
         }
-
-        let output_power = outputs.iter().fold(0.0, |acc, x| acc + x.power());
-        let power_loss = input_power - output_power;
-        // println!("power loss: {}", power_loss);
-        println!(
-            "power conservation: final {}, manual {}",
-            power_loss / input_power,
-            manual_output_power / input_power
-        );
 
         outputs
     }

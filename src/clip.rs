@@ -10,8 +10,6 @@ use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
 use std::fmt;
 
-const AREA_THRESHOLD: f32 = 1e-2;
-
 #[cfg(test)]
 mod tests {
 
@@ -19,6 +17,7 @@ mod tests {
     use geo::{CoordsIter, MultiPolygon, Simplify};
 
     use super::*;
+    const AREA_THRESHOLD: f32 = 0.01;
 
     #[test]
     #[should_panic]
@@ -31,8 +30,8 @@ mod tests {
 
         // start function `do_clip` here:
         let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
-        let _ = clipping.clip();
-        let _ = clipping.clip(); // cannot redo clipping
+        let _ = clipping.clip(AREA_THRESHOLD);
+        let _ = clipping.clip(AREA_THRESHOLD); // cannot redo clipping
     }
 
     #[test]
@@ -300,7 +299,7 @@ impl<'a> Clipping<'a> {
     }
 
     /// Performs the clip on a `Clipping` object.
-    pub fn clip(&mut self) -> Result<()> {
+    pub fn clip(&mut self, area_threshold: f32) -> Result<()> {
         if self.is_done {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
@@ -308,7 +307,7 @@ impl<'a> Clipping<'a> {
         let (clip, mut subjects) = self.init_clip()?;
 
         // compute remapped intersections, converting to Intersection structs
-        let (intersection, remaining) = clip_faces(&clip, &mut subjects)?;
+        let (intersection, remaining) = clip_faces(&clip, &mut subjects, area_threshold)?;
 
         // compute statistics in clipping system
         self.set_stats(&intersection, &remaining);
@@ -327,6 +326,7 @@ impl<'a> Clipping<'a> {
 pub fn clip_faces<'a>(
     clip_in: &Face,
     subjects_in: &Vec<&'a Face>,
+    area_threshold: f32,
 ) -> Result<(Vec<Face>, Vec<Face>)> {
     if subjects_in.is_empty() {
         return Ok((Vec::new(), vec![clip_in.clone()]));
@@ -370,8 +370,8 @@ pub fn clip_faces<'a>(
             // Retain only meaningful intersections and differences.
             intersection
                 .0
-                .retain(|f| f.unsigned_area() > AREA_THRESHOLD);
-            difference.0.retain(|f| f.unsigned_area() > AREA_THRESHOLD);
+                .retain(|f| f.unsigned_area() > area_threshold);
+            difference.0.retain(|f| f.unsigned_area() > area_threshold);
 
             for poly in intersection.0.into_iter() {
                 // try to project the polygon onto the subject plane

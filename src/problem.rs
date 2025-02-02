@@ -373,6 +373,7 @@ impl Problem {
                         match beam.propagate(
                             &mut self.geom,
                             self.settings.medium_refr_index,
+                            self.settings.beam_area_threshold()
                         ) {
                             Ok((outputs,area_power_loss)) => {
                                 self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
@@ -390,6 +391,7 @@ impl Problem {
                     match beam.propagate(
                         &mut self.geom,
                         self.settings.medium_refr_index,
+                        self.settings.beam_area_threshold()
                     ) {
                         Ok((outputs,area_power_loss)) => {
                                 self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
@@ -404,6 +406,7 @@ impl Problem {
             BeamType::Initial => match beam.propagate(
                 &mut self.geom,
                 self.settings.medium_refr_index,
+                self.settings.beam_area_threshold()
             ) {
                 Ok((outputs,area_power_loss)) => {
                 self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
