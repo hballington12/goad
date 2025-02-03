@@ -252,37 +252,10 @@ impl Problem {
         queue: &mut Vec<Beam>,
         bins: &[(f32, f32)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
-        // description: &str,
     ) {
-        // let m = MultiProgress::new();
-        // let n = queue.len();
-        // let pb = m.add(ProgressBar::new(n as u64));
-        // pb.set_style(
-        //     ProgressStyle::with_template(
-        //         "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg}",
-        //     )
-        //     .unwrap()
-        //     .progress_chars("➤➤➤➤➤➤➤➤"),
-        // );
-        // pb.set_message(description.to_string());
-        // let pb2 = m.add(ProgressBar::new(1000 as u64));
-        // pb2.set_style(
-        //     ProgressStyle::with_template(
-        //         "{spinner:.red} [{elapsed_precise}] {bar:40.yellow/blue} {percent:>6.1.white}%     {msg}",
-        //     )
-        //     .unwrap()
-        //     .progress_chars("➤➤➤➤➤➤➤➤"),
-        // );
-        // pb2.set_message("power diffracted".to_string());
-
-        // let total_power = queue.iter().map(|beam| beam.power()).sum::<f32>();
-
         let ampl_far_field = queue
             .par_iter()
             .map(|outbeam| {
-                // let outbeam_power = outbeam.power();
-                // pb.inc(1);
-                // pb2.inc((outbeam_power / total_power * 1000.0) as u64);
                 outbeam.diffract(bins)
             })
             .reduce(
@@ -299,10 +272,6 @@ impl Problem {
         for (i, ampl) in ampl_far_field.iter().enumerate() {
             total_ampl_far_field[i] += ampl;
         }
-
-        // pb.finish_with_message(format!("{} (done)", description));
-        // pb2.finish_with_message(format!("power diffracted (%)"));
-        // total write
     }
 
     pub fn solve_far_ext_diff(&mut self) {
@@ -310,7 +279,6 @@ impl Problem {
             &mut self.ext_diff_beam_queue,
             &self.bins,
             &mut self.ampl,
-            // "external diffraction",
         );
     }
 
@@ -319,7 +287,6 @@ impl Problem {
             &mut self.out_beam_queue,
             &self.bins,
             &mut self.ampl,
-            // "outgoing beams",
         );
     }
     pub fn solve_far(&mut self) {
@@ -336,21 +303,17 @@ impl Problem {
     pub fn solve_near(&mut self) {
         loop {
             if self.beam_queue.len() == 0 {
-                // println!("all beams traced...");
                 break;
             }
 
             if self.powers.output / self.powers.input > self.settings.total_power_cutoff {
                 // add remaining power in beam queue to missing power due to cutoff
                 self.powers.trnc_cop += self.beam_queue.iter().map(|beam| beam.power() / self.scale_factor.powi(2)).sum::<f32>();
-                // println!("cut off power out reached...");
                 break;
             }
 
             self.propagate_next();
         }
-
-        // println!("{}", self.powers);
     }
 
     pub fn writeup(&self) {
@@ -587,7 +550,7 @@ impl MultiProblem {
         let pb = m.add(ProgressBar::new(n as u64));
         pb.set_style(
             ProgressStyle::with_template(
-                "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg}",
+            "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg} ETA: {eta_precise}",
             )
             .unwrap()
             .progress_chars("█▇▆▅▄▃▂▁")
