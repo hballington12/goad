@@ -183,7 +183,7 @@ impl Problem {
 
         let mut settings = settings.unwrap_or_else(settings::load_config);
 
-        let bins = generate_bins(&settings.binning);
+        let bins = generate_bins(&settings.binning.scheme);
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
         
@@ -231,7 +231,7 @@ impl Problem {
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
         let  settings = settings::load_config();
 
-        let bins = generate_bins(&settings.binning);
+        let bins = generate_bins(&settings.binning.scheme);
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
 
@@ -531,7 +531,7 @@ impl MultiProblem {
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let problems = Vec::new();
-        let bins = generate_bins(&settings.binning);
+        let bins = generate_bins(&settings.binning.scheme);
         let  mueller = Array2::<f32>::zeros((bins.len(), 16));
         let powers = Powers::new();
 

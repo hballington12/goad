@@ -43,7 +43,7 @@ mod tests {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-pub enum BinType {
+pub enum Scheme {
     Simple {
         num_theta: usize,
         num_phi: usize,
@@ -57,6 +57,11 @@ pub enum BinType {
     Custom {
         bins: Vec<(f32, f32)>,
     },
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct BinningScheme {
+    pub scheme: Scheme,
 }
 
 pub fn interval_spacings(splits: &Vec<f32>, spacings: &Vec<f32>) -> Vec<f32> {
@@ -128,15 +133,15 @@ pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
         .collect()
 }
 
-pub fn generate_bins(bin_type: &BinType) -> Vec<(f32, f32)> {
+pub fn generate_bins(bin_type: &Scheme) -> Vec<(f32, f32)> {
     match bin_type {
-        BinType::Simple { num_theta, num_phi } => simple_bins(*num_theta, *num_phi),
-        BinType::Interval {
+        Scheme::Simple { num_theta, num_phi } => simple_bins(*num_theta, *num_phi),
+        Scheme::Interval {
             thetas,
             theta_spacings,
             phis,
             phi_spacings,
         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
-        BinType::Custom { bins } => bins.to_vec(),
+        Scheme::Custom { bins } => bins.to_vec(),
     }
 }

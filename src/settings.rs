@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::fmt;
 
 use crate::{
-    bins::BinType,
+    bins::{BinningScheme, Scheme},
     orientation::{self, OrientationScheme},
 };
 
@@ -43,7 +43,7 @@ pub struct Settings {
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,
-    pub binning: BinType,
+    pub binning: BinningScheme,
     pub seed: Option<u64>,
 }
 
@@ -63,6 +63,8 @@ pub fn load_config() -> Settings {
             eprintln!("Error loading configuration: {}", err);
             std::process::exit(1);
         });
+
+    // println!("config: {:#?}", settings);
 
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
