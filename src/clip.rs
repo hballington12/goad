@@ -4,8 +4,6 @@ use crate::geom::PolygonExtensions;
 use anyhow::Result;
 use geo::{Area, Simplify};
 use geo_clipper::Clipper;
-use geo_types::Coord;
-use geo_types::Polygon;
 use macroquad::prelude::*;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;

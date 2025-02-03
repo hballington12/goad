@@ -257,6 +257,40 @@ impl Beam {
 
         outputs
     }
+
+    /// Uses the earcut function from the geom crate to convert a beam with
+    /// a complex face into beams with simple faces. The medium refractive index
+    /// is required to map the phase.
+    fn earcut(beam: &Beam, medium_refr_index: Complex<f32>) -> Vec<Beam> {
+        let mut outputs = Vec::new();
+        let midpoint = beam.face.data().midpoint;
+        match &beam.face {
+            Face::Simple(_) => outputs.push(beam.clone()),
+            Face::Complex { .. } => {
+                let faces = Face::earcut(&beam.face);
+                for face in faces {
+                    let dist = (face.data().midpoint - midpoint).dot(&beam.prop);
+                    let arg = dist * beam.wavenumber() * medium_refr_index.re;
+                    let ampl = beam.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
+
+                    let new_beam = Beam::new(
+                        face,
+                        beam.prop,
+                        beam.refr_index,
+                        beam.rec_count,
+                        beam.tir_count,
+                        Field::new(beam.field.e_perp, beam.prop, ampl).unwrap(),
+                        beam.variant.clone(),
+                        beam.type_.clone(),
+                        beam.wavelength,
+                    );
+
+                    outputs.push(new_beam);
+                }
+            }
+        }
+        outputs
+    }
 }
 
 /// Returns a transmitted propagation vector, where `stt` is the sine of the angle of transmission.
@@ -489,7 +523,13 @@ impl Beam {
                 ))
             })
             .collect();
-        remainder_beams
+
+        // Also convert any complex faces into simple faces
+        let mut output_beams = Vec::new();
+        for beam in remainder_beams {
+            output_beams.extend(Beam::earcut(&beam, medium_refr_index));
+        }
+        output_beams
     }
 }
 

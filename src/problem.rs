@@ -572,7 +572,7 @@ impl MultiProblem {
 
         // init a base problem that can be reset
         let problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
-        let mut problem = problem_base.clone();
+        // let mut problem = problem_base.clone();
 
         let m = MultiProgress::new();
         let n = self.orientations.num_orientations;

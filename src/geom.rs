@@ -26,11 +26,11 @@ mod tests {
     fn earcut_xy() {
         let mut geom = Geom::from_file("./examples/data/plane_xy.obj").unwrap();
 
-        let mut face = geom.shapes[0].faces.remove(0);
+        let face = geom.shapes[0].faces.remove(0);
         assert_eq!(face.data().exterior.len(), 4);
         assert_eq!(face.data().exterior[0], Point3::new(1.0, 1.0, 0.0));
 
-        let triangles = face.earcut();
+        let triangles = Face::earcut(&face);
 
         assert_eq!(triangles.len(), 2);
         assert_eq!(triangles[0].data().normal, face.data().normal);
@@ -40,11 +40,11 @@ mod tests {
     fn earcut_zy() {
         let mut geom = Geom::from_file("./examples/data/plane_yz.obj").unwrap();
 
-        let mut face = geom.shapes[0].faces.remove(0);
+        let face = geom.shapes[0].faces.remove(0);
         assert_eq!(face.data().exterior.len(), 4);
         assert_eq!(face.data().exterior[0], Point3::new(0.0, 1.0, 1.0));
 
-        let triangles = face.earcut();
+        let triangles = Face::earcut(&face);
 
         assert_eq!(triangles.len(), 2);
         assert_eq!(triangles[0].data().normal, face.data().normal);
@@ -637,41 +637,41 @@ impl Face {
         }
     }
 
-    /// Creates a `Face` struct from a `Polygon`
-    fn from_polygon(polygon: &Polygon<f32>) -> Result<Self> {
-        // do the exterior
-        let mut exterior = Vec::new();
-        for coord in polygon
-            .exterior()
-            .0
-            .iter()
-            .take(polygon.exterior().0.len() - 1)
-        {
-            exterior.push(Point3::new(coord.x, coord.y, 0.0));
-        }
+    // /// Creates a `Face` struct from a `Polygon`
+    // fn from_polygon(polygon: &Polygon<f32>) -> Result<Self> {
+    //     // do the exterior
+    //     let mut exterior = Vec::new();
+    //     for coord in polygon
+    //         .exterior()
+    //         .0
+    //         .iter()
+    //         .take(polygon.exterior().0.len() - 1)
+    //     {
+    //         exterior.push(Point3::new(coord.x, coord.y, 0.0));
+    //     }
 
-        if polygon.interiors().is_empty() {
-            let mut face = Face::new_simple(exterior, None)?;
-            if let Face::Simple(ref mut data) = face {
-                data.area = Some(polygon.unsigned_area());
-            }
-            Ok(face)
-        } else {
-            let mut interiors = Vec::new();
-            for interior in polygon.interiors() {
-                let mut vertices = Vec::new();
-                for coord in interior.0.iter().take(interior.0.len() - 1) {
-                    vertices.push(Point3::new(coord.x, coord.y, 0.0));
-                }
-                interiors.push(vertices);
-            }
-            let mut face = Face::new_complex(exterior, interiors, None)?;
-            if let Face::Complex { ref mut data, .. } = face {
-                data.area = Some(polygon.unsigned_area());
-            }
-            Ok(face)
-        }
-    }
+    //     if polygon.interiors().is_empty() {
+    //         let mut face = Face::new_simple(exterior, None)?;
+    //         if let Face::Simple(ref mut data) = face {
+    //             data.area = Some(polygon.unsigned_area());
+    //         }
+    //         Ok(face)
+    //     } else {
+    //         let mut interiors = Vec::new();
+    //         for interior in polygon.interiors() {
+    //             let mut vertices = Vec::new();
+    //             for coord in interior.0.iter().take(interior.0.len() - 1) {
+    //                 vertices.push(Point3::new(coord.x, coord.y, 0.0));
+    //             }
+    //             interiors.push(vertices);
+    //         }
+    //         let mut face = Face::new_complex(exterior, interiors, None)?;
+    //         if let Face::Complex { ref mut data, .. } = face {
+    //             data.area = Some(polygon.unsigned_area());
+    //         }
+    //         Ok(face)
+    //     }
+    // }
 
     pub fn data(&self) -> &FaceData {
         match self {
@@ -687,19 +687,20 @@ impl Face {
         }
     }
 
-    pub fn earcut(&mut self) -> Vec<Face> {
+    pub fn earcut(face: &Face) -> Vec<Face> {
+        let mut face = face.clone();
         // use nalgebra to get transform to xy plane
         let model = Isometry3::new(Vector3::zeros(), na::zero()); // do some sort of projection - set to nothing
         let origin = Point3::origin(); // camera location
 
         let target = Point3::new(
-            self.data().normal.x,
-            self.data().normal.y,
-            self.data().normal.z,
+            face.data().normal.x,
+            face.data().normal.y,
+            face.data().normal.z,
         ); // projection direction, defines negative z-axis in new coords
 
         let up: Vector3<f32> =
-            if self.data().normal.cross(&Vector3::y()).norm() < settings::COLINEAR_THRESHOLD {
+            if face.data().normal.cross(&Vector3::y()).norm() < settings::COLINEAR_THRESHOLD {
                 Vector3::x()
             } else {
                 Vector3::y()
@@ -710,22 +711,21 @@ impl Face {
         let transform = (view * model).to_homogeneous(); // transform to clipping system
         let itransform = transform.try_inverse().unwrap(); // inverse transform
 
-        self.transform(&transform).unwrap();
-        let poly = self.to_polygon();
+        face.transform(&transform).unwrap();
+        let poly = face.to_polygon();
         let triangles = poly.earcut_triangles();
         let outputs = triangles
             .iter()
             .map(|tri| {
                 let poly = tri.to_polygon();
 
-                let mut face = Face::from_polygon(&poly).unwrap();
+                let mut face = poly.project(&face.plane()).unwrap();
+                face.data_mut().exterior.reverse();
 
                 face.transform(&itransform).unwrap();
                 face
             })
             .collect();
-
-        self.transform(&itransform).unwrap(); // transform back to original
 
         outputs
     }
