@@ -57,7 +57,7 @@ pub fn load_config() -> Settings {
     let settings = Config::builder()
         .add_source(File::with_name("config/default"))
         .add_source(File::with_name("config/local").required(false))
-        .add_source(Environment::with_prefix("app"))
+        .add_source(Environment::with_prefix("goad"))
         .build()
         .unwrap_or_else(|err| {
             eprintln!("Error loading configuration: {}", err);
