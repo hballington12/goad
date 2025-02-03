@@ -48,6 +48,7 @@ pub struct Powers {
     pub trnc_energy: f32, // truncated power due to threshold beam power
     pub clip_err: f32, // truncated power due to clipping error
     pub trnc_area: f32,   // truncated power due to area threshold
+    pub trnc_cop: f32,    // truncated power due to cutoff power
     pub ext_diff: f32,    // external diffraction power
 }
 
@@ -62,6 +63,7 @@ impl DivAssign<f32> for Powers {
         self.trnc_energy /= rhs;
         self.clip_err /= rhs;
         self.trnc_area /= rhs;
+        self.trnc_cop /= rhs;
         self.ext_diff /= rhs;
     }
 }
@@ -80,6 +82,7 @@ impl Add for Powers {
             trnc_energy: self.trnc_energy + other.trnc_energy,
             clip_err: self.clip_err + other.clip_err,
             trnc_area: self.trnc_area + other.trnc_area,
+            trnc_cop: self.trnc_cop + other.trnc_cop,
             ext_diff: self.ext_diff + other.ext_diff,
         }
     }
@@ -99,6 +102,7 @@ impl AddAssign for Powers {
             trnc_energy: self.trnc_energy + other.trnc_energy,
             clip_err: self.clip_err + other.clip_err,
             trnc_area: self.trnc_area + other.trnc_area,
+            trnc_cop: self.trnc_cop + other.trnc_cop,
             ext_diff: self.ext_diff + other.ext_diff,
         };
     }
@@ -116,6 +120,7 @@ impl Powers {
             trnc_energy: 0.0,
             clip_err: 0.0,
             trnc_area: 0.0,
+            trnc_cop: 0.0,
             ext_diff: 0.0,
         }
     }
@@ -130,6 +135,7 @@ impl Powers {
                 // + self.trnc_clip
                 + self.trnc_area    
                 + self.clip_err
+                + self.trnc_cop
                 + self.trnc_energy)
     }
 }
@@ -146,6 +152,7 @@ impl fmt::Display for Powers {
         writeln!(f, "  Clip Err:         {:.6}", self.clip_err)?;
         writeln!(f, "  Trunc. Energy:    {:.6}", self.trnc_energy)?;
         writeln!(f, "  Trunc. Area:      {:.6}", self.trnc_area)?;
+        writeln!(f, "  Trunc. Cop:       {:.6}", self.trnc_cop)?;
         writeln!(f, "  Other:            {:.6}", self.missing())?;
         writeln!(f, "  External Diff:    {:.6}", self.ext_diff)
     }
@@ -332,6 +339,8 @@ impl Problem {
             }
 
             if self.powers.output / self.powers.input > self.settings.total_power_cutoff {
+                // add remaining power in beam queue to missing power due to cutoff
+                self.powers.trnc_cop += self.beam_queue.iter().map(|beam| beam.power() / self.scale_factor.powi(2)).sum::<f32>();
                 // println!("cut off power out reached...");
                 break;
             }

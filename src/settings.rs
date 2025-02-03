@@ -67,26 +67,48 @@ pub fn load_config() -> Settings {
 
     // Parse command-line arguments and override values
     let args = CliArgs::parse();
+
     if let Some(wavelength) = args.w {
         config.wavelength = wavelength;
     }
-
     if let Some(medium) = args.ri0 {
         config.medium_refr_index = medium;
     }
-
     if let Some(particle) = args.ri {
         config.particle_refr_index = particle;
     }
+    if let Some(geo) = args.geo {
+        config.geom_name = geo;
+    }
+    if let Some(mp) = args.mp {
+        config.beam_power_threshold = mp;
+    }
+    if let Some(maf) = args.maf {
+        config.beam_area_threshold_fac = maf;
+    }
+    if let Some(cop) = args.cop {
+        config.total_power_cutoff = cop;
+    }
+    if let Some(rec) = args.rec {
+        config.max_rec = rec;
+    }
+    if let Some(tir) = args.tir {
+        config.max_tir = tir;
+    }
 
-    assert!(
-        config.beam_area_threshold_fac > 1e-5,
-        "Beam area threshold factor must be greater than 1e-5"
-    );
+    validate_config(&config);
 
     println!("{}", config);
 
     config
+}
+
+fn validate_config(config: &Settings) {
+    assert!(
+        config.beam_area_threshold_fac > 1e-5,
+        "Beam area threshold factor must be greater than 1e-5"
+    );
+    assert!(config.wavelength > 0.0, "Wavelength must be greater than 0");
 }
 
 #[derive(Parser, Debug)]
@@ -118,7 +140,8 @@ pub struct CliArgs {
     #[arg(long)]
     tir: Option<i32>,
 
-    /// File path to the input geometry.
+    /// File path to the input geometry. All input shapes should be defined in this file.
+    /// Currently, only the Wavefront .obj format is supported.
     #[arg(long)]
     geo: Option<String>,
 
