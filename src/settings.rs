@@ -67,8 +67,16 @@ pub fn load_config() -> Settings {
 
     // Parse command-line arguments and override values
     let args = CliArgs::parse();
-    if let Some(wavelength) = args.wavelength {
+    if let Some(wavelength) = args.w {
         config.wavelength = wavelength;
+    }
+
+    if let Some(medium) = args.ri0 {
+        config.medium_refr_index = medium;
+    }
+
+    if let Some(particle) = args.ri {
+        config.particle_refr_index = particle;
     }
 
     assert!(
@@ -76,19 +84,53 @@ pub fn load_config() -> Settings {
         "Beam area threshold factor must be greater than 1e-5"
     );
 
+    println!("{}", config);
+
     config
 }
 
 #[derive(Parser, Debug)]
 #[command(version, about = "Light Scattering Simulation")]
 pub struct CliArgs {
-    /// Override wavelength
+    /// Wavelength in units of the geometry.
     #[arg(long)]
-    wavelength: Option<f32>,
+    w: Option<f32>,
 
-    /// Override vertex merge distance
+    /// Minimum absolute beam power threshold for new beams to propagate.
     #[arg(long)]
-    vertex_merge_distance: Option<f32>,
+    mp: Option<f32>,
+
+    /// Minimum area factor for new beams to propagate. The actual area threshold is
+    /// calculated as `wavelength^2 * factor`.
+    #[arg(long)]
+    maf: Option<f32>,
+
+    /// Cutoff power. The total acceptable output power per orientation before beam propagation is terminated.
+    /// Once this threshold is reached, the near-field simulation will stop.
+    #[arg(long)]
+    cop: Option<f32>,
+
+    /// The maximum number of recursions before a beam is truncated.
+    #[arg(long)]
+    rec: Option<i32>,
+
+    /// The maximum number of total internal reflections before a beam is truncated.
+    #[arg(long)]
+    tir: Option<i32>,
+
+    /// File path to the input geometry.
+    #[arg(long)]
+    geo: Option<String>,
+
+    /// The refractive index of the surrounding medium.
+    #[arg(long)]
+    ri0: Option<Complex<f32>>,
+
+    /// The refractive index of the particle/s, separated by spaces.
+    /// If multiple values are provided, each shape in the geometry will be assigned a refractive index.
+    /// If fewer values are provided than the number of shapes, the first value will be used for the remaining shapes.
+    #[arg(short, long, value_parser, num_args = 1.., value_delimiter = ' ')]
+    ri: Option<Vec<Complex<f32>>>,
 }
 
 impl fmt::Display for Settings {
@@ -100,6 +142,7 @@ impl fmt::Display for Settings {
   - Beam Power Threshold: {:.6}
   - Total Power Cutoff: {:.6}
   - Medium Refractive Index: {:.6} + {:.6}i
+  - Particle Refractive Indices: {:?}
   - Max Rec: {}
   - Max TIR: {}
   - Far Field Resolution: {}",
@@ -108,6 +151,7 @@ impl fmt::Display for Settings {
             self.total_power_cutoff,
             self.medium_refr_index.re,
             self.medium_refr_index.im,
+            self.particle_refr_index,
             self.max_rec,
             self.max_tir,
             self.far_field_resolution
