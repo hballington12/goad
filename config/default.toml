@@ -7,8 +7,8 @@ beam_area_threshold_fac = 1
 total_power_cutoff = 0.99
 max_rec = 10
 max_tir = 10
-far_field_resolution = 180
+far_field_resolution = [181,361]
 
 [[orientation]]
-Discrete = { alphas = [182], betas = [20], gammas = [20]}
+Discrete = { eulers = [[0,0,0]] }
 #Uniform = { num_orients = 2}

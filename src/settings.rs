@@ -1,10 +1,10 @@
-use clap::Parser;
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use config::{Config, Environment, File};
 use nalgebra::Complex;
 use serde::Deserialize;
 use std::fmt;
 
-use crate::orientation::OrientationScheme;
+use crate::orientation::{self, OrientationScheme};
 
 /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.001;
@@ -40,7 +40,7 @@ pub struct Settings {
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,
-    pub far_field_resolution: usize,
+    pub far_field_resolution: (usize, usize),
 }
 
 impl Settings {
@@ -95,10 +95,11 @@ pub fn load_config() -> Settings {
     if let Some(tir) = args.tir {
         config.max_tir = tir;
     }
+    if let Some(orient) = args.orient {
+        config.orientation = OrientationScheme { scheme: orient };
+    }
 
     validate_config(&config);
-
-    println!("{}", config);
 
     config
 }
@@ -112,7 +113,7 @@ fn validate_config(config: &Settings) {
 }
 
 #[derive(Parser, Debug)]
-#[command(version, about = "Light Scattering Simulation")]
+#[command(version, about = "GOAD - Geometric Optics with Aperture Diffraction")]
 pub struct CliArgs {
     /// Wavelength in units of the geometry.
     #[arg(long)]
@@ -154,6 +155,10 @@ pub struct CliArgs {
     /// If fewer values are provided than the number of shapes, the first value will be used for the remaining shapes.
     #[arg(short, long, value_parser, num_args = 1.., value_delimiter = ' ')]
     ri: Option<Vec<Complex<f32>>>,
+
+    /// Orientation scheme for the simulation.
+    #[command(subcommand)]
+    orient: Option<orientation::Scheme>,
 }
 
 impl fmt::Display for Settings {
@@ -168,7 +173,7 @@ impl fmt::Display for Settings {
   - Particle Refractive Indices: {:?}
   - Max Rec: {}
   - Max TIR: {}
-  - Far Field Resolution: {}",
+  - Far Field Resolution: {:?}",
             self.wavelength,
             self.beam_power_threshold,
             self.total_power_cutoff,

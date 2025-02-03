@@ -1,20 +1,47 @@
-use std::f32::consts::PI;
+use clap::Subcommand;
+use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
 use rand::Rng;
 // use rand::SeedableRng;
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Subcommand, Debug, Clone, Deserialize, PartialEq)]
 pub enum Scheme {
     /// Uniform distribution of angles.
+    /// Orient the geometry in random orientations, averaged over the given number of orientations.
+    /// Example: `uniform 100`
     Uniform { num_orients: usize },
     /// Discrete list of angles in degrees.
-    Discrete {
-        alphas: Vec<f32>,
-        betas: Vec<f32>,
-        gammas: Vec<f32>,
-    },
+    /// The angles are given as a comma-separated list of alpha, beta, gamma.
+    /// Example: `discrete 0,0,0 20,30,40`
+    Discrete { eulers: Vec<Euler> },
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub struct Euler {
+    alpha: f32,
+    beta: f32,
+    gamma: f32,
+}
+
+impl FromStr for Euler {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts: Vec<&str> = s.split(',').collect();
+        if parts.len() != 3 {
+            return Err(anyhow::anyhow!("Invalid number of angles"));
+        }
+        let a = parts[0].trim().parse::<f32>()?;
+        let b = parts[1].trim().parse::<f32>()?;
+        let c = parts[2].trim().parse::<f32>()?;
+        Ok(Euler {
+            alpha: a,
+            beta: b,
+            gamma: c,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -36,14 +63,10 @@ impl Orientations {
             Scheme::Uniform {
                 num_orients: num_orientations,
             } => Orientations::random_uniform(*num_orientations),
-            Scheme::Discrete {
-                alphas,
-                betas,
-                gammas,
-            } => {
-                let alphas = alphas.clone();
-                let betas = betas.clone();
-                let gammas = gammas.clone();
+            Scheme::Discrete { eulers } => {
+                let alphas: Vec<f32> = eulers.iter().map(|e| e.alpha).collect();
+                let betas: Vec<f32> = eulers.iter().map(|e| e.beta).collect();
+                let gammas: Vec<f32> = eulers.iter().map(|e| e.gamma).collect();
                 Orientations::new_discrete(alphas, betas, gammas).unwrap()
             }
         }

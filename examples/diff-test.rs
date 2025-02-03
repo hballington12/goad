@@ -1,7 +1,7 @@
+use goad::geom::{self};
+use goad::{bins, diff, output};
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Vector3};
-use pbt::geom::{self};
-use pbt::{bins, diff, output};
 
 fn main() {
     let geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();

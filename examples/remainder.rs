@@ -1,8 +1,8 @@
+use goad::clip::Clipping;
+use goad::geom::{self, Face};
+use goad::helpers::draw_face;
 use macroquad::prelude::*;
 use nalgebra::{Point3, Vector3};
-use pbt::clip::Clipping;
-use pbt::geom::{self, Face};
-use pbt::helpers::draw_face;
 
 #[macroquad::main("Testing...")]
 async fn main() {

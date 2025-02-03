@@ -1,5 +1,5 @@
-use pbt::problem::MultiProblem;
-use pbt::settings::{self};
+use goad::problem::MultiProblem;
+use goad::settings::{self};
 
 fn main() {
     let settings = settings::load_config();

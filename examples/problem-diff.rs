@@ -1,5 +1,5 @@
-use pbt::geom::{self};
-use pbt::problem::Problem;
+use goad::geom::{self};
+use goad::problem::Problem;
 
 fn main() {
     let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();

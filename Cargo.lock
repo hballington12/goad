@@ -540,6 +540,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e05e7e6723e3455f4818c7b26e855439f7546cf617ef669d1adedb8669e5cb9"
 
 [[package]]
+name = "goad"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "config",
+ "geo",
+ "geo-clipper",
+ "geo-types",
+ "indicatif",
+ "macroquad",
+ "nalgebra",
+ "ndarray",
+ "num-complex",
+ "rand",
+ "rayon",
+ "serde",
+ "tobj",
+ "toml",
+]
+
+[[package]]
 name = "hash32"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -947,28 +969,6 @@ name = "pathdiff"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
-
-[[package]]
-name = "pbt"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "config",
- "geo",
- "geo-clipper",
- "geo-types",
- "indicatif",
- "macroquad",
- "nalgebra",
- "ndarray",
- "num-complex",
- "rand",
- "rayon",
- "serde",
- "tobj",
- "toml",
-]
 
 [[package]]
 name = "pest"

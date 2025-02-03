@@ -1,10 +1,10 @@
-use macroquad::prelude::*;
-use nalgebra::{Complex, Point3, Vector3};
-use pbt::problem::Problem;
-use pbt::{
+use goad::problem::Problem;
+use goad::{
     beam::Beam,
     geom::{self, Face},
 };
+use macroquad::prelude::*;
+use nalgebra::{Complex, Point3, Vector3};
 use std::io::{self, Write};
 
 #[macroquad::main("Testing...")]
@@ -52,7 +52,7 @@ async fn main() {
         problem.beam_queue.len()
     );
 
-    let mut propagation: Option<pbt::beam::BeamPropagation> = None;
+    let mut propagation: Option<goad::beam::BeamPropagation> = None;
 
     println!("running...");
 
