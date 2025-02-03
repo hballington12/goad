@@ -1,16 +1,138 @@
 use ndarray::Array1;
+use serde::Deserialize;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_interval_bins() {
+        let values = vec![0.0, 1.0, 2.0];
+        let spacings = vec![0.5, 0.5];
+        let result = interval_spacings(&values, &spacings);
+        let expected = vec![0.0, 0.5, 1.0, 1.5, 2.0];
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    #[should_panic(expected = "bad angle choice")]
+    fn test_interval_bins_bad_angle() {
+        let values = vec![0.0, 1.0, 2.0];
+        let spacings = vec![0.3, 0.5];
+        interval_spacings(&values, &spacings);
+    }
+
+    #[test]
+    fn test_simple_bins() {
+        let num_theta = 3;
+        let num_phi = 3;
+        let result = simple_bins(num_theta, num_phi);
+        let expected = vec![
+            (0.0, 0.0),
+            (0.0, std::f32::consts::PI),
+            (0.0, 2.0 * std::f32::consts::PI),
+            (std::f32::consts::PI / 2.0, 0.0),
+            (std::f32::consts::PI / 2.0, std::f32::consts::PI),
+            (std::f32::consts::PI / 2.0, 2.0 * std::f32::consts::PI),
+            (std::f32::consts::PI, 0.0),
+            (std::f32::consts::PI, std::f32::consts::PI),
+            (std::f32::consts::PI, 2.0 * std::f32::consts::PI),
+        ];
+        assert_eq!(result, expected);
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+pub enum BinType {
+    Simple {
+        num_theta: usize,
+        num_phi: usize,
+    },
+    Interval {
+        thetas: Vec<f32>,
+        theta_spacings: Vec<f32>,
+        phis: Vec<f32>,
+        phi_spacings: Vec<f32>,
+    },
+    Custom {
+        bins: Vec<(f32, f32)>,
+    },
+}
+
+pub fn interval_spacings(splits: &Vec<f32>, spacings: &Vec<f32>) -> Vec<f32> {
+    let num_values = splits.len();
+    let mut values = Vec::new();
+
+    for i in 0..num_values - 1 {
+        // Iterate over the splits
+
+        // compute the number of values between the splits
+        let jmax = ((splits[i + 1] - splits[i]) / spacings[i]).round() as usize;
+
+        // validate that the split is close to an integer multiple of the spacing
+        let remainder = (splits[i + 1] - splits[i]) % spacings[i];
+        if remainder.abs() > 1e-3 && (spacings[i] - remainder).abs() > 1e-3 {
+            panic!(
+                "bad angle choice, line: {}, this should be close to integer: {}",
+                i,
+                (splits[i + 1] - splits[i]) / spacings[i]
+            );
+        }
+
+        for j in 0..=jmax {
+            // Iterate over the number of values between the splits
+            if i != num_values - 2 && j == jmax {
+                // skip the last value unless it is the last split
+                continue;
+            } else {
+                values.push(splits[i] + j as f32 * spacings[i]);
+            }
+        }
+    }
+
+    values
+}
+
+pub fn interval_bins(
+    theta_spacing: &Vec<f32>,
+    theta_splits: &Vec<f32>,
+    phi_spacing: &Vec<f32>,
+    phi_splits: &Vec<f32>,
+) -> Vec<(f32, f32)> {
+    let thetas = interval_spacings(theta_splits, theta_spacing);
+    let phis = interval_spacings(phi_splits, phi_spacing);
+
+    let mut bins = Vec::new();
+    for theta in thetas.iter() {
+        for phi in phis.iter() {
+            bins.push((*theta, *phi));
+        }
+    }
+
+    bins
+}
 
 /// Generate theta and phi combinations
-pub fn generate_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
-    let thetas =
-        Array1::linspace(0.0, std::f32::consts::PI, num_theta).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
-
-    let phis =
-        Array1::linspace(0.0, 2.0 * std::f32::consts::PI, num_phi).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
+pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
+    let thetas = Array1::linspace(0.0, 180.0, num_theta).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
+    let phis = Array1::linspace(0.0, 360.0, num_phi).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
 
     // Flatten the combinations of theta and phi into a 1D array of tuples
     thetas
         .iter()
         .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
         .collect()
+}
+
+pub fn generate_bins(bin_type: &BinType) -> Vec<(f32, f32)> {
+    match bin_type {
+        BinType::Simple { num_theta, num_phi } => simple_bins(*num_theta, *num_phi),
+        BinType::Interval {
+            thetas,
+            theta_spacings,
+            phis,
+            phi_spacings,
+        } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
+        BinType::Custom { bins } => bins.to_vec(),
+    }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    beam::{Beam, BeamPropagation, BeamType, BeamVariant}, bins, field::Field, geom::{Face, Geom}, helpers::draw_face, orientation::Orientations, output, settings::{self, Settings}
+    beam::{Beam, BeamPropagation, BeamType, BeamVariant}, bins::{self, generate_bins}, field::Field, geom::{Face, Geom}, helpers::draw_face, orientation::Orientations, output, settings::{self, Settings}
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -178,10 +178,7 @@ impl Problem {
 
         let mut settings = settings.unwrap_or_else(settings::load_config);
 
-        let bins = bins::generate_bins(
-            settings.far_field_resolution.0,
-            settings.far_field_resolution.1,
-        );
+        let bins = generate_bins(&settings.binning);
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
         
@@ -226,10 +223,7 @@ impl Problem {
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
         let  settings = settings::load_config();
 
-        let bins = bins::generate_bins(
-            settings.far_field_resolution.0,
-            settings.far_field_resolution.1,
-        );
+        let bins = generate_bins(&settings.binning);
         let total_ampl_far_field =
             vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
 
@@ -566,10 +560,7 @@ impl MultiProblem {
 
         let orientations = Orientations::generate(&settings.orientation.scheme);
         let problems = Vec::new();
-        let bins = bins::generate_bins(
-            settings.far_field_resolution.0,
-            settings.far_field_resolution.1,
-        );
+        let bins = generate_bins(&settings.binning);
         let  mueller = Array2::<f32>::zeros((bins.len(), 16));
         let powers = Powers::new();
 

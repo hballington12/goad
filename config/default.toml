@@ -7,8 +7,12 @@ beam_area_threshold_fac = 1
 total_power_cutoff = 0.99
 max_rec = 10
 max_tir = 10
-far_field_resolution = [181,361]
+
+[binning]
+#Simple = { num_theta = 100, num_phi = 120 }
+#Interval = { thetas = [0,180], theta_spacings = [1], phis = [0,360], phi_spacings = [2]}
+#Custom = { bins = [[0,0],[0,40],[20,180]] }
 
 [[orientation]]
 Discrete = { eulers = [[0,0,0]] }
-#Uniform = { num_orients = 2}
+#Uniform = { num_orients = 2 }

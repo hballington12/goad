@@ -1,4 +1,4 @@
-use std::{f32::consts::PI, fs::File, io::BufWriter};
+use std::{fs::File, io::BufWriter};
 
 use anyhow::Result;
 use nalgebra::{Complex, Matrix2};
@@ -13,7 +13,7 @@ pub fn writeup(bins: &[(f32, f32)], mueller: &Array2<f32>) -> Result<()> {
     // Iterate over the array and write data to the file
     for (index, row) in mueller.outer_iter().enumerate() {
         let (theta, phi) = bins[index];
-        write!(writer, "{} {} ", theta * 180.0 / PI, phi * 180.0 / PI)?;
+        write!(writer, "{} {} ", theta, phi)?;
         for value in row.iter() {
             write!(writer, "{} ", value)?;
         }

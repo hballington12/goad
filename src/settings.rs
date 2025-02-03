@@ -4,7 +4,10 @@ use nalgebra::Complex;
 use serde::Deserialize;
 use std::fmt;
 
-use crate::orientation::{self, OrientationScheme};
+use crate::{
+    bins::BinType,
+    orientation::{self, OrientationScheme},
+};
 
 /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.001;
@@ -40,7 +43,7 @@ pub struct Settings {
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,
-    pub far_field_resolution: (usize, usize),
+    pub binning: BinType,
 }
 
 impl Settings {
@@ -59,6 +62,8 @@ pub fn load_config() -> Settings {
             eprintln!("Error loading configuration: {}", err);
             std::process::exit(1);
         });
+
+    // println!("Configuration loaded from: {:#?}", settings);
 
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
@@ -173,7 +178,7 @@ impl fmt::Display for Settings {
   - Particle Refractive Indices: {:?}
   - Max Rec: {}
   - Max TIR: {}
-  - Far Field Resolution: {:?}",
+  ",
             self.wavelength,
             self.beam_power_threshold,
             self.total_power_cutoff,
@@ -182,7 +187,6 @@ impl fmt::Display for Settings {
             self.particle_refr_index,
             self.max_rec,
             self.max_tir,
-            self.far_field_resolution
         )
     }
 }
