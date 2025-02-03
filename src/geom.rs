@@ -716,14 +716,20 @@ impl Face {
         let triangles = poly.earcut_triangles();
         let outputs = triangles
             .iter()
-            .map(|tri| {
+            .filter_map(|tri| {
                 let poly = tri.to_polygon();
 
-                let mut face = poly.project(&face.plane()).unwrap();
+                let mut face = match poly.project(&face.plane()) {
+                    Ok(face) => face,
+                    Err(_) => return None,
+                };
                 face.data_mut().exterior.reverse();
 
-                face.transform(&itransform).unwrap();
-                face
+                if let Err(_) = face.transform(&itransform) {
+                    return None;
+                }
+
+                Some(face)
             })
             .collect();
 
