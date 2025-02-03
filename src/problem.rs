@@ -189,11 +189,9 @@ impl Problem {
         settings.beam_power_threshold *= scale_factor.powi(2); // power scales with area
         settings.beam_area_threshold_fac *= scale_factor.powi(2); // area scales with length^2
 
-        let beam = basic_initial_beam(&geom, settings.wavelength, settings.medium_refr_index);
-
         let problem = Self {
             geom,
-            beam_queue: vec![beam],
+            beam_queue: vec![],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             powers: Powers::new(),
@@ -204,6 +202,11 @@ impl Problem {
         };
 
         problem
+    }
+
+    pub fn init(&mut self) {
+        let beam = basic_initial_beam(&self.geom, self.settings.wavelength, self.settings.medium_refr_index);
+        self.beam_queue.push(beam);
     }
 
     /// Resets the problem and reilluminates it with a basic initial beam.
@@ -510,7 +513,7 @@ impl Problem {
 fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
     const FAC: f32 = 1.1;
     let bounds = geom.bounds();
-    let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
+    let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));    
 
     let clip_vertices = vec![
         Point3::new(max[0], max[1], max[2]),
@@ -558,7 +561,7 @@ impl MultiProblem {
 
         init_geom(&settings, &mut geom);
 
-        let orientations = Orientations::generate(&settings.orientation.scheme);
+        let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let problems = Vec::new();
         let bins = generate_bins(&settings.binning);
         let  mueller = Array2::<f32>::zeros((bins.len(), 16));
@@ -592,6 +595,7 @@ impl MultiProblem {
                 panic!("Error rotating geometry: {}", error);
             }
 
+            problem.init();
             problem.solve();
 
             let mueller = output::ampl_to_mueller(&self.bins, &problem.ampl);

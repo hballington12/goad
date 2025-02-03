@@ -3,17 +3,15 @@ use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
 use rand::Rng;
-// use rand::SeedableRng;
+use rand::SeedableRng;
 use serde::Deserialize;
 
 #[derive(Subcommand, Debug, Clone, Deserialize, PartialEq)]
 pub enum Scheme {
-    /// Uniform distribution of angles.
-    /// Orient the geometry in random orientations, averaged over the given number of orientations.
+    /// Solve the problem by averaging over a uniform distribution of angles.
     /// Example: `uniform 100`
     Uniform { num_orients: usize },
-    /// Discrete list of angles in degrees.
-    /// The angles are given as a comma-separated list of alpha, beta, gamma.
+    /// Solve the problem by averaging over a discrete set of angles (in degrees).
     /// Example: `discrete 0,0,0 20,30,40`
     Discrete { eulers: Vec<Euler> },
 }
@@ -58,11 +56,11 @@ pub struct Orientations {
 }
 
 impl Orientations {
-    pub fn generate(scheme: &Scheme) -> Orientations {
+    pub fn generate(scheme: &Scheme, seed: Option<u64>) -> Orientations {
         match &scheme {
             Scheme::Uniform {
                 num_orients: num_orientations,
-            } => Orientations::random_uniform(*num_orientations),
+            } => Orientations::random_uniform(*num_orientations, seed),
             Scheme::Discrete { eulers } => {
                 let alphas: Vec<f32> = eulers.iter().map(|e| e.alpha).collect();
                 let betas: Vec<f32> = eulers.iter().map(|e| e.beta).collect();
@@ -91,9 +89,13 @@ impl Orientations {
         })
     }
 
-    pub fn random_uniform(num_orient: usize) -> Orientations {
-        let mut rng = rand::rng();
-        // let mut rng = rand::rngs::StdRng::seed_from_u64(41);
+    pub fn random_uniform(num_orient: usize, seed: Option<u64>) -> Orientations {
+        let mut rng = if let Some(seed) = seed {
+            rand::rngs::StdRng::seed_from_u64(seed)
+        } else {
+            rand::rngs::StdRng::from_rng(&mut rand::rng())
+        };
+
         let alphas: Vec<f32> = (0..num_orient)
             .map(|_| rng.random_range(0.0..1.0) as f32 * 360.0)
             .collect();

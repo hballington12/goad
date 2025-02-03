@@ -44,6 +44,7 @@ pub struct Settings {
     pub max_rec: i32,
     pub max_tir: i32,
     pub binning: BinType,
+    pub seed: Option<u64>,
 }
 
 impl Settings {
@@ -62,8 +63,6 @@ pub fn load_config() -> Settings {
             eprintln!("Error loading configuration: {}", err);
             std::process::exit(1);
         });
-
-    // println!("Configuration loaded from: {:#?}", settings);
 
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
@@ -85,10 +84,10 @@ pub fn load_config() -> Settings {
     if let Some(geo) = args.geo {
         config.geom_name = geo;
     }
-    if let Some(mp) = args.mp {
+    if let Some(mp) = args.bp {
         config.beam_power_threshold = mp;
     }
-    if let Some(maf) = args.maf {
+    if let Some(maf) = args.baf {
         config.beam_area_threshold_fac = maf;
     }
     if let Some(cop) = args.cop {
@@ -106,6 +105,8 @@ pub fn load_config() -> Settings {
 
     validate_config(&config);
 
+    // println!("{:?}", config);
+
     config
 }
 
@@ -121,17 +122,17 @@ fn validate_config(config: &Settings) {
 #[command(version, about = "GOAD - Geometric Optics with Aperture Diffraction")]
 pub struct CliArgs {
     /// Wavelength in units of the geometry.
-    #[arg(long)]
+    #[arg(short, long)]
     w: Option<f32>,
 
     /// Minimum absolute beam power threshold for new beams to propagate.
     #[arg(long)]
-    mp: Option<f32>,
+    bp: Option<f32>,
 
     /// Minimum area factor for new beams to propagate. The actual area threshold is
     /// calculated as `wavelength^2 * factor`.
     #[arg(long)]
-    maf: Option<f32>,
+    baf: Option<f32>,
 
     /// Cutoff power. The total acceptable output power per orientation before beam propagation is terminated.
     /// Once this threshold is reached, the near-field simulation will stop.
@@ -148,7 +149,7 @@ pub struct CliArgs {
 
     /// File path to the input geometry. All input shapes should be defined in this file.
     /// Currently, only the Wavefront .obj format is supported.
-    #[arg(long)]
+    #[arg(short, long)]
     geo: Option<String>,
 
     /// The refractive index of the surrounding medium.
@@ -164,6 +165,10 @@ pub struct CliArgs {
     /// Orientation scheme for the simulation.
     #[command(subcommand)]
     orient: Option<orientation::Scheme>,
+
+    /// Random seed for the simulation.
+    #[arg(short, long)]
+    seed: Option<u64>,
 }
 
 impl fmt::Display for Settings {

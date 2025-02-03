@@ -1,18 +1,57 @@
+# Configuration file for the GOAD simulation.
+# This file contains the default values for all config options.
+# The user should not modify this config, but may make a local copy of it 
+#   called `local.conf`.
+# Config options found in `local.conf` will always override the default values
+#   given in this file.
+# Configuration options specified on the command line will override values given
+#   in this file.
+
+# Wavelength of the light source in dimensions of the geometry file
 wavelength = 0.532
-medium_refr_index = [1.0,0.0]
-particle_refr_index = [[1.31,0.0]]
+
+# Refractive index of the medium (real and imaginary parts)
+medium_refr_index = [1.0, 0.0]
+
+# Refractive index of the particle (real and imaginary parts)
+# For files containing multiple shapes, use a nested list for different values
+#   for each shape, eg. [[1.31,0.0],[1.5,0.001]]
+particle_refr_index = [[1.31, 0.0]]
+
+# Geometry file name for the particle
 geom_name = "./examples/data/hex.obj"
+
+# Threshold for truncation by beam power
 beam_power_threshold = 0.005
+
+# Factor for truncating beams by area
+# Truncation absolute area is wavenumber^2 / factor
 beam_area_threshold_fac = 1 
+
+# Total power cutoff fraction
 total_power_cutoff = 0.99
+
+# Maximum number of recursions
 max_rec = 10
+
+# Maximum number of total internal reflections
 max_tir = 10
 
-[binning]
-#Simple = { num_theta = 100, num_phi = 120 }
-#Interval = { thetas = [0,180], theta_spacings = [1], phis = [0,360], phi_spacings = [2]}
-#Custom = { bins = [[0,0],[0,40],[20,180]] }
+# Seed for random number generation (default is commented out for no seed)
+# seed = 6
 
+# Binning configuration
+[binning]
+# Simple binning with specified number of theta and phi bins
+Simple = { num_theta = 181, num_phi = 181 }
+# Interval binning with specified theta and phi spacings 
+# Interval = { thetas = [0,180], theta_spacings = [1], phis = [0,360], phi_spacings = [2]}
+# Custom binning with specified bins 
+# Custom = { bins = [[0,0],[0,40],[20,180]] }
+
+# Orientation configuration
 [[orientation]]
-Discrete = { eulers = [[0,0,0]] }
-#Uniform = { num_orients = 2 }
+# Discrete orientation with specified Euler angles
+Discrete = { eulers = [[30,30,20]] }
+# Random uniform distribution of orientations with specified number of orientations 
+# Uniform = { num_orients = 2 }
