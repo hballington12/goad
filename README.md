@@ -23,7 +23,7 @@ Once Cargo is installed, you clone
 installed, you can clone the repository and build the project using Cargo:
 
 ```sh
-git clone https://github.com/hballington12/goad.git
+git clone git@github.com:hballington12/goad.git
 cd goad
 cargo build --release
 ```
