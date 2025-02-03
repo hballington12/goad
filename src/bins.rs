@@ -73,9 +73,13 @@ pub fn interval_spacings(splits: &Vec<f32>, spacings: &Vec<f32>) -> Vec<f32> {
         let remainder = (splits[i + 1] - splits[i]) % spacings[i];
         if remainder.abs() > 1e-3 && (spacings[i] - remainder).abs() > 1e-3 {
             panic!(
-                "bad angle choice, line: {}, this should be close to integer: {}",
+                "Invalid spacing: split at index {} (value: {}) to index {} (value: {}) is not an integer multiple of spacing {}. Computed remainder: {}",
                 i,
-                (splits[i + 1] - splits[i]) / spacings[i]
+                splits[i],
+                i + 1,
+                splits[i + 1],
+                spacings[i],
+                remainder
             );
         }
 

@@ -43,7 +43,7 @@ max_tir = 10
 # Binning configuration
 [binning]
 # Simple binning with specified number of theta and phi bins
-Simple = { num_theta = 181, num_phi = 181 }
+# Simple = { num_theta = 181, num_phi = 181 }
 # Interval binning with specified theta and phi spacings 
 # Interval = { thetas = [0,180], theta_spacings = [1], phis = [0,360], phi_spacings = [2]}
 # Custom binning with specified bins 

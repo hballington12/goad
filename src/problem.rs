@@ -1,13 +1,18 @@
 use crate::{
-    beam::{Beam, BeamPropagation, BeamType, BeamVariant}, bins::{self, generate_bins}, field::Field, geom::{Face, Geom}, helpers::draw_face, orientation::Orientations, output, settings::{self, Settings}
+    beam::{Beam, BeamPropagation, BeamType, BeamVariant},
+    bins::generate_bins,
+    field::Field,
+    geom::{Face, Geom},
+    helpers::draw_face,
+    orientation::Orientations,
+    output,
+    settings::{self, Settings},
 };
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use ndarray::Array2;
 use rayon::prelude::*;
-use std::{fmt, ops::DivAssign};
-use std::ops::Add;
-
+use std::{fmt, ops::DivAssign, ops::Add};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 #[cfg(test)]

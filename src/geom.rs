@@ -1,19 +1,11 @@
-use crate::containment::ContainmentGraph;
-use crate::containment::AABB;
+use crate::containment::{ContainmentGraph, AABB};
 use crate::settings;
 use anyhow::Result;
-use geo::Area;
-use geo::TriangulateEarcut;
-use geo_types::Coord;
-use geo_types::LineString;
-use geo_types::Polygon;
-use nalgebra::Complex;
-use nalgebra::Matrix3;
-use nalgebra::Vector4;
-use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
+use geo::{Area, TriangulateEarcut};
+use geo_types::{Coord, LineString, Polygon};
+use nalgebra::{self as na, Complex, Isometry3, Matrix3, Matrix4, Point3, Vector3, Vector4};
 use std::path::Path;
-use tobj;
-use tobj::Model;
+use tobj::{self, Model};
 
 #[cfg(test)]
 mod tests {

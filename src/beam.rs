@@ -3,21 +3,18 @@ use std::f32::consts::PI;
 
 use geo::Coord;
 use macroquad::prelude::*;
-use nalgebra::Complex;
-use nalgebra::Matrix2;
-use nalgebra::Point3;
-use nalgebra::Vector3;
+use nalgebra::{Complex, Matrix2, Point3, Vector3};
 
-use crate::clip::Clipping;
-use crate::diff;
-use crate::field::Field;
-use crate::fresnel;
-use crate::geom::Face;
-use crate::geom::Geom;
-use crate::helpers::draw_face;
-use crate::helpers::lines_to_screen;
-use crate::settings;
-use crate::snell::get_theta_t;
+use crate::{
+    clip::Clipping,
+    diff,
+    field::Field,
+    fresnel,
+    geom::{Face, Geom},
+    helpers::{draw_face, lines_to_screen},
+    settings,
+    snell::get_theta_t,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
