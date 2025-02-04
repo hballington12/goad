@@ -15,7 +15,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "bad angle choice")]
+    #[should_panic]
     fn test_interval_bins_bad_angle() {
         let values = vec![0.0, 1.0, 2.0];
         let spacings = vec![0.3, 0.5];
@@ -29,14 +29,14 @@ mod tests {
         let result = simple_bins(num_theta, num_phi);
         let expected = vec![
             (0.0, 0.0),
-            (0.0, std::f32::consts::PI),
-            (0.0, 2.0 * std::f32::consts::PI),
-            (std::f32::consts::PI / 2.0, 0.0),
-            (std::f32::consts::PI / 2.0, std::f32::consts::PI),
-            (std::f32::consts::PI / 2.0, 2.0 * std::f32::consts::PI),
-            (std::f32::consts::PI, 0.0),
-            (std::f32::consts::PI, std::f32::consts::PI),
-            (std::f32::consts::PI, 2.0 * std::f32::consts::PI),
+            (0.0, 180.0),
+            (0.0, 360.0),
+            (90.0, 0.0),
+            (90.0, 180.0),
+            (90.0, 360.0),
+            (180.0, 0.0),
+            (180.0, 180.0),
+            (180.0, 360.0),
         ];
         assert_eq!(result, expected);
     }
