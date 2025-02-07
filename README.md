@@ -10,17 +10,15 @@ GOAD is a Rust-based physical-optics hybrid light scattering model based on geom
 
 ## Installation
 
-To install and run the project, ensure you have Rust installed. Clone the repository and build the project using Cargo:
-Before building the project, ensure you have Cargo installed. You can install Rust and Cargo by following the instructions on the [official Rust website](https://doc.rust-lang.org/cargo/getting-started/installation.html).
+Before building the project ensure you have Rust's package manager, Cargo installed. You can install Rust and Cargo by following the instructions on the [official Rust website](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 
-On Linux and macOS, you can usually install Rust and Cargo using the following command:
+On Linux and macOS, you can usually install Cargo using:
 
 ```sh
 curl https://sh.rustup.rs -sSf | sh
 ```
 
-Once Cargo is installed, you clone 
-installed, you can clone the repository and build the project using Cargo:
+Once Cargo is installed, you clone you can clone the repository and build the project using Cargo:
 
 ```sh
 git clone git@github.com:hballington12/goad.git
@@ -111,6 +109,12 @@ cargo run --release -- [OPTIONS]
 cargo run --release -- -w 0.532 --geo ./examples/data/cube.obj
 ```
 
+Or, equivalently:
+
+```sh
+./target/release/goad -w 0.532 --geo ./examples/data/cube.obj
+```
+
 ## Testing
 
 To check that everything is running as it should be on your system, you can run the tests with the following command:
@@ -125,4 +129,4 @@ Contributions are welcome! Please open an issue or submit a pull request on GitH
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License. See the [LICENSE](LICENSE) file for details.

@@ -94,6 +94,7 @@ impl Add for Powers {
 }
 
 use std::ops::AddAssign;
+use std::time::Instant;
 
 impl AddAssign for Powers {
     fn add_assign(&mut self, other: Self) {
@@ -541,6 +542,9 @@ impl MultiProblem {
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
 
+        let start = Instant::now();
+        println!("Solving problem...");
+
         // init a base problem that can be reset
         let problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
         // let mut problem = problem_base.clone();
@@ -585,6 +589,14 @@ impl MultiProblem {
             }
         }
         self.powers /= self.orientations.num_orientations as f32;
+        let end = Instant::now();
+        let duration = end.duration_since(start);
+        let time_per_orientation = duration / self.orientations.num_orientations as u32;
+
+        println!(
+            "Time taken: {:.2?}, Time per orientation: {:.2?}",
+            duration, time_per_orientation
+        );
 
         pb.finish_with_message(format!("(done)"));
         println!("Average {}", self.powers);

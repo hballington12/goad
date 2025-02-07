@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::fmt;
 
 use crate::{
-    bins::{BinningScheme, Scheme},
+    bins::BinningScheme,
     orientation::{self, OrientationScheme},
 };
 
@@ -107,7 +107,7 @@ pub fn load_config() -> Settings {
 
     validate_config(&config);
 
-    // println!("{:?}", config);
+    println!("{:#?}", config);
 
     config
 }

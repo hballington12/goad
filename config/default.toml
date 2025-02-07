@@ -25,8 +25,8 @@ geom_name = "./examples/data/hex.obj"
 beam_power_threshold = 0.005
 
 # Factor for truncating beams by area
-# Truncation absolute area is wavenumber^2 / factor
-beam_area_threshold_fac = 1 
+# Truncation absolute area is wavelength^2 * factor
+beam_area_threshold_fac = 0.1
 
 # Total power cutoff fraction
 total_power_cutoff = 0.99
@@ -43,9 +43,9 @@ max_tir = 10
 # Binning configuration
 [[binning]]
 # Simple binning with specified number of theta and phi bins
-# Simple = { num_theta = 181, num_phi = 181 }
+Simple = { num_theta = 181, num_phi = 181 }
 # Interval binning with specified theta and phi spacings 
-Interval = { thetas = [0,180], theta_spacings = [1], phis = [0,360], phi_spacings = [2]}
+# Interval = { thetas = [0,180], theta_spacings = [1], phis = [0,360], phi_spacings = [2]}
 # Custom binning with specified bins 
 # Custom = { bins = [[0,0],[0,40],[20,180]] }
 
