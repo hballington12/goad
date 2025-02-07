@@ -2,7 +2,9 @@ use clap::Parser;
 use config::{Config, Environment, File};
 use nalgebra::Complex;
 use serde::Deserialize;
+use std::env;
 use std::fmt;
+use std::path::PathBuf;
 
 use crate::{
     bins::BinningScheme,
@@ -54,9 +56,16 @@ impl Settings {
 }
 
 pub fn load_config() -> Settings {
+    let exe_path = env::current_exe().expect("Failed to get current executable path");
+    let goad_dir = exe_path
+        .parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.parent())
+        .expect("Failed to get target directory.");
+
     let settings = Config::builder()
-        .add_source(File::with_name("config/default"))
-        .add_source(File::with_name("config/local").required(false))
+        .add_source(File::from(goad_dir.join("config/default")))
+        .add_source(File::from(goad_dir.join("config/local")))
         .add_source(Environment::with_prefix("goad"))
         .build()
         .unwrap_or_else(|err| {
