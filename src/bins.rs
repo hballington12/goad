@@ -1,4 +1,5 @@
 use ndarray::Array1;
+use pyo3::prelude::*;
 use serde::Deserialize;
 
 #[cfg(test)]
@@ -59,9 +60,20 @@ pub enum Scheme {
     },
 }
 
+#[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct BinningScheme {
     pub scheme: Scheme,
+}
+
+#[pymethods]
+impl BinningScheme {
+    #[new]
+    fn py_new(bins: Vec<(f32, f32)>) -> Self {
+        BinningScheme {
+            scheme: Scheme::Custom { bins },
+        }
+    }
 }
 
 pub fn interval_spacings(splits: &Vec<f32>, spacings: &Vec<f32>) -> Vec<f32> {

@@ -14,6 +14,7 @@ use ndarray::Array2;
 use rayon::prelude::*;
 use std::{fmt, ops::DivAssign, ops::Add};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use pyo3::prelude::*;
 
 #[cfg(test)]
 mod tests {
@@ -165,6 +166,7 @@ impl fmt::Display for Powers {
 }
 
 /// A solvable physics problem.
+#[pyclass]
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Problem {
     pub geom: Geom,                       // geometry to trace beams in
@@ -176,6 +178,27 @@ pub struct Problem {
     pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
     pub settings: Settings,               // runtime settings
     scale_factor: f32, // scaling factor for geometry
+}
+
+#[pymethods]
+impl Problem {
+    #[new]
+    fn py_new(geom: Geom, settings: Settings) -> Self {
+        // println!("Geometry: {:#?}", geom);
+        Problem::new(geom, Some(settings))
+    }
+
+    pub fn py_solve(&mut self) -> PyResult<()>{
+        self.init();
+        self.solve_near();
+        self.solve_far();
+        Ok(())
+    }
+
+    pub fn py_print_stats(&self) -> PyResult<()> {
+        println!("{}", self.powers);
+        Ok(())
+    }
 }
 
 impl Problem {
@@ -209,6 +232,7 @@ impl Problem {
 
         problem
     }
+
 
     pub fn init(&mut self) {
         let beam = basic_initial_beam(&self.geom, self.settings.wavelength, self.settings.medium_refr_index);

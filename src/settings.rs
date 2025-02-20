@@ -1,11 +1,13 @@
 use clap::Parser;
 use config::{Config, Environment, File};
 use nalgebra::Complex;
+use pyo3::prelude::*;
 use serde::Deserialize;
 use std::env;
 use std::fmt;
-use std::path::PathBuf;
 
+use crate::bins;
+use crate::orientation::Euler;
 use crate::{
     bins::BinningScheme,
     orientation::{self, OrientationScheme},
@@ -33,6 +35,7 @@ pub const KXY_EPSILON: f32 = 1e-3;
 pub const PROP_PERTURBATION: f32 = 1e-5;
 
 /// Runtime configuration for the application.
+#[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Settings {
     pub wavelength: f32,
@@ -47,6 +50,52 @@ pub struct Settings {
     pub max_tir: i32,
     pub binning: BinningScheme,
     pub seed: Option<u64>,
+}
+
+#[pymethods]
+impl Settings {
+    #[new]
+    fn py_new(
+        wavelength: f32,
+        beam_power_threshold: f32,
+        beam_area_threshold_fac: f32,
+        total_power_cutoff: f32,
+        medium_refr_index_re: f32,
+        medium_refr_index_im: f32,
+        particle_refr_index_re: f32,
+        particle_refr_index_im: f32,
+        geom_name: String,
+        max_rec: i32,
+        max_tir: i32,
+        bins: Vec<(f32, f32)>,
+    ) -> Self {
+        let medium_refr_index = Complex::new(medium_refr_index_re, medium_refr_index_im);
+        let particle_refr_index =
+            vec![Complex::new(particle_refr_index_re, particle_refr_index_im)];
+        let orientation: OrientationScheme = OrientationScheme {
+            scheme: orientation::Scheme::Discrete {
+                eulers: vec![Euler::new(0.0, 0.0, 0.0)],
+            },
+        };
+        let binning = BinningScheme {
+            scheme: bins::Scheme::Custom { bins },
+        };
+
+        Settings {
+            wavelength,
+            beam_power_threshold,
+            beam_area_threshold_fac,
+            total_power_cutoff,
+            medium_refr_index,
+            particle_refr_index,
+            orientation,
+            geom_name,
+            max_rec,
+            max_tir,
+            binning,
+            seed: None,
+        }
+    }
 }
 
 impl Settings {

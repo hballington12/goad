@@ -23,6 +23,12 @@ pub struct Euler {
     gamma: f32,
 }
 
+impl Euler {
+    pub fn new(alpha: f32, beta: f32, gamma: f32) -> Self {
+        Self { alpha, beta, gamma }
+    }
+}
+
 impl FromStr for Euler {
     type Err = anyhow::Error;
 

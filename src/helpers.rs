@@ -91,3 +91,7 @@ pub fn lines_to_screen(line_strings: Vec<Vec<Coord<f32>>>, color: Color, thickne
         }
     }
 }
+
+pub fn add_one(x: i32) -> i32 {
+    x + 1
+}

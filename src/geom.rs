@@ -4,6 +4,7 @@ use anyhow::Result;
 use geo::{Area, TriangulateEarcut};
 use geo_types::{Coord, LineString, Polygon};
 use nalgebra::{self as na, Complex, Isometry3, Matrix3, Matrix4, Point3, Vector3, Vector4};
+use pyo3::prelude::*;
 use std::path::Path;
 use tobj::{self, Model};
 
@@ -730,6 +731,7 @@ impl Face {
 }
 
 /// Represents a 3D surface mesh.
+#[pyclass]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
     pub vertices: Vec<Point3<f32>>, // List of all vertices in the mesh
@@ -885,6 +887,47 @@ impl Shape {
     }
 }
 
+/// Python bindings for the `Shape` struct.
+#[pymethods]
+impl Shape {
+    #[new]
+    fn py_new(
+        vertices: Vec<(f32, f32, f32)>,
+        face_indices: Vec<Vec<usize>>,
+        id: usize,
+        refr_index_re: f32,
+        refr_index_im: f32,
+    ) -> PyResult<Self> {
+        let vertices = vertices
+            .into_iter()
+            .map(|(x, y, z)| Point3::new(x, y, z))
+            .collect::<Vec<_>>();
+
+        let mut shape = Shape::new(Some(id), None);
+        shape.num_vertices = vertices.len();
+        shape.vertices = vertices;
+
+        const BODGE_SHAPE_ID: usize = 0;
+
+        for indices in face_indices {
+            let face_vertices: Vec<_> = indices.into_iter().map(|i| shape.vertices[i]).collect();
+            shape.add_face(
+                Face::new_simple(face_vertices, Some(BODGE_SHAPE_ID))
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?,
+            );
+        }
+
+        shape.set_aabb();
+        shape.refr_index = Complex {
+            re: refr_index_re,
+            im: refr_index_im,
+        };
+
+        Ok(shape)
+    }
+}
+
+#[pyclass]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geom {
     pub shapes: Vec<Shape>,
@@ -1122,6 +1165,42 @@ impl Geom {
         }
 
         Ok(())
+    }
+}
+
+/// Python bindings for the `Geom` struct.
+#[pymethods]
+impl Geom {
+    #[new]
+    fn py_new(shapes: Vec<Shape>) -> Self {
+        let num_shapes = shapes.len();
+        let mut containment_graph = ContainmentGraph::new(num_shapes);
+
+        // Ensure all shapes have valid IDs upfront
+        let shapes_with_ids: Vec<_> = shapes
+            .iter()
+            .filter_map(|shape| {
+                shape
+                    .id
+                    .map(|id| (id, shape))
+                    .or_else(|| panic!("Shape cannot be added to containment graph without an id"))
+            })
+            .collect();
+
+        // Iterate over distinct pairs of shapes
+        for (id_a, a) in &shapes_with_ids {
+            for (id_b, b) in &shapes_with_ids {
+                if id_a != id_b && a.contains(b) {
+                    containment_graph.set_parent(*id_b, *id_a);
+                }
+            }
+        }
+
+        Self {
+            shapes,
+            containment_graph,
+            num_shapes,
+        }
     }
 }
 
