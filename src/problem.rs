@@ -185,6 +185,7 @@ impl Problem {
     #[new]
     fn py_new(geom: Geom, settings: Settings) -> Self {
         // println!("Geometry: {:#?}", geom);
+        println!("Settings: {:#?}", settings);
         Problem::new(geom, Some(settings))
     }
 
@@ -224,7 +225,7 @@ impl Problem {
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             powers: Powers::new(),
-            bins: bins,
+            bins,
             ampl: total_ampl_far_field,
             settings,
             scale_factor

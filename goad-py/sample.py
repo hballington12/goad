@@ -52,12 +52,15 @@ settings = goad.Settings(
     geom_name="test",
     max_rec=10,
     max_tir=10,
-    bins=[(0.0, 1.0), (0.0, 1.0), (0.0, 1.0)]
+    theta_res=100,
+    phi_res=100
 )
 
 print("creating goad problem")
 
 problem = goad.Problem(geom, settings)
+
+print("settings:", settings)
 
 print("solving goad problem")
 

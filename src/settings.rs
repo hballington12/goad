@@ -67,7 +67,8 @@ impl Settings {
         geom_name: String,
         max_rec: i32,
         max_tir: i32,
-        bins: Vec<(f32, f32)>,
+        theta_res: usize,
+        phi_res: usize,
     ) -> Self {
         let medium_refr_index = Complex::new(medium_refr_index_re, medium_refr_index_im);
         let particle_refr_index =
@@ -78,7 +79,10 @@ impl Settings {
             },
         };
         let binning = BinningScheme {
-            scheme: bins::Scheme::Custom { bins },
+            scheme: bins::Scheme::Simple {
+                num_theta: theta_res,
+                num_phi: phi_res,
+            },
         };
 
         Settings {
