@@ -12,9 +12,10 @@ import bpy
 import os
 import sys
 import importlib
-
-# Prevent Python from writing bytecode files
-sys.dont_write_bytecode = True
+import matplotlib.pyplot as plt
+import numpy as np
+from io import BytesIO
+from PIL import Image
 
 # Determine the path to the Rust module
 addon_dir = os.path.dirname(__file__)
@@ -62,6 +63,10 @@ class SCATTERING_PT_Panel(bpy.types.Panel):
 
         # Compute Scattering Button
         layout.operator("object.compute_scattering")
+
+        # Display Plot
+        if context.scene.plot_image:
+            layout.template_ID_preview(context.scene, "plot_image", new="image.new", open="image.open")
 
 class OBJECT_OT_ComputeScattering(bpy.types.Operator):
     """Compute light scattering"""
@@ -145,7 +150,36 @@ class OBJECT_OT_ComputeScattering(bpy.types.Operator):
 
         problem.py_print_stats()
 
+        self.generate_plot(context)
+
         return {'FINISHED'}
+
+    def generate_plot(self, context):
+        # Example data for plotting
+        x = np.linspace(0, 10, 100)
+        y = np.cos(x)
+
+        # Create plot
+        plt.figure()
+        plt.plot(x, y)
+        plt.title("Example Plot")
+        plt.xlabel("X-axis")
+        plt.ylabel("Y-axis")
+
+        # Save plot to a BytesIO object
+        buf = BytesIO()
+        plt.savefig(buf, format='PNG')
+        buf.seek(0)
+
+        # Load plot as Blender image
+        plot_img = Image.open(buf)
+        image_name = "ScatteringPlot"
+        if image_name in bpy.data.images:
+            bpy.data.images.remove(bpy.data.images[image_name])
+        image = bpy.data.images.new(image_name, width=plot_img.width, height=plot_img.height)
+        pixels = [chan/255 for pixel in plot_img.convert('RGBA').getdata() for chan in pixel]
+        image.pixels = pixels
+        context.scene.plot_image = image
 
 # Extract mesh vertices and faces
 def extract_mesh(obj):
@@ -174,12 +208,14 @@ def register():
     bpy.utils.register_class(OBJECT_OT_ComputeScattering)
     bpy.types.Scene.scattering_intensity = bpy.props.FloatProperty(name="Wavelength", default=1.0, min=0.1, max=10.0)
     bpy.types.Scene.scattering_angle = bpy.props.FloatProperty(name="Scattering Angle", default=45.0, min=0.0, max=180.0)
+    bpy.types.Scene.plot_image = bpy.props.PointerProperty(type=bpy.types.Image)
 
 def unregister():
     bpy.utils.unregister_class(SCATTERING_PT_Panel)
     bpy.utils.unregister_class(OBJECT_OT_ComputeScattering)
     del bpy.types.Scene.scattering_intensity
     del bpy.types.Scene.scattering_angle
+    del bpy.types.Scene.plot_image
 
 if __name__ == "__main__":
     register()
