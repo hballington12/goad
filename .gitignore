@@ -7,4 +7,5 @@ config/local.toml
 **.so
 **.blend
 **/.env/
-goad-py/
+log**
+goad-py/.env
