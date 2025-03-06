@@ -11,10 +11,40 @@ bl_info = {
 import bpy
 import os
 import sys
+import subprocess
 import importlib
+from io import BytesIO
+import site
+import threading
+import queue
+
+# Function to install required packages
+def install_packages():
+    # Add user site-packages to Python path
+    user_site = site.getusersitepackages()
+    if user_site not in sys.path:
+        sys.path.append(user_site)
+    
+    packages = ["matplotlib", "numpy", "PIL", "tornado"]
+    python_executable = sys.executable
+    for package in packages:
+        try:
+            importlib.import_module(package)
+            module = importlib.import_module(package)
+            print(f"Package {package} location: {module.__file__}")
+        except ImportError:
+            subprocess.check_call([python_executable, "-m", "pip", "install", package])
+            module = importlib.import_module(package)
+            print(f"Installed {package} at: {module.__file__}")
+
+# Install required packages
+install_packages()
+
+import matplotlib
+matplotlib.use('WebAgg') # Use the WebAgg backend for plotting
+
 import matplotlib.pyplot as plt
 import numpy as np
-from io import BytesIO
 from PIL import Image
 
 # Determine the path to the Rust module
@@ -39,6 +69,19 @@ except ImportError as e:
     if not os.path.exists(module_path):
         print("Module file does not exist!")
 
+
+def update_plot(data):
+    """
+    Update the plot with new data.
+
+    Parameters:
+    data (list or numpy array): The data to plot.
+    """
+    print("Updating plot")
+    plt.figure(1)  # Use figure with label 1
+    plt.plot(data)  # Plot the new data
+    # plt.show()  # Show the plot in a new window
+
 class SCATTERING_PT_Panel(bpy.types.Panel):
     """Light Scattering UI Panel"""
     bl_label = "GOAD"
@@ -46,6 +89,8 @@ class SCATTERING_PT_Panel(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = "GOAD"
+
+    plt.ion()
 
     def draw(self, context):
         layout = self.layout
@@ -63,10 +108,6 @@ class SCATTERING_PT_Panel(bpy.types.Panel):
 
         # Compute Scattering Button
         layout.operator("object.compute_scattering")
-
-        # Display Plot
-        if context.scene.plot_image:
-            layout.template_ID_preview(context.scene, "plot_image", new="image.new", open="image.open")
 
 class OBJECT_OT_ComputeScattering(bpy.types.Operator):
     """Compute light scattering"""
@@ -150,36 +191,12 @@ class OBJECT_OT_ComputeScattering(bpy.types.Operator):
 
         problem.py_print_stats()
 
-        self.generate_plot(context)
+        # Example data to plot
+        data = np.random.rand(100) * 10  # Generate 100 random numbers between 0 and 10
+        # update_plot(data)
+        update_plot(data)  # Call the function in a new thread
 
         return {'FINISHED'}
-
-    def generate_plot(self, context):
-        # Example data for plotting
-        x = np.linspace(0, 10, 100)
-        y = np.cos(x)
-
-        # Create plot
-        plt.figure()
-        plt.plot(x, y)
-        plt.title("Example Plot")
-        plt.xlabel("X-axis")
-        plt.ylabel("Y-axis")
-
-        # Save plot to a BytesIO object
-        buf = BytesIO()
-        plt.savefig(buf, format='PNG')
-        buf.seek(0)
-
-        # Load plot as Blender image
-        plot_img = Image.open(buf)
-        image_name = "ScatteringPlot"
-        if image_name in bpy.data.images:
-            bpy.data.images.remove(bpy.data.images[image_name])
-        image = bpy.data.images.new(image_name, width=plot_img.width, height=plot_img.height)
-        pixels = [chan/255 for pixel in plot_img.convert('RGBA').getdata() for chan in pixel]
-        image.pixels = pixels
-        context.scene.plot_image = image
 
 # Extract mesh vertices and faces
 def extract_mesh(obj):
@@ -208,14 +225,12 @@ def register():
     bpy.utils.register_class(OBJECT_OT_ComputeScattering)
     bpy.types.Scene.scattering_intensity = bpy.props.FloatProperty(name="Wavelength", default=1.0, min=0.1, max=10.0)
     bpy.types.Scene.scattering_angle = bpy.props.FloatProperty(name="Scattering Angle", default=45.0, min=0.0, max=180.0)
-    bpy.types.Scene.plot_image = bpy.props.PointerProperty(type=bpy.types.Image)
 
 def unregister():
-    bpy.utils.unregister_class(SCATTERING_PT_Panel)
-    bpy.utils.unregister_class(OBJECT_OT_ComputeScattering)
-    del bpy.types.Scene.scattering_intensity
     del bpy.types.Scene.scattering_angle
-    del bpy.types.Scene.plot_image
+    del bpy.types.Scene.scattering_intensity
+    bpy.utils.unregister_class(OBJECT_OT_ComputeScattering)
+    bpy.utils.unregister_class(SCATTERING_PT_Panel)
 
 if __name__ == "__main__":
     register()
