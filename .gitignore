@@ -6,4 +6,5 @@ config/local.toml
 **/__pycache__/
 **.so
 **.blend
-**.env/
+**/.env/
+goad-py/
