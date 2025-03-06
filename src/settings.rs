@@ -118,7 +118,7 @@ pub fn load_config() -> Settings {
 
     let settings = Config::builder()
         .add_source(File::from(goad_dir.join("config/default")))
-        .add_source(File::from(goad_dir.join("config/local")))
+        .add_source(File::from(goad_dir.join("config/local")).required(false))
         .add_source(Environment::with_prefix("goad"))
         .build()
         .unwrap_or_else(|err| {
