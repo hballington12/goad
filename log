@@ -1,0 +1,46 @@
+Settings {
+    wavelength: 0.532,
+    beam_power_threshold: 0.0025,
+    beam_area_threshold_fac: 0.1,
+    total_power_cutoff: 0.99,
+    medium_refr_index: Complex {
+        re: 1.0,
+        im: 0.0,
+    },
+    particle_refr_index: [
+        Complex {
+            re: 1.31,
+            im: 0.0,
+        },
+    ],
+    orientation: OrientationScheme {
+        scheme: Uniform {
+            num_orients: 5,
+        },
+    },
+    geom_name: "./examples/data/hex.obj",
+    max_rec: 15,
+    max_tir: 100,
+    binning: BinningScheme {
+        scheme: Simple {
+            num_theta: 181,
+            num_phi: 181,
+        },
+    },
+    seed: None,
+}
+Solving problem...
+Time taken: 241.44ms, Time per orientation: 48.29ms
+Average Powers:
+  Input:            113.481522
+  Output:           112.376709
+  Absorbed:         0.000000
+  Trunc. Refl:      0.000000
+  Trunc. Rec:       0.000000
+  Clip Err:         0.000000
+  Trunc. Energy:    0.000000
+  Trunc. Area:      0.000194
+  Trunc. Cop:       1.104617
+  Other:            0.000008
+  External Diff:    113.481491
+

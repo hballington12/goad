@@ -3,4 +3,7 @@
 **.txt
 mueller_scatgrid**
 config/local.toml
-log
+**/__pycache__/
+**.so
+**.blend
+**.env/

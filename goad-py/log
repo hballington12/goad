@@ -1,0 +1,889 @@
+1 + 1 = 2
+Geometry: Geom {
+    shapes: [
+        Shape {
+            vertices: [
+                [
+                    6.025435,
+                    6.025435,
+                    -6.025435,
+                ],
+                [
+                    6.025435,
+                    6.025435,
+                    6.025435,
+                ],
+                [
+                    6.025435,
+                    -6.025435,
+                    -6.025435,
+                ],
+                [
+                    6.025435,
+                    -6.025435,
+                    6.025435,
+                ],
+                [
+                    -6.025435,
+                    6.025435,
+                    -6.025435,
+                ],
+                [
+                    -6.025435,
+                    6.025435,
+                    6.025435,
+                ],
+                [
+                    -6.025435,
+                    -6.025435,
+                    -6.025435,
+                ],
+                [
+                    -6.025435,
+                    -6.025435,
+                    6.025435,
+                ],
+            ],
+            num_vertices: 8,
+            faces: [
+                Simple(
+                    FaceData {
+                        exterior: [
+                            [
+                                6.025435,
+                                6.025435,
+                                -6.025435,
+                            ],
+                            [
+                                6.025435,
+                                6.025435,
+                                6.025435,
+                            ],
+                            [
+                                6.025435,
+                                -6.025435,
+                                6.025435,
+                            ],
+                            [
+                                6.025435,
+                                -6.025435,
+                                -6.025435,
+                            ],
+                        ],
+                        normal: [
+                            [
+                                1.0,
+                                0.0,
+                                -0.0,
+                            ],
+                        ],
+                        midpoint: [
+                            6.025435,
+                            0.0,
+                            0.0,
+                        ],
+                        num_vertices: 4,
+                        area: None,
+                        shape_id: None,
+                    },
+                ),
+                Simple(
+                    FaceData {
+                        exterior: [
+                            [
+                                6.025435,
+                                -6.025435,
+                                -6.025435,
+                            ],
+                            [
+                                6.025435,
+                                -6.025435,
+                                6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                -6.025435,
+                                6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                -6.025435,
+                                -6.025435,
+                            ],
+                        ],
+                        normal: [
+                            [
+                                0.0,
+                                -1.0,
+                                0.0,
+                            ],
+                        ],
+                        midpoint: [
+                            0.0,
+                            -6.025435,
+                            0.0,
+                        ],
+                        num_vertices: 4,
+                        area: None,
+                        shape_id: None,
+                    },
+                ),
+                Simple(
+                    FaceData {
+                        exterior: [
+                            [
+                                -6.025435,
+                                -6.025435,
+                                -6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                -6.025435,
+                                6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                6.025435,
+                                6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                6.025435,
+                                -6.025435,
+                            ],
+                        ],
+                        normal: [
+                            [
+                                -1.0,
+                                0.0,
+                                0.0,
+                            ],
+                        ],
+                        midpoint: [
+                            -6.025435,
+                            0.0,
+                            0.0,
+                        ],
+                        num_vertices: 4,
+                        area: None,
+                        shape_id: None,
+                    },
+                ),
+                Simple(
+                    FaceData {
+                        exterior: [
+                            [
+                                -6.025435,
+                                6.025435,
+                                -6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                6.025435,
+                                6.025435,
+                            ],
+                            [
+                                6.025435,
+                                6.025435,
+                                6.025435,
+                            ],
+                            [
+                                6.025435,
+                                6.025435,
+                                -6.025435,
+                            ],
+                        ],
+                        normal: [
+                            [
+                                0.0,
+                                1.0,
+                                0.0,
+                            ],
+                        ],
+                        midpoint: [
+                            0.0,
+                            6.025435,
+                            0.0,
+                        ],
+                        num_vertices: 4,
+                        area: None,
+                        shape_id: None,
+                    },
+                ),
+                Simple(
+                    FaceData {
+                        exterior: [
+                            [
+                                6.025435,
+                                -6.025435,
+                                -6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                -6.025435,
+                                -6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                6.025435,
+                                -6.025435,
+                            ],
+                            [
+                                6.025435,
+                                6.025435,
+                                -6.025435,
+                            ],
+                        ],
+                        normal: [
+                            [
+                                0.0,
+                                0.0,
+                                -1.0,
+                            ],
+                        ],
+                        midpoint: [
+                            0.0,
+                            0.0,
+                            -6.025435,
+                        ],
+                        num_vertices: 4,
+                        area: None,
+                        shape_id: None,
+                    },
+                ),
+                Simple(
+                    FaceData {
+                        exterior: [
+                            [
+                                -6.025435,
+                                -6.025435,
+                                6.025435,
+                            ],
+                            [
+                                6.025435,
+                                -6.025435,
+                                6.025435,
+                            ],
+                            [
+                                6.025435,
+                                6.025435,
+                                6.025435,
+                            ],
+                            [
+                                -6.025435,
+                                6.025435,
+                                6.025435,
+                            ],
+                        ],
+                        normal: [
+                            [
+                                0.0,
+                                0.0,
+                                1.0,
+                            ],
+                        ],
+                        midpoint: [
+                            0.0,
+                            0.0,
+                            6.025435,
+                        ],
+                        num_vertices: 4,
+                        area: None,
+                        shape_id: None,
+                    },
+                ),
+            ],
+            num_faces: 6,
+            refr_index: Complex {
+                re: 1.31,
+                im: 0.0,
+            },
+            id: Some(
+                1,
+            ),
+            parent_id: None,
+            aabb: Some(
+                AABB {
+                    min: [
+                        -6.025435,
+                        -6.025435,
+                        -6.025435,
+                    ],
+                    max: [
+                        6.025435,
+                        6.025435,
+                        6.025435,
+                    ],
+                },
+            ),
+        },
+    ],
+    containment_graph: ContainmentGraph {
+        parent: [
+            None,
+        ],
+    },
+    num_shapes: 1,
+}
+Settings: Settings {
+    wavelength: 0.532,
+    beam_power_threshold: 0.1,
+    beam_area_threshold_fac: 0.1,
+    total_power_cutoff: 0.99,
+    medium_refr_index: Complex {
+        re: 1.0,
+        im: 0.0,
+    },
+    particle_refr_index: [
+        Complex {
+            re: 1.31,
+            im: 0.0,
+        },
+    ],
+    orientation: OrientationScheme {
+        scheme: Discrete {
+            eulers: [
+                Euler {
+                    alpha: 0.0,
+                    beta: 0.0,
+                    gamma: 0.0,
+                },
+            ],
+        },
+    },
+    geom_name: "test",
+    max_rec: 10,
+    max_tir: 10,
+    binning: BinningScheme {
+        scheme: Custom {
+            bins: [
+                (
+                    0.0,
+                    1.0,
+                ),
+                (
+                    0.0,
+                    1.0,
+                ),
+                (
+                    0.0,
+                    1.0,
+                ),
+            ],
+        },
+    },
+    seed: None,
+}
+problem: Problem {
+    geom: Geom {
+        shapes: [
+            Shape {
+                vertices: [
+                    [
+                        1.0,
+                        1.0,
+                        -1.0,
+                    ],
+                    [
+                        1.0,
+                        1.0,
+                        1.0,
+                    ],
+                    [
+                        1.0,
+                        -1.0,
+                        -1.0,
+                    ],
+                    [
+                        1.0,
+                        -1.0,
+                        1.0,
+                    ],
+                    [
+                        -1.0,
+                        1.0,
+                        -1.0,
+                    ],
+                    [
+                        -1.0,
+                        1.0,
+                        1.0,
+                    ],
+                    [
+                        -1.0,
+                        -1.0,
+                        -1.0,
+                    ],
+                    [
+                        -1.0,
+                        -1.0,
+                        1.0,
+                    ],
+                ],
+                num_vertices: 8,
+                faces: [
+                    Simple(
+                        FaceData {
+                            exterior: [
+                                [
+                                    1.0,
+                                    1.0,
+                                    -1.0,
+                                ],
+                                [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                ],
+                                [
+                                    1.0,
+                                    -1.0,
+                                    1.0,
+                                ],
+                                [
+                                    1.0,
+                                    -1.0,
+                                    -1.0,
+                                ],
+                            ],
+                            normal: [
+                                [
+                                    1.0,
+                                    0.0,
+                                    -0.0,
+                                ],
+                            ],
+                            midpoint: [
+                                6.025435,
+                                0.0,
+                                0.0,
+                            ],
+                            num_vertices: 4,
+                            area: None,
+                            shape_id: None,
+                        },
+                    ),
+                    Simple(
+                        FaceData {
+                            exterior: [
+                                [
+                                    1.0,
+                                    -1.0,
+                                    -1.0,
+                                ],
+                                [
+                                    1.0,
+                                    -1.0,
+                                    1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    -1.0,
+                                    1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    -1.0,
+                                    -1.0,
+                                ],
+                            ],
+                            normal: [
+                                [
+                                    0.0,
+                                    -1.0,
+                                    0.0,
+                                ],
+                            ],
+                            midpoint: [
+                                0.0,
+                                -6.025435,
+                                0.0,
+                            ],
+                            num_vertices: 4,
+                            area: None,
+                            shape_id: None,
+                        },
+                    ),
+                    Simple(
+                        FaceData {
+                            exterior: [
+                                [
+                                    -1.0,
+                                    -1.0,
+                                    -1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    -1.0,
+                                    1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    1.0,
+                                    1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    1.0,
+                                    -1.0,
+                                ],
+                            ],
+                            normal: [
+                                [
+                                    -1.0,
+                                    0.0,
+                                    0.0,
+                                ],
+                            ],
+                            midpoint: [
+                                -6.025435,
+                                0.0,
+                                0.0,
+                            ],
+                            num_vertices: 4,
+                            area: None,
+                            shape_id: None,
+                        },
+                    ),
+                    Simple(
+                        FaceData {
+                            exterior: [
+                                [
+                                    -1.0,
+                                    1.0,
+                                    -1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    1.0,
+                                    1.0,
+                                ],
+                                [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                ],
+                                [
+                                    1.0,
+                                    1.0,
+                                    -1.0,
+                                ],
+                            ],
+                            normal: [
+                                [
+                                    0.0,
+                                    1.0,
+                                    0.0,
+                                ],
+                            ],
+                            midpoint: [
+                                0.0,
+                                6.025435,
+                                0.0,
+                            ],
+                            num_vertices: 4,
+                            area: None,
+                            shape_id: None,
+                        },
+                    ),
+                    Simple(
+                        FaceData {
+                            exterior: [
+                                [
+                                    1.0,
+                                    -1.0,
+                                    -1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    -1.0,
+                                    -1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    1.0,
+                                    -1.0,
+                                ],
+                                [
+                                    1.0,
+                                    1.0,
+                                    -1.0,
+                                ],
+                            ],
+                            normal: [
+                                [
+                                    0.0,
+                                    0.0,
+                                    -1.0,
+                                ],
+                            ],
+                            midpoint: [
+                                0.0,
+                                0.0,
+                                -6.025435,
+                            ],
+                            num_vertices: 4,
+                            area: None,
+                            shape_id: None,
+                        },
+                    ),
+                    Simple(
+                        FaceData {
+                            exterior: [
+                                [
+                                    -1.0,
+                                    -1.0,
+                                    1.0,
+                                ],
+                                [
+                                    1.0,
+                                    -1.0,
+                                    1.0,
+                                ],
+                                [
+                                    1.0,
+                                    1.0,
+                                    1.0,
+                                ],
+                                [
+                                    -1.0,
+                                    1.0,
+                                    1.0,
+                                ],
+                            ],
+                            normal: [
+                                [
+                                    0.0,
+                                    0.0,
+                                    1.0,
+                                ],
+                            ],
+                            midpoint: [
+                                0.0,
+                                0.0,
+                                6.025435,
+                            ],
+                            num_vertices: 4,
+                            area: None,
+                            shape_id: None,
+                        },
+                    ),
+                ],
+                num_faces: 6,
+                refr_index: Complex {
+                    re: 1.31,
+                    im: 0.0,
+                },
+                id: Some(
+                    1,
+                ),
+                parent_id: None,
+                aabb: Some(
+                    AABB {
+                        min: [
+                            -1.0,
+                            -1.0,
+                            -1.0,
+                        ],
+                        max: [
+                            1.0,
+                            1.0,
+                            1.0,
+                        ],
+                    },
+                ),
+            },
+        ],
+        containment_graph: ContainmentGraph {
+            parent: [
+                None,
+            ],
+        },
+        num_shapes: 1,
+    },
+    beam_queue: [],
+    out_beam_queue: [],
+    ext_diff_beam_queue: [],
+    powers: Powers {
+        input: 0.0,
+        output: 0.0,
+        absorbed: 0.0,
+        trnc_ref: 0.0,
+        trnc_rec: 0.0,
+        trnc_clip: 0.0,
+        trnc_energy: 0.0,
+        clip_err: 0.0,
+        trnc_area: 0.0,
+        trnc_cop: 0.0,
+        ext_diff: 0.0,
+    },
+    bins: [
+        (
+            0.0,
+            1.0,
+        ),
+        (
+            0.0,
+            1.0,
+        ),
+        (
+            0.0,
+            1.0,
+        ),
+    ],
+    ampl: [
+        [
+            [
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+            ],
+            [
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+            ],
+        ],
+        [
+            [
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+            ],
+            [
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+            ],
+        ],
+        [
+            [
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+            ],
+            [
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+                Complex {
+                    re: 0.0,
+                    im: 0.0,
+                },
+            ],
+        ],
+    ],
+    settings: Settings {
+        wavelength: 0.08829238,
+        beam_power_threshold: 0.002754376,
+        beam_area_threshold_fac: 0.002754376,
+        total_power_cutoff: 0.99,
+        medium_refr_index: Complex {
+            re: 1.0,
+            im: 0.0,
+        },
+        particle_refr_index: [
+            Complex {
+                re: 1.31,
+                im: 0.0,
+            },
+        ],
+        orientation: OrientationScheme {
+            scheme: Discrete {
+                eulers: [
+                    Euler {
+                        alpha: 0.0,
+                        beta: 0.0,
+                        gamma: 0.0,
+                    },
+                ],
+            },
+        },
+        geom_name: "test",
+        max_rec: 10,
+        max_tir: 10,
+        binning: BinningScheme {
+            scheme: Custom {
+                bins: [
+                    (
+                        0.0,
+                        1.0,
+                    ),
+                    (
+                        0.0,
+                        1.0,
+                    ),
+                    (
+                        0.0,
+                        1.0,
+                    ),
+                ],
+            },
+        },
+        seed: None,
+    },
+    scale_factor: 0.16596313,
+}
+Test
+Solving near-field problem...
+Beam queue is empty, breaking the loop.
+Near-field problem solved.
+size of outbeam queue: 0
+Powers:
+  Input:            0.000000
+  Output:           0.000000
+  Absorbed:         0.000000
+  Trunc. Refl:      0.000000
+  Trunc. Rec:       0.000000
+  Clip Err:         0.000000
+  Trunc. Energy:    0.000000
+  Trunc. Area:      0.000000
+  Trunc. Cop:       0.000000
+  Other:            0.000000
+  External Diff:    0.000000
+
+Powers:
+  Input:            0.000000
+  Output:           0.000000
+  Absorbed:         0.000000
+  Trunc. Refl:      0.000000
+  Trunc. Rec:       0.000000
+  Clip Err:         0.000000
+  Trunc. Energy:    0.000000
+  Trunc. Area:      0.000000
+  Trunc. Cop:       0.000000
+  Other:            0.000000
+  External Diff:    0.000000
+
+3
+creating shape object
+creating geometry object
+creating goad settings
+creating goad problem
+created goad problem
