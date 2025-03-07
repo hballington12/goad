@@ -110,12 +110,8 @@ impl Settings {
 }
 
 pub fn load_config() -> Result<Settings> {
-    let exe_path = env::current_exe().expect("Failed to get current executable path");
-    let goad_dir = exe_path
-        .parent()
-        .and_then(|p| p.parent())
-        .and_then(|p| p.parent())
-        .expect("Failed to get target directory.");
+    // Try to find the project directory in different ways
+    let goad_dir = retrieve_project_root();
 
     let default_config_file = goad_dir.join("config/default.toml");
     let local_config = goad_dir.join("config/local.toml");
@@ -187,6 +183,46 @@ pub fn load_config() -> Result<Settings> {
     println!("{:#?}", config);
 
     Ok(config)
+}
+
+/// Retrieve the project root directory.
+/// This function tries to find the project root directory in different ways:
+/// 1. If the CARGO_MANIFEST_DIR environment variable is set, use it.
+/// 2. If the GOAD_ROOT_DIR environment variable is set, use it.
+/// 3. If the "config" subdirectory is found in the exectuable directory or any of its parents, use it.
+/// If none of these methods work, the function will panic.
+fn retrieve_project_root() -> std::path::PathBuf {
+    let goad_dir = if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        // When running through cargo (e.g. cargo run, cargo test)
+        std::path::PathBuf::from(manifest_dir)
+    } else if let Ok(path) = env::var("GOAD_ROOT_DIR") {
+        // Allow explicit configuration via environment variable
+        std::path::PathBuf::from(path)
+    } else {
+        // Fallback: try to find the nearest directory containing a "config" subdirectory
+        // Start from the executable directory and walk upward
+        let exe_path = env::current_exe().expect("Failed to get current executable path");
+        let mut current_dir = exe_path
+            .parent()
+            .expect("Failed to get executable directory")
+            .to_path_buf();
+        let mut found = false;
+
+        while !found && current_dir.parent().is_some() {
+            if current_dir.join("config").is_dir() {
+                found = true;
+            } else {
+                current_dir = current_dir.parent().unwrap().to_path_buf();
+            }
+        }
+
+        if found {
+            current_dir
+        } else {
+            panic!("Could not find project root directory");
+        }
+    };
+    goad_dir
 }
 
 fn validate_config(config: &Settings) {
