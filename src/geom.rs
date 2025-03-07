@@ -1,4 +1,5 @@
 use crate::containment::{ContainmentGraph, AABB};
+use crate::orientation::{self, *};
 use crate::settings;
 use anyhow::Result;
 use geo::{Area, TriangulateEarcut};
@@ -1103,35 +1104,14 @@ impl Geom {
 
     /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in degrees)
     /// Uses Mishchenko's Euler rotation matrix convention.
-    pub fn euler_rotate(&mut self, alpha: f32, beta: f32, gamma: f32) -> Result<()> {
+    pub fn euler_rotate(&mut self, euler: Euler) -> Result<()> {
         if !self.is_centered() {
             return Err(anyhow::anyhow!(
                 "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
             ));
         }
 
-        let alpha = alpha.to_radians();
-        let beta = beta.to_radians();
-        let gamma = gamma.to_radians();
-
-        let s1 = alpha.sin();
-        let s2 = beta.sin();
-        let s3 = gamma.sin();
-        let c1 = alpha.cos();
-        let c2 = beta.cos();
-        let c3 = gamma.cos();
-
-        let rot = Matrix3::new(
-            c1 * c2 * c3 - s1 * s3,
-            -c1 * c2 * s3 - s1 * c3,
-            c1 * s2,
-            s1 * c2 * c3 + c1 * s3,
-            -s1 * c2 * s3 + c1 * c3,
-            s1 * s2,
-            -s2 * c3,
-            s2 * s3,
-            c2,
-        );
+        let rot = orientation::euler_rotation_matrix(euler);
 
         for shape in self.shapes.iter_mut() {
             for vertex in shape.vertices.iter_mut() {

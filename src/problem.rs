@@ -4,7 +4,7 @@ use crate::{
     field::Field,
     geom::{Face, Geom},
     helpers::draw_face,
-    orientation::Orientations,
+    orientation::{Euler, Orientations},
     output,
     settings::{self, Settings},
 };
@@ -588,7 +588,7 @@ impl MultiProblem {
 
         (self.mueller,self.powers) = self.orientations.eulers.par_iter().map(|(a,b,g)| {
             let mut problem = problem_base.clone();
-            if let Err(error) = problem.geom.euler_rotate(*a, *b, *g) {
+            if let Err(error) = problem.geom.euler_rotate(Euler::new(*a, *b, *g)) {
                 panic!("Error rotating geometry: {}", error);
             }
 

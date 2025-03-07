@@ -1,4 +1,5 @@
 use clap::Subcommand;
+use nalgebra::Matrix3;
 use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
@@ -16,6 +17,23 @@ pub enum Scheme {
     Discrete { eulers: Vec<Euler> },
 }
 
+/// Euler angle order for the discrete orientation scheme.
+#[derive(Debug, Clone, Deserialize, PartialEq, Copy)]
+pub enum EulerConvention {
+    XZX,
+    XYX,
+    YXY,
+    YZY,
+    ZYZ,
+    ZXZ,
+    XZY,
+    XYZ,
+    YXZ,
+    YZX,
+    ZYX,
+    ZXY,
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Euler {
     alpha: f32,
@@ -27,6 +45,32 @@ impl Euler {
     pub fn new(alpha: f32, beta: f32, gamma: f32) -> Self {
         Self { alpha, beta, gamma }
     }
+}
+
+pub fn euler_rotation_matrix(euler: Euler) -> Matrix3<f32> {
+    let alpha = euler.alpha.to_radians();
+    let beta = euler.beta.to_radians();
+    let gamma = euler.gamma.to_radians();
+
+    let s1 = alpha.sin();
+    let s2 = beta.sin();
+    let s3 = gamma.sin();
+    let c1 = alpha.cos();
+    let c2 = beta.cos();
+    let c3 = gamma.cos();
+
+    let rot = Matrix3::new(
+        c1 * c2 * c3 - s1 * s3,
+        -c1 * c2 * s3 - s1 * c3,
+        c1 * s2,
+        s1 * c2 * c3 + c1 * s3,
+        -s1 * c2 * s3 + c1 * c3,
+        s1 * s2,
+        -s2 * c3,
+        s2 * s3,
+        c2,
+    );
+    rot
 }
 
 impl FromStr for Euler {
@@ -51,6 +95,7 @@ impl FromStr for Euler {
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct OrientationScheme {
     pub scheme: Scheme,
+    pub euler_convention: EulerConvention,
 }
 
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles

@@ -8,10 +8,7 @@ use std::fmt;
 
 use crate::bins;
 use crate::orientation::Euler;
-use crate::{
-    bins::BinningScheme,
-    orientation::{self, OrientationScheme},
-};
+use crate::{bins::BinningScheme, orientation::*};
 
 /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.001;
@@ -33,6 +30,8 @@ pub const DIFF_DMIN: f32 = 1e-5;
 pub const KXY_EPSILON: f32 = 1e-3;
 /// Small perturbation for propagation distance to reduce errors in diffraction
 pub const PROP_PERTURBATION: f32 = 1e-5;
+/// Default Euler angle order for the discrete orientation scheme.
+pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
 
 /// Runtime configuration for the application.
 #[pyclass]
@@ -74,9 +73,10 @@ impl Settings {
         let particle_refr_index =
             vec![Complex::new(particle_refr_index_re, particle_refr_index_im)];
         let orientation: OrientationScheme = OrientationScheme {
-            scheme: orientation::Scheme::Discrete {
+            scheme: Scheme::Discrete {
                 eulers: vec![Euler::new(0.0, 0.0, 0.0)],
             },
+            euler_convention: EulerConvention::ZYZ,
         };
         let binning = BinningScheme {
             scheme: bins::Scheme::Simple {
@@ -118,7 +118,7 @@ pub fn load_config() -> Settings {
 
     let settings = Config::builder()
         .add_source(File::from(goad_dir.join("config/default")))
-        .add_source(File::from(goad_dir.join("config/local")).required(false))
+        // .add_source(File::from(goad_dir.join("config/local")).required(false))
         .add_source(Environment::with_prefix("goad"))
         .build()
         .unwrap_or_else(|err| {
@@ -126,7 +126,7 @@ pub fn load_config() -> Settings {
             std::process::exit(1);
         });
 
-    // println!("config: {:#?}", settings);
+    println!("config: {:#?}", settings);
 
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
@@ -164,7 +164,10 @@ pub fn load_config() -> Settings {
         config.max_tir = tir;
     }
     if let Some(orient) = args.orient {
-        config.orientation = OrientationScheme { scheme: orient };
+        config.orientation = OrientationScheme {
+            scheme: orient,
+            euler_convention: EulerConvention::ZYZ,
+        };
     }
 
     validate_config(&config);
@@ -228,7 +231,7 @@ pub struct CliArgs {
 
     /// Orientation scheme for the simulation.
     #[command(subcommand)]
-    orient: Option<orientation::Scheme>,
+    orient: Option<Scheme>,
 
     /// Random seed for the simulation.
     #[arg(short, long)]

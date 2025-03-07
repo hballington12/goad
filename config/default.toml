@@ -50,8 +50,15 @@ Simple = { num_theta = 181, num_phi = 181 }
 # Custom = { bins = [[0,0],[0,40],[20,180]] }
 
 # Orientation configuration
-[[orientation]]
-# Discrete orientation with specified Euler angles
-Discrete = { eulers = [[30,30,20]] }
-# Random uniform distribution of orientations with specified number of orientations 
-# Uniform = { num_orients = 2 }
+[orientation]
+euler_convention = "ZYZ" # Euler angle convention 
+
+[orientation.scheme] # Uncomment the desired orientation scheme below
+
+# Discrete orientations with specific Euler angles
+[orientation.scheme.Discrete]
+eulers = [[30, 30, 20], [30, 20, 50]] # Array of Euler angles in degrees
+
+# # Random uniform distribution
+# [orientation.scheme.Uniform]
+# num_orients = 2 # Number of orientations to generate
