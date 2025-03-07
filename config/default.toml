@@ -1,11 +1,12 @@
 # Configuration file for the GOAD simulation.
 # This file contains the default values for all config options.
 # The user should not modify this config, but may make a local copy of it 
-#   called `local.conf`.
-# Config options found in `local.conf` will always override the default values
-#   given in this file.
+#   in this directory called `local.toml`.
+# If `local.toml` exists, GOAD will use the values specified in that file.
+# Environment variables can be set to override values in this file. 
+#   eg. `export GOAD_WAVELENGTH=632.8`
 # Configuration options specified on the command line will override values given
-#   in this file.
+#   in this file, as well as those set by environment variables.
 
 # Generic configuration
 wavelength = 0.532 # wavelength in dimension of the geometry file

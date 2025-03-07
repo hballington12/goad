@@ -117,12 +117,21 @@ pub fn load_config() -> Result<Settings> {
         .and_then(|p| p.parent())
         .and_then(|p| p.parent())
         .expect("Failed to get target directory.");
-    let default_config = goad_dir.join("config/default");
-    // let local_config = goad_dir.join("config/local");
 
-    let settings = Config::builder()
-        .add_source(File::from(default_config).required(true))
-        // .add_source(File::from(local_config).required(false))
+    let default_config_file = goad_dir.join("config/default.toml");
+    let local_config = goad_dir.join("config/local.toml");
+
+    // Check if local config exists, if not use default
+    let config_file = if local_config.exists() {
+        println!("Using local configuration: {:?}", local_config);
+        local_config
+    } else {
+        println!("Using default configuration: {:?}", default_config_file);
+        default_config_file
+    };
+
+    let default_settings: Config = Config::builder()
+        .add_source(File::from(config_file).required(true))
         .add_source(Environment::with_prefix("goad"))
         .build()
         .unwrap_or_else(|err| {
@@ -130,9 +139,9 @@ pub fn load_config() -> Result<Settings> {
             std::process::exit(1);
         });
 
-    println!("config: {:#?}", settings);
+    // println!("config: {:#?}", default_settings);
 
-    let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
+    let mut config: Settings = default_settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
         std::process::exit(1);
     });
