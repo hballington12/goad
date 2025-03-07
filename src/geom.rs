@@ -1111,31 +1111,31 @@ impl Geom {
             ));
         }
 
-        let rot = orientation::euler_rotation_matrix(euler, convention);
+        let rotation = euler.rotation_matrix(convention);
 
         for shape in self.shapes.iter_mut() {
             for vertex in shape.vertices.iter_mut() {
-                vertex.coords = rot * vertex.coords;
+                vertex.coords = rotation * vertex.coords;
             }
 
             for face in shape.faces.iter_mut() {
                 match face {
                     Face::Simple(data) => {
-                        data.midpoint = rot * data.midpoint;
-                        data.normal = rot * data.normal;
+                        data.midpoint = rotation * data.midpoint;
+                        data.normal = rotation * data.normal;
                         for vertex in data.exterior.iter_mut() {
-                            vertex.coords = rot * vertex.coords;
+                            vertex.coords = rotation * vertex.coords;
                         }
                     }
 
                     Face::Complex { data, interiors } => {
                         for vertex in data.exterior.iter_mut() {
-                            vertex.coords = rot * vertex.coords;
+                            vertex.coords = rotation * vertex.coords;
                         }
 
                         for interior in interiors.iter_mut() {
                             for vertex in interior.iter_mut() {
-                                vertex.coords = rot * vertex.coords;
+                                vertex.coords = rotation * vertex.coords;
                             }
                         }
                     }
