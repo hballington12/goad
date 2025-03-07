@@ -1,8 +1,10 @@
+use anyhow::Result;
 use clap::Parser;
 use config::{Config, Environment, File};
 use nalgebra::Complex;
 use pyo3::prelude::*;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::env;
 use std::fmt;
 
@@ -108,17 +110,19 @@ impl Settings {
     }
 }
 
-pub fn load_config() -> Settings {
+pub fn load_config() -> Result<Settings> {
     let exe_path = env::current_exe().expect("Failed to get current executable path");
     let goad_dir = exe_path
         .parent()
         .and_then(|p| p.parent())
         .and_then(|p| p.parent())
         .expect("Failed to get target directory.");
+    let default_config = goad_dir.join("config/default");
+    // let local_config = goad_dir.join("config/local");
 
     let settings = Config::builder()
-        .add_source(File::from(goad_dir.join("config/default")))
-        // .add_source(File::from(goad_dir.join("config/local")).required(false))
+        .add_source(File::from(default_config).required(true))
+        // .add_source(File::from(local_config).required(false))
         .add_source(Environment::with_prefix("goad"))
         .build()
         .unwrap_or_else(|err| {
@@ -174,7 +178,7 @@ pub fn load_config() -> Settings {
 
     println!("{:#?}", config);
 
-    config
+    Ok(config)
 }
 
 fn validate_config(config: &Settings) {

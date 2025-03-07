@@ -206,7 +206,7 @@ impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(mut geom: Geom, settings: Option<Settings>) -> Self {
 
-        let mut settings = settings.unwrap_or_else(settings::load_config);
+        let mut settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
 
         let bins = generate_bins(&settings.binning.scheme);
         let total_ampl_far_field =
@@ -255,7 +255,7 @@ impl Problem {
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        let  settings = settings::load_config();
+        let  settings = settings::load_config().expect("Failed to load config");
 
         let bins = generate_bins(&settings.binning.scheme);
         let total_ampl_far_field =
