@@ -7,58 +7,53 @@
 # Configuration options specified on the command line will override values given
 #   in this file.
 
-# Wavelength of the light source in dimensions of the geometry file
-wavelength = 0.532
-
-# Refractive index of the medium (real and imaginary parts)
-medium_refr_index = [1.0, 0.0]
-
-# Refractive index of the particle (real and imaginary parts)
+# Generic configuration
+wavelength = 0.532 # wavelength in dimension of the geometry file
+medium_refr_index = [
+    1.0,
+    0.0,
+] # refractive index of the medium [real, imaginary]
+particle_refr_index = [
+    [
+        1.31,
+        0.0,
+    ],
+] # Refractive index of the particle/s (real and imaginary parts)
 # For files containing multiple shapes, use a nested list for different values
-#   for each shape, eg. [[1.31,0.0],[1.5,0.001]]
-particle_refr_index = [[1.31, 0.0]]
+# for each shape, eg. [[1.31,0.0],[1.5,0.001]]
+geom_name = "./examples/data/hex.obj" # Geometry file name for the particle
+beam_power_threshold = 0.005          # Threshold for truncation by beam power
+beam_area_threshold_fac = 0.1         # Factor for truncating beams by area
+total_power_cutoff = 0.99             # Total power cutoff fraction
+max_rec = 10                          # Maximum number of recursions
+max_tir = 10                          # Maximum number of total internal reflections
+# seed = 6                              # Seed (comment out for no seed)
 
-# Geometry file name for the particle
-geom_name = "./examples/data/hex.obj"
+[binning] # Binning configuration
 
-# Threshold for truncation by beam power
-beam_power_threshold = 0.005
+[binning.scheme] # Uncomment the desired binning scheme below
 
-# Factor for truncating beams by area
-# Truncation absolute area is wavelength^2 * factor
-beam_area_threshold_fac = 0.1
+[binning.scheme.Simple] # Simple square grid binning
+num_theta = 181 # Number of theta bins
+num_phi = 181   # Number of phi bins
 
-# Total power cutoff fraction
-total_power_cutoff = 0.99
+# [binning.scheme.Interval] # Interval binning with specified theta and phi spacings
+# thetas = [0, 1, 175, 179, 180]
+# theta_spacings = [0.1, 1, 0.5, 0.1]
+# phis = [0, 360]
+# phi_spacings = [2]
 
-# Maximum number of recursions
-max_rec = 10
+# [binning.scheme.Custom] # Custom binning with specified [theta,phi] angular bins
+# bins = [[0, 0], [0, 40], [20, 180]]
 
-# Maximum number of total internal reflections
-max_tir = 10
 
-# Seed for random number generation (default is commented out for no seed)
-# seed = 6
-
-# Binning configuration
-[[binning]]
-# Simple binning with specified number of theta and phi bins
-Simple = { num_theta = 181, num_phi = 181 }
-# Interval binning with specified theta and phi spacings 
-# Interval = { thetas = [0,180], theta_spacings = [1], phis = [0,360], phi_spacings = [2]}
-# Custom binning with specified bins 
-# Custom = { bins = [[0,0],[0,40],[20,180]] }
-
-# Orientation configuration
-[orientation]
+[orientation] # Orientation configuration
 euler_convention = "ZYZ" # Euler angle convention 
 
 [orientation.scheme] # Uncomment the desired orientation scheme below
 
-# Discrete orientations with specific Euler angles
-[orientation.scheme.Discrete]
+[orientation.scheme.Discrete] # Disscrete orientation with specified Euler angles
 eulers = [[30, 30, 20], [30, 20, 50]] # Array of Euler angles in degrees
 
-# # Random uniform distribution
-# [orientation.scheme.Uniform]
+# [orientation.scheme.Uniform] # Random uniform distribution
 # num_orients = 2 # Number of orientations to generate
