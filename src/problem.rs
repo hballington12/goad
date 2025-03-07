@@ -588,7 +588,7 @@ impl MultiProblem {
 
         (self.mueller,self.powers) = self.orientations.eulers.par_iter().map(|(a,b,g)| {
             let mut problem = problem_base.clone();
-            if let Err(error) = problem.geom.euler_rotate(Euler::new(*a, *b, *g)) {
+            if let Err(error) = problem.geom.euler_rotate(Euler::new(*a, *b, *g), problem.settings.orientation.euler_convention) {
                 panic!("Error rotating geometry: {}", error);
             }
 

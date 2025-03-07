@@ -4,7 +4,6 @@ use config::{Config, Environment, File};
 use nalgebra::Complex;
 use pyo3::prelude::*;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::env;
 use std::fmt;
 

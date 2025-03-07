@@ -4,7 +4,7 @@ use crate::settings;
 use anyhow::Result;
 use geo::{Area, TriangulateEarcut};
 use geo_types::{Coord, LineString, Polygon};
-use nalgebra::{self as na, Complex, Isometry3, Matrix3, Matrix4, Point3, Vector3, Vector4};
+use nalgebra::{self as na, Complex, Isometry3, Matrix4, Point3, Vector3, Vector4};
 use pyo3::prelude::*;
 use std::path::Path;
 use tobj::{self, Model};
@@ -1104,14 +1104,14 @@ impl Geom {
 
     /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in degrees)
     /// Uses Mishchenko's Euler rotation matrix convention.
-    pub fn euler_rotate(&mut self, euler: Euler) -> Result<()> {
+    pub fn euler_rotate(&mut self, euler: Euler, convention: EulerConvention) -> Result<()> {
         if !self.is_centered() {
             return Err(anyhow::anyhow!(
                 "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
             ));
         }
 
-        let rot = orientation::euler_rotation_matrix(euler);
+        let rot = orientation::euler_rotation_matrix(euler, convention);
 
         for shape in self.shapes.iter_mut() {
             for vertex in shape.vertices.iter_mut() {

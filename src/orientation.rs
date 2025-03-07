@@ -47,7 +47,7 @@ impl Euler {
     }
 }
 
-pub fn euler_rotation_matrix(euler: Euler) -> Matrix3<f32> {
+pub fn euler_rotation_matrix(euler: Euler, convention: EulerConvention) -> Matrix3<f32> {
     let alpha = euler.alpha.to_radians();
     let beta = euler.beta.to_radians();
     let gamma = euler.gamma.to_radians();
@@ -59,18 +59,140 @@ pub fn euler_rotation_matrix(euler: Euler) -> Matrix3<f32> {
     let c2 = beta.cos();
     let c3 = gamma.cos();
 
-    let rot = Matrix3::new(
-        c1 * c2 * c3 - s1 * s3,
-        -c1 * c2 * s3 - s1 * c3,
-        c1 * s2,
-        s1 * c2 * c3 + c1 * s3,
-        -s1 * c2 * s3 + c1 * c3,
-        s1 * s2,
-        -s2 * c3,
-        s2 * s3,
-        c2,
-    );
-    rot
+    match convention {
+        EulerConvention::XZX => Matrix3::new(
+            c2,
+            -c3 * s2,
+            s2 * s3,
+            c1 * s2,
+            c1 * c2 * c3 - s1 * s3,
+            -c3 * s1 - c1 * c2 * s3,
+            s1 * s2,
+            c1 * s3 + c2 * c3 * s1,
+            c1 * c3 - c2 * s1 * s3,
+        ),
+        EulerConvention::XYX => Matrix3::new(
+            c2,
+            s2 * s3,
+            c3 * s2,
+            s1 * s2,
+            c1 * c3 - c2 * s1 * s3,
+            -c1 * s3 - c2 * c3 * s1,
+            -c1 * s2,
+            c2 * s1 + c1 * c2 * s3,
+            c1 * c2 * c3 - s1 * s3,
+        ),
+        EulerConvention::YXY => Matrix3::new(
+            c1 * c3 - c2 * s1 * s3,
+            s1 * s2,
+            c1 * s3 + c2 * c3 * s1,
+            s2 * s3,
+            c2,
+            -c3 * s2,
+            -c3 * s1 - c1 * c2 * s3,
+            c1 * s2,
+            c1 * c2 * c3 - s1 * s3,
+        ),
+        EulerConvention::YZY => Matrix3::new(
+            c1 * c2 * c3 - s1 * s3,
+            -c1 * s2,
+            c1 * s3 + c1 * c2 * s3,
+            c3 * s2,
+            c2,
+            s2 * s3,
+            -s1 * c2 * c3 - c1 * s3,
+            s1 * s2,
+            c1 * c3 - c2 * s1 * s3,
+        ),
+        EulerConvention::ZYZ => Matrix3::new(
+            c1 * c2 * c3 - s1 * s3,
+            -c1 * c2 * s3 - s1 * c3,
+            c1 * s2,
+            s1 * c2 * c3 + c1 * s3,
+            -s1 * c2 * s3 + c1 * c3,
+            s1 * s2,
+            -s2 * c3,
+            s2 * s3,
+            c2,
+        ),
+        EulerConvention::ZXZ => Matrix3::new(
+            c1 * c3 - s1 * s3 * c2,
+            -c1 * s3 - s1 * c3 * c2,
+            s1 * s2,
+            s1 * c3 + c1 * s3 * c2,
+            -s1 * s3 + c1 * c3 * c2,
+            -c1 * s2,
+            s3 * s2,
+            c3 * s2,
+            c2,
+        ),
+        EulerConvention::XZY => Matrix3::new(
+            c2 * c3,
+            -s2,
+            c2 * s3,
+            s1 * s3 + c1 * c3 * s2,
+            c1 * c2,
+            c1 * s2 * s3 - c3 * s1,
+            c3 * s1 * s2 - c1 * s3,
+            c2 * s1,
+            c1 * c3 + s1 * s2 * s3,
+        ),
+        EulerConvention::XYZ => Matrix3::new(
+            c2 * c3,
+            -c2 * s3,
+            s2,
+            c1 * s3 + c3 * s1 * s2,
+            c1 * c3 - s1 * s2 * s3,
+            -c2 * s1,
+            s1 * s3 - c1 * c3 * s2,
+            c3 * s1 + c1 * s2 * s3,
+            c1 * c2,
+        ),
+        EulerConvention::YXZ => Matrix3::new(
+            c1 * c3 + s1 * s2 * s3,
+            c3 * s1 * s2 - c1 * s3,
+            c2 * s1,
+            c2 * s3,
+            c2 * c3,
+            -s2,
+            c1 * s2 * s3 - c3 * s1,
+            s1 * s3 + c1 * c3 * s2,
+            c1 * c2,
+        ),
+        EulerConvention::YZX => Matrix3::new(
+            c1 * c2,
+            c1 * s2 * s3 - c3 * s1,
+            s1 * s3 + c1 * c3 * s2,
+            s2,
+            c2 * c3,
+            -c2 * s3,
+            -c2 * s1,
+            c1 * s3 + c3 * s1 * s2,
+            c1 * c3 - s1 * s2 * s3,
+        ),
+        EulerConvention::ZYX => Matrix3::new(
+            c1 * c2,
+            c1 * s2 * s3 - c3 * s1,
+            s1 * s3 + c1 * c3 * s2,
+            c2 * s1,
+            c1 * c3 + s1 * s2 * s3,
+            c3 * s1 * s2 - c1 * s3,
+            -s2,
+            c2 * s3,
+            c2 * c3,
+        ),
+        EulerConvention::ZXY => Matrix3::new(
+            c1 * c3 - s1 * s2 * s3,
+            -c2 * s1,
+            c1 * s3 + c3 * s1 * s2,
+            c3 * s1 + c1 * s2 * s3,
+            c1 * c2,
+            s1 * s3 - c1 * c3 * s2,
+            -c2 * s3,
+            s2,
+            c2 * c3,
+        ),
+    }
 }
 
 impl FromStr for Euler {
