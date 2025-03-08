@@ -85,8 +85,27 @@ fn unique_grid(tuple_slice: &[(f32, f32)]) -> Vec<(f32, f32)> {
     unique_grid
 }
 
+/// Write the 1d Mueller matrix to a file against the theta and phi bins
+pub fn write_mueller_1d(bins: &[f32], mueller_1d: &Array2<f32>) -> Result<()> {
+    // Open a file for writing
+    let file = File::create("mueller_scatgrid_1d").unwrap();
+    let mut writer = BufWriter::new(file);
+
+    // Iterate over the array and write data to the file
+    for (index, row) in mueller_1d.outer_iter().enumerate() {
+        let theta = bins[index];
+        write!(writer, "{} ", theta)?;
+        for value in row.iter() {
+            write!(writer, "{} ", value)?;
+        }
+        writeln!(writer)?;
+    }
+
+    Ok(())
+}
+
 /// Write the Mueller matrix to a file against the theta and phi bins
-pub fn writeup(bins: &[(f32, f32)], mueller: &Array2<f32>) -> Result<()> {
+pub fn write_mueller(bins: &[(f32, f32)], mueller: &Array2<f32>) -> Result<()> {
     // Open a file for writing
     let file = File::create("mueller_scatgrid").unwrap();
     let mut writer = BufWriter::new(file);
@@ -192,6 +211,7 @@ pub fn try_mueller_to_1d(
             .slice_mut(s![i, ..])
             .assign(&mueller.slice(s![index, ..]));
     }
+
     // zip the bins and mueller matrix
     let combined: Vec<_> = bins
         .iter()
@@ -207,39 +227,43 @@ pub fn try_mueller_to_1d(
         .map(|(_, group)| group.map(|x| x).collect())
         .collect();
 
-    println!("{:?}", grouped);
-
-    // get number of thetas
-    let num_thetas = grouped.len();
-
-    // integrate over phi
     let mut thetas = Vec::new();
-    let mut mueller_1d = Array2::<f32>::zeros((num_thetas, 16));
-    // loop over vectors at each theta
+    let mut mueller_1d = Array2::<f32>::zeros((grouped.len(), 16));
 
+    // loop over vectors at each theta
     for (i, muellers) in grouped.iter().enumerate() {
+        // Unzip the theta, phi, and mueller values
         let thetas_phi: Vec<_> = muellers
             .iter()
             .map(|((theta, phi), _)| (*theta, *phi))
             .collect();
         let mueller_phi: Vec<_> = muellers.iter().map(|(_, mueller)| mueller).collect();
         let mut mueller_1d_row = Array1::<f32>::zeros(16);
+
+        // loop over the mueller values at each phi
         for j in 0..16 {
+            // Create 1D arrays for x and y, where x is phi and y is 1 of the 16 mueller values
             let y = Array1::from(mueller_phi.iter().map(|row| row[j]).collect::<Vec<_>>());
-            let x = Array1::from(thetas_phi.iter().map(|(_, phi)| *phi).collect::<Vec<_>>());
+            let phi_values: Vec<_> = thetas_phi.iter().map(|(_, phi)| *phi).collect();
+
+            // Check if phi values are sorted in ascending order (probably dont need this)
+            for i in 1..phi_values.len() {
+                if phi_values[i] < phi_values[i - 1] {
+                    return Err(anyhow!(
+                        "Phi values must be sorted in ascending order for integration"
+                    ));
+                }
+            }
+            let x = Array1::from(phi_values);
             mueller_1d_row[j] = integrate_trapezoidal(&x, &y); // integrate over phi
         }
+
+        // Assign the theta and mueller values to the final arrays
         thetas.push(thetas_phi[0].0);
         mueller_1d
             .slice_mut(s![i, ..])
             .assign(&mueller_1d_row.slice(s![..]));
     }
-
-    // println!("");
-    // let zipped = thetas.iter().zip(mueller_1d.outer_iter());
-    // for (theta, row) in zipped {
-    //     println!("theta: {} mueller: {:?}", theta, row);
-    // }
 
     Ok((thetas, mueller_1d))
 }

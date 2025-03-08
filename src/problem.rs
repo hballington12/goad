@@ -1,6 +1,6 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins::generate_bins,
+    bins::{generate_bins, BinningScheme, Scheme},
     field::Field,
     geom::{Face, Geom},
     helpers::draw_face,
@@ -367,7 +367,7 @@ impl Problem {
 
     pub fn writeup(&self) {
         // let mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
-        let _ = output::writeup(&self.bins, &self.mueller);
+        let _ = output::write_mueller(&self.bins, &self.mueller);
     }
 
     /// Propagates the next beam in the queue.
@@ -567,6 +567,7 @@ pub struct MultiProblem {
     pub orientations: Orientations,
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
     pub mueller: Array2::<f32>, // total mueller in far-field
+    pub mueller_1d: Option<Array2::<f32>>, // 1d mueller
     pub settings: Settings,               // runtime settings
     pub powers: Powers,                   // different power contributions
 }
@@ -581,10 +582,10 @@ impl MultiProblem {
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let problems = Vec::new();
         let bins = generate_bins(&settings.binning.scheme);
-        let  mueller = Array2::<f32>::zeros((bins.len(), 16));
+        let mueller = Array2::<f32>::zeros((bins.len(), 16));
         let powers = Powers::new();
 
-        Self { geom, problems, orientations, bins, mueller, settings, powers }
+        Self { geom, problems, orientations, bins, mueller, mueller_1d: None, settings, powers }
     }
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
@@ -647,14 +648,25 @@ impl MultiProblem {
         );
 
         // try compute 1d mueller
-        let mueller_1d = output::try_mueller_to_1d(&self.bins, &self.mueller);
+        match self.settings.binning.scheme {
+            Scheme::Custom { .. } => {}, // 1d mueller not supported for custom bins
+            _ => {
+                match output::try_mueller_to_1d(&self.bins, &self.mueller) {
+                    Ok((theta, mueller_1d)) => {
+                        let _ = output::write_mueller_1d(&theta, &mueller_1d);
+                        self.mueller_1d = Some(mueller_1d);
+                    }
+                    Err(..) => {},
+                }
+            }
+        }
 
         // pb.finish_with_message(format!("(done)";
         println!("Average {}", self.powers);
     }
 
     pub fn writeup(&self) {
-        let _ = output::writeup(&self.bins, &self.mueller);
+        let _ = output::write_mueller(&self.bins, &self.mueller);
     }
 
 
