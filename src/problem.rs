@@ -229,6 +229,7 @@ impl Problem {
     pub fn py_solve(&mut self) -> PyResult<()>{
         self.init();
         self.solve();
+        self.try_mueller_to_1d();
         Ok(())
     }
 
@@ -252,6 +253,26 @@ impl Problem {
         mueller_list
     }
 
+    // getter function to retrieve Python object containing the 1d mueller matrix
+    // convert the Array2 to a list of lists and return
+    #[getter]
+    pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
+        if let Some(mueller_1d) = &self.result.mueller_1d {
+            let mut mueller_list = Vec::new();
+            for row in mueller_1d.outer_iter() {
+                let mut row_list = Vec::new();
+                for val in row.iter() {
+                    row_list.push(*val);
+                }
+                mueller_list.push(row_list);
+            }
+            mueller_list
+        } else {
+            Vec::new()
+        }
+    }
+
+
 }
 
 impl Problem {
@@ -259,7 +280,6 @@ impl Problem {
     pub fn new(mut geom: Geom, settings: Option<Settings>) -> Self {
 
         let mut settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
-
         
         // rescale geometry so the max dimension is 1
         geom.recentre();
@@ -383,6 +403,17 @@ impl Problem {
                     }
                     Err(e) => {println!("Failed to compute 1d mueller: {}",e);},
                 }
+            }
+        }
+    }
+
+    pub fn try_mueller_to_1d(&mut self) {
+        match self.result.try_mueller_to_1d() {
+            Ok(()) => {
+                println!("1d mueller computed successfully");
+            }
+            Err(e) => {
+                println!("Failed to compute 1d mueller: {}", e);
             }
         }
     }

@@ -31,12 +31,13 @@ pub fn diffraction(
         let cos_phi = phi.to_radians().cos();
 
         // Calculate pos (xfar, yfar, zfar) for the current (theta, phi)
-        let r_sin_theta = settings::RADIUS * sin_theta;
+        let radius = settings::RADIUS * 2.0 * PI / wavenumber;
+        let r_sin_theta = radius * sin_theta;
         let rotated_pos = rot3
             * (Vector3::new(
                 r_sin_theta * cos_phi,
                 r_sin_theta * sin_phi,
-                -settings::RADIUS * cos_theta,
+                -radius * cos_theta,
             ) - center_of_mass.coords);
 
         // Calculate distance to bins and bin unit vectors
