@@ -1,6 +1,6 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins::{generate_bins, BinningScheme, Scheme},
+    bins::{generate_bins, Scheme},
     field::Field,
     geom::{Face, Geom},
     helpers::draw_face,
@@ -165,6 +165,29 @@ impl fmt::Display for Powers {
     }
 }
 
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Solution {
+    pub powers: Powers,
+    pub bins: Vec<(f32, f32)>,
+    pub mueller: Array2::<f32>,
+    pub ampl: Vec<Matrix2<Complex<f32>>>,
+}
+
+impl Solution {
+    /// Creates a new `Solution` with empty mueller and amplitude matrix
+    pub fn new_empty(bins: Vec<(f32, f32)>) -> Self {
+        let mueller = Array2::<f32>::zeros((bins.len(), 16));
+        let ampl = vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+        Self {
+            powers: Powers::new(),
+            bins,
+            mueller,
+            ampl,
+        }
+    }
+}
+
 /// A solvable physics problem.
 #[pyclass]
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
@@ -173,11 +196,8 @@ pub struct Problem {
     pub beam_queue: Vec<Beam>,            // beams awaiting near-field propagation
     pub out_beam_queue: Vec<Beam>,        // beams awaiting diffraction
     pub ext_diff_beam_queue: Vec<Beam>,   // beams awaiting external diffraction
-    pub powers: Powers,                   // different power contributions
-    pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
-    pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
-    pub mueller: Array2::<f32>,           // total mueller in far-field
     pub settings: Settings,               // runtime settings
+    pub solution: Solution,         // results of the problem
     scale_factor: f32, // scaling factor for geometry
 }
 
@@ -197,7 +217,7 @@ impl Problem {
     }
 
     pub fn py_print_stats(&self) -> PyResult<()> {
-        println!("{}", self.powers);
+        println!("{}", self.solution.powers);
         Ok(())
     }
 
@@ -206,7 +226,7 @@ impl Problem {
     #[getter]
     pub fn get_mueller(&self) -> Vec<Vec<f32>> {
         let mut mueller_list = Vec::new();
-        for row in self.mueller.outer_iter() {
+        for row in self.solution.mueller.outer_iter() {
             let mut row_list = Vec::new();
             for val in row.iter() {
                 row_list.push(*val);
@@ -224,11 +244,6 @@ impl Problem {
 
         let mut settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
 
-        let bins = generate_bins(&settings.binning.scheme);
-        let ampl =
-            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
-
-        let mueller = Array2::<f32>::zeros((bins.len(), 16));
         
         // rescale geometry so the max dimension is 1
         geom.recentre();
@@ -236,18 +251,17 @@ impl Problem {
         settings.wavelength = settings.wavelength * scale_factor;
         settings.beam_power_threshold *= scale_factor.powi(2); // power scales with area
         settings.beam_area_threshold_fac *= scale_factor.powi(2); // area scales with length^2
+        let bins = generate_bins(&settings.binning.scheme);
+        let solution = Solution::new_empty(bins);
 
         let problem = Self {
             geom,
             beam_queue: vec![],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
-            powers: Powers::new(),
-            bins,
-            ampl,
-            mueller,
             settings,
-            scale_factor
+            scale_factor,
+            solution,
         };
 
         problem
@@ -264,8 +278,8 @@ impl Problem {
         self.beam_queue.clear();
         self.out_beam_queue.clear();    
         self.ext_diff_beam_queue.clear();
-        self.powers = Powers::new();
-        self.ampl.iter_mut().for_each(|a| a.fill(Complex::ZERO));
+        self.solution.powers = Powers::new();
+        self.solution.ampl.iter_mut().for_each(|a| a.fill(Complex::ZERO));
 
         let beam = basic_initial_beam(&self.geom, self.settings.wavelength, self.settings.medium_refr_index);
 
@@ -277,22 +291,16 @@ impl Problem {
         let  settings = settings::load_config().expect("Failed to load config");
 
         let bins = generate_bins(&settings.binning.scheme);
-        let ampl =
-            vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
-
-        let mueller = Array2::<f32>::zeros((bins.len(), 16));
+        let solution = Solution::new_empty(bins);
 
         Self {
             geom,
             beam_queue: vec![beam],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
-            powers: Powers::new(),
-            bins,
-            ampl,
-            mueller,
             settings,
             scale_factor: 1.0,
+            solution,
         }
     }
 
@@ -325,16 +333,16 @@ impl Problem {
     pub fn solve_far_ext_diff(&mut self) {
         Self::diffract_outbeams(
             &mut self.ext_diff_beam_queue,
-            &self.bins,
-            &mut self.ampl,
+            &self.solution.bins,
+            &mut self.solution.ampl,
         );
     }
 
     pub fn solve_far_outbeams(&mut self) {
         Self::diffract_outbeams(
             &mut self.out_beam_queue,
-            &self.bins,
-            &mut self.ampl,
+            &self.solution.bins,
+            &mut self.solution.ampl,
         );
     }
     pub fn solve_far(&mut self) {
@@ -345,7 +353,7 @@ impl Problem {
     pub fn solve(&mut self) {
         self.solve_near();
         self.solve_far();
-        self.mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
+        self.solution.mueller = output::ampl_to_mueller(&self.solution.bins, &self.solution.ampl);
     }
 
     /// Trace beams to solve the near-field problem.
@@ -355,9 +363,9 @@ impl Problem {
                 break;
             }
 
-            if self.powers.output / self.powers.input > self.settings.total_power_cutoff {
+            if self.solution.powers.output / self.solution.powers.input > self.settings.total_power_cutoff {
                 // add remaining power in beam queue to missing power due to cutoff
-                self.powers.trnc_cop += self.beam_queue.iter().map(|beam| beam.power() / self.scale_factor.powi(2)).sum::<f32>();
+                self.solution.powers.trnc_cop += self.beam_queue.iter().map(|beam| beam.power() / self.scale_factor.powi(2)).sum::<f32>();
                 break;
             }
 
@@ -367,7 +375,7 @@ impl Problem {
 
     pub fn writeup(&self) {
         // let mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
-        let _ = output::write_mueller(&self.bins, &self.mueller);
+        let _ = output::write_mueller(&self.solution.bins, &self.solution.mueller);
     }
 
     /// Propagates the next beam in the queue.
@@ -383,14 +391,14 @@ impl Problem {
             BeamType::Default => {
                 // truncation conditions
                 if beam.power() < self.settings.beam_power_threshold {
-                    self.powers.trnc_energy += beam.power() / self.scale_factor.powi(2);
+                    self.solution.powers.trnc_energy += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
-                    self.powers.trnc_area += beam.power() / self.scale_factor.powi(2);
+                    self.solution.powers.trnc_area += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
                     if beam.tir_count > self.settings.max_tir {
-                        self.powers.trnc_ref += beam.power() / self.scale_factor.powi(2);
+                        self.solution.powers.trnc_ref += beam.power() / self.scale_factor.powi(2);
                         Vec::new()
                     } else {
                         match beam.propagate(
@@ -399,16 +407,16 @@ impl Problem {
                             self.settings.beam_area_threshold()
                         ) {
                             Ok((outputs,area_power_loss)) => {
-                                self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                                self.solution.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
                                 outputs},
                             Err(_) => {
-                                self.powers.clip_err += beam.power() / self.scale_factor.powi(2);
+                                self.solution.powers.clip_err += beam.power() / self.scale_factor.powi(2);
                                 Vec::new()
                             }
                         }
                     }
                 } else if beam.rec_count > self.settings.max_rec {
-                    self.powers.trnc_rec += beam.power() / self.scale_factor.powi(2);
+                    self.solution.powers.trnc_rec += beam.power() / self.scale_factor.powi(2);
                     Vec::new()
                 } else {
                     match beam.propagate(
@@ -417,10 +425,10 @@ impl Problem {
                         self.settings.beam_area_threshold()
                     ) {
                         Ok((outputs,area_power_loss)) => {
-                                self.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                                self.solution.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
                                 outputs},
                         Err(_) => {
-                            self.powers.clip_err += beam.power() / self.scale_factor.powi(2);
+                            self.solution.powers.clip_err += beam.power() / self.scale_factor.powi(2);
                             Vec::new()
                         }
                     }
@@ -444,8 +452,8 @@ impl Problem {
             }
         };
 
-        self.powers.absorbed += beam.absorbed_power / self.scale_factor.powi(2);
-        self.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power() / self.scale_factor.powi(2);
+        self.solution.powers.absorbed += beam.absorbed_power / self.scale_factor.powi(2);
+        self.solution.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power() / self.scale_factor.powi(2);
 
         // Process each output beam
         for output in outputs.iter() {
@@ -453,15 +461,15 @@ impl Problem {
             match (&beam.type_, &output.type_) {
                 (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
                 (BeamType::Default, BeamType::OutGoing) => {
-                    self.powers.output += output_power;
+                    self.solution.powers.output += output_power;
                     self.insert_outbeam(output.clone());
                 }
                 (BeamType::Initial, BeamType::Default) => {
-                    self.powers.input += output_power;
+                    self.solution.powers.input += output_power;
                     self.insert_beam(output.clone());
                 }
                 (BeamType::Initial, BeamType::ExternalDiff) => {
-                    self.powers.ext_diff += output_power;
+                    self.solution.powers.ext_diff += output_power;
                     self.ext_diff_beam_queue.push(output.clone());
                 }
                 _ => {}
@@ -565,11 +573,11 @@ pub struct MultiProblem {
     pub geom: Geom,
     pub problems: Vec<Problem>,
     pub orientations: Orientations,
-    pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
-    pub mueller: Array2::<f32>, // total mueller in far-field
-    pub mueller_1d: Option<Array2::<f32>>, // 1d mueller
-    pub settings: Settings,               // runtime settings
-    pub powers: Powers,                   // different power contributions
+    pub bins: Vec<(f32, f32)>,              // bins for far-field diffraction
+    pub mueller: Array2::<f32>,             // total mueller in far-field
+    pub mueller_1d: Option<Array2::<f32>>,  // 1d mueller
+    pub settings: Settings,                 // runtime settings
+    pub powers: Powers,                     // different power contributions
 }
 
 impl MultiProblem {
@@ -619,10 +627,10 @@ impl MultiProblem {
             problem.init();
             problem.solve();
 
-            let mueller = problem.mueller;
+            let mueller = problem.solution.mueller;
 
             pb.inc(1);
-            (mueller, problem.powers)
+            (mueller, problem.solution.powers)
         }).reduce(|| (Array2::<f32>::zeros((self.bins.len(), 16)), Powers::new()), |(mut acc_mueller, mut acc_powers), (local_mueller, local_powers)| {
             for (a, l) in acc_mueller.iter_mut().zip(local_mueller) {
                 *a += l;
