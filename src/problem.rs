@@ -649,7 +649,7 @@ impl MultiProblem {
         // try compute 1d mueller
         let mueller_1d = output::try_mueller_to_1d(&self.bins, &self.mueller);
 
-        // pb.finish_with_message(format!("(done)"));
+        // pb.finish_with_message(format!("(done)";
         println!("Average {}", self.powers);
     }
 

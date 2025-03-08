@@ -182,7 +182,7 @@ pub fn try_mueller_to_1d(
     // Sort the bins and mueller by theta
     let mut bins = bins.to_owned();
     bins.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    let mut mueller = mueller.to_owned();
+    let mueller = mueller.to_owned();
 
     // Create a new sorted mueller matrix
     let mut sorted_mueller = mueller.clone();
@@ -192,13 +192,6 @@ pub fn try_mueller_to_1d(
             .slice_mut(s![i, ..])
             .assign(&mueller.slice(s![index, ..]));
     }
-
-    // zip the bins and mueller matrix
-    // let mueller_vec = mueller
-    //     .outer_iter()
-    //     .map(|row| row.to_vec())
-    //     .collect::<Vec<_>>();
-
     // zip the bins and mueller matrix
     let combined: Vec<_> = bins
         .iter()
@@ -242,16 +235,11 @@ pub fn try_mueller_to_1d(
             .assign(&mueller_1d_row.slice(s![..]));
     }
 
-    println!("");
-    println!("{:?}", mueller_1d);
+    // println!("");
+    // let zipped = thetas.iter().zip(mueller_1d.outer_iter());
+    // for (theta, row) in zipped {
+    //     println!("theta: {} mueller: {:?}", theta, row);
+    // }
 
-    !todo!()
-}
-
-fn split_at_values<T: PartialEq + Clone>(vec: &[T]) -> Vec<Vec<T>> {
-    vec.iter()
-        .chunk_by(|&x| x)
-        .into_iter()
-        .map(|(_, group)| group.cloned().collect())
-        .collect()
+    Ok((thetas, mueller_1d))
 }
