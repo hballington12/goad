@@ -6,7 +6,6 @@ print(a)
 goad.goad_py_add()
 
 print("creating shape object")
-
 vertices = [
     (6.025435, 6.025435, -6.025435),
     (6.025435, 6.025435, 6.025435),
@@ -60,10 +59,13 @@ print("creating goad problem")
 
 problem = goad.Problem(geom, settings)
 
-print("settings:", settings)
+# print("settings:", settings)
 
 print("solving goad problem")
 
 problem.py_solve()
 
 problem.py_print_stats()
+
+# # print the first element of problem.mueller
+mueller = problem.mueller

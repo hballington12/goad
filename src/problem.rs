@@ -200,6 +200,22 @@ impl Problem {
         println!("{}", self.powers);
         Ok(())
     }
+
+    // getter function to retrieve Python object containing the mueller matrix
+    // convert the Array2 to a list of lists and return
+    #[getter]
+    pub fn get_mueller(&self) -> Vec<Vec<f32>> {
+        let mut mueller_list = Vec::new();
+        for row in self.mueller.outer_iter() {
+            let mut row_list = Vec::new();
+            for val in row.iter() {
+                row_list.push(*val);
+            }
+            mueller_list.push(row_list);
+        }
+        mueller_list
+    }
+
 }
 
 impl Problem {
