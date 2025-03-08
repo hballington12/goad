@@ -7,7 +7,7 @@ from PyQt6.QtGui import QAction
 
 from opengl_view import OpenGLWidget
 from plot_view import MatplotlibWidget
-from panels import ControlPanel, PropertiesPanel, OutlinerPanel, ConsolePanel
+from panels import ControlPanel, PropertiesPanel, OutlinerPanel, ConsolePanel, SimulationSettingsPanel
 
 class MainWindow(QMainWindow):
     """Main application window with dockable widgets"""
@@ -55,6 +55,13 @@ class MainWindow(QMainWindow):
         self.properties_panel = PropertiesPanel()
         self.properties_dock.setWidget(self.properties_panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.properties_dock)
+        
+        # Simulation settings panel (left side)
+        self.simulation_dock = QDockWidget("Simulation Settings", self)
+        self.simulation_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self.simulation_panel = SimulationSettingsPanel()
+        self.simulation_dock.setWidget(self.simulation_panel)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.simulation_dock)
         
         # Outliner panel (left side, below properties)
         self.outliner_dock = QDockWidget("Outliner", self)
@@ -136,6 +143,12 @@ class MainWindow(QMainWindow):
                                  checked=True,
                                  triggered=self.toggleConsole)
         
+        self.simulationSettingsAct = QAction("&Simulation Settings", self,
+                                          statusTip="Show/hide simulation settings panel",
+                                          checkable=True,
+                                          checked=True,
+                                          triggered=self.toggleSimulationSettings)
+        
         # Plot menu actions
         self.sinePlotAct = QAction("&Sine Plot", self,
                                   statusTip="Show sine plot",
@@ -171,6 +184,7 @@ class MainWindow(QMainWindow):
         self.viewMenu.addAction(self.plotViewAct)
         self.viewMenu.addAction(self.controlsAct)
         self.viewMenu.addAction(self.propertiesAct)
+        self.viewMenu.addAction(self.simulationSettingsAct)
         self.viewMenu.addAction(self.outlinerAct)
         self.viewMenu.addAction(self.consoleAct)
         self.viewMenu.addSeparator()
@@ -227,6 +241,9 @@ class MainWindow(QMainWindow):
     def toggleConsole(self):
         self.console_dock.setVisible(self.consoleAct.isChecked())
     
+    def toggleSimulationSettings(self):
+        self.simulation_dock.setVisible(self.simulationSettingsAct.isChecked())
+    
     # Plot actions
     def createSinePlot(self):
         """Create sine plot"""
@@ -247,16 +264,18 @@ class MainWindow(QMainWindow):
         
         # Re-add all widgets to their default locations
         for dock in [self.plot_dock, self.control_dock, self.properties_dock, 
-                    self.outliner_dock, self.console_dock]:
+                    self.simulation_dock, self.outliner_dock, self.console_dock]:
             if dock.isFloating():
                 dock.setFloating(False)
                 
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.control_dock)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.properties_dock)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.simulation_dock)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.outliner_dock)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.console_dock)
-        self.tabifyDockWidget(self.properties_dock, self.outliner_dock)
+        self.tabifyDockWidget(self.properties_dock, self.simulation_dock)
+        self.tabifyDockWidget(self.simulation_dock, self.outliner_dock)
     
     def setCompactLayout(self):
         self.statusBar().showMessage("Switching to compact layout...")

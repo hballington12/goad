@@ -11,6 +11,7 @@ geo = "0.29.3"
 geo-clipper = "0.8.0"
 geo-types = "0.7.14"
 indicatif = "0.17.9"
+itertools = "0.14.0"
 macroquad = "0.4.13"
 nalgebra = { version = "0.33.2", features = ["serde"] }
 ndarray = "0.16.1"
