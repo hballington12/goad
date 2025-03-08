@@ -82,6 +82,7 @@ fn unique_grid(tuple_slice: &[(f32, f32)]) -> Vec<(f32, f32)> {
     unique_grid
 }
 
+/// Write the Mueller matrix to a file against the theta and phi bins
 pub fn writeup(bins: &[(f32, f32)], mueller: &Array2<f32>) -> Result<()> {
     // Open a file for writing
     let file = File::create("mueller_scatgrid").unwrap();

@@ -1,5 +1,5 @@
 use crate::containment::{ContainmentGraph, AABB};
-use crate::orientation::{self, *};
+use crate::orientation::*;
 use crate::settings;
 use anyhow::Result;
 use geo::{Area, TriangulateEarcut};

@@ -176,6 +176,7 @@ pub struct Problem {
     pub powers: Powers,                   // different power contributions
     pub bins: Vec<(f32, f32)>,            // bins for far-field diffraction
     pub ampl: Vec<Matrix2<Complex<f32>>>, // total amplitude in far-field
+    pub mueller: Array2::<f32>,           // total mueller in far-field
     pub settings: Settings,               // runtime settings
     scale_factor: f32, // scaling factor for geometry
 }
@@ -191,8 +192,7 @@ impl Problem {
 
     pub fn py_solve(&mut self) -> PyResult<()>{
         self.init();
-        self.solve_near();
-        self.solve_far();
+        self.solve();
         Ok(())
     }
 
@@ -209,8 +209,10 @@ impl Problem {
         let mut settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
 
         let bins = generate_bins(&settings.binning.scheme);
-        let total_ampl_far_field =
+        let ampl =
             vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+
+        let mueller = Array2::<f32>::zeros((bins.len(), 16));
         
         // rescale geometry so the max dimension is 1
         geom.recentre();
@@ -226,7 +228,8 @@ impl Problem {
             ext_diff_beam_queue: vec![],
             powers: Powers::new(),
             bins,
-            ampl: total_ampl_far_field,
+            ampl,
+            mueller,
             settings,
             scale_factor
         };
@@ -258,8 +261,10 @@ impl Problem {
         let  settings = settings::load_config().expect("Failed to load config");
 
         let bins = generate_bins(&settings.binning.scheme);
-        let total_ampl_far_field =
+        let ampl =
             vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+
+        let mueller = Array2::<f32>::zeros((bins.len(), 16));
 
         Self {
             geom,
@@ -267,8 +272,9 @@ impl Problem {
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             powers: Powers::new(),
-            bins: bins,
-            ampl: total_ampl_far_field,
+            bins,
+            ampl,
+            mueller,
             settings,
             scale_factor: 1.0,
         }
@@ -323,6 +329,7 @@ impl Problem {
     pub fn solve(&mut self) {
         self.solve_near();
         self.solve_far();
+        self.mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
     }
 
     /// Trace beams to solve the near-field problem.
@@ -343,8 +350,8 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        let mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
-        let _ = output::writeup(&self.bins, &mueller);
+        // let mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
+        let _ = output::writeup(&self.bins, &self.mueller);
     }
 
     /// Propagates the next beam in the queue.
@@ -595,7 +602,7 @@ impl MultiProblem {
             problem.init();
             problem.solve();
 
-            let mueller = output::ampl_to_mueller(&self.bins, &problem.ampl);
+            let mueller = problem.mueller;
 
             pb.inc(1);
             (mueller, problem.powers)
@@ -623,7 +630,7 @@ impl MultiProblem {
             duration, time_per_orientation
         );
 
-        pb.finish_with_message(format!("(done)"));
+        // pb.finish_with_message(format!("(done)"));
         println!("Average {}", self.powers);
     }
 
