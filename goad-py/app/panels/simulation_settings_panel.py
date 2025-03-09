@@ -158,6 +158,11 @@ class SimulationSettingsPanel(QWidget):
         current_euler = self.settings.euler
         new_euler = [angle, current_euler[1], current_euler[2]]
         self.settings.euler = new_euler
+
+        # Update problem settings
+        problem_settings = self.problem.settings
+        problem_settings.euler = new_euler
+        self.problem.settings = problem_settings
         
         # Run simulation if live update is enabled
         if self.live_update.isChecked():
@@ -172,7 +177,11 @@ class SimulationSettingsPanel(QWidget):
         current_euler = self.settings.euler
         new_euler = [current_euler[0], angle, current_euler[2]]
         self.settings.euler = new_euler
-        self.problem.settings = self.settings
+
+        # Update problem settings
+        problem_settings = self.problem.settings
+        problem_settings.euler = new_euler
+        self.problem.settings = problem_settings
         
         # Run simulation if live update is enabled
         if self.live_update.isChecked():
@@ -187,6 +196,11 @@ class SimulationSettingsPanel(QWidget):
         current_euler = self.settings.euler
         new_euler = [current_euler[0], current_euler[1], angle]
         self.settings.euler = new_euler
+
+        # Update problem settings
+        problem_settings = self.problem.settings
+        problem_settings.euler = new_euler
+        self.problem.settings = problem_settings
         
         # Run simulation if live update is enabled
         if self.live_update.isChecked():
@@ -240,7 +254,7 @@ class SimulationSettingsPanel(QWidget):
         """Run the GOAD simulation using the pre-initialized problem"""
 
         print("Creating GOAD problem...")
-        self.problem = goad.Problem(self.settings)
+        # self.problem = goad.Problem(self.settings)
         
         print("Applying rotation")
         self.problem.py_rerotate()
