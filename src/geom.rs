@@ -1182,6 +1182,16 @@ impl Geom {
             num_shapes,
         }
     }
+
+    /// Getter for the vertices of the first shape
+    #[getter]
+    fn get_first_shape_vertices(&self) -> Vec<(f32, f32, f32)> {
+        self.shapes[0]
+            .vertices
+            .iter()
+            .map(|v| (v.x, v.y, v.z))
+            .collect()
+    }
 }
 
 /// Calculates, rather inaccurately, the center of mass of a set of vertices.

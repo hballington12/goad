@@ -8,7 +8,7 @@ fn main() {
     geom.shapes[0].refr_index.im = 0.001;
 
     let mut problem = Problem::new(geom, None);
-    problem.init();
+    problem.reset();
     problem.solve();
     problem.writeup();
 }

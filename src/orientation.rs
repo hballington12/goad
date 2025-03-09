@@ -36,9 +36,9 @@ pub enum EulerConvention {
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Euler {
-    alpha: f32,
-    beta: f32,
-    gamma: f32,
+    pub alpha: f32,
+    pub beta: f32,
+    pub gamma: f32,
 }
 
 impl Euler {

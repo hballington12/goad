@@ -23,7 +23,8 @@ class OpenGLWidget(QOpenGLWidget):
             self.model = Wavefront(model_path)
         else:
             self.model = Wavefront(os.path.join(root_path, 'app/hex.obj'))
-        
+            
+    
     def initializeGL(self):
         """Set up OpenGL state"""
         glClearColor(0.2, 0.2, 0.2, 1.0)
@@ -66,7 +67,7 @@ class OpenGLWidget(QOpenGLWidget):
         # Adjust scale if needed
         scale_factor = 1.0
         glScalef(scale_factor, scale_factor, scale_factor)
-        
+    
         visualization.draw(self.model)
         
     def set_rotation_y(self, value):

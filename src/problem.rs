@@ -2,14 +2,14 @@ use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, Scheme},
     field::Field,
-    geom::{Face, Geom},
+    geom::{self, Face, Geom},
     helpers::draw_face,
-    orientation::{Euler, Orientations},
+    orientation::{self, Euler, Orientations},
     output,
     settings::{self, Settings},
 };
 use macroquad::prelude::*;
-use nalgebra::{Complex, Matrix2, Point3, Vector3};
+use nalgebra::{base, Complex, Matrix2, Point3, Vector3};
 use ndarray::Array2;
 use rayon::prelude::*;
 use std::{fmt, ops::DivAssign, ops::Add};
@@ -208,26 +208,59 @@ impl Result {
 #[pyclass]
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Problem {
+    pub base_geom: Geom,                  // original geometry
     pub geom: Geom,                       // geometry to trace beams in
     pub beam_queue: Vec<Beam>,            // beams awaiting near-field propagation
     pub out_beam_queue: Vec<Beam>,        // beams awaiting diffraction
     pub ext_diff_beam_queue: Vec<Beam>,   // beams awaiting external diffraction
     pub settings: Settings,               // runtime settings
-    pub result: Result,         // results of the problem
-    scale_factor: f32, // scaling factor for geometry
+    pub result: Result,                   // results of the problem
+    // scale_factor: f32,                    // scaling factor for geometry
 }
 
 #[pymethods]
 impl Problem {
     #[new]
-    fn py_new(geom: Geom, settings: Settings) -> Self {
-        // println!("Geometry: {:#?}", geom);
+    fn py_new(settings: Settings) -> Self {
         println!("Settings: {:#?}", settings);
+
+        let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
         Problem::new(geom, Some(settings))
     }
 
+    /// Function to apply the rotation to the geometry before the solve.
+    pub fn py_rerotate(&mut self) -> PyResult<()> {
+        match self.settings.orientation.scheme {
+            orientation::Scheme::Discrete { ref eulers } => {
+                let euler = &eulers[0];
+                self.geom.clone_from(&self.base_geom); // reclone the original geometry
+                self.geom.euler_rotate(euler.clone(), self.settings.orientation.euler_convention).unwrap();
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Setter function for the problem settings
+    #[setter]
+    pub fn set_settings(&mut self, settings: Settings) {
+        self.settings = settings;
+    }
+
+    /// Getter function for the problem settings
+    #[getter]
+    pub fn get_settings(&self) -> Settings {
+        self.settings.clone()
+    }
+
+    /// Getter function for the geometry
+    #[getter]
+    pub fn get_geom(&self) -> Geom {
+        self.geom.clone()
+    }
+
     pub fn py_solve(&mut self) -> PyResult<()>{
-        self.init();
+        self.reset();
         self.solve();
         self.try_mueller_to_1d();
         Ok(())
@@ -280,62 +313,55 @@ impl Problem {
     pub fn new(mut geom: Geom, settings: Option<Settings>) -> Self {
 
         let mut settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
-        
+
         // rescale geometry so the max dimension is 1
         geom.recentre();
-        let scale_factor = geom.rescale();
-        settings.wavelength = settings.wavelength * scale_factor;
-        settings.beam_power_threshold *= scale_factor.powi(2); // power scales with area
-        settings.beam_area_threshold_fac *= scale_factor.powi(2); // area scales with length^2
+        settings.scale_factor = geom.rescale();
+
         let bins = generate_bins(&settings.binning.scheme);
         let solution = Result::new_empty(bins);
 
         let problem = Self {
+            base_geom: geom.clone(),
             geom,
             beam_queue: vec![],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             settings,
-            scale_factor,
             result: solution,
         };
 
         problem
     }
 
-
-    pub fn init(&mut self) {
-        let beam = basic_initial_beam(&self.geom, self.settings.wavelength, self.settings.medium_refr_index);
-        self.beam_queue.push(beam);
-    }
-
-    /// Resets the problem and reilluminates it with a basic initial beam.
+    /// Resets the problem and illuminates it with a basic initial beam.
     pub fn reset(&mut self) {
         self.beam_queue.clear();
         self.out_beam_queue.clear();    
         self.ext_diff_beam_queue.clear();
-        self.result.powers = Powers::new();
-        self.result.ampl.iter_mut().for_each(|a| a.fill(Complex::ZERO));
+        self.result = Result::new_empty(self.result.bins.clone());
 
-        let beam = basic_initial_beam(&self.geom, self.settings.wavelength, self.settings.medium_refr_index);
+        let scaled_wavelength = self.settings.wavelength * self.settings.scale_factor;
+
+        let beam = basic_initial_beam(&self.geom, scaled_wavelength, self.settings.medium_refr_index);
 
         self.beam_queue.push(beam);
     }
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        let  settings = settings::load_config().expect("Failed to load config");
+        let settings = settings::load_config().expect("Failed to load config");
 
         let bins = generate_bins(&settings.binning.scheme);
         let solution = Result::new_empty(bins);
 
         Self {
+            base_geom: geom.clone(),
             geom,
             beam_queue: vec![beam],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             settings,
-            scale_factor: 1.0,
             result: solution,
         }
     }
@@ -427,7 +453,7 @@ impl Problem {
 
             if self.result.powers.output / self.result.powers.input > self.settings.total_power_cutoff {
                 // add remaining power in beam queue to missing power due to cutoff
-                self.result.powers.trnc_cop += self.beam_queue.iter().map(|beam| beam.power() / self.scale_factor.powi(2)).sum::<f32>();
+                self.result.powers.trnc_cop += self.beam_queue.iter().map(|beam| beam.power() / self.settings.scale_factor.powi(2)).sum::<f32>();
                 break;
             }
 
@@ -452,15 +478,15 @@ impl Problem {
         let outputs = match &mut beam.type_ {
             BeamType::Default => {
                 // truncation conditions
-                if beam.power() < self.settings.beam_power_threshold {
-                    self.result.powers.trnc_energy += beam.power() / self.scale_factor.powi(2);
+                if beam.power() < self.settings.beam_power_threshold * self.settings.scale_factor.powi(2) {
+                    self.result.powers.trnc_energy += beam.power() / self.settings.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
-                    self.result.powers.trnc_area += beam.power() / self.scale_factor.powi(2);
+                    self.result.powers.trnc_area += beam.power() / self.settings.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
                     if beam.tir_count > self.settings.max_tir {
-                        self.result.powers.trnc_ref += beam.power() / self.scale_factor.powi(2);
+                        self.result.powers.trnc_ref += beam.power() / self.settings.scale_factor.powi(2);
                         Vec::new()
                     } else {
                         match beam.propagate(
@@ -469,16 +495,16 @@ impl Problem {
                             self.settings.beam_area_threshold()
                         ) {
                             Ok((outputs,area_power_loss)) => {
-                                self.result.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                                self.result.powers.trnc_area += area_power_loss / self.settings.scale_factor.powi(2);
                                 outputs},
                             Err(_) => {
-                                self.result.powers.clip_err += beam.power() / self.scale_factor.powi(2);
+                                self.result.powers.clip_err += beam.power() / self.settings.scale_factor.powi(2);
                                 Vec::new()
                             }
                         }
                     }
                 } else if beam.rec_count > self.settings.max_rec {
-                    self.result.powers.trnc_rec += beam.power() / self.scale_factor.powi(2);
+                    self.result.powers.trnc_rec += beam.power() / self.settings.scale_factor.powi(2);
                     Vec::new()
                 } else {
                     match beam.propagate(
@@ -487,10 +513,10 @@ impl Problem {
                         self.settings.beam_area_threshold()
                     ) {
                         Ok((outputs,area_power_loss)) => {
-                                self.result.powers.trnc_area += area_power_loss / self.scale_factor.powi(2);
+                                self.result.powers.trnc_area += area_power_loss / self.settings.scale_factor.powi(2);
                                 outputs},
                         Err(_) => {
-                            self.result.powers.clip_err += beam.power() / self.scale_factor.powi(2);
+                            self.result.powers.clip_err += beam.power() / self.settings.scale_factor.powi(2);
                             Vec::new()
                         }
                     }
@@ -514,12 +540,12 @@ impl Problem {
             }
         };
 
-        self.result.powers.absorbed += beam.absorbed_power / self.scale_factor.powi(2);
-        self.result.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power() / self.scale_factor.powi(2);
+        self.result.powers.absorbed += beam.absorbed_power / self.settings.scale_factor.powi(2);
+        self.result.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power() / self.settings.scale_factor.powi(2);
 
         // Process each output beam
         for output in outputs.iter() {
-            let output_power = output.power() / self.scale_factor.powi(2);
+            let output_power = output.power() / self.settings.scale_factor.powi(2);
             match (&beam.type_, &output.type_) {
                 (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
                 (BeamType::Default, BeamType::OutGoing) => {
@@ -682,7 +708,7 @@ impl MultiProblem {
                 panic!("Error rotating geometry: {}", error);
             }
 
-            problem.init();
+            problem.reset();
             problem.solve();
 
             let mueller = problem.result.mueller;

@@ -22,31 +22,109 @@ class SimulationSettingsPanel(QWidget):
         layout = QVBoxLayout()
         form_layout = QFormLayout()
         
-        # Time step setting
-        self.time_step = QDoubleSpinBox()
-        self.time_step.setRange(0.001, 1.0)
-        self.time_step.setSingleStep(0.001)
-        self.time_step.setValue(0.01)
-        self.time_step.setDecimals(3)
-        form_layout.addRow("Time Step (s):", self.time_step)
-        
         # Simulation algorithm
         self.algorithm = QComboBox()
-        self.algorithm.addItems(["Euler", "Verlet", "RK4"])
+        self.algorithm.addItems(["Euler XYZ"])
         form_layout.addRow("Algorithm:", self.algorithm)
         
-        # Gravity toggle
-        self.gravity_enabled = QCheckBox()
-        self.gravity_enabled.setChecked(True)
-        form_layout.addRow("Gravity Enabled:", self.gravity_enabled)
+        # Wavelength control
+        self.wavelength = QDoubleSpinBox()
+        self.wavelength.setRange(0.1, 10.0)
+        self.wavelength.setValue(0.532)
+        self.wavelength.setDecimals(3)
+        self.wavelength.setSingleStep(0.001)
+        self.wavelength.setSuffix(" μm")
+        form_layout.addRow("Wavelength:", self.wavelength)
         
-        # Gravity value
-        self.gravity_value = QDoubleSpinBox()
-        self.gravity_value.setRange(0.0, 100.0)
-        self.gravity_value.setSingleStep(0.1)
-        self.gravity_value.setValue(9.8)
-        self.gravity_value.setDecimals(1)
-        form_layout.addRow("Gravity (m/s²):", self.gravity_value)
+        # Beam power threshold
+        self.beam_power_threshold = QDoubleSpinBox()
+        self.beam_power_threshold.setRange(1e-6, 1.0)
+        self.beam_power_threshold.setValue(1e-1)
+        self.beam_power_threshold.setDecimals(6)
+        self.beam_power_threshold.setSingleStep(0.01)
+        form_layout.addRow("Beam Power Threshold:", self.beam_power_threshold)
+        
+        # Beam area threshold factor
+        self.beam_area_threshold_fac = QDoubleSpinBox()
+        self.beam_area_threshold_fac.setRange(1e-6, 1.0)
+        self.beam_area_threshold_fac.setValue(1e-1)
+        self.beam_area_threshold_fac.setDecimals(6)
+        self.beam_area_threshold_fac.setSingleStep(0.01)
+        form_layout.addRow("Beam Area Threshold:", self.beam_area_threshold_fac)
+        
+        # Power cutoff
+        self.total_power_cutoff = QDoubleSpinBox()
+        self.total_power_cutoff.setRange(0.01, 0.9999)
+        self.total_power_cutoff.setValue(0.99)
+        self.total_power_cutoff.setDecimals(4)
+        self.total_power_cutoff.setSingleStep(0.01)
+        form_layout.addRow("Power Cutoff:", self.total_power_cutoff)
+        
+        # Medium refractive index
+        self.medium_refr_index_re = QDoubleSpinBox()
+        self.medium_refr_index_re.setRange(0.1, 10.0)
+        self.medium_refr_index_re.setValue(1.0)
+        self.medium_refr_index_re.setDecimals(4)
+        self.medium_refr_index_re.setSingleStep(0.01)
+        form_layout.addRow("Medium Refr. Index (Real):", self.medium_refr_index_re)
+        
+        self.medium_refr_index_im = QDoubleSpinBox()
+        self.medium_refr_index_im.setRange(0.0, 10.0)
+        self.medium_refr_index_im.setValue(0.0)
+        self.medium_refr_index_im.setDecimals(4)
+        self.medium_refr_index_im.setSingleStep(0.001)
+        form_layout.addRow("Medium Refr. Index (Imag):", self.medium_refr_index_im)
+        
+        # Particle refractive index
+        self.particle_refr_index_re = QDoubleSpinBox()
+        self.particle_refr_index_re.setRange(0.1, 10.0)
+        self.particle_refr_index_re.setValue(1.31)
+        self.particle_refr_index_re.setDecimals(4)
+        self.particle_refr_index_re.setSingleStep(0.01)
+        form_layout.addRow("Particle Refr. Index (Real):", self.particle_refr_index_re)
+        
+        self.particle_refr_index_im = QDoubleSpinBox()
+        self.particle_refr_index_im.setRange(0.0, 10.0)
+        self.particle_refr_index_im.setValue(0.0)
+        self.particle_refr_index_im.setDecimals(4)
+        self.particle_refr_index_im.setSingleStep(0.001)
+        form_layout.addRow("Particle Refr. Index (Imag):", self.particle_refr_index_im)
+        
+        # Geometry selection
+        self.geom_name = QComboBox()
+        self.geom_name.addItems(["hex.obj", "sphere.obj", "cylinder.obj"])
+        form_layout.addRow("Geometry:", self.geom_name)
+        
+        # Max recursion
+        self.max_rec = QDoubleSpinBox()
+        self.max_rec.setRange(1, 100)
+        self.max_rec.setValue(10)
+        self.max_rec.setDecimals(0)
+        self.max_rec.setSingleStep(1)
+        form_layout.addRow("Max Recursion:", self.max_rec)
+        
+        # Max TIR
+        self.max_tir = QDoubleSpinBox()
+        self.max_tir.setRange(1, 100)
+        self.max_tir.setValue(10)
+        self.max_tir.setDecimals(0)
+        self.max_tir.setSingleStep(1)
+        form_layout.addRow("Max TIR:", self.max_tir)
+        
+        # Resolution
+        self.theta_res = QDoubleSpinBox()
+        self.theta_res.setRange(10, 1000)
+        self.theta_res.setValue(181)
+        self.theta_res.setDecimals(0)
+        self.theta_res.setSingleStep(10)
+        form_layout.addRow("Theta Resolution:", self.theta_res)
+        
+        self.phi_res = QDoubleSpinBox()
+        self.phi_res.setRange(10, 1000)
+        self.phi_res.setValue(181)
+        self.phi_res.setDecimals(0)
+        self.phi_res.setSingleStep(10)
+        form_layout.addRow("Phi Resolution:", self.phi_res)
         
         # Add the form layout to the main layout
         layout.addLayout(form_layout)
@@ -142,13 +220,28 @@ class SimulationSettingsPanel(QWidget):
         self.euler_a.valueChanged.connect(self.update_euler_a_display)
         self.euler_b.valueChanged.connect(self.update_euler_b_display)
         self.euler_g.valueChanged.connect(self.update_euler_g_display)
+        self.euler_a.valueChanged.connect(self.on_setting_changed)
+        self.euler_b.valueChanged.connect(self.on_setting_changed)
+        self.euler_g.valueChanged.connect(self.on_setting_changed)
+        
+        # Connect other controls to update settings
+        self.wavelength.valueChanged.connect(self.update_settings)
+        self.beam_power_threshold.valueChanged.connect(self.update_settings)
+        self.beam_area_threshold_fac.valueChanged.connect(self.update_settings)
+        self.total_power_cutoff.valueChanged.connect(self.update_settings)
+        self.medium_refr_index_re.valueChanged.connect(self.update_settings)
+        self.medium_refr_index_im.valueChanged.connect(self.update_settings)
+        self.particle_refr_index_re.valueChanged.connect(self.update_settings)
+        self.particle_refr_index_im.valueChanged.connect(self.update_settings)
+        self.geom_name.currentTextChanged.connect(self.update_settings)
+        self.max_rec.valueChanged.connect(self.update_settings)
+        self.max_tir.valueChanged.connect(self.update_settings)
+        self.theta_res.valueChanged.connect(self.update_settings)
+        self.phi_res.valueChanged.connect(self.update_settings)
         
         # Connect other controls if they should trigger live updates
-        self.time_step.valueChanged.connect(self.on_setting_changed)
         self.algorithm.currentIndexChanged.connect(self.on_setting_changed)
-        self.gravity_enabled.stateChanged.connect(self.on_setting_changed)
-        self.gravity_value.valueChanged.connect(self.on_setting_changed)
-    
+
     def update_euler_a_display(self, value):
         """Update the Euler A display and GOAD settings"""
         angle = value
@@ -157,12 +250,7 @@ class SimulationSettingsPanel(QWidget):
         # Update GOAD settings
         current_euler = self.settings.euler
         new_euler = [angle, current_euler[1], current_euler[2]]
-        self.settings.euler = new_euler
-
-        # Update problem settings
-        problem_settings = self.problem.settings
-        problem_settings.euler = new_euler
-        self.problem.settings = problem_settings
+        self.on_new_euler_angles(new_euler)
         
         # Run simulation if live update is enabled
         if self.live_update.isChecked():
@@ -176,12 +264,7 @@ class SimulationSettingsPanel(QWidget):
         # Update GOAD settings
         current_euler = self.settings.euler
         new_euler = [current_euler[0], angle, current_euler[2]]
-        self.settings.euler = new_euler
-
-        # Update problem settings
-        problem_settings = self.problem.settings
-        problem_settings.euler = new_euler
-        self.problem.settings = problem_settings
+        self.on_new_euler_angles(new_euler)
         
         # Run simulation if live update is enabled
         if self.live_update.isChecked():
@@ -195,69 +278,129 @@ class SimulationSettingsPanel(QWidget):
         # Update GOAD settings
         current_euler = self.settings.euler
         new_euler = [current_euler[0], current_euler[1], angle]
-        self.settings.euler = new_euler
-
-        # Update problem settings
-        problem_settings = self.problem.settings
-        problem_settings.euler = new_euler
-        self.problem.settings = problem_settings
+        self.on_new_euler_angles(new_euler)
         
         # Run simulation if live update is enabled
         if self.live_update.isChecked():
             self.run_simulation()
     
+    def on_new_euler_angles(self, euler):
+        self.settings.euler = euler
+
+        # Update problem settings
+        problem_settings = self.problem.settings
+        problem_settings.euler = euler
+        self.problem.settings = problem_settings
+
+        self.problem.py_rerotate()
+
     def on_setting_changed(self):
         """Called when any setting is changed to potentially trigger a simulation run"""
         # Only run if live update is enabled
         if self.live_update.isChecked():
             self.run_simulation()
     
+    def update_settings(self):
+        """Update all GOAD settings from UI controls"""
+        print("Updating GOAD settings...")
+        
+        # Create new settings object with values from UI controls
+        self.settings = goad.Settings(
+            wavelength=self.wavelength.value(),
+            beam_power_threshold=self.beam_power_threshold.value(),
+            beam_area_threshold_fac=self.beam_area_threshold_fac.value(),
+            total_power_cutoff=self.total_power_cutoff.value(),
+            medium_refr_index_re=self.medium_refr_index_re.value(),
+            medium_refr_index_im=self.medium_refr_index_im.value(),
+            particle_refr_index_re=self.particle_refr_index_re.value(),
+            particle_refr_index_im=self.particle_refr_index_im.value(),
+            geom_name=self.geom_name.currentText(),
+            max_rec=int(self.max_rec.value()),
+            max_tir=int(self.max_tir.value()),
+            theta_res=int(self.theta_res.value()),
+            phi_res=int(self.phi_res.value()),
+            euler=[self.euler_a.value(), self.euler_b.value(), self.euler_g.value()]
+        )
+        
+        # Update the problem with the new settings
+        self.problem.settings = self.settings
+        
+        # Signal that settings have changed
+        self.on_setting_changed()
+
     def setup_goad_configuration(self):
         """Initialize the GOAD problem with default settings"""
         print("Creating GOAD settings and initializing problem...")
         
+        # self.settings = goad.Settings(
+        #     wavelength=0.532,
+        #     beam_power_threshold=1e-1,
+        #     beam_area_threshold_fac=1e-1,
+        #     total_power_cutoff=0.99,
+        #     medium_refr_index_re=1.0,
+        #     medium_refr_index_im=0.0,
+        #     particle_refr_index_re=1.31,
+        #     particle_refr_index_im=0.0,
+        #     geom_name="hex.obj",
+        #     max_rec=10,
+        #     max_tir=10,
+        #     theta_res=181,
+        #     phi_res=181,
+        #     euler=[0.0, 0.0, 0.0]
+        # )
+
+        # Create new settings object with values from UI controls
         self.settings = goad.Settings(
-            wavelength=0.532,
-            beam_power_threshold=1e-1,
-            beam_area_threshold_fac=1e-1,
-            total_power_cutoff=0.99,
-            medium_refr_index_re=1.0,
-            medium_refr_index_im=0.0,
-            particle_refr_index_re=1.31,
-            particle_refr_index_im=0.0,
-            geom_name="hex.obj",
-            max_rec=10,
-            max_tir=10,
-            theta_res=181,
-            phi_res=181,
-            euler=[0.0, 0.0, 0.0]
+            wavelength=self.wavelength.value(),
+            beam_power_threshold=self.beam_power_threshold.value(),
+            beam_area_threshold_fac=self.beam_area_threshold_fac.value(),
+            total_power_cutoff=self.total_power_cutoff.value(),
+            medium_refr_index_re=self.medium_refr_index_re.value(),
+            medium_refr_index_im=self.medium_refr_index_im.value(),
+            particle_refr_index_re=self.particle_refr_index_re.value(),
+            particle_refr_index_im=self.particle_refr_index_im.value(),
+            geom_name=self.geom_name.currentText(),
+            max_rec=int(self.max_rec.value()),
+            max_tir=int(self.max_tir.value()),
+            theta_res=int(self.theta_res.value()),
+            phi_res=int(self.phi_res.value()),
+            euler=[self.euler_a.value(), self.euler_b.value(), self.euler_g.value()]
         )
+        
+        # # Update UI controls with initial values from settings
+        # self.wavelength.setValue(self.settings.wavelength)
+        # self.beam_power_threshold.setValue(self.settings.beam_power_threshold)
+        # self.beam_area_threshold_fac.setValue(self.settings.beam_area_threshold_fac)
+        # self.total_power_cutoff.setValue(self.settings.total_power_cutoff)
+        # self.medium_refr_index_re.setValue(self.settings.medium_refr_index_re)
+        # self.medium_refr_index_im.setValue(self.settings.medium_refr_index_im)
+        # self.particle_refr_index_re.setValue(self.settings.particle_refr_index_re)
+        # self.particle_refr_index_im.setValue(self.settings.particle_refr_index_im)
+        
+        # # Find and select the right geometry in the combobox
+        # index = self.geom_name.findText(self.settings.geom_name)
+        # if index >= 0:
+        #     self.geom_name.setCurrentIndex(index)
+            
+        # self.max_rec.setValue(self.settings.max_rec)
+        # self.max_tir.setValue(self.settings.max_tir)
+        # self.theta_res.setValue(self.settings.theta_res)
+        # self.phi_res.setValue(self.settings.phi_res)
         
         # Initialize the problem object so we don't need to recreate it for each run
         print("Creating GOAD problem...")
         self.problem = goad.Problem(self.settings)
-        
         print("GOAD settings initialized and ready.")
     
     def run_simulation(self):
         """Handle the Run Simulation button click"""
         print(f"Running simulation with:")
-        print(f"- Time step: {self.time_step.value()} seconds")
-        print(f"- Algorithm: {self.algorithm.currentText()}")
-        print(f"- Gravity enabled: {self.gravity_enabled.isChecked()}")
-        print(f"- Gravity value: {self.gravity_value.value()} m/s²")
         print(f"- Euler angles: [{self.euler_a.value()}, {self.euler_b.value()}, {self.euler_g.value()}]")
 
         self.run_goad_sample()
 
     def run_goad_sample(self):
         """Run the GOAD simulation using the pre-initialized problem"""
-
-        print("Creating GOAD problem...")
-        # self.problem = goad.Problem(self.settings)
-        
-        print("Applying rotation")
-        self.problem.py_rerotate()
 
         print("Solving GOAD problem...")
         

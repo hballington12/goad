@@ -7,7 +7,7 @@ from PyQt6.QtGui import QAction
 
 from opengl_view import OpenGLWidget
 from plot_view import MatplotlibWidget
-from panels import ControlPanel, PropertiesPanel, OutlinerPanel, ConsolePanel, SimulationSettingsPanel
+from panels import PropertiesPanel, OutlinerPanel, ConsolePanel, SimulationSettingsPanel
 
 class MainWindow(QMainWindow):
     """Main application window with dockable widgets"""
@@ -42,13 +42,6 @@ class MainWindow(QMainWindow):
         self.plot_dock.setWidget(self.plot_widget)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
         
-        # Control panel (right side, below plot)
-        self.control_dock = QDockWidget("Controls", self)
-        self.control_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
-        self.control_panel = ControlPanel()
-        self.control_dock.setWidget(self.control_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.control_dock)
-        
         # Properties panel (left side)
         self.properties_dock = QDockWidget("Properties", self)
         self.properties_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
@@ -81,7 +74,8 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.console_dock)
         
         # Tab the dock widgets
-        self.tabifyDockWidget(self.properties_dock, self.outliner_dock)
+        self.tabifyDockWidget(self.properties_dock, self.simulation_dock)
+        self.tabifyDockWidget(self.simulation_dock, self.outliner_dock)
         
         # Connect signals
         self.simulation_panel.euler_a.valueChanged.connect(

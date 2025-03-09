@@ -48,18 +48,19 @@ settings = goad.Settings(
     medium_refr_index_im=0.0,
     particle_refr_index_re=1.31,
     particle_refr_index_im=0.0,
-    geom_name="test",
+    geom_name="hex.obj",
     max_rec=10,
     max_tir=10,
     theta_res=100,
-    phi_res=100
+    phi_res=100,
+    euler=[0.0, 20.0, 0.0]
 )
 
 print("creating goad problem")
 
-problem = goad.Problem(geom, settings)
+problem = goad.Problem(settings)
 
-# print("settings:", settings)
+print("settings wavelength:", settings.wavelength)
 
 print("solving goad problem")
 
@@ -69,3 +70,5 @@ problem.py_print_stats()
 
 # # print the first element of problem.mueller
 mueller = problem.mueller
+
+mueller_1d = problem.mueller_1d

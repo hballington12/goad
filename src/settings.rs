@@ -50,6 +50,12 @@ pub struct Settings {
     pub max_tir: i32,
     pub binning: BinningScheme,
     pub seed: Option<u64>,
+    #[serde(default = "default_scale_factor")]
+    pub scale_factor: f32,
+}
+
+fn default_scale_factor() -> f32 {
+    1.0
 }
 
 #[pymethods]
@@ -69,15 +75,16 @@ impl Settings {
         max_tir: i32,
         theta_res: usize,
         phi_res: usize,
+        euler: Vec<f32>,
     ) -> Self {
         let medium_refr_index = Complex::new(medium_refr_index_re, medium_refr_index_im);
         let particle_refr_index =
             vec![Complex::new(particle_refr_index_re, particle_refr_index_im)];
         let orientation: OrientationScheme = OrientationScheme {
             scheme: Scheme::Discrete {
-                eulers: vec![Euler::new(0.0, 0.0, 0.0)],
+                eulers: vec![Euler::new(euler[0], euler[1], euler[2])],
             },
-            euler_convention: EulerConvention::ZYZ,
+            euler_convention: EulerConvention::XYZ,
         };
         let binning = BinningScheme {
             scheme: bins::Scheme::Simple {
@@ -85,7 +92,6 @@ impl Settings {
                 num_phi: phi_res,
             },
         };
-
         Settings {
             wavelength,
             beam_power_threshold,
@@ -99,13 +105,34 @@ impl Settings {
             max_tir,
             binning,
             seed: None,
+            scale_factor: 1.0,
+        }
+    }
+
+    /// Set the euler angles
+    #[setter]
+    fn set_euler(&mut self, euler: Vec<f32>) {
+        self.orientation = OrientationScheme {
+            scheme: Scheme::Discrete {
+                eulers: vec![Euler::new(euler[0], euler[1], euler[2])],
+            },
+            euler_convention: EulerConvention::XYZ,
+        };
+    }
+
+    /// Get the euler angle, assuming the orientation scheme is discrete
+    #[getter]
+    fn get_euler(&self) -> Vec<f32> {
+        match &self.orientation.scheme {
+            Scheme::Discrete { eulers } => vec![eulers[0].alpha, eulers[0].beta, eulers[0].gamma],
+            _ => vec![0.0, 0.0, 0.0],
         }
     }
 }
 
 impl Settings {
     pub fn beam_area_threshold(&self) -> f32 {
-        self.wavelength * self.wavelength * self.beam_area_threshold_fac
+        self.wavelength * self.wavelength * self.beam_area_threshold_fac * self.scale_factor.powi(2)
     }
 }
 
