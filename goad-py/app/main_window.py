@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         self.createMenus()
         self.createToolBars()
         self.createStatusBar()
-    
+        
     def createDockWidgets(self):
         """Create dockable UI panels"""
         # Plot panel (right side)
@@ -84,15 +84,15 @@ class MainWindow(QMainWindow):
         self.tabifyDockWidget(self.properties_dock, self.outliner_dock)
         
         # Connect signals
-        self.control_panel.x_rotation_slider.valueChanged.connect(
+        self.simulation_panel.euler_a.valueChanged.connect(
             self.opengl_widget.set_rotation_x)
-        self.control_panel.y_rotation_slider.valueChanged.connect(
+        self.simulation_panel.euler_b.valueChanged.connect(
             self.opengl_widget.set_rotation_y)
-        self.control_panel.z_rotation_slider.valueChanged.connect(
+        self.simulation_panel.euler_g.valueChanged.connect(
             self.opengl_widget.set_rotation_z)
-        self.control_panel.update_plot_btn.clicked.connect(
-            self.plot_widget.update_plot)
-    
+        self.simulation_panel.mueller_data_ready.connect(
+            self.plot_widget.plot_mueller_data)
+
     def createActions(self):
         """Create application actions"""
         # File menu actions
