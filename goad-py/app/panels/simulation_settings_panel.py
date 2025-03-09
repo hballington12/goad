@@ -292,8 +292,6 @@ class SimulationSettingsPanel(QWidget):
         problem_settings.euler = euler
         self.problem.settings = problem_settings
 
-        self.problem.py_rerotate()
-
     def on_setting_changed(self):
         """Called when any setting is changed to potentially trigger a simulation run"""
         # Only run if live update is enabled
@@ -367,26 +365,6 @@ class SimulationSettingsPanel(QWidget):
             euler=[self.euler_a.value(), self.euler_b.value(), self.euler_g.value()]
         )
         
-        # # Update UI controls with initial values from settings
-        # self.wavelength.setValue(self.settings.wavelength)
-        # self.beam_power_threshold.setValue(self.settings.beam_power_threshold)
-        # self.beam_area_threshold_fac.setValue(self.settings.beam_area_threshold_fac)
-        # self.total_power_cutoff.setValue(self.settings.total_power_cutoff)
-        # self.medium_refr_index_re.setValue(self.settings.medium_refr_index_re)
-        # self.medium_refr_index_im.setValue(self.settings.medium_refr_index_im)
-        # self.particle_refr_index_re.setValue(self.settings.particle_refr_index_re)
-        # self.particle_refr_index_im.setValue(self.settings.particle_refr_index_im)
-        
-        # # Find and select the right geometry in the combobox
-        # index = self.geom_name.findText(self.settings.geom_name)
-        # if index >= 0:
-        #     self.geom_name.setCurrentIndex(index)
-            
-        # self.max_rec.setValue(self.settings.max_rec)
-        # self.max_tir.setValue(self.settings.max_tir)
-        # self.theta_res.setValue(self.settings.theta_res)
-        # self.phi_res.setValue(self.settings.phi_res)
-        
         # Initialize the problem object so we don't need to recreate it for each run
         print("Creating GOAD problem...")
         self.problem = goad.Problem(self.settings)
@@ -402,8 +380,12 @@ class SimulationSettingsPanel(QWidget):
     def run_goad_sample(self):
         """Run the GOAD simulation using the pre-initialized problem"""
 
-        print("Solving GOAD problem...")
+        print("Creating GOAD problem...")
+        self.problem = goad.Problem(self.settings)
+        print("GOAD settings initialized and ready.")
         
+        print("Solving GOAD problem...")
+
         # Solving the pre-initialized problem
         self.problem.py_solve()
         
