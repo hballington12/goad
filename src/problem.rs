@@ -194,12 +194,12 @@ impl Problem {
     /// Initialises the geometry and scales it.
     pub fn init(&mut self) {
         self.geom.recentre();
-        self.settings.scale_factor = self.geom.rescale();
+        self.settings.scale = self.geom.rescale();
     }
 
     /// Illuminates the problem with a basic initial beam.
     pub fn illuminate(&mut self) {
-        let scaled_wavelength = self.settings.wavelength * self.settings.scale_factor;
+        let scaled_wavelength = self.settings.wavelength * self.settings.scale;
 
         let beam = basic_initial_beam(
             &self.geom,
@@ -311,14 +311,12 @@ impl Problem {
                 break;
             }
 
-            if self.result.powers.output / self.result.powers.input
-                > self.settings.total_power_cutoff
-            {
+            if self.result.powers.output / self.result.powers.input > self.settings.cutoff {
                 // add remaining power in beam queue to missing power due to cutoff
                 self.result.powers.trnc_cop += self
                     .beam_queue
                     .iter()
-                    .map(|beam| beam.power() / self.settings.scale_factor.powi(2))
+                    .map(|beam| beam.power() / self.settings.scale.powi(2))
                     .sum::<f32>();
                 break;
             }
@@ -350,13 +348,13 @@ impl Problem {
             }
         };
 
-        self.result.powers.absorbed += beam.absorbed_power / self.settings.scale_factor.powi(2);
-        self.result.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power()
-            / self.settings.scale_factor.powi(2);
+        self.result.powers.absorbed += beam.absorbed_power / self.settings.scale.powi(2);
+        self.result.powers.trnc_clip +=
+            (beam.clipping_area - beam.csa()).abs() * beam.power() / self.settings.scale.powi(2);
 
         // Process each output beam
         for output in outputs.iter() {
-            let output_power = output.power() / self.settings.scale_factor.powi(2);
+            let output_power = output.power() / self.settings.scale.powi(2);
             match (&beam.type_, &output.type_) {
                 (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
                 (BeamType::Default, BeamType::OutGoing) => {
@@ -393,21 +391,21 @@ impl Problem {
     /// Cycles through checks to decide whether to propagate the beam or not.
     fn propagate_default(&mut self, beam: &mut Beam) -> Vec<Beam> {
         // beam power is below threshold
-        if beam.power() < self.settings.beam_power_threshold * self.settings.scale_factor.powi(2) {
-            self.result.powers.trnc_energy += beam.power() / self.settings.scale_factor.powi(2);
+        if beam.power() < self.settings.beam_power_threshold * self.settings.scale.powi(2) {
+            self.result.powers.trnc_energy += beam.power() / self.settings.scale.powi(2);
             return Vec::new();
         }
 
         // beam area is below threshold
         if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
-            self.result.powers.trnc_area += beam.power() / self.settings.scale_factor.powi(2);
+            self.result.powers.trnc_area += beam.power() / self.settings.scale.powi(2);
             return Vec::new();
         }
 
         // total internal reflection considerations
         if beam.variant == Some(BeamVariant::Tir) {
             if beam.tir_count > self.settings.max_tir {
-                self.result.powers.trnc_ref += beam.power() / self.settings.scale_factor.powi(2);
+                self.result.powers.trnc_ref += beam.power() / self.settings.scale.powi(2);
                 return Vec::new();
             } else {
                 return self.propagate(beam);
@@ -416,7 +414,7 @@ impl Problem {
 
         // beam recursion over the maximum
         if beam.rec_count > self.settings.max_rec {
-            self.result.powers.trnc_rec += beam.power() / self.settings.scale_factor.powi(2);
+            self.result.powers.trnc_rec += beam.power() / self.settings.scale.powi(2);
             return Vec::new();
         }
 
@@ -431,12 +429,11 @@ impl Problem {
             self.settings.beam_area_threshold(),
         ) {
             Ok((outputs, area_power_loss)) => {
-                self.result.powers.trnc_area +=
-                    area_power_loss / self.settings.scale_factor.powi(2);
+                self.result.powers.trnc_area += area_power_loss / self.settings.scale.powi(2);
                 outputs
             }
             Err(_) => {
-                self.result.powers.clip_err += beam.power() / self.settings.scale_factor.powi(2);
+                self.result.powers.clip_err += beam.power() / self.settings.scale.powi(2);
                 Vec::new()
             }
         }

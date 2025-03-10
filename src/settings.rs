@@ -41,7 +41,7 @@ pub struct Settings {
     pub wavelength: f32,
     pub beam_power_threshold: f32,
     pub beam_area_threshold_fac: f32,
-    pub total_power_cutoff: f32,
+    pub cutoff: f32,
     pub medium_refr_index: Complex<f32>,
     pub particle_refr_index: Vec<Complex<f32>>,
     pub orientation: OrientationScheme,
@@ -51,7 +51,7 @@ pub struct Settings {
     pub binning: BinningScheme,
     pub seed: Option<u64>,
     #[serde(default = "default_scale_factor")]
-    pub scale_factor: f32,
+    pub scale: f32,
 }
 
 fn default_scale_factor() -> f32 {
@@ -65,7 +65,7 @@ impl Settings {
         wavelength: f32,
         beam_power_threshold: f32,
         beam_area_threshold_fac: f32,
-        total_power_cutoff: f32,
+        cutoff: f32,
         medium_refr_index_re: f32,
         medium_refr_index_im: f32,
         particle_refr_index_re: f32,
@@ -96,7 +96,7 @@ impl Settings {
             wavelength,
             beam_power_threshold,
             beam_area_threshold_fac,
-            total_power_cutoff,
+            cutoff,
             medium_refr_index,
             particle_refr_index,
             orientation,
@@ -105,7 +105,7 @@ impl Settings {
             max_tir,
             binning,
             seed: None,
-            scale_factor: 1.0,
+            scale: 1.0,
         }
     }
 
@@ -132,7 +132,7 @@ impl Settings {
 
 impl Settings {
     pub fn beam_area_threshold(&self) -> f32 {
-        self.wavelength * self.wavelength * self.beam_area_threshold_fac * self.scale_factor.powi(2)
+        self.wavelength * self.wavelength * self.beam_area_threshold_fac * self.scale.powi(2)
     }
 }
 
@@ -190,7 +190,7 @@ pub fn load_config() -> Result<Settings> {
         config.beam_area_threshold_fac = maf;
     }
     if let Some(cop) = args.cop {
-        config.total_power_cutoff = cop;
+        config.cutoff = cop;
     }
     if let Some(rec) = args.rec {
         config.max_rec = rec;
@@ -328,7 +328,7 @@ impl fmt::Display for Settings {
   ",
             self.wavelength,
             self.beam_power_threshold,
-            self.total_power_cutoff,
+            self.cutoff,
             self.medium_refr_index.re,
             self.medium_refr_index.im,
             self.particle_refr_index,
