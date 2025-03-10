@@ -389,55 +389,55 @@ impl Problem {
         }
     }
 
+    /// Propagates a beam with the default settings.
+    /// Cycles through checks to decide whether to propagate the beam or not.
     fn propagate_default(&mut self, beam: &mut Beam) -> Vec<Beam> {
-        // truncation conditions for default beams
+        // beam power is below threshold
         if beam.power() < self.settings.beam_power_threshold * self.settings.scale_factor.powi(2) {
             self.result.powers.trnc_energy += beam.power() / self.settings.scale_factor.powi(2);
-            Vec::new()
-        } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
+            return Vec::new();
+        }
+
+        // beam area is below threshold
+        if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
             self.result.powers.trnc_area += beam.power() / self.settings.scale_factor.powi(2);
-            Vec::new()
-        } else if beam.variant == Some(BeamVariant::Tir) {
+            return Vec::new();
+        }
+
+        // total internal reflection considerations
+        if beam.variant == Some(BeamVariant::Tir) {
             if beam.tir_count > self.settings.max_tir {
                 self.result.powers.trnc_ref += beam.power() / self.settings.scale_factor.powi(2);
-                Vec::new()
+                return Vec::new();
             } else {
-                match beam.propagate(
-                    &mut self.geom,
-                    self.settings.medium_refr_index,
-                    self.settings.beam_area_threshold(),
-                ) {
-                    Ok((outputs, area_power_loss)) => {
-                        self.result.powers.trnc_area +=
-                            area_power_loss / self.settings.scale_factor.powi(2);
-                        outputs
-                    }
-                    Err(_) => {
-                        self.result.powers.clip_err +=
-                            beam.power() / self.settings.scale_factor.powi(2);
-                        Vec::new()
-                    }
-                }
+                return self.propagate(beam);
             }
-        } else if beam.rec_count > self.settings.max_rec {
+        }
+
+        // beam recursion over the maximum
+        if beam.rec_count > self.settings.max_rec {
             self.result.powers.trnc_rec += beam.power() / self.settings.scale_factor.powi(2);
-            Vec::new()
-        } else {
-            match beam.propagate(
-                &mut self.geom,
-                self.settings.medium_refr_index,
-                self.settings.beam_area_threshold(),
-            ) {
-                Ok((outputs, area_power_loss)) => {
-                    self.result.powers.trnc_area +=
-                        area_power_loss / self.settings.scale_factor.powi(2);
-                    outputs
-                }
-                Err(_) => {
-                    self.result.powers.clip_err +=
-                        beam.power() / self.settings.scale_factor.powi(2);
-                    Vec::new()
-                }
+            return Vec::new();
+        }
+
+        // else, propagate the beam
+        self.propagate(beam)
+    }
+
+    fn propagate(&mut self, beam: &mut Beam) -> Vec<Beam> {
+        match beam.propagate(
+            &mut self.geom,
+            self.settings.medium_refr_index,
+            self.settings.beam_area_threshold(),
+        ) {
+            Ok((outputs, area_power_loss)) => {
+                self.result.powers.trnc_area +=
+                    area_power_loss / self.settings.scale_factor.powi(2);
+                outputs
+            }
+            Err(_) => {
+                self.result.powers.clip_err += beam.power() / self.settings.scale_factor.powi(2);
+                Vec::new()
             }
         }
     }
