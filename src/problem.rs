@@ -311,7 +311,10 @@ impl Problem {
                 break;
             }
 
-            if self.result.powers.output / self.result.powers.input > self.settings.cutoff {
+            let input_power = self.result.powers.input;
+            let output_power = self.result.powers.output;
+
+            if output_power / input_power > self.settings.cutoff {
                 // add remaining power in beam queue to missing power due to cutoff
                 self.result.powers.trnc_cop += self
                     .beam_queue
@@ -326,7 +329,6 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        // let mueller = output::ampl_to_mueller(&self.bins, &self.ampl);
         let _ = output::write_mueller(&self.result.bins, &self.result.mueller);
     }
 
@@ -350,7 +352,7 @@ impl Problem {
 
         self.result.powers.absorbed += beam.absorbed_power / self.settings.scale.powi(2);
         self.result.powers.trnc_clip +=
-            (beam.clipping_area - beam.csa()).abs() * beam.power() / self.settings.scale.powi(2);
+            (beam.clipping_area - beam.csa()) * beam.power() / self.settings.scale.powi(2);
 
         // Process each output beam
         for output in outputs.iter() {
