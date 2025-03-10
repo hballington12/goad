@@ -6,7 +6,8 @@ from PyQt6.QtWidgets import (QMainWindow, QDockWidget, QMessageBox)
 from PyQt6.QtGui import QAction
 
 from opengl_view import OpenGLWidget
-from plot_view import MatplotlibWidget
+from plot_view import PlotlyWidget
+# from plot_view import MatplotlibWidget
 from panels import PropertiesPanel, OutlinerPanel, ConsolePanel, SimulationSettingsPanel
 
 class MainWindow(QMainWindow):
@@ -38,7 +39,7 @@ class MainWindow(QMainWindow):
             Qt.DockWidgetArea.LeftDockWidgetArea | 
             Qt.DockWidgetArea.BottomDockWidgetArea
         )
-        self.plot_widget = MatplotlibWidget()
+        self.plot_widget = PlotlyWidget()
         self.plot_dock.setWidget(self.plot_widget)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
         self.plot_dock.setVisible(False)

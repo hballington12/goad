@@ -42,7 +42,7 @@ class SimulationSettingsPanel(QWidget):
         
         # Wavelength control
         self.wavelength = QDoubleSpinBox()
-        self.wavelength.setRange(0.1, 10.0)
+        self.wavelength.setRange(0.001, 100.0)
         self.wavelength.setValue(0.532)
         self.wavelength.setDecimals(3)
         self.wavelength.setSingleStep(0.001)
@@ -67,7 +67,7 @@ class SimulationSettingsPanel(QWidget):
         
         # Power cutoff
         self.total_power_cutoff = QDoubleSpinBox()
-        self.total_power_cutoff.setRange(0.01, 0.9999)
+        self.total_power_cutoff.setRange(0.01, 1.00)
         self.total_power_cutoff.setValue(0.99)
         self.total_power_cutoff.setDecimals(4)
         self.total_power_cutoff.setSingleStep(0.01)
@@ -110,7 +110,7 @@ class SimulationSettingsPanel(QWidget):
         
         # Max recursion
         self.max_rec = QDoubleSpinBox()
-        self.max_rec.setRange(1, 100)
+        self.max_rec.setRange(0, 100)
         self.max_rec.setValue(10)
         self.max_rec.setDecimals(0)
         self.max_rec.setSingleStep(1)
@@ -118,7 +118,7 @@ class SimulationSettingsPanel(QWidget):
         
         # Max TIR
         self.max_tir = QDoubleSpinBox()
-        self.max_tir.setRange(1, 100)
+        self.max_tir.setRange(0, 100)
         self.max_tir.setValue(10)
         self.max_tir.setDecimals(0)
         self.max_tir.setSingleStep(1)

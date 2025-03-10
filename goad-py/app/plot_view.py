@@ -1,89 +1,138 @@
 """
-Matplotlib plotting widget
+Plotly plotting widget with persistent figure and data updates - Dark Mode
 """
 import numpy as np
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
+from plotly.graph_objects import Figure
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from PyQt6.QtWebEngineWidgets import QWebEngineView
 
-class MatplotlibWidget(QWidget):
-    """Widget to display matplotlib plots"""
+class PlotlyWidget(QWidget):
+    """Widget to display Plotly plots"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.figure = Figure(figsize=(5, 4), dpi=100)
-        self.canvas = FigureCanvas(self.figure)
+        # Create a web view to display the Plotly plot
+        self.web_view = QWebEngineView()
         
+        # Set up the layout
         layout = QVBoxLayout()
-        layout.addWidget(self.canvas)
+        layout.addWidget(self.web_view)
         self.setLayout(layout)
         
-        self.ax = self.figure.add_subplot(111)
+        # Initialize an empty figure with proper styling
+        self.initialize_figure()
+        
+        # Render the empty figure initially
+        self.update_plot()
+        
+    def initialize_figure(self):
+        """Initialize the figure with dark theme styling but no data"""
+        self.fig = go.Figure()
+        
+        # Add an empty scatter trace that will be updated later
+        self.fig.add_trace(
+            go.Scatter(
+                x=[], 
+                y=[],
+                mode='lines',
+                line=dict(color='#00bfff', width=3),  # Bright blue for dark theme
+                name='S11',
+                hovertemplate='Angle: %{x:.2f}°<br>S11: %{y:.4e}<extra></extra>'
+            )
+        )
+        
+        # Set up the layout once with dark theme
+        self.fig.update_layout(
+            title={
+                'text': 'Mueller Matrix Elements',
+                'font': {'size': 18, 'color': '#ffffff'},
+                'y': 0.95
+            },
+            xaxis_title={
+                'text': 'Angle (degrees)',
+                'font': {'size': 14, 'color': '#e0e0e0'}
+            },
+            yaxis_title={
+                'text': 'Intensity',
+                'font': {'size': 14, 'color': '#e0e0e0'}
+            },
+            yaxis_type='log',
+            paper_bgcolor='#1e1e1e',  # Dark background color
+            plot_bgcolor='#282828',   # Dark plot area
+            hovermode='closest',
+            margin=dict(l=60, r=30, t=80, b=60),
+            legend=dict(
+                x=0.02,
+                y=0.98,
+                bgcolor='rgba(40, 40, 40, 0.8)',
+                bordercolor='#555555',
+                font=dict(color='#e0e0e0')
+            ),
+            template='plotly_dark',
+            font=dict(color='#e0e0e0')  # Default font color for all text
+        )
+        
+        # Add grid lines with dark theme colors
+        self.fig.update_xaxes(
+            showgrid=True, 
+            gridwidth=1, 
+            gridcolor='#3a3a3a',
+            linecolor='#555555',
+            tickfont=dict(color='#e0e0e0')
+        )
+        self.fig.update_yaxes(
+            showgrid=True, 
+            gridwidth=1, 
+            gridcolor='#3a3a3a',
+            linecolor='#555555',
+            tickfont=dict(color='#e0e0e0')
+        )
+    
+    def update_plot(self):
+        """Render the current figure state to the web view"""
+        self.web_view.setHtml(self.fig.to_html(
+            include_plotlyjs='cdn', 
+            config={
+                'responsive': True,
+                'scrollZoom': True,
+                'displayModeBar': True,
+                'displaylogo': False,
+                'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
+                'toImageButtonOptions': {
+                    'format': 'png',
+                    'filename': 'mueller_plot',
+                    'height': 800,
+                    'width': 1200,
+                    'scale': 2
+                }
+            }
+        ))
         
     def plot_mueller_data(self, data):
-        """Plot the Mueller matrix data
+        """Update the Mueller matrix data on the existing figure
         
         Args:
-            mueller_data: List of lists containing the Mueller matrix elements
+            data: Tuple containing (angles, mueller_data)
         """
-
         # Unpack the data
         angles, mueller_data = data
 
         # Convert data to numpy array if it's not already
         mueller_array = np.array(mueller_data)
         
-        # Clear the existing plot
-        self.ax.clear()
+        # Update the existing trace data (more efficient than recreating)
+        self.fig.update_traces(
+            x=angles,
+            y=mueller_array[:, 0],
+            selector=dict(name='S11')
+        )
         
-        # Plot configuration options (from mueller_plotter.py)
-        FS = 16  # font size
-        LW = 2   # line width
-        GRID = True
-        XLABEL = r"$\theta$ / $^\circ$"  # x-axis label
-        YLABEL = "Phase Function"  # y-axis label
-        LEGEND = True   
-
-        # Enhanced styling - set figure style
-        self.figure.patch.set_facecolor('#E8E8E8')  # Light gray figure background
-        self.ax.set_facecolor('#F5F5F5')  # Slightly lighter gray plot background
+        # Add animation
+        self.fig.update_layout(
+            transition_duration=500,
+            transition={'easing': 'cubic-in-out'}
+        )
         
-        # Apply plot configurations
-        plt.rcParams['font.size'] = FS
-        plt.rcParams['axes.linewidth'] = LW
-        
-        # Plot Mueller matrix elements with improved styling
-        # Use a color palette for more appealing visuals
-        self.ax.plot(angles, mueller_array[:, 0], color='#1f77b4', linewidth=LW+0.5, label='S11', 
-                     alpha=0.9)
-        
-        # Set labels and styling
-        self.ax.set_xlabel(XLABEL, fontsize=FS, fontweight='bold')
-        self.ax.set_ylabel(YLABEL, fontsize=FS, fontweight='bold')
-        self.ax.set_title('GOAD Simulation: Mueller Matrix Elements', 
-                          fontsize=FS+2, fontweight='bold', pad=10)
-        
-        # Enhance ticks and labels
-        self.ax.tick_params(axis='both', which='major', labelsize=FS-2, width=1.5, length=6)
-        self.ax.tick_params(axis='both', which='minor', width=1, length=3)
-        
-        # Add a box around the plot
-        for spine in self.ax.spines.values():
-            spine.set_linewidth(1.5)
-            spine.set_color('#555555')
-        
-        # Apply grid and axis limits (from mueller_plotter.py)
-        if GRID:
-            self.ax.grid(True, linestyle='--', alpha=0.7, color='#888888')
-        self.ax.set_xlim(0, 180)
-        self.ax.set_yscale('log')
-        
-        # Customize the legend with border similar to mueller_plotter.py
-        if LEGEND:
-            legend = self.ax.legend(loc='upper right', fontsize=FS-2, 
-                                   edgecolor='#555555', frameon=True, 
-                                   fancybox=True, shadow=True, framealpha=0.9)
-            legend.get_frame().set_linewidth(1.5)
-        
-        # Redraw the canvas
-        self.canvas.draw()
+        # Update the plot in the web view
+        self.update_plot()

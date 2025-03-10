@@ -342,73 +342,8 @@ impl Problem {
 
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam.type_ {
-            BeamType::Default => {
-                // truncation conditions
-                if beam.power()
-                    < self.settings.beam_power_threshold * self.settings.scale_factor.powi(2)
-                {
-                    self.result.powers.trnc_energy +=
-                        beam.power() / self.settings.scale_factor.powi(2);
-                    Vec::new()
-                } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
-                    self.result.powers.trnc_area +=
-                        beam.power() / self.settings.scale_factor.powi(2);
-                    Vec::new()
-                } else if beam.variant == Some(BeamVariant::Tir) {
-                    if beam.tir_count > self.settings.max_tir {
-                        self.result.powers.trnc_ref +=
-                            beam.power() / self.settings.scale_factor.powi(2);
-                        Vec::new()
-                    } else {
-                        match beam.propagate(
-                            &mut self.geom,
-                            self.settings.medium_refr_index,
-                            self.settings.beam_area_threshold(),
-                        ) {
-                            Ok((outputs, area_power_loss)) => {
-                                self.result.powers.trnc_area +=
-                                    area_power_loss / self.settings.scale_factor.powi(2);
-                                outputs
-                            }
-                            Err(_) => {
-                                self.result.powers.clip_err +=
-                                    beam.power() / self.settings.scale_factor.powi(2);
-                                Vec::new()
-                            }
-                        }
-                    }
-                } else if beam.rec_count > self.settings.max_rec {
-                    self.result.powers.trnc_rec +=
-                        beam.power() / self.settings.scale_factor.powi(2);
-                    Vec::new()
-                } else {
-                    match beam.propagate(
-                        &mut self.geom,
-                        self.settings.medium_refr_index,
-                        self.settings.beam_area_threshold(),
-                    ) {
-                        Ok((outputs, area_power_loss)) => {
-                            self.result.powers.trnc_area +=
-                                area_power_loss / self.settings.scale_factor.powi(2);
-                            outputs
-                        }
-                        Err(_) => {
-                            self.result.powers.clip_err +=
-                                beam.power() / self.settings.scale_factor.powi(2);
-                            Vec::new()
-                        }
-                    }
-                }
-            }
-            BeamType::Initial => match beam.propagate(
-                &mut self.geom,
-                self.settings.medium_refr_index,
-                self.settings.beam_area_threshold(),
-            ) {
-                Ok((outputs, ..)) => outputs,
-
-                Err(_) => Vec::new(),
-            },
+            BeamType::Default => self.propagate_default(&mut beam),
+            BeamType::Initial => self.propagate_initial(&mut beam),
             _ => {
                 println!("Unknown beam type, returning empty outputs.");
                 Vec::new()
@@ -440,6 +375,71 @@ impl Problem {
             }
         }
         Some(BeamPropagation::new(beam, outputs))
+    }
+
+    fn propagate_initial(&mut self, beam: &mut Beam) -> Vec<Beam> {
+        match beam.propagate(
+            &mut self.geom,
+            self.settings.medium_refr_index,
+            self.settings.beam_area_threshold(),
+        ) {
+            Ok((outputs, ..)) => outputs,
+
+            Err(_) => Vec::new(),
+        }
+    }
+
+    fn propagate_default(&mut self, beam: &mut Beam) -> Vec<Beam> {
+        // truncation conditions for default beams
+        if beam.power() < self.settings.beam_power_threshold * self.settings.scale_factor.powi(2) {
+            self.result.powers.trnc_energy += beam.power() / self.settings.scale_factor.powi(2);
+            Vec::new()
+        } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
+            self.result.powers.trnc_area += beam.power() / self.settings.scale_factor.powi(2);
+            Vec::new()
+        } else if beam.variant == Some(BeamVariant::Tir) {
+            if beam.tir_count > self.settings.max_tir {
+                self.result.powers.trnc_ref += beam.power() / self.settings.scale_factor.powi(2);
+                Vec::new()
+            } else {
+                match beam.propagate(
+                    &mut self.geom,
+                    self.settings.medium_refr_index,
+                    self.settings.beam_area_threshold(),
+                ) {
+                    Ok((outputs, area_power_loss)) => {
+                        self.result.powers.trnc_area +=
+                            area_power_loss / self.settings.scale_factor.powi(2);
+                        outputs
+                    }
+                    Err(_) => {
+                        self.result.powers.clip_err +=
+                            beam.power() / self.settings.scale_factor.powi(2);
+                        Vec::new()
+                    }
+                }
+            }
+        } else if beam.rec_count > self.settings.max_rec {
+            self.result.powers.trnc_rec += beam.power() / self.settings.scale_factor.powi(2);
+            Vec::new()
+        } else {
+            match beam.propagate(
+                &mut self.geom,
+                self.settings.medium_refr_index,
+                self.settings.beam_area_threshold(),
+            ) {
+                Ok((outputs, area_power_loss)) => {
+                    self.result.powers.trnc_area +=
+                        area_power_loss / self.settings.scale_factor.powi(2);
+                    outputs
+                }
+                Err(_) => {
+                    self.result.powers.clip_err +=
+                        beam.power() / self.settings.scale_factor.powi(2);
+                    Vec::new()
+                }
+            }
+        }
     }
 
     /// Draws a `BeamPropagation` on top of a `Geom`.
