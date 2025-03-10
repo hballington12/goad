@@ -454,42 +454,38 @@ impl Problem {
     }
 
     /// Inserts a beam into the beam queue such that beams with greatest power
-    /// are prioritised for dequeueing.
+    /// are prioritised for dequeueing. Order is ascending because beams are
+    /// process by popping.
     pub fn insert_beam(&mut self, beam: Beam) {
-        let value = beam.power();
-        let queue = &self.beam_queue;
-
-        // Find the position to insert the beam using binary search
-        let pos = queue
-            .binary_search_by(|x| {
-                x.power()
-                    .partial_cmp(&value)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .unwrap_or_else(|e| e);
-
-        // Insert the beam at the determined position
+        let pos = get_position_by_power(beam.power(), &self.beam_queue, true);
         self.beam_queue.insert(pos, beam);
     }
 
     /// Inserts a beam into the outbeam queue such that beams with greatest power
-    /// are prioritised for dequeueing.
+    /// are prioritised for dequeueing. Order is descending because outbeams are
+    /// process sequentially.
     pub fn insert_outbeam(&mut self, beam: Beam) {
-        let value = beam.power();
-        let queue = &self.out_beam_queue;
-
-        // Find the position to insert the beam using binary search
-        let pos = queue
-            .binary_search_by(|x| {
-                value
-                    .partial_cmp(&x.power())
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .unwrap_or_else(|e| e);
-
-        // Insert the beam at the determined position
+        let pos = get_position_by_power(beam.power(), &self.out_beam_queue, false);
         self.out_beam_queue.insert(pos, beam);
     }
+}
+
+/// Find the position to insert the beam using binary search.
+fn get_position_by_power(value: f32, queue: &Vec<Beam>, ascending: bool) -> usize {
+    queue
+        .binary_search_by(|x| {
+            let cmp = x
+                .power()
+                .partial_cmp(&value)
+                .unwrap_or(std::cmp::Ordering::Equal);
+
+            if ascending {
+                cmp
+            } else {
+                cmp.reverse()
+            }
+        })
+        .unwrap_or_else(|e| e)
 }
 
 /// Creates a basic initial beam for full illumination of the geometry along the z-axis.
