@@ -1,4 +1,5 @@
 import goad_py as goad
+import time
 
 a = goad.sum_as_string(1, 2)
 print(a)
@@ -51,8 +52,8 @@ settings = goad.Settings(
     geom_name="hex.obj",
     max_rec=10,
     max_tir=10,
-    theta_res=100,
-    phi_res=100,
+    theta_res=361,
+    phi_res=181,
     euler=[0.0, 20.0, 0.0]
 )
 
@@ -60,11 +61,17 @@ print("creating goad problem")
 
 problem = goad.Problem(settings)
 
-print("settings wavelength:", settings.wavelength)
-
 print("solving goad problem")
 
-problem.py_solve()
+from concurrent.futures import ThreadPoolExecutor
+
+executor = ThreadPoolExecutor(max_workers=4)
+
+start_time = time.time()
+
+
+end_time = time.time()
+print(f"Solving took {end_time - start_time:.4f} seconds")
 
 problem.py_print_stats()
 

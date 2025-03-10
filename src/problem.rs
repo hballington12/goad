@@ -9,7 +9,7 @@ use crate::{
     settings::{self, Settings},
 };
 use macroquad::prelude::*;
-use nalgebra::{base, Complex, Matrix2, Point3, Vector3};
+use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use ndarray::Array2;
 use rayon::prelude::*;
 use std::{fmt, ops::DivAssign, ops::Add};
@@ -215,30 +215,16 @@ pub struct Problem {
     pub ext_diff_beam_queue: Vec<Beam>,   // beams awaiting external diffraction
     pub settings: Settings,               // runtime settings
     pub result: Result,                   // results of the problem
-    // scale_factor: f32,                    // scaling factor for geometry
 }
 
 #[pymethods]
 impl Problem {
     #[new]
     fn py_new(settings: Settings) -> Self {
-        println!("Settings: {:#?}", settings);
+        let mut geom = geom::Geom::from_file(&settings.geom_name).unwrap();
+        init_geom(&settings, &mut geom);
 
-        let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
         Problem::new(geom, Some(settings))
-    }
-
-    /// Function to apply the rotation to the geometry before the solve.
-    pub fn py_rerotate(&mut self) -> PyResult<()> {
-        match self.settings.orientation.scheme {
-            orientation::Scheme::Discrete { ref eulers } => {
-                let euler = &eulers[0];
-                self.geom.clone_from(&self.base_geom); // reclone the original geometry
-                self.geom.euler_rotate(euler.clone(), self.settings.orientation.euler_convention).unwrap();
-            }
-            _ => {}
-        }
-        Ok(())
     }
 
     /// Setter function for the problem settings
@@ -261,6 +247,20 @@ impl Problem {
 
     pub fn py_solve(&mut self) -> PyResult<()>{
         self.reset();
+
+        println!("Solve with settings: {:#?}", self.settings);
+
+        match self.settings.orientation.scheme {
+            orientation::Scheme::Discrete { ref eulers } => {
+                let euler = &eulers[0];
+                self.geom.clone_from(&self.base_geom); // reclone the original geometry
+                self.geom.euler_rotate(euler.clone(), self.settings.orientation.euler_convention).unwrap();
+            }
+            _ => {}
+        }
+
+        self.init();
+        self.illuminate();
         self.solve();
         self.try_mueller_to_1d();
         Ok(())
@@ -312,11 +312,8 @@ impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(mut geom: Geom, settings: Option<Settings>) -> Self {
 
-        let mut settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
-
-        // rescale geometry so the max dimension is 1
-        geom.recentre();
-        settings.scale_factor = geom.rescale();
+        let settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
+        init_geom(&settings, &mut geom);
 
         let bins = generate_bins(&settings.binning.scheme);
         let solution = Result::new_empty(bins);
@@ -334,13 +331,24 @@ impl Problem {
         problem
     }
 
-    /// Resets the problem and illuminates it with a basic initial beam.
+    /// Resets the problem. 
     pub fn reset(&mut self) {
         self.beam_queue.clear();
         self.out_beam_queue.clear();    
         self.ext_diff_beam_queue.clear();
         self.result = Result::new_empty(self.result.bins.clone());
+        self.geom.clone_from(&self.base_geom);
 
+    }
+
+    /// Initialises the geometry and scales it.
+    pub fn init(&mut self) {
+        self.geom.recentre();
+        self.settings.scale_factor = self.geom.rescale();
+    }
+
+    /// Illuminates the problem with a basic initial beam.
+    pub fn illuminate(&mut self) {
         let scaled_wavelength = self.settings.wavelength * self.settings.scale_factor;
 
         let beam = basic_initial_beam(&self.geom, scaled_wavelength, self.settings.medium_refr_index);
@@ -687,7 +695,8 @@ impl MultiProblem {
         println!("Solving problem...");
 
         // init a base problem that can be reset
-        let problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
+        let mut problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
+        problem_base.init();
         // let mut problem = problem_base.clone();
 
         let m = MultiProgress::new();
@@ -708,7 +717,7 @@ impl MultiProblem {
                 panic!("Error rotating geometry: {}", error);
             }
 
-            problem.reset();
+            problem.illuminate();
             problem.solve();
 
             let mueller = problem.result.mueller;

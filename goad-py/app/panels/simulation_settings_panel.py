@@ -329,23 +329,6 @@ class SimulationSettingsPanel(QWidget):
     def setup_goad_configuration(self):
         """Initialize the GOAD problem with default settings"""
         print("Creating GOAD settings and initializing problem...")
-        
-        # self.settings = goad.Settings(
-        #     wavelength=0.532,
-        #     beam_power_threshold=1e-1,
-        #     beam_area_threshold_fac=1e-1,
-        #     total_power_cutoff=0.99,
-        #     medium_refr_index_re=1.0,
-        #     medium_refr_index_im=0.0,
-        #     particle_refr_index_re=1.31,
-        #     particle_refr_index_im=0.0,
-        #     geom_name="hex.obj",
-        #     max_rec=10,
-        #     max_tir=10,
-        #     theta_res=181,
-        #     phi_res=181,
-        #     euler=[0.0, 0.0, 0.0]
-        # )
 
         # Create new settings object with values from UI controls
         self.settings = goad.Settings(
@@ -372,17 +355,14 @@ class SimulationSettingsPanel(QWidget):
     
     def run_simulation(self):
         """Handle the Run Simulation button click"""
-        print(f"Running simulation with:")
-        print(f"- Euler angles: [{self.euler_a.value()}, {self.euler_b.value()}, {self.euler_g.value()}]")
 
-        self.run_goad_sample()
+        self.run_goad()
 
-    def run_goad_sample(self):
+    def run_goad(self):
         """Run the GOAD simulation using the pre-initialized problem"""
 
         print("Creating GOAD problem...")
         self.problem = goad.Problem(self.settings)
-        print("GOAD settings initialized and ready.")
         
         print("Solving GOAD problem...")
 
