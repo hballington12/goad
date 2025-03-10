@@ -489,7 +489,7 @@ fn get_position_by_power(value: f32, queue: &Vec<Beam>, ascending: bool) -> usiz
 
 /// Creates a basic initial beam for full illumination of the geometry along the z-axis.
 fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
-    const FAC: f32 = 1.1;
+    const FAC: f32 = 1.1; // scale factor to stretch beam to cover geometry
     let bounds = geom.bounds();
     let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
 
