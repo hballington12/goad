@@ -75,10 +75,7 @@ async fn main() {
                 "\rnumber of beams in beam queue: {:?}    ", // Add spaces to overwrite previous text
                 problem.beam_queue.len()
             );
-            println!(
-                "number of beams in outbeams: {:?}    ",
-                problem.out_beam_queue.len()
-            );
+            println!("number of beams in outbeams: {:?}    ", problem.queue.len());
             io::stdout().flush().unwrap();
         } else {
             println!("No more beams to propagate.");

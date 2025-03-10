@@ -457,10 +457,10 @@ impl Problem {
     /// are prioritised for dequeueing.
     pub fn insert_beam(&mut self, beam: Beam) {
         let value = beam.power();
+        let queue = &self.beam_queue;
 
         // Find the position to insert the beam using binary search
-        let pos = self
-            .beam_queue
+        let pos = queue
             .binary_search_by(|x| {
                 x.power()
                     .partial_cmp(&value)
@@ -470,19 +470,16 @@ impl Problem {
 
         // Insert the beam at the determined position
         self.beam_queue.insert(pos, beam);
-
-        // Or just push
-        // self.beam_queue.push(beam);
     }
 
     /// Inserts a beam into the outbeam queue such that beams with greatest power
     /// are prioritised for dequeueing.
     pub fn insert_outbeam(&mut self, beam: Beam) {
         let value = beam.power();
+        let queue = &self.out_beam_queue;
 
         // Find the position to insert the beam using binary search
-        let pos = self
-            .out_beam_queue
+        let pos = queue
             .binary_search_by(|x| {
                 value
                     .partial_cmp(&x.power())
@@ -492,9 +489,6 @@ impl Problem {
 
         // Insert the beam at the determined position
         self.out_beam_queue.insert(pos, beam);
-
-        // Or just push
-        // self.out_beam_queue.push(beam);
     }
 }
 
