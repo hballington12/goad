@@ -9,6 +9,8 @@ pub mod geom;
 pub mod helpers;
 pub mod orientation;
 pub mod output;
+pub mod powers;
 pub mod problem;
+pub mod result;
 pub mod settings;
 pub mod snell;

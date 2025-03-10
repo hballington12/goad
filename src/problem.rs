@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, Scheme},
@@ -6,15 +8,16 @@ use crate::{
     helpers::draw_face,
     orientation::{self, Euler, Orientations},
     output,
-    settings::{self, Settings},
+    powers::Powers,
+    result::Result,
+    settings::{load_config, Settings},
 };
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use ndarray::Array2;
-use rayon::prelude::*;
-use std::{fmt, ops::DivAssign, ops::Add};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use pyo3::prelude::*;
+use rayon::prelude::*;
 
 #[cfg(test)]
 mod tests {
@@ -43,178 +46,17 @@ mod tests {
     }
 }
 
-#[derive(Debug, Copy,  Clone, PartialEq)]
-pub struct Powers {
-    pub input: f32,       // near-field input power
-    pub output: f32,      // near-field output power
-    pub absorbed: f32,    // near-field absorbed power
-    pub trnc_ref: f32,    // truncated power due to max reflections
-    pub trnc_rec: f32,    // truncated power due to max recursions
-    pub trnc_clip: f32,   // truncated power due to clipping
-    pub trnc_energy: f32, // truncated power due to threshold beam power
-    pub clip_err: f32, // truncated power due to clipping error
-    pub trnc_area: f32,   // truncated power due to area threshold
-    pub trnc_cop: f32,    // truncated power due to cutoff power
-    pub ext_diff: f32,    // external diffraction power
-}
-
-impl DivAssign<f32> for Powers {
-    fn div_assign(&mut self, rhs: f32) {
-        self.input /= rhs;
-        self.output /= rhs;
-        self.absorbed /= rhs;
-        self.trnc_ref /= rhs;
-        self.trnc_rec /= rhs;
-        self.trnc_clip /= rhs;
-        self.trnc_energy /= rhs;
-        self.clip_err /= rhs;
-        self.trnc_area /= rhs;
-        self.trnc_cop /= rhs;
-        self.ext_diff /= rhs;
-    }
-}
-
-impl Add for Powers {
-    type Output = Self;
-
-    fn add(self, other: Self) -> Self {
-        Self {
-            input: self.input + other.input,
-            output: self.output + other.output,
-            absorbed: self.absorbed + other.absorbed,
-            trnc_ref: self.trnc_ref + other.trnc_ref,
-            trnc_rec: self.trnc_rec + other.trnc_rec,
-            trnc_clip: self.trnc_clip + other.trnc_clip,
-            trnc_energy: self.trnc_energy + other.trnc_energy,
-            clip_err: self.clip_err + other.clip_err,
-            trnc_area: self.trnc_area + other.trnc_area,
-            trnc_cop: self.trnc_cop + other.trnc_cop,
-            ext_diff: self.ext_diff + other.ext_diff,
-        }
-    }
-}
-
-use std::ops::AddAssign;
-use std::time::Instant;
-
-impl AddAssign for Powers {
-    fn add_assign(&mut self, other: Self) {
-        *self = Self {
-            input: self.input + other.input,
-            output: self.output + other.output,
-            absorbed: self.absorbed + other.absorbed,
-            trnc_ref: self.trnc_ref + other.trnc_ref,
-            trnc_rec: self.trnc_rec + other.trnc_rec,
-            trnc_clip: self.trnc_clip + other.trnc_clip,
-            trnc_energy: self.trnc_energy + other.trnc_energy,
-            clip_err: self.clip_err + other.clip_err,
-            trnc_area: self.trnc_area + other.trnc_area,
-            trnc_cop: self.trnc_cop + other.trnc_cop,
-            ext_diff: self.ext_diff + other.ext_diff,
-        };
-    }
-}
-
-impl Powers {
-    pub fn new() -> Self {
-        Self {
-            input: 0.0,
-            output: 0.0,
-            absorbed: 0.0,
-            trnc_ref: 0.0,
-            trnc_rec: 0.0,
-            trnc_clip: 0.0,
-            trnc_energy: 0.0,
-            clip_err: 0.0,
-            trnc_area: 0.0,
-            trnc_cop: 0.0,
-            ext_diff: 0.0,
-        }
-    }
-
-    /// Returns the power unaccounted for.
-    pub fn missing(&self) -> f32 {
-        self.input
-            - (self.output
-                + self.absorbed
-                + self.trnc_ref
-                + self.trnc_rec
-                // + self.trnc_clip
-                + self.trnc_area    
-                + self.clip_err
-                + self.trnc_cop
-                + self.trnc_energy)
-    }
-}
-
-impl fmt::Display for Powers {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Powers:")?;
-        writeln!(f, "  Input:            {:.6}", self.input)?;
-        writeln!(f, "  Output:           {:.6}", self.output)?;
-        writeln!(f, "  Absorbed:         {:.6}", self.absorbed)?;
-        writeln!(f, "  Trunc. Refl:      {:.6}", self.trnc_ref)?;
-        writeln!(f, "  Trunc. Rec:       {:.6}", self.trnc_rec)?;
-        // writeln!(f, "  Trunc. Clip:   {:.6}", self.trnc_clip)?;
-        writeln!(f, "  Clip Err:         {:.6}", self.clip_err)?;
-        writeln!(f, "  Trunc. Energy:    {:.6}", self.trnc_energy)?;
-        writeln!(f, "  Trunc. Area:      {:.6}", self.trnc_area)?;
-        writeln!(f, "  Trunc. Cop:       {:.6}", self.trnc_cop)?;
-        writeln!(f, "  Other:            {:.6}", self.missing())?;
-        writeln!(f, "  External Diff:    {:.6}", self.ext_diff)
-    }
-}
-
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Result {
-    pub powers: Powers,
-    pub bins: Vec<(f32, f32)>,
-    pub mueller: Array2::<f32>,
-    pub ampl: Vec<Matrix2<Complex<f32>>>,
-    pub bins_1d: Option<Vec<f32>>,
-    pub mueller_1d: Option<Array2::<f32>>,
-}
-
-impl Result {
-    /// Creates a new `Result` with empty mueller and amplitude matrix
-    pub fn new_empty(bins: Vec<(f32, f32)>) -> Self {
-        let mueller = Array2::<f32>::zeros((bins.len(), 16));
-        let ampl = vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
-        Self {
-            powers: Powers::new(),
-            bins,
-            mueller,
-            ampl,
-            bins_1d: None,
-            mueller_1d: None,
-        }
-    }
-
-    pub fn try_mueller_to_1d(&mut self) -> std::result::Result<(), anyhow::Error> {
-        match output::try_mueller_to_1d(&self.bins, &self.mueller) {
-            Ok((theta, mueller_1d)) => {
-                self.bins_1d = Some(theta);
-                self.mueller_1d = Some(mueller_1d);
-
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
-    }
-}
-
 /// A solvable physics problem.
 #[pyclass]
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Problem {
-    pub base_geom: Geom,                  // original geometry
-    pub geom: Geom,                       // geometry to trace beams in
-    pub beam_queue: Vec<Beam>,            // beams awaiting near-field propagation
-    pub out_beam_queue: Vec<Beam>,        // beams awaiting diffraction
-    pub ext_diff_beam_queue: Vec<Beam>,   // beams awaiting external diffraction
-    pub settings: Settings,               // runtime settings
-    pub result: Result,                   // results of the problem
+    pub base_geom: Geom,                // original geometry
+    pub geom: Geom,                     // geometry to trace beams in
+    pub beam_queue: Vec<Beam>,          // beams awaiting near-field propagation
+    pub out_beam_queue: Vec<Beam>,      // beams awaiting diffraction
+    pub ext_diff_beam_queue: Vec<Beam>, // beams awaiting external diffraction
+    pub settings: Settings,             // runtime settings
+    pub result: Result,                 // results of the problem
 }
 
 #[pymethods]
@@ -245,7 +87,7 @@ impl Problem {
         self.geom.clone()
     }
 
-    pub fn py_solve(&mut self) -> PyResult<()>{
+    pub fn py_solve(&mut self) -> PyResult<()> {
         self.reset();
 
         println!("Solve with settings: {:#?}", self.settings);
@@ -254,7 +96,9 @@ impl Problem {
             orientation::Scheme::Discrete { ref eulers } => {
                 let euler = &eulers[0];
                 self.geom.clone_from(&self.base_geom); // reclone the original geometry
-                self.geom.euler_rotate(euler.clone(), self.settings.orientation.euler_convention).unwrap();
+                self.geom
+                    .euler_rotate(euler.clone(), self.settings.orientation.euler_convention)
+                    .unwrap();
             }
             _ => {}
         }
@@ -305,14 +149,21 @@ impl Problem {
         }
     }
 
-
+    /// getter function to retrieve Python object containing the theta values for the 1d mueller matrix
+    #[getter]
+    pub fn get_theta_1d(&self) -> Vec<f32> {
+        if let Some(theta) = &self.result.bins_1d {
+            theta.clone()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 impl Problem {
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new(mut geom: Geom, settings: Option<Settings>) -> Self {
-
-        let settings = settings.unwrap_or_else(|| settings::load_config().expect("Failed to load config"));
+        let settings = settings.unwrap_or_else(|| load_config().expect("Failed to load config"));
         init_geom(&settings, &mut geom);
 
         let bins = generate_bins(&settings.binning.scheme);
@@ -331,14 +182,13 @@ impl Problem {
         problem
     }
 
-    /// Resets the problem. 
+    /// Resets the problem.
     pub fn reset(&mut self) {
         self.beam_queue.clear();
-        self.out_beam_queue.clear();    
+        self.out_beam_queue.clear();
         self.ext_diff_beam_queue.clear();
         self.result = Result::new_empty(self.result.bins.clone());
         self.geom.clone_from(&self.base_geom);
-
     }
 
     /// Initialises the geometry and scales it.
@@ -351,14 +201,18 @@ impl Problem {
     pub fn illuminate(&mut self) {
         let scaled_wavelength = self.settings.wavelength * self.settings.scale_factor;
 
-        let beam = basic_initial_beam(&self.geom, scaled_wavelength, self.settings.medium_refr_index);
+        let beam = basic_initial_beam(
+            &self.geom,
+            scaled_wavelength,
+            self.settings.medium_refr_index,
+        );
 
         self.beam_queue.push(beam);
     }
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        let settings = settings::load_config().expect("Failed to load config");
+        let settings = load_config().expect("Failed to load config");
 
         let bins = generate_bins(&settings.binning.scheme);
         let solution = Result::new_empty(bins);
@@ -381,9 +235,7 @@ impl Problem {
     ) {
         let ampl_far_field = queue
             .par_iter()
-            .map(|outbeam| {
-                outbeam.diffract(bins)
-            })
+            .map(|outbeam| outbeam.diffract(bins))
             .reduce(
                 || vec![Matrix2::<Complex<f32>>::zeros(); bins.len()],
                 |mut acc, local| {
@@ -427,17 +279,17 @@ impl Problem {
 
         // try compute 1d mueller
         match self.settings.binning.scheme {
-            Scheme::Custom { .. } => {}, // 1d mueller not supported for custom bins
-            _ => {
-                match output::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-                    Ok((theta, mueller_1d)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d);
-                        self.result.bins_1d = Some(theta);
-                        self.result.mueller_1d = Some(mueller_1d);
-                    }
-                    Err(e) => {println!("Failed to compute 1d mueller: {}",e);},
+            Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
+            _ => match output::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+                Ok((theta, mueller_1d)) => {
+                    let _ = output::write_mueller_1d(&theta, &mueller_1d);
+                    self.result.bins_1d = Some(theta);
+                    self.result.mueller_1d = Some(mueller_1d);
                 }
-            }
+                Err(e) => {
+                    println!("Failed to compute 1d mueller: {}", e);
+                }
+            },
         }
     }
 
@@ -459,9 +311,15 @@ impl Problem {
                 break;
             }
 
-            if self.result.powers.output / self.result.powers.input > self.settings.total_power_cutoff {
+            if self.result.powers.output / self.result.powers.input
+                > self.settings.total_power_cutoff
+            {
                 // add remaining power in beam queue to missing power due to cutoff
-                self.result.powers.trnc_cop += self.beam_queue.iter().map(|beam| beam.power() / self.settings.scale_factor.powi(2)).sum::<f32>();
+                self.result.powers.trnc_cop += self
+                    .beam_queue
+                    .iter()
+                    .map(|beam| beam.power() / self.settings.scale_factor.powi(2))
+                    .sum::<f32>();
                 break;
             }
 
@@ -486,45 +344,57 @@ impl Problem {
         let outputs = match &mut beam.type_ {
             BeamType::Default => {
                 // truncation conditions
-                if beam.power() < self.settings.beam_power_threshold * self.settings.scale_factor.powi(2) {
-                    self.result.powers.trnc_energy += beam.power() / self.settings.scale_factor.powi(2);
+                if beam.power()
+                    < self.settings.beam_power_threshold * self.settings.scale_factor.powi(2)
+                {
+                    self.result.powers.trnc_energy +=
+                        beam.power() / self.settings.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
-                    self.result.powers.trnc_area += beam.power() / self.settings.scale_factor.powi(2);
+                    self.result.powers.trnc_area +=
+                        beam.power() / self.settings.scale_factor.powi(2);
                     Vec::new()
                 } else if beam.variant == Some(BeamVariant::Tir) {
                     if beam.tir_count > self.settings.max_tir {
-                        self.result.powers.trnc_ref += beam.power() / self.settings.scale_factor.powi(2);
+                        self.result.powers.trnc_ref +=
+                            beam.power() / self.settings.scale_factor.powi(2);
                         Vec::new()
                     } else {
                         match beam.propagate(
                             &mut self.geom,
                             self.settings.medium_refr_index,
-                            self.settings.beam_area_threshold()
+                            self.settings.beam_area_threshold(),
                         ) {
-                            Ok((outputs,area_power_loss)) => {
-                                self.result.powers.trnc_area += area_power_loss / self.settings.scale_factor.powi(2);
-                                outputs},
+                            Ok((outputs, area_power_loss)) => {
+                                self.result.powers.trnc_area +=
+                                    area_power_loss / self.settings.scale_factor.powi(2);
+                                outputs
+                            }
                             Err(_) => {
-                                self.result.powers.clip_err += beam.power() / self.settings.scale_factor.powi(2);
+                                self.result.powers.clip_err +=
+                                    beam.power() / self.settings.scale_factor.powi(2);
                                 Vec::new()
                             }
                         }
                     }
                 } else if beam.rec_count > self.settings.max_rec {
-                    self.result.powers.trnc_rec += beam.power() / self.settings.scale_factor.powi(2);
+                    self.result.powers.trnc_rec +=
+                        beam.power() / self.settings.scale_factor.powi(2);
                     Vec::new()
                 } else {
                     match beam.propagate(
                         &mut self.geom,
                         self.settings.medium_refr_index,
-                        self.settings.beam_area_threshold()
+                        self.settings.beam_area_threshold(),
                     ) {
-                        Ok((outputs,area_power_loss)) => {
-                                self.result.powers.trnc_area += area_power_loss / self.settings.scale_factor.powi(2);
-                                outputs},
+                        Ok((outputs, area_power_loss)) => {
+                            self.result.powers.trnc_area +=
+                                area_power_loss / self.settings.scale_factor.powi(2);
+                            outputs
+                        }
                         Err(_) => {
-                            self.result.powers.clip_err += beam.power() / self.settings.scale_factor.powi(2);
+                            self.result.powers.clip_err +=
+                                beam.power() / self.settings.scale_factor.powi(2);
                             Vec::new()
                         }
                     }
@@ -533,14 +403,11 @@ impl Problem {
             BeamType::Initial => match beam.propagate(
                 &mut self.geom,
                 self.settings.medium_refr_index,
-                self.settings.beam_area_threshold()
+                self.settings.beam_area_threshold(),
             ) {
-                Ok((outputs,..)) => {
-                outputs},
+                Ok((outputs, ..)) => outputs,
 
-                Err(_) => {
-                    Vec::new()
-                }
+                Err(_) => Vec::new(),
             },
             _ => {
                 println!("Unknown beam type, returning empty outputs.");
@@ -549,7 +416,8 @@ impl Problem {
         };
 
         self.result.powers.absorbed += beam.absorbed_power / self.settings.scale_factor.powi(2);
-        self.result.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power() / self.settings.scale_factor.powi(2);
+        self.result.powers.trnc_clip += (beam.clipping_area - beam.csa()).abs() * beam.power()
+            / self.settings.scale_factor.powi(2);
 
         // Process each output beam
         for output in outputs.iter() {
@@ -588,7 +456,7 @@ impl Problem {
     /// Inserts a beam into the beam queue such that beams with greatest power
     /// are prioritised for dequeueing.
     pub fn insert_beam(&mut self, beam: Beam) {
-        let value = beam.power() ;
+        let value = beam.power();
 
         // Find the position to insert the beam using binary search
         let pos = self
@@ -634,7 +502,7 @@ impl Problem {
 fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
     const FAC: f32 = 1.1;
     let bounds = geom.bounds();
-    let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));    
+    let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
 
     let clip_vertices = vec![
         Point3::new(max[0], max[1], max[2]),
@@ -669,8 +537,8 @@ pub struct MultiProblem {
     pub geom: Geom,
     pub problems: Vec<Problem>,
     pub orientations: Orientations,
-    pub settings: Settings,                 // runtime settings
-    pub result: Result,                     // averaged result of the problems
+    pub settings: Settings, // runtime settings
+    pub result: Result,     // averaged result of the problems
 }
 
 impl MultiProblem {
@@ -685,12 +553,17 @@ impl MultiProblem {
         let bins = generate_bins(&settings.binning.scheme);
         let result = Result::new_empty(bins);
 
-        Self { geom, problems, orientations, settings, result }
+        Self {
+            geom,
+            problems,
+            orientations,
+            settings,
+            result,
+        }
     }
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
-
         let start = Instant::now();
         println!("Solving problem...");
 
@@ -711,26 +584,42 @@ impl MultiProblem {
         );
         pb.set_message("orientation".to_string());
 
-        (self.result.mueller,self.result.powers) = self.orientations.eulers.par_iter().map(|(a,b,g)| {
-            let mut problem = problem_base.clone();
-            if let Err(error) = problem.geom.euler_rotate(Euler::new(*a, *b, *g), problem.settings.orientation.euler_convention) {
-                panic!("Error rotating geometry: {}", error);
-            }
+        (self.result.mueller, self.result.powers) = self
+            .orientations
+            .eulers
+            .par_iter()
+            .map(|(a, b, g)| {
+                let mut problem = problem_base.clone();
+                if let Err(error) = problem.geom.euler_rotate(
+                    Euler::new(*a, *b, *g),
+                    problem.settings.orientation.euler_convention,
+                ) {
+                    panic!("Error rotating geometry: {}", error);
+                }
 
-            problem.illuminate();
-            problem.solve();
+                problem.illuminate();
+                problem.solve();
 
-            let mueller = problem.result.mueller;
+                let mueller = problem.result.mueller;
 
-            pb.inc(1);
-            (mueller, problem.result.powers)
-        }).reduce(|| (Array2::<f32>::zeros((self.result.bins.len(), 16)), Powers::new()), |(mut acc_mueller, mut acc_powers), (local_mueller, local_powers)| {
-            for (a, l) in acc_mueller.iter_mut().zip(local_mueller) {
-                *a += l;
-            }
-            acc_powers += local_powers;
-            (acc_mueller, acc_powers)
-        });
+                pb.inc(1);
+                (mueller, problem.result.powers)
+            })
+            .reduce(
+                || {
+                    (
+                        Array2::<f32>::zeros((self.result.bins.len(), 16)),
+                        Powers::new(),
+                    )
+                },
+                |(mut acc_mueller, mut acc_powers), (local_mueller, local_powers)| {
+                    for (a, l) in acc_mueller.iter_mut().zip(local_mueller) {
+                        *a += l;
+                    }
+                    acc_powers += local_powers;
+                    (acc_mueller, acc_powers)
+                },
+            );
 
         // normalise
         for mut row in self.result.mueller.outer_iter_mut() {
@@ -750,16 +639,14 @@ impl MultiProblem {
 
         // try compute 1d mueller
         match self.settings.binning.scheme {
-            Scheme::Custom { .. } => {}, // 1d mueller not supported for custom bins
-            _ => {
-                match output::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-                    Ok((theta, mueller_1d)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d);
-                        self.result.mueller_1d = Some(mueller_1d);
-                    }
-                    Err(..) => {},
+            Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
+            _ => match output::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+                Ok((theta, mueller_1d)) => {
+                    let _ = output::write_mueller_1d(&theta, &mueller_1d);
+                    self.result.mueller_1d = Some(mueller_1d);
                 }
-            }
+                Err(..) => {}
+            },
         }
 
         // pb.finish_with_message(format!("(done)";
@@ -769,8 +656,6 @@ impl MultiProblem {
     pub fn writeup(&self) {
         let _ = output::write_mueller(&self.result.bins, &self.result.mueller);
     }
-
-
 }
 
 /// Initialises the geometry with the refractive indices from the settings.
@@ -780,7 +665,7 @@ fn init_geom(settings: &Settings, geom: &mut Geom) {
     for shape in geom.shapes.iter_mut() {
         shape.refr_index = settings.particle_refr_index[0]; // default refr index is first value
     }
-    for (i,refr_index) in settings.particle_refr_index.iter().enumerate() {
+    for (i, refr_index) in settings.particle_refr_index.iter().enumerate() {
         if i >= geom.shapes.len() {
             break;
         }

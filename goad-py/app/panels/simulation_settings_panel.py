@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QFormLayout, QDoubleSpinBox, 
                             QCheckBox, QLabel, QPushButton, QSlider, QHBoxLayout)
 from PyQt6.QtCore import pyqtSignal, Qt
 import goad_py as goad
-import numpy as np
+from PyQt6.QtWidgets import QScrollArea
 
 class SimulationSettingsPanel(QWidget):
     """Panel for simulation settings"""
@@ -19,7 +19,20 @@ class SimulationSettingsPanel(QWidget):
         self.connect_signals()
         
     def initUI(self):
-        layout = QVBoxLayout()
+        # Create a main layout for the whole panel
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create a scroll area that will contain all our controls
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Create a widget to hold all controls
+        scroll_widget = QWidget()
+        layout = QVBoxLayout(scroll_widget)
+        
         form_layout = QFormLayout()
         
         # Simulation algorithm
@@ -212,7 +225,17 @@ class SimulationSettingsPanel(QWidget):
         # Add stretch to push everything to the top
         layout.addStretch(1)
         
-        self.setLayout(layout)
+        # Set the layout on the scroll widget
+        scroll_widget.setLayout(layout)
+        
+        # Put the scroll widget into the scroll area
+        scroll_area.setWidget(scroll_widget)
+        
+        # Add the scroll area to the main layout
+        main_layout.addWidget(scroll_area)
+        
+        # Set the main layout on the panel
+        self.setLayout(main_layout)
     
     def connect_signals(self):
         """Connect widget signals to update handlers"""
@@ -374,7 +397,9 @@ class SimulationSettingsPanel(QWidget):
         
         # Get the Mueller data
         mueller_1d = self.problem.mueller_1d
+
+        angles = self.problem.theta_1d
         
         # Emit the signal with the Mueller data
-        self.mueller_data_ready.emit(mueller_1d)
+        self.mueller_data_ready.emit((angles,mueller_1d))
         print("Mueller data emitted.")

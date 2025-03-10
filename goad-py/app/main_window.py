@@ -41,6 +41,7 @@ class MainWindow(QMainWindow):
         self.plot_widget = MatplotlibWidget()
         self.plot_dock.setWidget(self.plot_widget)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
+        self.plot_dock.setVisible(False)
         
         # Properties panel (left side)
         self.properties_dock = QDockWidget("Properties", self)
@@ -48,6 +49,7 @@ class MainWindow(QMainWindow):
         self.properties_panel = PropertiesPanel()
         self.properties_dock.setWidget(self.properties_panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.properties_dock)
+        self.properties_dock.setVisible(False)
         
         # Simulation settings panel (left side)
         self.simulation_dock = QDockWidget("Simulation Settings", self)
@@ -62,6 +64,7 @@ class MainWindow(QMainWindow):
         self.outliner_panel = OutlinerPanel()
         self.outliner_dock.setWidget(self.outliner_panel)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.outliner_dock)
+        self.outliner_dock.setVisible(False)
         
         # Console panel (bottom)
         self.console_dock = QDockWidget("Console", self)
@@ -86,6 +89,8 @@ class MainWindow(QMainWindow):
             self.opengl_widget.set_rotation_z)
         self.simulation_panel.mueller_data_ready.connect(
             self.plot_widget.plot_mueller_data)
+        self.simulation_panel.mueller_data_ready.connect(
+            self.showPlotDock)
 
     def createActions(self):
         """Create application actions"""
@@ -110,7 +115,7 @@ class MainWindow(QMainWindow):
         self.plotViewAct = QAction("&Plot View", self,
                                   statusTip="Show/hide plot panel",
                                   checkable=True,
-                                  checked=True,
+                                  checked=False,
                                   triggered=self.togglePlotView)
         
         self.controlsAct = QAction("&Controls", self,
@@ -122,13 +127,13 @@ class MainWindow(QMainWindow):
         self.propertiesAct = QAction("&Properties", self,
                                     statusTip="Show/hide properties panel",
                                     checkable=True,
-                                    checked=True,
+                                    checked=False,
                                     triggered=self.toggleProperties)
         
         self.outlinerAct = QAction("&Outliner", self,
                                   statusTip="Show/hide outliner panel",
                                   checkable=True,
-                                  checked=True,
+                                  checked=False,
                                   triggered=self.toggleOutliner)
         
         self.consoleAct = QAction("&Console", self,
@@ -143,28 +148,11 @@ class MainWindow(QMainWindow):
                                           checked=True,
                                           triggered=self.toggleSimulationSettings)
         
-        # Plot menu actions
-        self.sinePlotAct = QAction("&Sine Plot", self,
-                                  statusTip="Show sine plot",
-                                  triggered=self.createSinePlot)
-        
-        self.cosinePlotAct = QAction("&Cosine Plot", self,
-                                    statusTip="Show cosine plot",
-                                    triggered=self.createCosinePlot)
-        
         # Layout actions
-        self.defaultLayoutAct = QAction("&Default Layout", self,
+        self.defaultLayoutAct = QAction("&Reset Layout", self,
                                       statusTip="Reset to default layout",
                                       triggered=self.setDefaultLayout)
         
-        self.compactLayoutAct = QAction("&Compact Layout", self,
-                                      statusTip="Switch to compact layout",
-                                      triggered=self.setCompactLayout)
-        
-        self.wideLayoutAct = QAction("&Wide Layout", self,
-                                   statusTip="Switch to wide layout",
-                                   triggered=self.setWideLayout)
-    
     def createMenus(self):
         """Create application menus"""
         self.fileMenu = self.menuBar().addMenu("&File")
@@ -185,12 +173,8 @@ class MainWindow(QMainWindow):
         
         self.layoutMenu = self.viewMenu.addMenu("&Layouts")
         self.layoutMenu.addAction(self.defaultLayoutAct)
-        self.layoutMenu.addAction(self.compactLayoutAct)
-        self.layoutMenu.addAction(self.wideLayoutAct)
         
         self.plotMenu = self.menuBar().addMenu("&Plot")
-        self.plotMenu.addAction(self.sinePlotAct)
-        self.plotMenu.addAction(self.cosinePlotAct)
     
     def createToolBars(self):
         """Create application toolbars"""
@@ -238,18 +222,9 @@ class MainWindow(QMainWindow):
     def toggleSimulationSettings(self):
         self.simulation_dock.setVisible(self.simulationSettingsAct.isChecked())
     
-    # Plot actions
-    def createSinePlot(self):
-        """Create sine plot"""
-        self.plot_widget.create_sine_plot()
-        self.statusBar().showMessage("Created sine plot")
-        self.console_panel.log("Created sine plot")
-    
-    def createCosinePlot(self):
-        """Create cosine plot"""
-        self.plot_widget.create_cosine_plot()
-        self.statusBar().showMessage("Created cosine plot")
-        self.console_panel.log("Created cosine plot")
+    def showPlotDock(self):
+        if not self.plot_dock.isVisible():
+            self.plot_dock.setVisible(True)
     
     # Layout actions
     def setDefaultLayout(self):
@@ -257,46 +232,19 @@ class MainWindow(QMainWindow):
         self.console_panel.log("Switched to default layout")
         
         # Re-add all widgets to their default locations
-        for dock in [self.plot_dock, self.control_dock, self.properties_dock, 
+        for dock in [self.plot_dock, self.properties_dock, 
                     self.simulation_dock, self.outliner_dock, self.console_dock]:
             if dock.isFloating():
                 dock.setFloating(False)
                 
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.control_dock)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.properties_dock)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.simulation_dock)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.outliner_dock)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.console_dock)
         self.tabifyDockWidget(self.properties_dock, self.simulation_dock)
         self.tabifyDockWidget(self.simulation_dock, self.outliner_dock)
-    
-    def setCompactLayout(self):
-        self.statusBar().showMessage("Switching to compact layout...")
-        self.console_panel.log("Switched to compact layout")
-        
-        # Tabify panels for compact view
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.properties_dock)
-        self.tabifyDockWidget(self.plot_dock, self.properties_dock)
-        
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.control_dock)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.outliner_dock)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.console_dock)
-        self.tabifyDockWidget(self.control_dock, self.outliner_dock)
-        self.tabifyDockWidget(self.control_dock, self.console_dock)
-    
-    def setWideLayout(self):
-        self.statusBar().showMessage("Switching to wide layout...")
-        self.console_panel.log("Switched to wide layout")
-        
-        # Arrange panels for widescreen
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.properties_dock)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.outliner_dock)
-        self.splitDockWidget(self.properties_dock, self.outliner_dock, Qt.Orientation.Vertical)
-        
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.plot_dock)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.control_dock)
-        self.splitDockWidget(self.plot_dock, self.control_dock, Qt.Orientation.Vertical)
-        
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.console_dock)
+
+        self.properties_dock.setVisible(False)
+        self.outliner_dock.setVisible(False)
+        self.plot_dock.setVisible(False)
