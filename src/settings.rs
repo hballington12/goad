@@ -136,6 +136,28 @@ impl Settings {
     }
 }
 
+pub fn load_default_config() -> Result<Settings> {
+    let goad_dir = retrieve_project_root();
+    let default_config_file = goad_dir.join("config/default.toml");
+
+    let settings: Config = Config::builder()
+        .add_source(File::from(default_config_file).required(true))
+        .build()
+        .unwrap_or_else(|err| {
+            eprintln!("Error loading configuration: {}", err);
+            std::process::exit(1);
+        });
+
+    let config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
+        eprintln!("Error deserializing configuration: {}", err);
+        std::process::exit(1);
+    });
+
+    validate_config(&config);
+
+    Ok(config)
+}
+
 pub fn load_config() -> Result<Settings> {
     // Try to find the project directory in different ways
     let goad_dir = retrieve_project_root();
@@ -152,7 +174,7 @@ pub fn load_config() -> Result<Settings> {
         default_config_file
     };
 
-    let default_settings: Config = Config::builder()
+    let settings: Config = Config::builder()
         .add_source(File::from(config_file).required(true))
         .add_source(Environment::with_prefix("goad"))
         .build()
@@ -163,7 +185,7 @@ pub fn load_config() -> Result<Settings> {
 
     // println!("config: {:#?}", default_settings);
 
-    let mut config: Settings = default_settings.try_deserialize().unwrap_or_else(|err| {
+    let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
         std::process::exit(1);
     });

@@ -6,6 +6,7 @@ use goad::{
     problem::{collect_mueller, MultiProblem},
     settings,
 };
+use num_complex::Complex32;
 
 // Tolerance for comparing Mueller matrix elements
 const TOL: f32 = 1e-1;
@@ -17,7 +18,7 @@ fn hello_world() {
 
 #[test]
 fn fixed_hex_30_30_30() {
-    let mut settings = settings::load_config().unwrap();
+    let mut settings = settings::load_default_config().unwrap();
     // Reduce binning for faster testing
     settings.binning = BinningScheme {
         scheme: bins::Scheme::Simple {
@@ -37,6 +38,33 @@ fn fixed_hex_30_30_30() {
 
     let result = collect_mueller(&multiproblem.result.mueller);
     let reference = load_reference_mueller("fixed_hex_30_30_30_mueller_scatgrid").unwrap();
+    compare_results(result, reference, TOL).unwrap();
+}
+
+#[test]
+fn fixed_hex_30_20_20() {
+    let mut settings = settings::load_default_config().unwrap();
+    // Reduce binning for faster testing
+    settings.binning = BinningScheme {
+        scheme: bins::Scheme::Simple {
+            num_theta: 19,
+            num_phi: 19,
+        },
+    };
+    settings.orientation = goad::orientation::OrientationScheme {
+        scheme: goad::orientation::Scheme::Discrete {
+            eulers: vec![Euler::new(30.0, 20.0, 20.0)],
+        },
+        euler_convention: goad::orientation::EulerConvention::ZYZ,
+    };
+    // Change the refractive index
+    settings.particle_refr_index = vec![Complex32::new(1.3117, 0.1)];
+
+    let mut multiproblem = MultiProblem::new(settings);
+    multiproblem.solve();
+
+    let result = collect_mueller(&multiproblem.result.mueller);
+    let reference = load_reference_mueller("fixed_hex_30_20_20_mueller_scatgrid").unwrap();
     compare_results(result, reference, TOL).unwrap();
 }
 
