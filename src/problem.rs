@@ -119,15 +119,7 @@ impl Problem {
     // convert the Array2 to a list of lists and return
     #[getter]
     pub fn get_mueller(&self) -> Vec<Vec<f32>> {
-        let mut mueller_list = Vec::new();
-        for row in self.result.mueller.outer_iter() {
-            let mut row_list = Vec::new();
-            for val in row.iter() {
-                row_list.push(*val);
-            }
-            mueller_list.push(row_list);
-        }
-        mueller_list
+        collect_mueller(&self.result.mueller)
     }
 
     // getter function to retrieve Python object containing the 1d mueller matrix
@@ -467,6 +459,20 @@ impl Problem {
         let pos = get_position_by_power(beam.power(), &self.out_beam_queue, false);
         self.out_beam_queue.insert(pos, beam);
     }
+}
+
+/// Collects a 2d array as a list of lists.
+/// There is probably already a function for this in ndarray.
+pub fn collect_mueller(array2: &Array2<f32>) -> Vec<Vec<f32>> {
+    let mut mueller_list = Vec::new();
+    for row in array2.outer_iter() {
+        let mut row_list = Vec::new();
+        for val in row.iter() {
+            row_list.push(*val);
+        }
+        mueller_list.push(row_list);
+    }
+    mueller_list
 }
 
 /// Find the position to insert the beam using binary search.

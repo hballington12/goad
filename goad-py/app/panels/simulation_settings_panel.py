@@ -66,12 +66,12 @@ class SimulationSettingsPanel(QWidget):
         form_layout.addRow("Beam Area Threshold:", self.beam_area_threshold_fac)
         
         # Power cutoff
-        self.total_power_cutoff = QDoubleSpinBox()
-        self.total_power_cutoff.setRange(0.01, 1.00)
-        self.total_power_cutoff.setValue(0.99)
-        self.total_power_cutoff.setDecimals(4)
-        self.total_power_cutoff.setSingleStep(0.01)
-        form_layout.addRow("Power Cutoff:", self.total_power_cutoff)
+        self.cutoff = QDoubleSpinBox()
+        self.cutoff.setRange(0.01, 1.00)
+        self.cutoff.setValue(0.99)
+        self.cutoff.setDecimals(4)
+        self.cutoff.setSingleStep(0.01)
+        form_layout.addRow("Power Cutoff:", self.cutoff)
         
         # Medium refractive index
         self.medium_refr_index_re = QDoubleSpinBox()
@@ -251,7 +251,7 @@ class SimulationSettingsPanel(QWidget):
         self.wavelength.valueChanged.connect(self.update_settings)
         self.beam_power_threshold.valueChanged.connect(self.update_settings)
         self.beam_area_threshold_fac.valueChanged.connect(self.update_settings)
-        self.total_power_cutoff.valueChanged.connect(self.update_settings)
+        self.cutoff.valueChanged.connect(self.update_settings)
         self.medium_refr_index_re.valueChanged.connect(self.update_settings)
         self.medium_refr_index_im.valueChanged.connect(self.update_settings)
         self.particle_refr_index_re.valueChanged.connect(self.update_settings)
@@ -330,7 +330,7 @@ class SimulationSettingsPanel(QWidget):
             wavelength=self.wavelength.value(),
             beam_power_threshold=self.beam_power_threshold.value(),
             beam_area_threshold_fac=self.beam_area_threshold_fac.value(),
-            total_power_cutoff=self.total_power_cutoff.value(),
+            cutoff=self.cutoff.value(),
             medium_refr_index_re=self.medium_refr_index_re.value(),
             medium_refr_index_im=self.medium_refr_index_im.value(),
             particle_refr_index_re=self.particle_refr_index_re.value(),
@@ -358,7 +358,7 @@ class SimulationSettingsPanel(QWidget):
             wavelength=self.wavelength.value(),
             beam_power_threshold=self.beam_power_threshold.value(),
             beam_area_threshold_fac=self.beam_area_threshold_fac.value(),
-            total_power_cutoff=self.total_power_cutoff.value(),
+            cutoff=self.cutoff.value(),
             medium_refr_index_re=self.medium_refr_index_re.value(),
             medium_refr_index_im=self.medium_refr_index_im.value(),
             particle_refr_index_re=self.particle_refr_index_re.value(),
