@@ -55,18 +55,29 @@ impl Results {
     }
 
     pub fn compute_params(&mut self, wavelength: f32) -> std::result::Result<(), anyhow::Error> {
-        if let Some(theta) = &self.bins_1d {
-            let waveno = 2.0 * PI / wavelength;
-
-            self.asymettry = Some(compute_asymmetry(theta, &self.mueller_1d.as_ref().unwrap()));
-            self.scat_cross = Some(compute_scat_cross(
-                theta,
-                &self.mueller_1d.as_ref().unwrap(),
-                waveno,
-            ));
-        }
+        self.compute_scat_cross(wavelength);
+        self.compute_asymmetry(wavelength);
 
         Ok(())
+    }
+
+    pub fn compute_asymmetry(&mut self, wavelength: f32) {
+        if let (Some(theta), Some(mueller_1d), Some(scatt)) =
+            (&self.bins_1d, &self.mueller_1d, self.scat_cross)
+        {
+            self.asymettry = Some(compute_asymmetry(
+                theta,
+                mueller_1d,
+                2.0 * PI / wavelength,
+                scatt,
+            ));
+        }
+    }
+
+    pub fn compute_scat_cross(&mut self, wavelength: f32) {
+        if let (Some(theta), Some(mueller_1d)) = (&self.bins_1d, &self.mueller_1d) {
+            self.scat_cross = Some(compute_scat_cross(theta, mueller_1d, 2.0 * PI / wavelength));
+        }
     }
 
     pub fn print(&self) {
@@ -168,13 +179,16 @@ pub fn try_mueller_to_1d(
 }
 
 /// Integrate the first mueller element over theta to get the asymmetry parameter
-pub fn compute_asymmetry(theta: &[f32], mueller_1d: &Array2<f32>) -> f32 {
+pub fn compute_asymmetry(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32, scatt: f32) -> f32 {
     // get first column of mueller matrix
     let y = mueller_1d.slice(s![.., 0]).to_owned();
-    let x = Array1::from(theta.to_owned());
 
-    // integrate over theta
-    let asymmetry = output::integrate_trapezoidal(&x, &y, |_, y| y);
+    let x = Array1::from(theta.iter().map(|&t| t.to_radians()).collect::<Vec<f32>>());
+
+    // integrate p11 sin(theta) cos(theta) / scatt cross / k^2
+    let asymmetry = output::integrate_trapezoidal(&x, &y, |x, y| {
+        x.sin() * x.cos() * y / scatt / waveno.powi(2)
+    });
 
     println!("Asymmetry: {}", asymmetry);
 
