@@ -44,7 +44,7 @@ pub struct Settings {
     pub cutoff: f32,
     pub medium_refr_index: Complex<f32>,
     pub particle_refr_index: Vec<Complex<f32>>,
-    pub orientation: OrientationScheme,
+    pub orientation: Orientation,
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,
@@ -80,7 +80,7 @@ impl Settings {
         let medium_refr_index = Complex::new(medium_refr_index_re, medium_refr_index_im);
         let particle_refr_index =
             vec![Complex::new(particle_refr_index_re, particle_refr_index_im)];
-        let orientation: OrientationScheme = OrientationScheme {
+        let orientation: Orientation = Orientation {
             scheme: Scheme::Discrete {
                 eulers: vec![Euler::new(euler[0], euler[1], euler[2])],
             },
@@ -112,7 +112,7 @@ impl Settings {
     /// Set the euler angles
     #[setter]
     fn set_euler(&mut self, euler: Vec<f32>) {
-        self.orientation = OrientationScheme {
+        self.orientation = Orientation {
             scheme: Scheme::Discrete {
                 eulers: vec![Euler::new(euler[0], euler[1], euler[2])],
             },
@@ -221,7 +221,7 @@ pub fn load_config() -> Result<Settings> {
         config.max_tir = tir;
     }
     if let Some(orient) = args.orient {
-        config.orientation = OrientationScheme {
+        config.orientation = Orientation {
             scheme: orient,
             euler_convention: EulerConvention::ZYZ,
         };

@@ -1,13 +1,9 @@
+use std::io::Write;
 use std::{fs::File, io::BufWriter};
 
 use anyhow::Result;
 use nalgebra::{Complex, Matrix2};
-// use ndarray::array;
-use ndarray::{s, Array1, Array2, Axis};
-// use ndarray_stats::QuantileExt;
-use anyhow::anyhow;
-use itertools::Itertools;
-use std::io::Write;
+use ndarray::{s, Array1, Array2};
 
 #[cfg(test)]
 mod tests {
@@ -19,13 +15,13 @@ mod tests {
         // Test the integral of sin(x) from 0 to pi
         let x = Array1::linspace(0.0, PI, 1000);
         let y = x.mapv(f32::sin);
-        let result = integrate_trapezoidal(&x, &y);
+        let result = integrate_trapezoidal(&x, &y, |_, y| y);
         assert!((result - 2.0).abs() < 1e-4, "result: {}", result);
 
         // Test the integral of xsin(x) from 0 to pi
         let x = Array1::linspace(0.0, PI, 1000);
         let y = &x * &x.mapv(f32::sin);
-        let result = integrate_trapezoidal(&x, &y);
+        let result = integrate_trapezoidal(&x, &y, |_, y| y);
         assert!((result - PI).abs() < 1e-4, "result: {}", result);
     }
 
@@ -58,10 +54,24 @@ mod tests {
     }
 }
 
-fn integrate_trapezoidal(x: &Array1<f32>, y: &Array1<f32>) -> f32 {
+pub fn integrate_trapezoidal<F>(x: &Array1<f32>, y: &Array1<f32>, transform: F) -> f32
+where
+    F: Fn(f32, f32) -> f32,
+{
     let dx = &x.slice(s![1..]) - &x.slice(s![..-1]);
-    let avg_y = (&y.slice(s![1..]) + &y.slice(s![..-1])) / 2.0;
-    (dx * avg_y).sum()
+    let xl = x.slice(s![..-1]);
+    let xr = x.slice(s![1..]);
+    let yl = y.slice(s![..-1]);
+    let yr = y.slice(s![1..]);
+
+    let mut sum = 0.0;
+    for i in 0..dx.len() {
+        let left = transform(xl[i], yl[i]);
+        let right = transform(xr[i], yr[i]);
+        sum += dx[i] * (left + right) / 2.0;
+    }
+
+    sum
 }
 
 #[allow(dead_code)]
@@ -179,91 +189,4 @@ pub fn ampl_to_mueller(
             (amplc[(1, 1)] * amplc[(0, 0)].conj() - amplc[(0, 1)] * amplc[(1, 0)].conj()).re;
     }
     mueller
-}
-
-/// Integrate over phi (second bin of the tuple) to get the 1D Mueller matrix
-/// Uses the trapezoidal rule
-/// Returns a tuple of the theta bins and the 1D Mueller matrix
-/// NOTE: Assumes phi is ordered
-pub fn try_mueller_to_1d(
-    bins: &[(f32, f32)],
-    mueller: &Array2<f32>,
-) -> Result<(Vec<f32>, Array2<f32>)> {
-    // Check that the mueller matrix and bins are the same length
-    if mueller.len_of(Axis(0)) != bins.len() {
-        return Err(anyhow!(
-            "Mueller matrix and bins must have the same length. Got {} and {}",
-            mueller.len_of(Axis(0)),
-            bins.len()
-        ));
-    }
-
-    // Sort the bins and mueller by theta
-    let mut bins = bins.to_owned();
-    bins.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    let mueller = mueller.to_owned();
-
-    // Create a new sorted mueller matrix
-    let mut sorted_mueller = mueller.clone();
-    for (i, bin) in bins.iter().enumerate() {
-        let index = bins.iter().position(|b| b == bin).unwrap();
-        sorted_mueller
-            .slice_mut(s![i, ..])
-            .assign(&mueller.slice(s![index, ..]));
-    }
-
-    // zip the bins and mueller matrix
-    let combined: Vec<_> = bins
-        .iter()
-        .zip(mueller.outer_iter())
-        .map(|(bin, row)| (*bin, row.to_owned()))
-        .collect();
-
-    // group the combined Vec by theta
-    let grouped: Vec<Vec<_>> = combined
-        .into_iter()
-        .chunk_by(|((key, _), _)| *key)
-        .into_iter()
-        .map(|(_, group)| group.map(|x| x).collect())
-        .collect();
-
-    let mut thetas = Vec::new();
-    let mut mueller_1d = Array2::<f32>::zeros((grouped.len(), 16));
-
-    // loop over vectors at each theta
-    for (i, muellers) in grouped.iter().enumerate() {
-        // Unzip the theta, phi, and mueller values
-        let thetas_phi: Vec<_> = muellers
-            .iter()
-            .map(|((theta, phi), _)| (*theta, *phi))
-            .collect();
-        let mueller_phi: Vec<_> = muellers.iter().map(|(_, mueller)| mueller).collect();
-        let mut mueller_1d_row = Array1::<f32>::zeros(16);
-
-        // loop over the mueller values at each phi
-        for j in 0..16 {
-            // Create 1D arrays for x and y, where x is phi and y is 1 of the 16 mueller values
-            let y = Array1::from(mueller_phi.iter().map(|row| row[j]).collect::<Vec<_>>());
-            let phi_values: Vec<_> = thetas_phi.iter().map(|(_, phi)| *phi).collect();
-
-            // Check if phi values are sorted in ascending order (probably dont need this)
-            for i in 1..phi_values.len() {
-                if phi_values[i] < phi_values[i - 1] {
-                    return Err(anyhow!(
-                        "Phi values must be sorted in ascending order for integration"
-                    ));
-                }
-            }
-            let x = Array1::from(phi_values);
-            mueller_1d_row[j] = integrate_trapezoidal(&x, &y); // integrate over phi
-        }
-
-        // Assign the theta and mueller values to the final arrays
-        thetas.push(thetas_phi[0].0);
-        mueller_1d
-            .slice_mut(s![i, ..])
-            .assign(&mueller_1d_row.slice(s![..]));
-    }
-
-    Ok((thetas, mueller_1d))
 }

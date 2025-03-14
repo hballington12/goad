@@ -26,7 +26,7 @@ fn fixed_hex_30_30_30() {
             num_phi: 19,
         },
     };
-    settings.orientation = goad::orientation::OrientationScheme {
+    settings.orientation = goad::orientation::Orientation {
         scheme: goad::orientation::Scheme::Discrete {
             eulers: vec![Euler::new(30.0, 30.0, 30.0)],
         },
@@ -51,7 +51,7 @@ fn fixed_hex_30_20_20() {
             num_phi: 19,
         },
     };
-    settings.orientation = goad::orientation::OrientationScheme {
+    settings.orientation = goad::orientation::Orientation {
         scheme: goad::orientation::Scheme::Discrete {
             eulers: vec![Euler::new(30.0, 20.0, 20.0)],
         },

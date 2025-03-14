@@ -9,7 +9,7 @@ use crate::{
     orientation::{self, Euler, Orientations},
     output,
     powers::Powers,
-    result::Result,
+    result::{self, Results},
     settings::{load_config, Settings},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -56,7 +56,7 @@ pub struct Problem {
     pub out_beam_queue: Vec<Beam>,      // beams awaiting diffraction
     pub ext_diff_beam_queue: Vec<Beam>, // beams awaiting external diffraction
     pub settings: Settings,             // runtime settings
-    pub result: Result,                 // results of the problem
+    pub result: Results,                // results of the problem
 }
 
 #[pymethods]
@@ -159,7 +159,7 @@ impl Problem {
         init_geom(&settings, &mut geom);
 
         let bins = generate_bins(&settings.binning.scheme);
-        let solution = Result::new_empty(bins);
+        let solution = Results::new_empty(bins);
 
         let problem = Self {
             base_geom: geom.clone(),
@@ -179,7 +179,7 @@ impl Problem {
         self.beam_queue.clear();
         self.out_beam_queue.clear();
         self.ext_diff_beam_queue.clear();
-        self.result = Result::new_empty(self.result.bins.clone());
+        self.result = Results::new_empty(self.result.bins.clone());
         self.geom.clone_from(&self.base_geom);
     }
 
@@ -207,7 +207,7 @@ impl Problem {
         let settings = load_config().expect("Failed to load config");
 
         let bins = generate_bins(&settings.binning.scheme);
-        let solution = Result::new_empty(bins);
+        let solution = Results::new_empty(bins);
 
         Self {
             base_geom: geom.clone(),
@@ -272,7 +272,7 @@ impl Problem {
         // try compute 1d mueller
         match self.settings.binning.scheme {
             Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-            _ => match output::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+            _ => match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
                 Ok((theta, mueller_1d)) => {
                     let _ = output::write_mueller_1d(&theta, &mueller_1d);
                     self.result.bins_1d = Some(theta);
@@ -533,7 +533,7 @@ pub struct MultiProblem {
     pub problems: Vec<Problem>,
     pub orientations: Orientations,
     pub settings: Settings, // runtime settings
-    pub result: Result,     // averaged result of the problems
+    pub result: Results,    // averaged result of the problems
 }
 
 impl MultiProblem {
@@ -546,7 +546,7 @@ impl MultiProblem {
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let problems = Vec::new();
         let bins = generate_bins(&settings.binning.scheme);
-        let result = Result::new_empty(bins);
+        let result = Results::new_empty(bins);
 
         Self {
             geom,
@@ -635,17 +635,22 @@ impl MultiProblem {
         // try compute 1d mueller
         match self.settings.binning.scheme {
             Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-            _ => match output::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+            _ => match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
                 Ok((theta, mueller_1d)) => {
                     let _ = output::write_mueller_1d(&theta, &mueller_1d);
+                    self.result.bins_1d = Some(theta);
                     self.result.mueller_1d = Some(mueller_1d);
+
+                    // compute params
+                    let _ = self.result.compute_params(self.settings.wavelength);
                 }
                 Err(..) => {}
             },
         }
 
         // pb.finish_with_message(format!("(done)";
-        println!("Average {}", self.result.powers);
+        println!("Results:");
+        self.result.print();
     }
 
     pub fn writeup(&self) {

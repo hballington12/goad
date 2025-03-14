@@ -214,7 +214,7 @@ impl FromStr for Euler {
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
-pub struct OrientationScheme {
+pub struct Orientation {
     pub scheme: Scheme,
     pub euler_convention: EulerConvention,
 }
