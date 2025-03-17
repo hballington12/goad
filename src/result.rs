@@ -54,9 +54,12 @@ impl Results {
         }
     }
 
+    /// Computes the parameters of the result
     pub fn compute_params(&mut self, wavelength: f32) -> std::result::Result<(), anyhow::Error> {
         self.compute_scat_cross(wavelength);
         self.compute_asymmetry(wavelength);
+        self.compute_ext_cross();
+        self.compute_albedo();
 
         Ok(())
     }
@@ -74,9 +77,29 @@ impl Results {
         }
     }
 
+    /// Computes the scattering cross section from the 1D Mueller matrix
     pub fn compute_scat_cross(&mut self, wavelength: f32) {
         if let (Some(theta), Some(mueller_1d)) = (&self.bins_1d, &self.mueller_1d) {
             self.scat_cross = Some(compute_scat_cross(theta, mueller_1d, 2.0 * PI / wavelength));
+        }
+    }
+
+    /// Computes the extinction cross section from the scattering cross section and absorbed power
+    pub fn compute_ext_cross(&mut self) {
+        match self.scat_cross {
+            Some(scat) => {
+                self.ext_cross = Some(scat + self.powers.absorbed);
+            }
+            None => {
+                self.ext_cross = None;
+            }
+        }
+    }
+
+    /// Computes the albedo from the scattering and extinction cross sections
+    pub fn compute_albedo(&mut self) {
+        if let (Some(scat), Some(ext)) = (self.scat_cross, self.ext_cross) {
+            self.albedo = Some(scat / ext);
         }
     }
 
