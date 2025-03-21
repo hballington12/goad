@@ -234,6 +234,21 @@ pub fn load_config() -> Result<Settings> {
         };
     }
 
+    // Handle binning scheme
+    if let Some(simple_bins) = &args.simple {
+        if simple_bins.len() == 2 {
+            let num_theta = simple_bins[0];
+            let num_phi = simple_bins[1];
+            config.binning = BinningScheme {
+                scheme: bins::Scheme::Simple { num_theta, num_phi },
+            };
+        } else {
+            eprintln!(
+                "Warning: Simple binning requires exactly two values. Using default binning."
+            );
+        }
+    }
+
     validate_config(&config);
 
     println!("{:#?}", config);
@@ -333,10 +348,6 @@ pub struct CliArgs {
     #[arg(short, long, value_parser, num_args = 1.., value_delimiter = ' ')]
     ri: Option<Vec<Complex<f32>>>,
 
-    /// Orientation scheme for the simulation.
-    // #[command(subcommand)]
-    // orient: Option<Scheme>,
-
     /// Random seed for the simulation.
     #[arg(short, long)]
     seed: Option<u64>,
@@ -349,6 +360,10 @@ pub struct CliArgs {
     /// Format: alpha1,beta1,gamma1 alpha2,beta2,gamma2 ...
     #[arg(long, value_parser = parse_euler_angles, num_args = 1.., value_delimiter = ' ', group = "orientation")]
     discrete: Option<Vec<Euler>>,
+
+    /// Use a simple binning scheme with the specified numbers of theta and phi bins.
+    #[arg(long, num_args = 2, value_delimiter = ' ', group = "binning")]
+    simple: Option<Vec<usize>>,
 }
 
 /// Parse a string of Euler angles in the format "alpha,beta,gamma"
