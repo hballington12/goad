@@ -220,10 +220,17 @@ pub fn load_config() -> Result<Settings> {
     if let Some(tir) = args.tir {
         config.max_tir = tir;
     }
-    if let Some(orient) = args.orient {
+
+    // Handle orientation schemes
+    if let Some(num_orients) = args.uniform {
         config.orientation = Orientation {
-            scheme: orient,
-            euler_convention: EulerConvention::ZYZ,
+            scheme: Scheme::Uniform { num_orients },
+            euler_convention: DEFAULT_EULER_ORDER,
+        };
+    } else if let Some(eulers) = args.discrete {
+        config.orientation = Orientation {
+            scheme: Scheme::Discrete { eulers },
+            euler_convention: DEFAULT_EULER_ORDER,
         };
     }
 
@@ -327,12 +334,48 @@ pub struct CliArgs {
     ri: Option<Vec<Complex<f32>>>,
 
     /// Orientation scheme for the simulation.
-    #[command(subcommand)]
-    orient: Option<Scheme>,
+    // #[command(subcommand)]
+    // orient: Option<Scheme>,
 
     /// Random seed for the simulation.
     #[arg(short, long)]
     seed: Option<u64>,
+
+    /// Use uniform orientation scheme with specified number of orientations
+    #[arg(long, group = "orientation")]
+    uniform: Option<usize>,
+
+    /// Use discrete orientation scheme with specified Euler angles (in degrees)
+    /// Format: alpha1,beta1,gamma1 alpha2,beta2,gamma2 ...
+    #[arg(long, value_parser = parse_euler_angles, num_args = 1.., value_delimiter = ' ', group = "orientation")]
+    discrete: Option<Vec<Euler>>,
+}
+
+/// Parse a string of Euler angles in the format "alpha,beta,gamma"
+fn parse_euler_angles(s: &str) -> Result<Euler, String> {
+    println!("Parsing Euler angles: '{}'", s);
+
+    let angles: Vec<&str> = s.split(',').collect();
+    if angles.len() != 3 {
+        return Err(format!(
+            "Invalid Euler angle format: '{}'. Expected 'alpha,beta,gamma'",
+            s
+        ));
+    }
+
+    let alpha = angles[0]
+        .parse::<f32>()
+        .map_err(|_| format!("Failed to parse alpha angle: {}", angles[0]))?;
+    let beta = angles[1]
+        .parse::<f32>()
+        .map_err(|_| format!("Failed to parse beta angle: {}", angles[1]))?;
+    let gamma = angles[2]
+        .parse::<f32>()
+        .map_err(|_| format!("Failed to parse gamma angle: {}", angles[2]))?;
+
+    println!("Parsed Euler angles: {}, {}, {}", alpha, beta, gamma);
+
+    Ok(Euler::new(alpha, beta, gamma))
 }
 
 impl fmt::Display for Settings {
