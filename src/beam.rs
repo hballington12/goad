@@ -480,7 +480,7 @@ fn create_refracted(
             n2,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refr_ampl).unwrap(),
+            Field::new(e_perp, prop, refr_ampl)?,
             Some(BeamVariant::Refr),
             BeamType::Default,
             beam.wavelength,
