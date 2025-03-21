@@ -247,6 +247,53 @@ pub fn load_config() -> Result<Settings> {
                 "Warning: Simple binning requires exactly two values. Using default binning."
             );
         }
+    } else if args.interval {
+        let mut valid_binning = true;
+
+        // Parse theta intervals
+        let (thetas, theta_spacings) = if let Some(theta_values) = &args.theta {
+            match parse_interval_specification(theta_values) {
+                Ok(result) => result,
+                Err(err) => {
+                    eprintln!("Error in theta specification: {}", err);
+                    valid_binning = false;
+                    (vec![], vec![])
+                }
+            }
+        } else {
+            eprintln!("Warning: Interval binning requires --theta parameter.");
+            valid_binning = false;
+            (vec![], vec![])
+        };
+
+        // Parse phi intervals
+        let (phis, phi_spacings) = if let Some(phi_values) = &args.phi {
+            match parse_interval_specification(phi_values) {
+                Ok(result) => result,
+                Err(err) => {
+                    eprintln!("Error in phi specification: {}", err);
+                    valid_binning = false;
+                    (vec![], vec![])
+                }
+            }
+        } else {
+            eprintln!("Warning: Interval binning requires --phi parameter.");
+            valid_binning = false;
+            (vec![], vec![])
+        };
+
+        if valid_binning {
+            config.binning = BinningScheme {
+                scheme: bins::Scheme::Interval {
+                    thetas,
+                    theta_spacings,
+                    phis,
+                    phi_spacings,
+                },
+            };
+        } else {
+            eprintln!("Warning: Could not create interval binning. Using default binning.");
+        }
     }
 
     validate_config(&config);
@@ -364,6 +411,20 @@ pub struct CliArgs {
     /// Use a simple binning scheme with the specified numbers of theta and phi bins.
     #[arg(long, num_args = 2, value_delimiter = ' ', group = "binning")]
     simple: Option<Vec<usize>>,
+
+    /// Use an interval binning scheme with specified intervals for theta and phi in degrees.
+    #[arg(long, group = "binning")]
+    interval: bool,
+
+    /// Theta angles for interval binning (must be used with --interval)
+    /// Format: start step1 mid1 step2 mid2 ... stepN end
+    #[arg(long, requires = "interval", num_args = 3.., value_delimiter = ' ')]
+    theta: Option<Vec<f32>>,
+
+    /// Phi angles for interval binning (must be used with --interval)
+    /// Format: start step1 mid1 step2 mid2 ... stepN end
+    #[arg(long, requires = "interval", num_args = 3.., value_delimiter = ' ')]
+    phi: Option<Vec<f32>>,
 }
 
 /// Parse a string of Euler angles in the format "alpha,beta,gamma"
@@ -391,6 +452,58 @@ fn parse_euler_angles(s: &str) -> Result<Euler, String> {
     println!("Parsed Euler angles: {}, {}, {}", alpha, beta, gamma);
 
     Ok(Euler::new(alpha, beta, gamma))
+}
+
+/// Parse interval specification in the format:
+/// start step1 mid1 step2 mid2 ... stepN end
+/// This returns two vectors:
+/// 1. positions: [start, mid1, mid2, ..., end]
+/// 2. spacings: [step1, step2, ..., stepN]
+fn parse_interval_specification(values: &[f32]) -> Result<(Vec<f32>, Vec<f32>), String> {
+    if values.len() < 3 {
+        return Err(format!(
+            "Insufficient values for interval specification: need at least 3, got {}",
+            values.len()
+        ));
+    }
+
+    // For values [start, step1, mid1, step2, mid2, ..., stepN, end],
+    // we need to extract positions and spacings
+    let mut positions = Vec::new();
+    let mut spacings = Vec::new();
+
+    // Add the start position
+    positions.push(values[0]);
+
+    // Process pairs of (step, position) until the last value
+    for i in (1..values.len() - 1).step_by(2) {
+        let step = values[i];
+        let pos = values[i + 1];
+
+        // Validate step
+        if step <= 0.0 {
+            return Err(format!("Step size must be positive. Got {}", step));
+        }
+
+        // Validate monotonicity
+        if pos < *positions.last().unwrap() {
+            return Err(format!(
+                "Positions must be monotonically increasing. Got {} after {}",
+                pos,
+                positions.last().unwrap()
+            ));
+        }
+
+        spacings.push(step);
+        positions.push(pos);
+    }
+
+    // Check if there are an odd number of values (required for valid format)
+    if values.len() % 2 == 0 {
+        return Err("Interval specification must have an odd number of values".to_string());
+    }
+
+    Ok((positions, spacings))
 }
 
 impl fmt::Display for Settings {
