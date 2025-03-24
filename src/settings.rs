@@ -164,9 +164,20 @@ pub fn load_config() -> Result<Settings> {
 
     let default_config_file = goad_dir.join("config/default.toml");
     let local_config = goad_dir.join("config/local.toml");
+    let current_dir_config = std::env::current_dir()
+        .map(|dir| dir.join("local.toml"))
+        .unwrap();
 
-    // Check if local config exists, if not use default
-    let config_file = if local_config.exists() {
+    println!("current_dir_config: {:?}", current_dir_config);
+
+    // Check if config exists in current dir, then local, then use default
+    let config_file = if current_dir_config.exists() {
+        println!(
+            "Using current directory configuration: {:?}",
+            current_dir_config
+        );
+        current_dir_config
+    } else if local_config.exists() {
         println!("Using local configuration: {:?}", local_config);
         local_config
     } else {
