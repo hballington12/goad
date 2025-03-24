@@ -168,10 +168,10 @@ pub fn load_config() -> Result<Settings> {
 
     // Check if local config exists, if not use default
     let config_file = if local_config.exists() {
-        // println!("Using local configuration: {:?}", local_config);
+        println!("Using local configuration: {:?}", local_config);
         local_config
     } else {
-        // println!("Using default configuration: {:?}", default_config_file);
+        println!("Using default configuration: {:?}", default_config_file);
         default_config_file
     };
 
@@ -184,7 +184,7 @@ pub fn load_config() -> Result<Settings> {
             std::process::exit(1);
         });
 
-    // println!("config: {:#?}", default_settings);
+    println!("config: {:#?}", settings);
 
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
@@ -222,17 +222,24 @@ pub fn load_config() -> Result<Settings> {
         config.max_tir = tir;
     }
 
+    // Store the Euler convention to use (default or user-specified)
+    let euler_convention = args.orientation.euler.unwrap_or(DEFAULT_EULER_ORDER);
+
     // Handle orientation schemes
     if let Some(num_orients) = args.orientation.uniform {
         config.orientation = Orientation {
             scheme: Scheme::Uniform { num_orients },
-            euler_convention: DEFAULT_EULER_ORDER,
+            euler_convention,
         };
     } else if let Some(eulers) = args.orientation.discrete {
         config.orientation = Orientation {
             scheme: Scheme::Discrete { eulers },
-            euler_convention: DEFAULT_EULER_ORDER,
+            euler_convention,
         };
+    } else if let Some(convention) = args.orientation.euler {
+        // If only the convention is specified but no orientation scheme,
+        // just update the convention on the existing scheme
+        config.orientation.euler_convention = convention;
     }
 
     // Handle binning scheme
@@ -470,6 +477,12 @@ pub struct OrientationArgs {
     /// Format: alpha1,beta1,gamma1 alpha2,beta2,gamma2 ...
     #[arg(long, value_parser = parse_euler_angles, num_args = 1.., value_delimiter = ' ', group = "orientation")]
     pub discrete: Option<Vec<Euler>>,
+
+    /// Specify Euler angle convention for orientation.
+    /// Valid values: XYZ, XZY, YXZ, YZX, ZXY, ZYZ, etc.
+    /// Default: ZYZ
+    #[arg(long, value_parser = parse_euler_convention)]
+    pub euler: Option<EulerConvention>,
 }
 
 /// Output binning parameters - control how scattered light is binned by angle
@@ -581,6 +594,25 @@ fn parse_interval_specification(values: &[f32]) -> Result<(Vec<f32>, Vec<f32>), 
     }
 
     Ok((positions, spacings))
+}
+
+/// Parse a string into a valid Euler angle convention
+fn parse_euler_convention(s: &str) -> Result<EulerConvention, String> {
+    match s.to_uppercase().as_str() {
+        "XYZ" => Ok(EulerConvention::XYZ),
+        "XZY" => Ok(EulerConvention::XZY),
+        "YXZ" => Ok(EulerConvention::YXZ),
+        "YZX" => Ok(EulerConvention::YZX),
+        "ZXY" => Ok(EulerConvention::ZXY),
+        "ZYX" => Ok(EulerConvention::ZYX),
+        "XYX" => Ok(EulerConvention::XYX),
+        "XZX" => Ok(EulerConvention::XZX),
+        "YXY" => Ok(EulerConvention::YXY),
+        "YZY" => Ok(EulerConvention::YZY),
+        "ZXZ" => Ok(EulerConvention::ZXZ),
+        "ZYZ" => Ok(EulerConvention::ZYZ),
+        _ => Err(format!("Invalid Euler convention: '{}'. Valid values are: XYZ, XZY, YXZ, YZX, ZXY, ZYX, XYX, XZX, YXY, YZY, ZXZ, ZYZ", s)),
+    }
 }
 
 impl fmt::Display for Settings {
