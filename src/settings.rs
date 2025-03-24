@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::Args;
 use clap::Parser;
 use config::{Config, Environment, File};
 use nalgebra::Complex;
@@ -181,7 +182,7 @@ pub fn load_config() -> Result<Settings> {
         println!("Using local configuration: {:?}", local_config);
         local_config
     } else {
-        println!("Using default configuration: {:?}", default_config_file);
+        // println!("Using default configuration: {:?}", default_config_file);
         default_config_file
     };
 
@@ -204,38 +205,107 @@ pub fn load_config() -> Result<Settings> {
     // Parse command-line arguments and override values
     let args = CliArgs::parse();
 
-    if let Some(wavelength) = args.w {
+    if let Some(wavelength) = args.propagation.w {
         config.wavelength = wavelength;
     }
-    if let Some(medium) = args.ri0 {
+    if let Some(medium) = args.material.ri0 {
         config.medium_refr_index = medium;
     }
-    if let Some(particle) = args.ri {
+    if let Some(particle) = args.material.ri {
         config.particle_refr_index = particle;
     }
-    if let Some(geo) = args.geo {
+    if let Some(geo) = args.material.geo {
         config.geom_name = geo;
     }
-    if let Some(mp) = args.bp {
+    if let Some(mp) = args.propagation.bp {
         config.beam_power_threshold = mp;
     }
-    if let Some(maf) = args.baf {
+    if let Some(maf) = args.propagation.baf {
         config.beam_area_threshold_fac = maf;
     }
-    if let Some(cop) = args.cop {
+    if let Some(cop) = args.propagation.cop {
         config.cutoff = cop;
     }
-    if let Some(rec) = args.rec {
+    if let Some(rec) = args.propagation.rec {
         config.max_rec = rec;
     }
-    if let Some(tir) = args.tir {
+    if let Some(tir) = args.propagation.tir {
         config.max_tir = tir;
     }
-    if let Some(orient) = args.orient {
+
+    // Handle orientation schemes
+    if let Some(num_orients) = args.orientation.uniform {
         config.orientation = Orientation {
-            scheme: orient,
-            euler_convention: EulerConvention::ZYZ,
+            scheme: Scheme::Uniform { num_orients },
+            euler_convention: DEFAULT_EULER_ORDER,
         };
+    } else if let Some(eulers) = args.orientation.discrete {
+        config.orientation = Orientation {
+            scheme: Scheme::Discrete { eulers },
+            euler_convention: DEFAULT_EULER_ORDER,
+        };
+    }
+
+    // Handle binning scheme
+    if let Some(simple_bins) = &args.binning.simple {
+        if simple_bins.len() == 2 {
+            let num_theta = simple_bins[0];
+            let num_phi = simple_bins[1];
+            config.binning = BinningScheme {
+                scheme: bins::Scheme::Simple { num_theta, num_phi },
+            };
+        } else {
+            eprintln!(
+                "Warning: Simple binning requires exactly two values. Using default binning."
+            );
+        }
+    } else if args.binning.interval {
+        let mut valid_binning = true;
+
+        // Parse theta intervals
+        let (thetas, theta_spacings) = if let Some(theta_values) = &args.binning.theta {
+            match parse_interval_specification(theta_values) {
+                Ok(result) => result,
+                Err(err) => {
+                    eprintln!("Error in theta specification: {}", err);
+                    valid_binning = false;
+                    (vec![], vec![])
+                }
+            }
+        } else {
+            eprintln!("Warning: Interval binning requires --theta parameter.");
+            valid_binning = false;
+            (vec![], vec![])
+        };
+
+        // Parse phi intervals
+        let (phis, phi_spacings) = if let Some(phi_values) = &args.binning.phi {
+            match parse_interval_specification(phi_values) {
+                Ok(result) => result,
+                Err(err) => {
+                    eprintln!("Error in phi specification: {}", err);
+                    valid_binning = false;
+                    (vec![], vec![])
+                }
+            }
+        } else {
+            eprintln!("Warning: Interval binning requires --phi parameter.");
+            valid_binning = false;
+            (vec![], vec![])
+        };
+
+        if valid_binning {
+            config.binning = BinningScheme {
+                scheme: bins::Scheme::Interval {
+                    thetas,
+                    theta_spacings,
+                    phis,
+                    phi_spacings,
+                },
+            };
+        } else {
+            eprintln!("Warning: Could not create interval binning. Using default binning.");
+        }
     }
 
     validate_config(&config);
@@ -295,55 +365,219 @@ fn validate_config(config: &Settings) {
 
 #[derive(Parser, Debug)]
 #[command(version, about = "GOAD - Geometric Optics with Aperture Diffraction")]
+#[command(author = "Harry Ballington")]
+#[command(help_template = "{about}\n{author}\n\nUsage: {usage}\n\n{all-args}{after-help}")]
+#[command(after_help = "\x1b[1;36mEXAMPLES:\x1b[0m
+    \x1b[32m# Run with a specific wavelength and geometry file\x1b[0m
+    \x1b[36mgoad -w 0.5 --geo geometry.obj\x1b[0m
+    
+    \x1b[32m# Run with a specific refractive index and random orientations\x1b[0m
+    \x1b[36mgoad --ri 1.31+0.01i --uniform 100\x1b[0m
+    
+    \x1b[32m# Run over discrete orientations with an interval binning scheme\x1b[0m
+    \x1b[36mgoad --discrete 0.0,0.0,0.0 90.0,0.0,0.0 --interval \\\x1b[0m
+    \x1b[36m     --theta 0 1 10 2 180 --phi 0 2 180\x1b[0m
+
+    \x1b[32m# Run inside a medium other than air\x1b[0m
+    \x1b[36mgoad --ri0 1.5+0.0i\x1b[0m
+
+    \x1b[32m# Run with multiple shapes with different refractive indices\x1b[0m
+    \x1b[36mgoad --ri 1.31+0.0i 1.5+0.1i --geo geometries.obj\x1b[0m
+    ")]
 pub struct CliArgs {
+    #[command(flatten)]
+    pub propagation: PropagationArgs,
+
+    #[command(flatten)]
+    pub material: MaterialArgs,
+
+    #[command(flatten)]
+    pub orientation: OrientationArgs,
+
+    #[command(flatten)]
+    pub binning: BinningArgs,
+
+    /// Random seed for reproducibility.
+    /// Omit for a randomized seed.
+    #[arg(short, long)]
+    pub seed: Option<u64>,
+}
+
+/// Beam propagation parameters - control how beams are traced through the geometry
+#[derive(Args, Debug)]
+pub struct PropagationArgs {
     /// Wavelength in units of the geometry.
+    /// Should be larger than the smallest feature in the geometry.
     #[arg(short, long)]
-    w: Option<f32>,
+    pub w: Option<f32>,
 
-    /// Minimum absolute beam power threshold for new beams to propagate.
+    /// Minimum beam power threshold for propagation.
+    /// Beams with less power than this will be truncated.
     #[arg(long)]
-    bp: Option<f32>,
+    pub bp: Option<f32>,
 
-    /// Minimum area factor for new beams to propagate. The actual area threshold is
-    /// calculated as `wavelength^2 * factor`.
+    /// Minimum area factor threshold for beam propagation.
+    /// The actual area threshold is wavelength² × factor.
+    /// Prevents geometric optics from modeling sub-wavelength beams.
     #[arg(long)]
-    baf: Option<f32>,
+    pub baf: Option<f32>,
 
-    /// Cutoff power. The total acceptable output power per orientation before beam propagation is terminated.
-    /// Once this threshold is reached, the near-field simulation will stop.
+    /// Total power cutoff fraction (0.0-1.0).
+    /// Simulation stops when this fraction of input power is accounted for.
+    /// Set to 1.0 to disable and trace all beams to completion.
     #[arg(long)]
-    cop: Option<f32>,
+    pub cop: Option<f32>,
 
-    /// The maximum number of recursions before a beam is truncated.
+    /// Maximum recursion depth for beam tracing.
+    /// Typical values: 8-15. Higher values rarely improve results
+    /// when reasonable beam power thresholds are set.
     #[arg(long)]
-    rec: Option<i32>,
+    pub rec: Option<i32>,
 
-    /// The maximum number of total internal reflections before a beam is truncated.
+    /// Maximum allowed total internal reflections.
+    /// Prevents infinite TIR loops by truncating beams
+    /// after this many TIR events.
     #[arg(long)]
-    tir: Option<i32>,
+    pub tir: Option<i32>,
+}
 
-    /// File path to the input geometry. All input shapes should be defined in this file.
-    /// Currently, only the Wavefront .obj format is supported.
+/// Material and geometry parameters - control the physical properties of the simulation
+#[derive(Args, Debug)]
+pub struct MaterialArgs {
+    /// Path to geometry file (.obj format).
+    /// Contains all input shapes for the simulation.
     #[arg(short, long)]
-    geo: Option<String>,
+    pub geo: Option<String>,
 
-    /// The refractive index of the surrounding medium.
+    /// Surrounding medium refractive index.
+    /// Format: "re+im" (e.g., "1.3117+0.0001i").
     #[arg(long)]
-    ri0: Option<Complex<f32>>,
+    pub ri0: Option<Complex<f32>>,
 
-    /// The refractive index of the particle/s, separated by spaces.
-    /// If multiple values are provided, each shape in the geometry will be assigned a refractive index.
-    /// If fewer values are provided than the number of shapes, the first value will be used for the remaining shapes.
+    /// Particle refractive indices, space-separated.
+    /// Each shape in the geometry is assigned a refractive index.
+    /// If fewer values than shapes are provided, the first value is reused.
     #[arg(short, long, value_parser, num_args = 1.., value_delimiter = ' ')]
-    ri: Option<Vec<Complex<f32>>>,
+    pub ri: Option<Vec<Complex<f32>>>,
+}
 
-    /// Orientation scheme for the simulation.
-    #[command(subcommand)]
-    orient: Option<Scheme>,
+/// Orientation parameters - control how the particle is oriented relative to the incident beam
+#[derive(Args, Debug)]
+pub struct OrientationArgs {
+    /// Use uniform random orientation scheme.
+    /// The value specifies the number of random orientations.
+    #[arg(long, group = "orientation")]
+    pub uniform: Option<usize>,
 
-    /// Random seed for the simulation.
-    #[arg(short, long)]
-    seed: Option<u64>,
+    /// Use discrete orientation scheme with specified Euler angles (degrees).
+    /// Format: alpha1,beta1,gamma1 alpha2,beta2,gamma2 ...
+    #[arg(long, value_parser = parse_euler_angles, num_args = 1.., value_delimiter = ' ', group = "orientation")]
+    pub discrete: Option<Vec<Euler>>,
+}
+
+/// Output binning parameters - control how scattered light is binned by angle
+#[derive(Args, Debug)]
+pub struct BinningArgs {
+    /// Use simple equal-spacing binning scheme.
+    /// Format: <num_theta_bins> <num_phi_bins>
+    #[arg(long, num_args = 2, value_delimiter = ' ', group = "binning")]
+    pub simple: Option<Vec<usize>>,
+
+    /// Enable interval binning scheme with variable spacing.
+    /// Allows fine binning in regions of interest like forward/backward scattering.
+    #[arg(long, group = "binning")]
+    pub interval: bool,
+
+    /// Theta angle bins for interval binning (degrees).
+    /// Format: start step1 mid1 step2 mid2 ... stepN end
+    /// Example: 0 1 10 2 180 = 0° to 10° in 1° steps, then 10° to 180° in 2° steps
+    #[arg(long, requires = "interval", num_args = 3.., value_delimiter = ' ')]
+    pub theta: Option<Vec<f32>>,
+
+    /// Phi angle bins for interval binning (degrees).
+    /// Format: start step1 mid1 step2 mid2 ... stepN end
+    /// Example: 0 2 180 = 0° to 180° in 2° steps
+    #[arg(long, requires = "interval", num_args = 3.., value_delimiter = ' ')]
+    pub phi: Option<Vec<f32>>,
+}
+
+/// Parse a string of Euler angles in the format "alpha,beta,gamma"
+fn parse_euler_angles(s: &str) -> Result<Euler, String> {
+    println!("Parsing Euler angles: '{}'", s);
+
+    let angles: Vec<&str> = s.split(',').collect();
+    if angles.len() != 3 {
+        return Err(format!(
+            "Invalid Euler angle format: '{}'. Expected 'alpha,beta,gamma'",
+            s
+        ));
+    }
+
+    let alpha = angles[0]
+        .parse::<f32>()
+        .map_err(|_| format!("Failed to parse alpha angle: {}", angles[0]))?;
+    let beta = angles[1]
+        .parse::<f32>()
+        .map_err(|_| format!("Failed to parse beta angle: {}", angles[1]))?;
+    let gamma = angles[2]
+        .parse::<f32>()
+        .map_err(|_| format!("Failed to parse gamma angle: {}", angles[2]))?;
+
+    println!("Parsed Euler angles: {}, {}, {}", alpha, beta, gamma);
+
+    Ok(Euler::new(alpha, beta, gamma))
+}
+
+/// Parse interval specification in the format:
+/// start step1 mid1 step2 mid2 ... stepN end
+/// This returns two vectors:
+/// 1. positions: [start, mid1, mid2, ..., end]
+/// 2. spacings: [step1, step2, ..., stepN]
+fn parse_interval_specification(values: &[f32]) -> Result<(Vec<f32>, Vec<f32>), String> {
+    if values.len() < 3 {
+        return Err(format!(
+            "Insufficient values for interval specification: need at least 3, got {}",
+            values.len()
+        ));
+    }
+
+    // For values [start, step1, mid1, step2, mid2, ..., stepN, end],
+    // we need to extract positions and spacings
+    let mut positions = Vec::new();
+    let mut spacings = Vec::new();
+
+    // Add the start position
+    positions.push(values[0]);
+
+    // Process pairs of (step, position) until the last value
+    for i in (1..values.len() - 1).step_by(2) {
+        let step = values[i];
+        let pos = values[i + 1];
+
+        // Validate step
+        if step <= 0.0 {
+            return Err(format!("Step size must be positive. Got {}", step));
+        }
+
+        // Validate monotonicity
+        if pos < *positions.last().unwrap() {
+            return Err(format!(
+                "Positions must be monotonically increasing. Got {} after {}",
+                pos,
+                positions.last().unwrap()
+            ));
+        }
+
+        spacings.push(step);
+        positions.push(pos);
+    }
+
+    // Check if there are an odd number of values (required for valid format)
+    if values.len() % 2 == 0 {
+        return Err("Interval specification must have an odd number of values".to_string());
+    }
+
+    Ok((positions, spacings))
 }
 
 impl fmt::Display for Settings {
