@@ -57,6 +57,7 @@ pub enum Scheme {
     },
     Custom {
         bins: Vec<(f32, f32)>,
+        file: Option<String>,
     },
 }
 
@@ -71,7 +72,7 @@ impl BinningScheme {
     #[new]
     fn py_new(bins: Vec<(f32, f32)>) -> Self {
         BinningScheme {
-            scheme: Scheme::Custom { bins },
+            scheme: Scheme::Custom { bins, file: None },
         }
     }
 }
@@ -154,6 +155,35 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<(f32, f32)> {
             phis,
             phi_spacings,
         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
-        Scheme::Custom { bins } => bins.to_vec(),
+        Scheme::Custom { bins, file } => {
+            println!("Loading custom bins from file: {:?}", file);
+            if let Some(file) = file {
+                let content = match std::fs::read_to_string(file) {
+                    Ok(content) => content,
+                    Err(e) => panic!("Could not read file '{}': {}", file, e),
+                };
+
+                // Parse the TOML file
+                match toml::from_str::<CustomBins>(&content) {
+                    Ok(custom_bins) => {
+                        println!("Loaded {} custom bins from file", custom_bins.bins.len());
+                        custom_bins.bins
+                    }
+                    Err(e) => {
+                        eprintln!("Error parsing custom bins file: {}", e);
+                        eprintln!("Falling back to default bins");
+                        bins.to_vec()
+                    }
+                }
+            } else {
+                bins.to_vec()
+            }
+        }
     }
+}
+
+// Define a struct to match the TOML structure
+#[derive(Debug, Deserialize)]
+struct CustomBins {
+    bins: Vec<(f32, f32)>,
 }

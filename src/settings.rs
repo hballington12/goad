@@ -236,7 +236,15 @@ pub fn load_config() -> Result<Settings> {
     }
 
     // Handle binning scheme
-    if let Some(simple_bins) = &args.binning.simple {
+    if let Some(custom_path) = &args.binning.custom {
+        // Custom binning scheme from file takes precedence over other binning options
+        config.binning = BinningScheme {
+            scheme: bins::Scheme::Custom {
+                bins: vec![], // Empty vector, will be filled from file at runtime
+                file: Some(custom_path.clone()),
+            },
+        };
+    } else if let Some(simple_bins) = &args.binning.simple {
         if simple_bins.len() == 2 {
             let num_theta = simple_bins[0];
             let num_phi = simple_bins[1];
@@ -488,6 +496,12 @@ pub struct BinningArgs {
     /// Example: 0 2 180 = 0° to 180° in 2° steps
     #[arg(long, requires = "interval", num_args = 3.., value_delimiter = ' ')]
     pub phi: Option<Vec<f32>>,
+
+    /// Path to custom binning scheme file.
+    /// Contains a list of (theta, phi) bin pairs in TOML format.
+    /// Overrides other binning parameters.
+    #[arg(long)]
+    pub custom: Option<String>,
 }
 
 /// Parse a string of Euler angles in the format "alpha,beta,gamma"

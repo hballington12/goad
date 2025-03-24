@@ -45,7 +45,9 @@ max_tir = 10                          # Maximum number of total internal reflect
             # phi_spacings = [2]
 
             # [binning.scheme.Custom] # Custom binning with specified [theta,phi] angular bins
-            # bins = [[0, 0], [0, 40], [20, 180]]
+            #     bins = [[0, 0], [0, 40], [20, 180]] # custom bins, unless a file is specified below
+            #     # file = "custom_bins.toml"           # File containing custom bins, relative to working directory 
+            #     # see the template directory for an example custom_bins.toml file
 
 
 [orientation] # Orientation configuration
