@@ -8,7 +8,6 @@ use crate::{
     helpers::draw_face,
     orientation::{self, Euler, Orientations},
     output,
-    powers::Powers,
     result::{self, Results},
     settings::{load_config, Settings},
 };
@@ -599,7 +598,6 @@ impl MultiProblem {
         // init a base problem that can be reset
         let mut problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
         problem_base.init();
-        // let mut problem = problem_base.clone();
 
         let m = MultiProgress::new();
         let n = self.orientations.num_orientations;
@@ -613,7 +611,8 @@ impl MultiProblem {
         );
         pb.set_message("orientation".to_string());
 
-        (self.result.mueller, self.result.powers) = self
+        // Solve for each orientation and reduce results on the fly
+        self.result = self
             .orientations
             .eulers
             .par_iter()
@@ -629,34 +628,17 @@ impl MultiProblem {
                 problem.illuminate();
                 problem.solve();
 
-                let mueller = problem.result.mueller;
-
                 pb.inc(1);
-                (mueller, problem.result.powers)
+                problem.result
             })
             .reduce(
-                || {
-                    (
-                        Array2::<f32>::zeros((self.result.bins.len(), 16)),
-                        Powers::new(),
-                    )
-                },
-                |(mut acc_mueller, mut acc_powers), (local_mueller, local_powers)| {
-                    for (a, l) in acc_mueller.iter_mut().zip(local_mueller) {
-                        *a += l;
-                    }
-                    acc_powers += local_powers;
-                    (acc_mueller, acc_powers)
-                },
+                || Results::new_empty(self.result.bins.clone()),
+                |accum, item| self.reduce_results(accum, item),
             );
 
-        // normalise
-        for mut row in self.result.mueller.outer_iter_mut() {
-            for val in row.iter_mut() {
-                *val /= self.orientations.num_orientations as f32;
-            }
-        }
-        self.result.powers /= self.orientations.num_orientations as f32;
+        // Normalize results by the number of orientations
+        self.normalize_results(self.orientations.num_orientations as f32);
+
         let end = Instant::now();
         let duration = end.duration_since(start);
         let time_per_orientation = duration / self.orientations.num_orientations as u32;
@@ -682,9 +664,91 @@ impl MultiProblem {
             },
         }
 
-        // pb.finish_with_message(format!("(done)";
         println!("Results:");
         self.result.print();
+    }
+
+    /// Combines two Results objects by adding their fields
+    fn reduce_results(&self, mut acc: Results, item: Results) -> Results {
+        // Add Mueller matrix elements
+        for (a, i) in acc.mueller.iter_mut().zip(item.mueller.iter()) {
+            *a += i;
+        }
+
+        // Add powers
+        acc.powers += item.powers;
+
+        // Add amplitude matrices if they exist
+        for (a, i) in acc.ampl.iter_mut().zip(item.ampl.iter()) {
+            *a += i;
+        }
+
+        for (a, i) in acc.ampl_beam.iter_mut().zip(item.ampl_beam.iter()) {
+            *a += i;
+        }
+
+        for (a, i) in acc.ampl_ext.iter_mut().zip(item.ampl_ext.iter()) {
+            *a += i;
+        }
+
+        for (a, i) in acc.mueller_beam.iter_mut().zip(item.mueller_beam.iter()) {
+            *a += i;
+        }
+
+        for (a, i) in acc.mueller_ext.iter_mut().zip(item.mueller_ext.iter()) {
+            *a += i;
+        }
+
+        acc
+    }
+
+    /// Normalizes the results by dividing by the number of orientations
+    fn normalize_results(&mut self, num_orientations: f32) {
+        // Normalize mueller matrix
+        for mut row in self.result.mueller.outer_iter_mut() {
+            for val in row.iter_mut() {
+                *val /= num_orientations;
+            }
+        }
+
+        // Normalize powers
+        self.result.powers /= num_orientations;
+
+        // Normalize amplitude matrices if they exist
+        if !self.result.ampl.is_empty() {
+            for ampl in self.result.ampl.iter_mut() {
+                *ampl /= Complex::new(num_orientations, 0.0);
+            }
+        }
+
+        if !self.result.ampl_beam.is_empty() {
+            for ampl in self.result.ampl_beam.iter_mut() {
+                *ampl /= Complex::new(num_orientations, 0.0);
+            }
+        }
+
+        if !self.result.ampl_ext.is_empty() {
+            for ampl in self.result.ampl_ext.iter_mut() {
+                *ampl /= Complex::new(num_orientations, 0.0);
+            }
+        }
+
+        // Normalize other Mueller matrices if they exist
+        if !self.result.mueller_beam.is_empty() {
+            for mut row in self.result.mueller_beam.outer_iter_mut() {
+                for val in row.iter_mut() {
+                    *val /= num_orientations;
+                }
+            }
+        }
+
+        if !self.result.mueller_ext.is_empty() {
+            for mut row in self.result.mueller_ext.outer_iter_mut() {
+                for val in row.iter_mut() {
+                    *val /= num_orientations;
+                }
+            }
+        }
     }
 
     pub fn writeup(&self) {
