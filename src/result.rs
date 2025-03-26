@@ -14,9 +14,15 @@ pub struct Results {
     pub powers: Powers,
     pub bins: Vec<(f32, f32)>,
     pub mueller: Array2<f32>,
+    pub mueller_beam: Array2<f32>,
+    pub mueller_ext: Array2<f32>,
     pub ampl: Vec<Matrix2<Complex<f32>>>,
+    pub ampl_beam: Vec<Matrix2<Complex<f32>>>,
+    pub ampl_ext: Vec<Matrix2<Complex<f32>>>,
     pub bins_1d: Option<Vec<f32>>,
     pub mueller_1d: Option<Array2<f32>>,
+    pub mueller_1d_beam: Option<Array2<f32>>,
+    pub mueller_1d_ext: Option<Array2<f32>>,
     pub asymettry: Option<f32>,
     pub scat_cross: Option<f32>,
     pub ext_cross: Option<f32>,
@@ -27,14 +33,24 @@ impl Results {
     /// Creates a new `Result` with empty mueller and amplitude matrix
     pub fn new_empty(bins: Vec<(f32, f32)>) -> Self {
         let mueller = Array2::<f32>::zeros((bins.len(), 16));
+        let mueller_beam = mueller.clone();
+        let mueller_ext = mueller.clone();
         let ampl = vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+        let ampl_beam = ampl.clone();
+        let ampl_ext = ampl.clone();
         Self {
             powers: Powers::new(),
             bins,
             mueller,
+            mueller_beam,
+            mueller_ext,
             ampl,
+            ampl_beam,
+            ampl_ext,
             bins_1d: None,
             mueller_1d: None,
+            mueller_1d_beam: None,
+            mueller_1d_ext: None,
             asymettry: None,
             scat_cross: None,
             ext_cross: None,

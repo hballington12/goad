@@ -244,11 +244,19 @@ impl Problem {
         }
     }
 
+    /// Combines the external diffraction and outbeams to get the far-field solution.
+    fn combine_far(&mut self) {
+        for (i, ampl) in self.result.ampl_ext.iter_mut().enumerate() {
+            *ampl += self.result.ampl_beam[i];
+        }
+        self.result.ampl = self.result.ampl_ext.clone();
+    }
+
     pub fn solve_far_ext_diff(&mut self) {
         Self::diffract_outbeams(
             &mut self.ext_diff_beam_queue,
             &self.result.bins,
-            &mut self.result.ampl,
+            &mut self.result.ampl_ext,
         );
     }
 
@@ -256,32 +264,58 @@ impl Problem {
         Self::diffract_outbeams(
             &mut self.out_beam_queue,
             &self.result.bins,
-            &mut self.result.ampl,
+            &mut self.result.ampl_beam,
         );
     }
     pub fn solve_far(&mut self) {
         self.solve_far_ext_diff();
         self.solve_far_outbeams();
+        self.combine_far();
     }
 
     pub fn solve(&mut self) {
         self.solve_near();
         self.solve_far();
         self.result.mueller = output::ampl_to_mueller(&self.result.bins, &self.result.ampl);
+        self.result.mueller_beam =
+            output::ampl_to_mueller(&self.result.bins, &self.result.ampl_beam);
+        self.result.mueller_ext = output::ampl_to_mueller(&self.result.bins, &self.result.ampl_ext);
 
         // try compute 1d mueller
         match self.settings.binning.scheme {
             Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-            _ => match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-                Ok((theta, mueller_1d)) => {
-                    let _ = output::write_mueller_1d(&theta, &mueller_1d);
-                    self.result.bins_1d = Some(theta);
-                    self.result.mueller_1d = Some(mueller_1d);
-                }
-                Err(e) => {
-                    println!("Failed to compute 1d mueller: {}", e);
-                }
-            },
+            _ => {
+                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+                    Ok((theta, mueller_1d)) => {
+                        let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
+                        self.result.bins_1d = Some(theta);
+                        self.result.mueller_1d = Some(mueller_1d);
+                    }
+                    Err(e) => {
+                        println!("Failed to compute 1d mueller: {}", e);
+                    }
+                };
+                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
+                    Ok((theta, mueller_1d_beam)) => {
+                        let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
+                        self.result.bins_1d = Some(theta);
+                        self.result.mueller_1d_beam = Some(mueller_1d_beam);
+                    }
+                    Err(e) => {
+                        println!("Failed to compute 1d mueller (beam): {}", e);
+                    }
+                };
+                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
+                    Ok((theta, mueller_1d_ext)) => {
+                        let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
+                        self.result.bins_1d = Some(theta);
+                        self.result.mueller_1d_ext = Some(mueller_1d_ext);
+                    }
+                    Err(e) => {
+                        println!("Failed to compute 1d mueller (ext): {}", e);
+                    }
+                };
+            }
         }
     }
 
@@ -637,7 +671,7 @@ impl MultiProblem {
             Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
             _ => match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
                 Ok((theta, mueller_1d)) => {
-                    let _ = output::write_mueller_1d(&theta, &mueller_1d);
+                    let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
                     self.result.bins_1d = Some(theta);
                     self.result.mueller_1d = Some(mueller_1d);
 

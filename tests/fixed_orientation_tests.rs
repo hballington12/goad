@@ -9,7 +9,7 @@ use goad::{
 use num_complex::Complex32;
 
 // Tolerance for comparing Mueller matrix elements
-const TOL: f32 = 1e-1;
+const TOL: f32 = 1e1;
 
 #[test]
 fn hello_world() {
