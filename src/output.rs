@@ -98,7 +98,7 @@ fn unique_grid(tuple_slice: &[(f32, f32)]) -> Vec<(f32, f32)> {
 /// Write the 1d Mueller matrix to a file against the theta and phi bins
 pub fn write_mueller_1d(bins: &[f32], mueller_1d: &Array2<f32>, suffix: &str) -> Result<()> {
     // Open a file for writing
-    let file_name = format!("mueller_scatgrid_1d_{}", suffix);
+    let file_name = format!("mueller_scatgrid_1d{}", suffix);
     let file = File::create(&file_name).unwrap();
     let mut writer = BufWriter::new(file);
 
@@ -116,9 +116,10 @@ pub fn write_mueller_1d(bins: &[f32], mueller_1d: &Array2<f32>, suffix: &str) ->
 }
 
 /// Write the Mueller matrix to a file against the theta and phi bins
-pub fn write_mueller(bins: &[(f32, f32)], mueller: &Array2<f32>) -> Result<()> {
+pub fn write_mueller(bins: &[(f32, f32)], mueller: &Array2<f32>, suffix: &str) -> Result<()> {
     // Open a file for writing
-    let file = File::create("mueller_scatgrid").unwrap();
+    let file_name = format!("mueller_scatgrid{}", suffix);
+    let file = File::create(&file_name).unwrap();
     let mut writer = BufWriter::new(file);
 
     // Iterate over the array and write data to the file

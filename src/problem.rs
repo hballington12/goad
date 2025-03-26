@@ -354,7 +354,9 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller);
+        let _ = output::write_mueller(&self.result.bins, &self.result.mueller, "");
+        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_beam, "_beam");
+        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_ext, "_ext");
     }
 
     /// Propagates the next beam in the queue.
@@ -704,55 +706,44 @@ impl MultiProblem {
 
     /// Normalizes the results by dividing by the number of orientations
     fn normalize_results(&mut self, num_orientations: f32) {
-        // Normalize mueller matrix
+        // Normalize powers
+        self.result.powers /= num_orientations;
+
+        for ampl in self.result.ampl.iter_mut() {
+            *ampl /= Complex::new(num_orientations, 0.0);
+        }
+
+        for ampl in self.result.ampl_beam.iter_mut() {
+            *ampl /= Complex::new(num_orientations, 0.0);
+        }
+
+        for ampl in self.result.ampl_ext.iter_mut() {
+            *ampl /= Complex::new(num_orientations, 0.0);
+        }
+
         for mut row in self.result.mueller.outer_iter_mut() {
             for val in row.iter_mut() {
                 *val /= num_orientations;
             }
         }
 
-        // Normalize powers
-        self.result.powers /= num_orientations;
-
-        // Normalize amplitude matrices if they exist
-        if !self.result.ampl.is_empty() {
-            for ampl in self.result.ampl.iter_mut() {
-                *ampl /= Complex::new(num_orientations, 0.0);
+        for mut row in self.result.mueller_beam.outer_iter_mut() {
+            for val in row.iter_mut() {
+                *val /= num_orientations;
             }
         }
 
-        if !self.result.ampl_beam.is_empty() {
-            for ampl in self.result.ampl_beam.iter_mut() {
-                *ampl /= Complex::new(num_orientations, 0.0);
-            }
-        }
-
-        if !self.result.ampl_ext.is_empty() {
-            for ampl in self.result.ampl_ext.iter_mut() {
-                *ampl /= Complex::new(num_orientations, 0.0);
-            }
-        }
-
-        // Normalize other Mueller matrices if they exist
-        if !self.result.mueller_beam.is_empty() {
-            for mut row in self.result.mueller_beam.outer_iter_mut() {
-                for val in row.iter_mut() {
-                    *val /= num_orientations;
-                }
-            }
-        }
-
-        if !self.result.mueller_ext.is_empty() {
-            for mut row in self.result.mueller_ext.outer_iter_mut() {
-                for val in row.iter_mut() {
-                    *val /= num_orientations;
-                }
+        for mut row in self.result.mueller_ext.outer_iter_mut() {
+            for val in row.iter_mut() {
+                *val /= num_orientations;
             }
         }
     }
 
     pub fn writeup(&self) {
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller);
+        let _ = output::write_mueller(&self.result.bins, &self.result.mueller, "");
+        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_beam, "_beam");
+        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_ext, "_ext");
     }
 }
 
