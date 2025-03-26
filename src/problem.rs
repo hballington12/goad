@@ -47,7 +47,7 @@ mod tests {
 
 /// A solvable physics problem.
 #[pyclass]
-#[derive(Debug, Clone, PartialEq)] // Added Default derive
+#[derive(Debug, Clone)] // Added Default derive
 pub struct Problem {
     pub base_geom: Geom,                // original geometry
     pub geom: Geom,                     // geometry to trace beams in
@@ -562,7 +562,7 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
 }
 
 /// A problem for a single geometry with multiple orientations.
-#[derive(Debug, PartialEq)] // Added Default derive
+#[derive(Debug)] // Added Default derive
 pub struct MultiProblem {
     pub geom: Geom,
     pub problems: Vec<Problem>,
@@ -629,6 +629,8 @@ impl MultiProblem {
 
                 problem.illuminate();
                 problem.solve();
+                problem.try_mueller_to_1d();
+                let _ = problem.result.compute_params(problem.settings.wavelength);
 
                 pb.inc(1);
                 problem.result

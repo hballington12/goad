@@ -1,6 +1,8 @@
 use std::f32::consts::PI;
 
+use crate::convergence::Convergence;
 use crate::output;
+use crate::params::Params;
 use crate::powers::Powers;
 use anyhow::anyhow;
 use anyhow::Result;
@@ -9,7 +11,7 @@ use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2, Axis};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct Results {
     pub powers: Powers,
     pub bins: Vec<(f32, f32)>,
@@ -23,10 +25,8 @@ pub struct Results {
     pub mueller_1d: Option<Array2<f32>>,
     pub mueller_1d_beam: Option<Array2<f32>>,
     pub mueller_1d_ext: Option<Array2<f32>>,
-    pub asymettry: Option<f32>,
-    pub scat_cross: Option<f32>,
-    pub ext_cross: Option<f32>,
-    pub albedo: Option<f32>,
+    pub params: Params,
+    pub convergence: Convergence<Params>,
 }
 
 impl Results {
@@ -51,10 +51,8 @@ impl Results {
             mueller_1d: None,
             mueller_1d_beam: None,
             mueller_1d_ext: None,
-            asymettry: None,
-            scat_cross: None,
-            ext_cross: None,
-            albedo: None,
+            params: Params::new(),
+            convergence: Convergence::new(0.1, 10),
         }
     }
 
@@ -79,9 +77,9 @@ impl Results {
 
     pub fn compute_asymmetry(&mut self, wavelength: f32) {
         if let (Some(theta), Some(mueller_1d), Some(scatt)) =
-            (&self.bins_1d, &self.mueller_1d, self.scat_cross)
+            (&self.bins_1d, &self.mueller_1d, self.params.scat_cross)
         {
-            self.asymettry = Some(compute_asymmetry(
+            self.params.asymettry = Some(compute_asymmetry(
                 theta,
                 mueller_1d,
                 2.0 * PI / wavelength,
@@ -92,16 +90,17 @@ impl Results {
 
     pub fn compute_scat_cross(&mut self, wavelength: f32) {
         if let (Some(theta), Some(mueller_1d)) = (&self.bins_1d, &self.mueller_1d) {
-            self.scat_cross = Some(compute_scat_cross(theta, mueller_1d, 2.0 * PI / wavelength));
+            self.params.scat_cross =
+                Some(compute_scat_cross(theta, mueller_1d, 2.0 * PI / wavelength));
         }
     }
 
     pub fn print(&self) {
         println!("Powers: {:?}", self.powers);
-        println!("Asymmetry: {:?}", self.asymettry);
-        println!("Scat Cross: {:?}", self.scat_cross);
-        println!("Ext Cross: {:?}", self.ext_cross);
-        println!("Albedo: {:?}", self.albedo);
+        println!("Asymmetry: {:?}", self.params.asymettry);
+        println!("Scat Cross: {:?}", self.params.scat_cross);
+        println!("Ext Cross: {:?}", self.params.ext_cross);
+        println!("Albedo: {:?}", self.params.albedo);
     }
 }
 
