@@ -4,8 +4,10 @@ use crate::settings;
 use anyhow::Result;
 use geo::{Area, TriangulateEarcut};
 use geo_types::{Coord, LineString, Polygon};
-use nalgebra::{self as na, Complex, Isometry3, Matrix4, Point3, Vector3, Vector4};
+use nalgebra::{self as na, Complex, Isometry3, Matrix3, Matrix4, Point3, Vector3, Vector4};
 use pyo3::prelude::*;
+use rand::Rng;
+use std::collections::HashMap;
 use std::path::Path;
 use tobj::{self, Model};
 
@@ -1145,6 +1147,77 @@ impl Geom {
         }
 
         Ok(())
+    }
+
+    pub fn distort(&mut self, sigma: f32) {
+        // For each shape in geometry:
+        for shape in self.shapes.iter_mut() {
+            // Prescan to hold a list of which vertices are in which faces
+            // This is done to avoid having to iterate over all faces for each vertex
+            let mut vertex_to_faces: HashMap<usize, Vec<usize>> = HashMap::new();
+            for (face_index, face) in shape.faces.iter().enumerate() {
+                for vertex in &face.data().exterior {
+                    let vertex_index = shape.vertices.iter().position(|v| v == vertex).unwrap();
+                    vertex_to_faces
+                        .entry(vertex_index)
+                        .or_insert_with(Vec::new)
+                        .push(face_index);
+                }
+            }
+
+            // Return early if any vertex doesn't belong to exactly 3 faces
+            // This handles degenerate cases that wouldn't work with our distortion algorithm
+            if vertex_to_faces.values().any(|faces| faces.len() != 3) {
+                println!(
+                    "Shape {} has vertices that do not belong to exactly 3 faces. Skipping distortion.",
+                    shape.id.unwrap_or(0)
+                );
+                return;
+            }
+
+            // Perturb the normal of each face in the shape
+            for face in shape.faces.iter_mut() {
+                let mut rng = rand::rng();
+                let perturbation = Vector3::new(
+                    rng.random_range(-sigma..sigma),
+                    rng.random_range(-sigma..sigma),
+                    rng.random_range(-sigma..sigma),
+                );
+                face.data_mut().normal += perturbation;
+                face.data_mut().normal.normalize_mut();
+            }
+
+            // For each vertex in the shape
+            // Get the perturbed normals of the faces it belongs to
+            // (use the mapping to get the faces it belongs to)
+            // Solve the linear system to get the new vertex position
+            for (vertex_index, faces) in vertex_to_faces.iter() {
+                let mut normals = Vec::new();
+                for face_index in faces {
+                    let face = &shape.faces[*face_index];
+                    normals.push(face.data().normal);
+                }
+
+                // Solve the linear system to get the new vertex position
+                // the solution is the intersection of the planes defined by the normals
+                // This is a simple linear system of equations
+                // Ax = b, where A is the matrix of normals, x is the new vertex position,
+                // and b is the vector of the original vertex position
+                let mut a = Matrix3::zeros();
+                let mut b = Vector3::zeros();
+                for (i, normal) in normals.iter().enumerate() {
+                    a[(i, 0)] = normal.x;
+                    a[(i, 1)] = normal.y;
+                    a[(i, 2)] = normal.z;
+                    b[i] = shape.vertices[*vertex_index].coords.dot(normal);
+                }
+                // Solve the linear system
+                let new_vertex = a.try_inverse().unwrap() * b;
+                shape.vertices[*vertex_index].coords = new_vertex;
+
+                // Update vertex positions in the faces that this vertex
+            }
+        }
     }
 }
 
