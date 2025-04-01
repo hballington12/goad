@@ -205,8 +205,6 @@ pub fn compute_asymmetry(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32, s
         x.sin() * x.cos() * y / scatt / waveno.powi(2)
     });
 
-    println!("Asymmetry: {}", asymmetry);
-
     asymmetry
 }
 
@@ -220,8 +218,6 @@ pub fn compute_scat_cross(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32) 
 
     // integrate p11 sin(theta) / k^2
     let scat_cross = output::integrate_trapezoidal(&x, &y, |x, y| x.sin() * y / waveno.powi(2));
-
-    println!("Scat cross: {}", scat_cross);
 
     scat_cross
 }

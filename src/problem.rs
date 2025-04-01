@@ -245,10 +245,10 @@ impl Problem {
 
     /// Combines the external diffraction and outbeams to get the far-field solution.
     fn combine_far(&mut self) {
-        for (i, ampl) in self.result.ampl_ext.iter_mut().enumerate() {
+        self.result.ampl = self.result.ampl_ext.clone();
+        for (i, ampl) in self.result.ampl.iter_mut().enumerate() {
             *ampl += self.result.ampl_beam[i];
         }
-        self.result.ampl = self.result.ampl_ext.clone();
     }
 
     pub fn solve_far_ext_diff(&mut self) {
@@ -286,7 +286,7 @@ impl Problem {
             _ => {
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
                     Ok((theta, mueller_1d)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
+                        // let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d = Some(mueller_1d);
                     }
@@ -296,7 +296,7 @@ impl Problem {
                 };
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
                     Ok((theta, mueller_1d_beam)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
+                        // let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d_beam = Some(mueller_1d_beam);
                     }
@@ -306,7 +306,7 @@ impl Problem {
                 };
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
                     Ok((theta, mueller_1d_ext)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
+                        // let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d_ext = Some(mueller_1d_ext);
                     }
@@ -321,7 +321,7 @@ impl Problem {
     pub fn try_mueller_to_1d(&mut self) {
         match self.result.try_mueller_to_1d() {
             Ok(()) => {
-                println!("1d mueller computed successfully");
+                // println!("1d mueller computed successfully");
             }
             Err(e) => {
                 println!("Failed to compute 1d mueller: {}", e);
@@ -655,17 +655,39 @@ impl MultiProblem {
         // try compute 1d mueller
         match self.settings.binning.scheme {
             Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-            _ => match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-                Ok((theta, mueller_1d)) => {
-                    let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
-                    self.result.bins_1d = Some(theta);
-                    self.result.mueller_1d = Some(mueller_1d);
+            _ => {
+                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+                    Ok((theta, mueller_1d)) => {
+                        let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
+                        self.result.bins_1d = Some(theta);
+                        self.result.mueller_1d = Some(mueller_1d);
 
-                    // compute params
-                    let _ = self.result.compute_params(self.settings.wavelength);
-                }
-                Err(..) => {}
-            },
+                        // compute params
+                        let _ = self.result.compute_params(self.settings.wavelength);
+                    }
+                    Err(..) => {}
+                };
+                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
+                    Ok((theta, mueller_1d_beam)) => {
+                        let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
+                        self.result.bins_1d = Some(theta);
+                        self.result.mueller_1d_beam = Some(mueller_1d_beam);
+                    }
+                    Err(e) => {
+                        println!("Failed to compute 1d mueller (beam): {}", e);
+                    }
+                };
+                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
+                    Ok((theta, mueller_1d_ext)) => {
+                        let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
+                        self.result.bins_1d = Some(theta);
+                        self.result.mueller_1d_ext = Some(mueller_1d_ext);
+                    }
+                    Err(e) => {
+                        println!("Failed to compute 1d mueller (ext): {}", e);
+                    }
+                };
+            }
         }
 
         println!("Results:");
