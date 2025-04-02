@@ -9,12 +9,21 @@ use crate::geom::{Face, Geom};
 impl Geom {
     pub fn distort(&mut self, sigma: f32) {
         // For each shape in geometry:
+        println!("Distoring geometry. num shapes is {}", self.shapes.len());
         for shape in self.shapes.iter_mut() {
+            // Use the shape aabb to get the bounding box
+            if shape.aabb.is_none() {
+                shape.set_aabb();
+            }
+            let aabb = shape.aabb.clone().unwrap();
+            let max_dim = (aabb.max - aabb.min).norm();
+            println!("max dim is {:?}", max_dim);
+
             // Prescan to hold a list of which vertices are in which faces
             let vertex_to_faces = build_vertex_to_face_map(shape);
 
             // Check if the shape can be distorted
-            if shape_can_be_distorted(&vertex_to_faces) {
+            if !shape_can_be_distorted(&vertex_to_faces) {
                 return;
             }
 
@@ -76,6 +85,25 @@ impl Geom {
                 // Reset vertices for next attempt
                 shape.vertices = original_vertices.clone();
             }
+
+            // Get new AABB after distortion
+            shape.set_aabb();
+            // Get new max dimension after distortion
+            let new_aabb = shape.aabb.clone().unwrap();
+            let new_max_dim = (new_aabb.max - new_aabb.min).norm();
+            println!("new max dim is {:?}", new_max_dim);
+
+            let rescale_fac = max_dim / new_max_dim;
+            println!(
+                "Rescaling shape by factor {} to fit in original bounding box",
+                rescale_fac
+            );
+            shape.rescale(rescale_fac);
+
+            let new_aabb = shape.aabb.clone().unwrap();
+            let new_max_dim = (new_aabb.max - new_aabb.min).norm();
+
+            println!("rescaled max dim is {:?}", new_max_dim);
         }
     }
 }
@@ -256,10 +284,10 @@ fn perturb_normals(sigma: f32, shape: &mut crate::geom::Shape) -> Vec<Vector3<f3
 
 fn shape_can_be_distorted(vertex_to_faces: &HashMap<usize, Vec<usize>>) -> bool {
     if vertex_to_faces.values().any(|faces| faces.len() != 3) {
-        true
-    } else {
         println!("Shape has vertices that do not belong to exactly 3 faces. Skipping distortion.");
         false
+    } else {
+        true
     }
 }
 
