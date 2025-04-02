@@ -26,6 +26,13 @@ impl Geom {
 
             // Update the vertex positions in the faces
             update_face_vertices(shape);
+
+            // Check for self-intersections
+            for face in shape.faces.iter() {
+                if face.data().self_intersects() {
+                    println!("Self-intersection detected in face: {:?}", face);
+                }
+            }
         }
     }
 }

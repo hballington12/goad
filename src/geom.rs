@@ -539,6 +539,102 @@ impl FaceData {
         self.set_midpoint();
         self.set_normal()
     }
+
+    /// Determine if a Face intersects itself using the exterior vertices.
+    pub fn self_intersects(&self) -> bool {
+        let vertices = &self.exterior;
+        let n = vertices.len();
+
+        // Need at least 4 vertices for self-intersection
+        if n < 4 {
+            return false;
+        }
+
+        // Check each pair of non-adjacent edges for intersection
+        for i in 0..n {
+            let i_next = (i + 1) % n;
+            let edge1_start = &vertices[i];
+            let edge1_end = &vertices[i_next];
+
+            // Start j at i+2 to avoid adjacent edges
+            for j in (i + 2)..n {
+                // Skip if this would create adjacent edges
+                if j == n - 1 && i == 0 {
+                    continue;
+                }
+
+                let j_next = (j + 1) % n;
+                // Also skip if edges would be adjacent
+                if j_next == i {
+                    continue;
+                }
+
+                let edge2_start = &vertices[j];
+                let edge2_end = &vertices[j_next];
+
+                // Check if these two edges intersect in 3D
+                if Self::segments_intersect_3d(edge1_start, edge1_end, edge2_start, edge2_end) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    // Helper function to check if two line segments intersect in 3D
+    fn segments_intersect_3d(
+        p1: &Point3<f32>,
+        p2: &Point3<f32>,
+        p3: &Point3<f32>,
+        p4: &Point3<f32>,
+    ) -> bool {
+        // Convert points to vectors for calculations
+        let p13 = p3 - p1;
+        let p43 = p3 - p4;
+        let p21 = p1 - p2;
+
+        // Check if lines are parallel
+        let d1343 = p13.x * p43.x + p13.y * p43.y + p13.z * p43.z;
+        let d4321 = p43.x * p21.x + p43.y * p21.y + p43.z * p21.z;
+        let d1321 = p13.x * p21.x + p13.y * p21.y + p13.z * p21.z;
+        let d4343 = p43.x * p43.x + p43.y * p43.y + p43.z * p43.z;
+        let d2121 = p21.x * p21.x + p21.y * p21.y + p21.z * p21.z;
+
+        let denom = d2121 * d4343 - d4321 * d4321;
+
+        // If denominator is close to 0, lines are parallel
+        if denom.abs() < settings::COLINEAR_THRESHOLD {
+            return false;
+        }
+
+        let numer = d1343 * d4321 - d1321 * d4343;
+
+        let mua = numer / denom;
+        let mub = (d1343 + d4321 * mua) / d4343;
+
+        // Check if intersection point is within both line segments
+        if mua >= 0.0 && mua <= 1.0 && mub >= 0.0 && mub <= 1.0 {
+            // Calculate intersection point
+            let pa = Point3::new(
+                p1.x + mua * (p2.x - p1.x),
+                p1.y + mua * (p2.y - p1.y),
+                p1.z + mua * (p2.z - p1.z),
+            );
+
+            let pb = Point3::new(
+                p3.x + mub * (p4.x - p3.x),
+                p3.y + mub * (p4.y - p3.y),
+                p3.z + mub * (p4.z - p3.z),
+            );
+
+            // Check if intersection points are close enough
+            let dist = (pa - pb).norm();
+            return dist < settings::VEC_LENGTH_THRESHOLD;
+        }
+
+        false
+    }
 }
 
 /// An enum for 2 different types of polygon in 3D.
