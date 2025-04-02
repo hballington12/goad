@@ -21,7 +21,7 @@ impl Geom {
             let perturbed_normals = perturb_normals(sigma, shape);
 
             // Solve the linear system to get the new vertex positions
-            solve_vertices(shape, vertex_to_faces, perturbed_normals);
+            solve_vertices(shape, vertex_to_faces, &perturbed_normals);
 
             // Update the vertex positions in the faces
             update_face_vertices(shape);
@@ -59,65 +59,81 @@ fn update_face_vertices(shape: &mut crate::geom::Shape) {
 fn solve_vertices(
     shape: &mut crate::geom::Shape,
     vertex_to_faces: HashMap<usize, Vec<usize>>,
-    perturbed_normals: Vec<nalgebra::Vector3<f32>>,
+    perturbed_normals: &Vec<nalgebra::Vector3<f32>>,
 ) {
     // For each vertex in the shape
     // Get the perturbed normals of the faces it belongs to
     // (use the mapping to get the faces it belongs to)
     // Solve the linear system to get the new vertex position
     for (vertex_index, faces) in vertex_to_faces.iter() {
-        let mut norms = Vec::new(); // these are the unperturbed normals
-        let mut pnorms = Vec::new(); // these are the perturbed normals
-        let mut mids = Vec::new(); // these are the midpoints of the faces
-
-        // loop over faces that this vertex belongs to
-        for face_index in faces {
-            let face = &shape.faces[*face_index];
-            norms.push(face.data().normal);
-            pnorms.push(perturbed_normals[*face_index]);
-            mids.push(face.data().midpoint);
-        }
+        let (norms, pnorms, mids) = fetch_face_data(shape, perturbed_normals, faces);
 
         println!("normals are {:?}", norms);
         println!("perturbed normals are {:?}", pnorms);
         println!("index is {:?}", vertex_index);
 
-        // Solve the linear system to get the new vertex position
-        // the solution is the intersection of the planes defined by the normals
-        // This is a simple linear system of equations
-        // Ax = b, where A is the matrix of normals, x is the new vertex position,
-        // and b is the vector of the original vertex position
-        let mut a = Matrix3::zeros();
-        let mut b = Vector3::zeros();
-        for (i, normal) in norms.iter().enumerate() {
-            // a[(i, 0)] = normal.x;
-            // a[(i, 1)] = normal.y;
-            // a[(i, 2)] = normal.z;
-            b[i] = mids[i].coords.dot(normal); // tilt is about the centroid
-                                               // b[i] = shape.vertices[*vertex_index].coords.dot(normal);
-        }
-        for (i, normal) in pnorms.iter().enumerate() {
-            a[(i, 0)] = normal.x;
-            a[(i, 1)] = normal.y;
-            a[(i, 2)] = normal.z;
-        }
-        // Solve the linear system
-        let new_vertex = a.try_inverse().expect("could not invert matrix") * b;
+        let new_vertex = solve_linear_system(norms, pnorms, mids);
+
         shape.vertices[*vertex_index].coords = new_vertex;
     }
 }
 
-fn perturb_normals(
-    sigma: f32,
+fn solve_linear_system(
+    norms: Vec<Vector3<f32>>,
+    pnorms: Vec<Vector3<f32>>,
+    mids: Vec<nalgebra::Point3<f32>>,
+) -> Vector3<f32> {
+    // Solve the linear system to get the new vertex position
+    // the solution is the intersection of the planes defined by the normals
+    // This is a simple linear system of equations
+    // Ax = b, where A is the matrix of normals, x is the new vertex position,
+    // and b is the vector of the original vertex position
+    let mut a = Matrix3::zeros();
+    let mut b = Vector3::zeros();
+    for (i, normal) in norms.iter().enumerate() {
+        // a[(i, 0)] = normal.x;
+        // a[(i, 1)] = normal.y;
+        // a[(i, 2)] = normal.z;
+        b[i] = mids[i].coords.dot(normal); // tilt is about the centroid
+                                           // b[i] = shape.vertices[*vertex_index].coords.dot(normal);
+    }
+    for (i, normal) in pnorms.iter().enumerate() {
+        a[(i, 0)] = normal.x;
+        a[(i, 1)] = normal.y;
+        a[(i, 2)] = normal.z;
+    }
+    // Solve the linear system
+    let new_vertex = a.try_inverse().expect("could not invert matrix") * b;
+    new_vertex
+}
+
+fn fetch_face_data(
     shape: &mut crate::geom::Shape,
-) -> Vec<
-    nalgebra::Matrix<
-        f32,
-        nalgebra::Const<3>,
-        nalgebra::Const<1>,
-        nalgebra::ArrayStorage<f32, 3, 1>,
-    >,
-> {
+    perturbed_normals: &Vec<Vector3<f32>>,
+    faces: &Vec<usize>,
+) -> (
+    Vec<Vector3<f32>>,
+    Vec<Vector3<f32>>,
+    Vec<nalgebra::Point3<f32>>,
+) {
+    let mut norms = Vec::new();
+    // these are the unperturbed normals
+    let mut pnorms = Vec::new();
+    // these are the perturbed normals
+    let mut mids = Vec::new();
+    // these are the midpoints of the faces
+
+    // loop over faces that this vertex belongs to
+    for face_index in faces {
+        let face = &shape.faces[*face_index];
+        norms.push(face.data().normal);
+        pnorms.push(perturbed_normals[*face_index]);
+        mids.push(face.data().midpoint);
+    }
+    (norms, pnorms, mids)
+}
+
+fn perturb_normals(sigma: f32, shape: &mut crate::geom::Shape) -> Vec<Vector3<f32>> {
     // Perturb the normal of each face in the shape
     let mut perturbed_normals = Vec::new();
     for face in shape.faces.iter_mut() {
