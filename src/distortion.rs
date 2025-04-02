@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use nalgebra::{Matrix3, Vector3};
-use rand::{distr, Rng};
+use rand::Rng;
 use rand_distr::{Distribution, Normal};
 
 use crate::geom::{Face, Geom};
@@ -161,7 +161,6 @@ fn perturb_normals(sigma: f32, shape: &mut crate::geom::Shape) -> Vec<Vector3<f3
 
         // compute theta and phi angles for original normal
         let theta = normal.z.acos();
-        let phi = normal.y.atan2(normal.x);
 
         // get the rotation matrix to rotate z axis to the normal vector
         let fac = 1.0 - normal.z; // 1 - cos(theta)
