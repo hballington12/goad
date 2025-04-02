@@ -16,16 +16,23 @@ async fn main() {
     let euler = Euler::new(0.0, 30.0, 0.0);
     let _ = geom.euler_rotate(euler, EulerConvention::ZYZ);
 
-    let projection = Vector3::new(0.0, 0.0, -1.0).normalize();
+    let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::x(); // choose e_perp along z-axis for now
 
     let lower_left = vec![-10.0, -10.0];
     let upper_right = vec![10.0, 10.0];
+    // let clip_vertices = vec![
+    //     Point3::new(upper_right[0], upper_right[1], 10.0),
+    //     Point3::new(upper_right[0], lower_left[1], 10.0),
+    //     Point3::new(lower_left[0], lower_left[1], 10.0),
+    //     Point3::new(lower_left[0], upper_right[1], 10.0),
+    // ];
+
     let clip_vertices = vec![
-        Point3::new(upper_right[0], upper_right[1], 10.0),
-        Point3::new(upper_right[0], lower_left[1], 10.0),
-        Point3::new(lower_left[0], lower_left[1], 10.0),
-        Point3::new(lower_left[0], upper_right[1], 10.0),
+        Point3::new(lower_left[0], 10.0, upper_right[1]),
+        Point3::new(lower_left[0], 10.0, lower_left[1]),
+        Point3::new(upper_right[0], 10.0, lower_left[1]),
+        Point3::new(upper_right[0], 10.0, upper_right[1]),
     ];
 
     let mut clip = Face::new_simple(clip_vertices, None, None).unwrap();
@@ -82,7 +89,7 @@ async fn main() {
             io::stdout().flush().unwrap();
         } else {
             println!("No more beams to propagate.");
-            break;
+            // break;
         }
 
         next_frame().await;

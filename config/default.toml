@@ -28,6 +28,7 @@ beam_area_threshold_fac = 0.1         # Factor for truncating beams by area
 cutoff = 0.99                         # Total power cutoff fraction
 max_rec = 10                          # Maximum number of recursions
 max_tir = 10                          # Maximum number of total internal reflections
+distortion = 0.0                      # Distortion factor for the geometry
 # seed = 6                              # Seed (comment out for no seed)
 
 [binning] # Binning configuration

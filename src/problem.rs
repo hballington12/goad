@@ -9,7 +9,7 @@ use crate::{
     orientation::{self, Euler, Orientations},
     output,
     result::{self, Results},
-    settings::{load_config, Settings},
+    settings::{self, load_config, Settings, MIN_DISTORTION},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use macroquad::prelude::*;
@@ -184,6 +184,12 @@ impl Problem {
 
     /// Initialises the geometry and scales it.
     pub fn init(&mut self) {
+        // Apply distortion if set
+        if let Some(distortion) = self.settings.distortion {
+            if distortion >= MIN_DISTORTION {
+                self.geom.distort(distortion);
+            }
+        }
         self.geom.recentre();
         self.settings.scale = self.geom.rescale();
     }
@@ -598,8 +604,7 @@ impl MultiProblem {
         println!("Solving problem...");
 
         // init a base problem that can be reset
-        let mut problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
-        problem_base.init();
+        let problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
 
         let m = MultiProgress::new();
         let n = self.orientations.num_orientations;
@@ -620,6 +625,9 @@ impl MultiProblem {
             .par_iter()
             .map(|(a, b, g)| {
                 let mut problem = problem_base.clone();
+
+                problem.init();
+
                 if let Err(error) = problem.geom.euler_rotate(
                     Euler::new(*a, *b, *g),
                     problem.settings.orientation.euler_convention,

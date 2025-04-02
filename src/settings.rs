@@ -34,6 +34,8 @@ pub const KXY_EPSILON: f32 = 1e-3;
 pub const PROP_PERTURBATION: f32 = 1e-5;
 /// Default Euler angle order for the discrete orientation scheme.
 pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
+/// Minimum Distortion factor for the geometry.
+pub const MIN_DISTORTION: f32 = 1e-5;
 
 /// Runtime configuration for the application.
 #[pyclass]
@@ -53,6 +55,7 @@ pub struct Settings {
     pub seed: Option<u64>,
     #[serde(default = "default_scale_factor")]
     pub scale: f32,
+    pub distortion: Option<f32>,
 }
 
 fn default_scale_factor() -> f32 {
@@ -107,6 +110,7 @@ impl Settings {
             binning,
             seed: None,
             scale: 1.0,
+            distortion: None,
         }
     }
 
@@ -312,6 +316,11 @@ pub fn load_config() -> Result<Settings> {
         }
     }
 
+    // Distortion
+    if let Some(distortion) = args.material.distortion {
+        config.distortion = Some(distortion);
+    }
+
     validate_config(&config);
 
     println!("{:#?}", config);
@@ -463,6 +472,13 @@ pub struct MaterialArgs {
     /// If fewer values than shapes are provided, the first value is reused.
     #[arg(short, long, value_parser, num_args = 1.., value_delimiter = ' ')]
     pub ri: Option<Vec<Complex<f32>>>,
+
+    /// Distortion factor for the geometry.
+    /// Applies distortion sampled from a Gaussian distribution.
+    /// Default: sigma = 0.0 (no distortion).
+    /// Sigma is the standard deviation of the facet theta tilt (in radians).
+    #[arg(long)]
+    pub distortion: Option<f32>,
 }
 
 /// Orientation parameters - control how the particle is oriented relative to the incident beam

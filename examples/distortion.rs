@@ -7,9 +7,9 @@ use nalgebra::Vector3;
 
 #[macroquad::main("Testing...")]
 async fn main() {
-    let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/octo.obj").unwrap();
 
-    geom.distort(0.1);
+    geom.distort(0.5);
     geom.recentre();
 
     let result = geom.euler_rotate(
