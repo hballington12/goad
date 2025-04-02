@@ -263,7 +263,7 @@ impl PolygonExtensions for Polygon<f32> {
         }
 
         if self.interiors().is_empty() {
-            let mut face = Face::new_simple(exterior, None)?;
+            let mut face = Face::new_simple(exterior, None, None)?;
             face.set_area(area);
             Ok(face)
         } else {
@@ -321,21 +321,27 @@ pub struct Plane {
 /// Represents a closed line of exterior points of a polygon 3D.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FaceData {
-    pub exterior: Vec<Point3<f32>>, // List of exterior vertices
-    pub normal: Vector3<f32>,       // Normal vector of the facet
-    pub midpoint: Point3<f32>,      // Midpoint
-    pub num_vertices: usize,        // Number of vertices
-    pub area: Option<f32>,          // Unsigned area
-    pub shape_id: Option<usize>,    // An optional parent shape id number
+    pub exterior: Vec<Point3<f32>>,           // List of exterior vertices
+    pub exterior_indices: Option<Vec<usize>>, // List of exterior vertex indices
+    pub normal: Vector3<f32>,                 // Normal vector of the facet
+    pub midpoint: Point3<f32>,                // Midpoint
+    pub num_vertices: usize,                  // Number of vertices
+    pub area: Option<f32>,                    // Unsigned area
+    pub shape_id: Option<usize>,              // An optional parent shape id number
 }
 
 impl FaceData {
-    pub fn new(vertices: Vec<Point3<f32>>, shape_id: Option<usize>) -> Result<Self> {
+    pub fn new(
+        vertices: Vec<Point3<f32>>,
+        shape_id: Option<usize>,
+        indices: Option<Vec<usize>>,
+    ) -> Result<Self> {
         let vertices = vertices.clone();
         let num_vertices = vertices.len();
 
         let mut face = Self {
             exterior: vertices,
+            exterior_indices: indices,
             num_vertices,
             normal: Vector3::zeros(),
             midpoint: Point3::origin(),
@@ -550,8 +556,12 @@ pub enum Face {
 }
 
 impl Face {
-    pub fn new_simple(exterior: Vec<Point3<f32>>, parent_id: Option<usize>) -> Result<Self> {
-        Ok(Face::Simple(FaceData::new(exterior, parent_id)?))
+    pub fn new_simple(
+        exterior: Vec<Point3<f32>>,
+        parent_id: Option<usize>,
+        indices: Option<Vec<usize>>,
+    ) -> Result<Self> {
+        Ok(Face::Simple(FaceData::new(exterior, parent_id, indices)?))
     }
 
     pub fn new_complex(
@@ -560,7 +570,7 @@ impl Face {
         parent_id: Option<usize>,
     ) -> Result<Self> {
         Ok(Face::Complex {
-            data: FaceData::new(exterior, parent_id)?,
+            data: FaceData::new(exterior, parent_id, None)?,
             interiors,
         })
     }
@@ -785,11 +795,11 @@ impl Shape {
             let end = next_face + arity as usize;
             let face_indices = &mesh.indices[next_face..end];
 
-            let face_vertices: Vec<_> = face_indices
-                .iter()
-                .map(|&i| shape.vertices[i as usize])
-                .collect();
-            shape.add_face(Face::new_simple(face_vertices, id)?);
+            // Convert face indices to usize
+            let usize_indices: Vec<usize> = face_indices.iter().map(|&i| i as usize).collect();
+
+            let face_vertices: Vec<_> = usize_indices.iter().map(|&i| shape.vertices[i]).collect();
+            shape.add_face(Face::new_simple(face_vertices, id, Some(usize_indices))?);
 
             next_face = end;
         }
@@ -915,7 +925,7 @@ impl Shape {
         for indices in face_indices {
             let face_vertices: Vec<_> = indices.into_iter().map(|i| shape.vertices[i]).collect();
             shape.add_face(
-                Face::new_simple(face_vertices, Some(BODGE_SHAPE_ID))
+                Face::new_simple(face_vertices, Some(BODGE_SHAPE_ID), None)
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?,
             );
         }
@@ -1176,6 +1186,7 @@ impl Geom {
             }
 
             // Perturb the normal of each face in the shape
+            let mut perturbed_normals = Vec::new();
             for face in shape.faces.iter_mut() {
                 let mut rng = rand::rng();
                 let perturbation = Vector3::new(
@@ -1183,8 +1194,11 @@ impl Geom {
                     rng.random_range(-sigma..sigma),
                     rng.random_range(-sigma..sigma),
                 );
-                face.data_mut().normal += perturbation;
-                face.data_mut().normal.normalize_mut();
+                println!("old normal is {:?}", face.data().normal);
+                let mut perturbed = face.data().normal + perturbation;
+                perturbed.normalize_mut();
+                println!("new normal is {:?}", perturbed);
+                perturbed_normals.push(perturbed);
             }
 
             // For each vertex in the shape
@@ -1192,11 +1206,21 @@ impl Geom {
             // (use the mapping to get the faces it belongs to)
             // Solve the linear system to get the new vertex position
             for (vertex_index, faces) in vertex_to_faces.iter() {
-                let mut normals = Vec::new();
+                let mut norms = Vec::new(); // these are the unperturbed normals
+                let mut pnorms = Vec::new(); // these are the perturbed normals
+                let mut mids = Vec::new(); // these are the midpoints of the faces
+
+                // loop over faces that this vertex belongs to
                 for face_index in faces {
                     let face = &shape.faces[*face_index];
-                    normals.push(face.data().normal);
+                    norms.push(face.data().normal);
+                    pnorms.push(perturbed_normals[*face_index]);
+                    mids.push(face.data().midpoint);
                 }
+
+                println!("normals are {:?}", norms);
+                println!("perturbed normals are {:?}", pnorms);
+                println!("index is {:?}", vertex_index);
 
                 // Solve the linear system to get the new vertex position
                 // the solution is the intersection of the planes defined by the normals
@@ -1205,17 +1229,45 @@ impl Geom {
                 // and b is the vector of the original vertex position
                 let mut a = Matrix3::zeros();
                 let mut b = Vector3::zeros();
-                for (i, normal) in normals.iter().enumerate() {
+                for (i, normal) in norms.iter().enumerate() {
+                    // a[(i, 0)] = normal.x;
+                    // a[(i, 1)] = normal.y;
+                    // a[(i, 2)] = normal.z;
+                    b[i] = mids[i].coords.dot(normal); // tilt is about the centroid
+                                                       // b[i] = shape.vertices[*vertex_index].coords.dot(normal);
+                }
+                for (i, normal) in pnorms.iter().enumerate() {
                     a[(i, 0)] = normal.x;
                     a[(i, 1)] = normal.y;
                     a[(i, 2)] = normal.z;
-                    b[i] = shape.vertices[*vertex_index].coords.dot(normal);
                 }
                 // Solve the linear system
-                let new_vertex = a.try_inverse().unwrap() * b;
+                let new_vertex = a.try_inverse().expect("could not invert matrix") * b;
                 shape.vertices[*vertex_index].coords = new_vertex;
-
-                // Update vertex positions in the faces that this vertex
+            }
+            // Update vertex positions in faces
+            for face in shape.faces.iter_mut() {
+                match face {
+                    Face::Simple(data) => {
+                        if let Some(indices) = &data.exterior_indices {
+                            println!(
+                                "Updating vertex positions in face with {} vertices",
+                                indices.len()
+                            );
+                            for (pos, &index) in indices.iter().enumerate() {
+                                if index < shape.vertices.len() {
+                                    // println!("old position is {:?}", data.exterior[pos]);
+                                    let vertex = shape.vertices[index];
+                                    // println!("new position is {:?}", vertex);
+                                    data.exterior[pos] = vertex;
+                                }
+                            }
+                        }
+                    }
+                    Face::Complex { .. } => {
+                        panic!("Complex faces not supported for distortion");
+                    }
+                }
             }
         }
     }

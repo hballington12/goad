@@ -28,7 +28,7 @@ async fn main() {
         Point3::new(lower_left[0], upper_right[1], 10.0),
     ];
 
-    let mut clip = Face::new_simple(clip_vertices, None).unwrap();
+    let mut clip = Face::new_simple(clip_vertices, None, None).unwrap();
     clip.data_mut().area =
         Some((upper_right[0] - lower_left[0]) * (upper_right[1] - lower_left[1]));
     geom.shapes[0].refr_index.re = 1.5;

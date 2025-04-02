@@ -541,7 +541,7 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
         Point3::new(min[0], max[1], max[2]),
     ];
 
-    let mut clip = Face::new_simple(clip_vertices, None).unwrap();
+    let mut clip = Face::new_simple(clip_vertices, None, None).unwrap();
     clip.data_mut().area = Some((max[0] - min[0]) * (max[1] - min[1]));
     let mut field = Field::new_identity(Vector3::x(), -Vector3::z()).unwrap();
 

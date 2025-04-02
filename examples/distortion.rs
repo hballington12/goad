@@ -9,12 +9,15 @@ use nalgebra::Vector3;
 async fn main() {
     let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
-    geom.distort(2.0);
+    geom.distort(0.25);
+    geom.recentre();
 
-    let _ = geom.euler_rotate(
+    let result = geom.euler_rotate(
         Euler::new(30.0, 30.0, 30.0),
         goad::orientation::EulerConvention::XYX,
     );
+
+    println!("result is {:?}", result);
 
     let clip_index = 4; // the index of the face to be used as the clip
     let projection = Vector3::new(-0.3, 0.0, -1.0);
