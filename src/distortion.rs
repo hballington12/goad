@@ -4,10 +4,17 @@ use nalgebra::{Matrix3, Vector3};
 use rand::Rng;
 use rand_distr::{Distribution, Normal};
 
-use crate::geom::{Face, Geom};
+use crate::{
+    geom::{Face, Geom},
+    settings::MIN_DISTORTION,
+};
 
 impl Geom {
     pub fn distort(&mut self, sigma: f32) {
+        if sigma <= MIN_DISTORTION {
+            return;
+        }
+
         // For each shape in geometry:
         for shape in self.shapes.iter_mut() {
             // Use the shape aabb to get the bounding box

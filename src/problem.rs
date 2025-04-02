@@ -9,7 +9,7 @@ use crate::{
     orientation::{self, Euler, Orientations},
     output,
     result::{self, Results},
-    settings::{load_config, Settings, MIN_DISTORTION},
+    settings::{load_config, Settings},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use macroquad::prelude::*;
@@ -186,9 +186,7 @@ impl Problem {
     pub fn init(&mut self) {
         // Apply distortion if set
         if let Some(distortion) = self.settings.distortion {
-            if distortion >= MIN_DISTORTION {
-                self.geom.distort(distortion);
-            }
+            self.geom.distort(distortion);
         }
         self.geom.recentre();
         self.settings.scale = self.geom.rescale();
