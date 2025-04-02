@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use nalgebra::{Matrix3, Vector3};
-use rand::Rng;
+use rand::{distr, Rng};
+use rand_distr::{Distribution, Normal};
 
 use crate::geom::{Face, Geom};
 
@@ -134,20 +135,72 @@ fn fetch_face_data(
 }
 
 fn perturb_normals(sigma: f32, shape: &mut crate::geom::Shape) -> Vec<Vector3<f32>> {
+    // this function is being updated with more mathematical rigour
+    // we will first compute the theta and phi angle of the normal vector
+    // then we will sample a theta and phi angle from a distribution
+    // and then we will compute the new normal vector
+
     // Perturb the normal of each face in the shape
     let mut perturbed_normals = Vec::new();
     for face in shape.faces.iter_mut() {
+        // first, we will compute the theta and phi angle of the normal vector
+        let normal = face.data().normal;
+        // theta is the angle between the normal and the z-axis
+        // let theta = normal.z.acos();
+        // phi is the angle between the normal and the x-axis
+        // let phi = normal.y.atan2(normal.x);
+        // now we will sample a theta and phi angle from a distribution
+        // we will use a normal distribution with mean 0 and standard deviation sigma for theta
+        // and a uniform distribution for phi from 0 to 2pi
+
+        // get the theta and phi distortion angles
         let mut rng = rand::rng();
-        let perturbation = Vector3::new(
-            rng.random_range(-sigma..sigma),
-            rng.random_range(-sigma..sigma),
-            rng.random_range(-sigma..sigma),
+        let norm_dist = Normal::new(0.0, sigma).unwrap();
+        let dtheta = norm_dist.sample(&mut rng);
+        let dphi = rng.random_range(0.0..std::f32::consts::PI * 2.0);
+
+        // compute theta and phi angles for original normal
+        let theta = normal.z.acos();
+        let phi = normal.y.atan2(normal.x);
+
+        // get the rotation matrix to rotate z axis to the normal vector
+        let fac = 1.0 - normal.z; // 1 - cos(theta)
+        let x = normal.x;
+        let y = normal.y;
+        let z = normal.z;
+
+        // rotation matrix using Rodrigues' rotation formula
+        let rotation_matrix = Matrix3::new(
+            1.0 + fac * (-y * y),
+            fac * (-y * x),
+            x * theta.sin(),
+            fac * (-y * x),
+            1.0 + fac * (-x * x),
+            y * theta.sin(),
+            -x * theta.sin(),
+            -y * theta.sin(),
+            z, // z == cos(theta)
         );
-        println!("old normal is {:?}", face.data().normal);
-        let mut perturbed = face.data().normal + perturbation;
-        perturbed.normalize_mut();
-        println!("new normal is {:?}", perturbed);
-        perturbed_normals.push(perturbed);
+
+        // // assert that rotating the z axis to the normal vector gives the normal vector
+        // let rotated_z = rotation_matrix * Vector3::z();
+        // assert!(
+        //     (rotated_z - normal).norm() < 1e-6,
+        //     "Rotation matrix is incorrect"
+        // );
+
+        // rotate the perturbation vector to the normal vector
+        let perturbation = Vector3::new(
+            dtheta.sin() * dphi.cos(),
+            dtheta.sin() * dphi.sin(),
+            dtheta.cos(),
+        );
+        let new_normal = rotation_matrix * perturbation;
+
+        println!("old normal is {:?}", normal);
+        println!("new normal is {:?}", new_normal);
+
+        perturbed_normals.push(new_normal);
     }
     perturbed_normals
 }
