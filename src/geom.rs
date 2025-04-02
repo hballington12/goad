@@ -635,6 +635,70 @@ impl FaceData {
 
         false
     }
+
+    /// Determine if a Face is convex by projecting it onto a suitable 2D plane
+    /// and checking the convexity of the resulting polygon.
+    pub fn is_convex(&self) -> bool {
+        let vertices = &self.exterior;
+        let n = vertices.len();
+
+        // Need at least 3 vertices for a valid polygon
+        if n < 3 {
+            return true; // Technically, a line or point is trivially convex
+        }
+
+        // Find the best projection plane based on the face normal
+        let abs_normal = Vector3::new(
+            self.normal.x.abs(),
+            self.normal.y.abs(),
+            self.normal.z.abs(),
+        );
+
+        // We'll project the face onto the plane where the normal has the largest component
+        let (i1, i2) = if abs_normal.x >= abs_normal.y && abs_normal.x >= abs_normal.z {
+            // Project onto YZ plane
+            (1, 2) // Use Y and Z coordinates
+        } else if abs_normal.y >= abs_normal.x && abs_normal.y >= abs_normal.z {
+            // Project onto XZ plane
+            (0, 2) // Use X and Z coordinates
+        } else {
+            // Project onto XY plane
+            (0, 1) // Use X and Y coordinates
+        };
+
+        // Check convexity using the cross product method
+        // A polygon is convex if all cross products of consecutive edges have the same sign
+        let mut sign = 0; // 0 = uninitialized, 1 = positive, -1 = negative
+
+        for i in 0..n {
+            let p1 = &vertices[i];
+            let p2 = &vertices[(i + 1) % n];
+            let p3 = &vertices[(i + 2) % n];
+
+            // Form 2D vectors for two consecutive edges
+            let v1 = [p2[i1] - p1[i1], p2[i2] - p1[i2]];
+            let v2 = [p3[i1] - p2[i1], p3[i2] - p2[i2]];
+
+            // Compute the 2D cross product
+            let cross = v1[0] * v2[1] - v1[1] * v2[0];
+
+            // If cross product is close to zero, these points are collinear
+            if cross.abs() < settings::COLINEAR_THRESHOLD {
+                continue;
+            }
+
+            // Initialize sign with first non-zero cross product
+            if sign == 0 {
+                sign = if cross > 0.0 { 1 } else { -1 };
+            } else if (cross > 0.0 && sign < 0) || (cross < 0.0 && sign > 0) {
+                // If sign changes, the polygon is not convex
+                return false;
+            }
+        }
+
+        // If we reach here, the polygon is convex
+        true
+    }
 }
 
 /// An enum for 2 different types of polygon in 3D.

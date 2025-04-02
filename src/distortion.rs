@@ -18,20 +18,63 @@ impl Geom {
                 return;
             }
 
-            // Perturb the normals of the faces
-            let perturbed_normals = perturb_normals(sigma, shape);
+            // Keep original vertices in case we need to restore them
+            let original_vertices = shape.vertices.clone();
 
-            // Solve the linear system to get the new vertex positions
-            solve_vertices(shape, vertex_to_faces, &perturbed_normals);
+            // Try distortion up to 25 times
+            let max_attempts = 25;
+            let mut attempt = 0;
 
-            // Update the vertex positions in the faces
-            update_face_vertices(shape);
+            loop {
+                attempt += 1;
 
-            // Check for self-intersections
-            for face in shape.faces.iter() {
-                if face.data().self_intersects() {
-                    println!("Self-intersection detected in face: {:?}", face);
+                // Perturb the normals of the faces
+                let perturbed_normals = perturb_normals(sigma, shape);
+
+                // Solve the linear system to get the new vertex positions
+                solve_vertices(shape, &vertex_to_faces, &perturbed_normals);
+
+                // Update the vertex positions in the faces
+                update_face_vertices(shape);
+
+                // Check for self-intersections
+                let mut distort_failed = false;
+                for (i, face) in shape.faces.iter().enumerate() {
+                    if face.data().self_intersects() {
+                        println!(
+                            "Attempt {}: Self-intersection detected in face {}",
+                            attempt, i
+                        );
+                        distort_failed = true;
+                        break;
+                    } else if !face.data().is_convex() {
+                        println!(
+                            "Attempt {}: Non-convex face detected in face {}",
+                            attempt, i
+                        );
+                        distort_failed = true;
+                        break;
+                    }
                 }
+
+                // If no self-intersections or max attempts reached, break the loop
+                if !distort_failed || attempt >= max_attempts {
+                    if distort_failed && attempt >= max_attempts {
+                        println!(
+                            "Maximum retries ({}) reached. Reverting to original shape.",
+                            max_attempts
+                        );
+                        // Restore original vertices
+                        shape.vertices = original_vertices;
+                        update_face_vertices(shape);
+                    } else if !distort_failed {
+                        println!("Successful distortion after {} attempt(s)", attempt);
+                    }
+                    break;
+                }
+
+                // Reset vertices for next attempt
+                shape.vertices = original_vertices.clone();
             }
         }
     }
@@ -66,7 +109,7 @@ fn update_face_vertices(shape: &mut crate::geom::Shape) {
 
 fn solve_vertices(
     shape: &mut crate::geom::Shape,
-    vertex_to_faces: HashMap<usize, Vec<usize>>,
+    vertex_to_faces: &HashMap<usize, Vec<usize>>,
     perturbed_normals: &Vec<nalgebra::Vector3<f32>>,
 ) {
     // For each vertex in the shape
