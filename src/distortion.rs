@@ -89,10 +89,6 @@ impl Geom {
             let new_max_dim = (new_aabb.max - new_aabb.min).norm();
 
             let rescale_fac = max_dim / new_max_dim;
-            println!(
-                "Rescaling shape by a factor of {} to fit in the original bounding box.",
-                rescale_fac
-            );
             shape.rescale(rescale_fac);
         }
     }
