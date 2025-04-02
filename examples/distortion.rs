@@ -9,7 +9,7 @@ use nalgebra::Vector3;
 async fn main() {
     let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
-    geom.distort(0.25);
+    geom.distort(0.5);
     geom.recentre();
 
     let result = geom.euler_rotate(
@@ -18,6 +18,9 @@ async fn main() {
     );
 
     println!("result is {:?}", result);
+
+    // write the distorted object to a file
+    geom.write_obj("hex_distorted.obj").unwrap();
 
     let clip_index = 4; // the index of the face to be used as the clip
     let projection = Vector3::new(-0.3, 0.0, -1.0);
