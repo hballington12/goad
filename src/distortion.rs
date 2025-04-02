@@ -9,7 +9,6 @@ use crate::geom::{Face, Geom};
 impl Geom {
     pub fn distort(&mut self, sigma: f32) {
         // For each shape in geometry:
-        println!("Distoring geometry. num shapes is {}", self.shapes.len());
         for shape in self.shapes.iter_mut() {
             // Use the shape aabb to get the bounding box
             if shape.aabb.is_none() {
@@ -17,7 +16,6 @@ impl Geom {
             }
             let aabb = shape.aabb.clone().unwrap();
             let max_dim = (aabb.max - aabb.min).norm();
-            println!("max dim is {:?}", max_dim);
 
             // Prescan to hold a list of which vertices are in which faces
             let vertex_to_faces = build_vertex_to_face_map(shape);
@@ -48,19 +46,11 @@ impl Geom {
 
                 // Check for self-intersections
                 let mut distort_failed = false;
-                for (i, face) in shape.faces.iter().enumerate() {
+                for face in &shape.faces {
                     if face.data().self_intersects() {
-                        println!(
-                            "Attempt {}: Self-intersection detected in face {}",
-                            attempt, i
-                        );
                         distort_failed = true;
                         break;
                     } else if !face.data().is_convex() {
-                        println!(
-                            "Attempt {}: Non-convex face detected in face {}",
-                            attempt, i
-                        );
                         distort_failed = true;
                         break;
                     }
@@ -76,8 +66,6 @@ impl Geom {
                         // Restore original vertices
                         shape.vertices = original_vertices;
                         update_face_vertices(shape);
-                    } else if !distort_failed {
-                        println!("Successful distortion after {} attempt(s)", attempt);
                     }
                     break;
                 }
@@ -88,22 +76,13 @@ impl Geom {
 
             // Get new AABB after distortion
             shape.set_aabb();
+
             // Get new max dimension after distortion
             let new_aabb = shape.aabb.clone().unwrap();
             let new_max_dim = (new_aabb.max - new_aabb.min).norm();
-            println!("new max dim is {:?}", new_max_dim);
 
             let rescale_fac = max_dim / new_max_dim;
-            println!(
-                "Rescaling shape by factor {} to fit in original bounding box",
-                rescale_fac
-            );
             shape.rescale(rescale_fac);
-
-            let new_aabb = shape.aabb.clone().unwrap();
-            let new_max_dim = (new_aabb.max - new_aabb.min).norm();
-
-            println!("rescaled max dim is {:?}", new_max_dim);
         }
     }
 }
@@ -114,10 +93,6 @@ fn update_face_vertices(shape: &mut crate::geom::Shape) {
         match face {
             Face::Simple(data) => {
                 if let Some(indices) = &data.exterior_indices {
-                    println!(
-                        "Updating vertex positions in face with {} vertices",
-                        indices.len()
-                    );
                     for (pos, &index) in indices.iter().enumerate() {
                         if index < shape.vertices.len() {
                             // println!("old position is {:?}", data.exterior[pos]);
@@ -146,10 +121,6 @@ fn solve_vertices(
     // Solve the linear system to get the new vertex position
     for (vertex_index, faces) in vertex_to_faces.iter() {
         let (norms, pnorms, mids) = fetch_face_data(shape, perturbed_normals, faces);
-
-        println!("normals are {:?}", norms);
-        println!("perturbed normals are {:?}", pnorms);
-        println!("index is {:?}", vertex_index);
 
         let new_vertex = solve_linear_system(norms, pnorms, mids);
 
@@ -273,9 +244,6 @@ fn perturb_normals(sigma: f32, shape: &mut crate::geom::Shape) -> Vec<Vector3<f3
             dtheta.cos(),
         );
         let new_normal = rotation_matrix * perturbation;
-
-        println!("old normal is {:?}", normal);
-        println!("new normal is {:?}", new_normal);
 
         perturbed_normals.push(new_normal);
     }
