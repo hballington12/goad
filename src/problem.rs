@@ -9,7 +9,7 @@ use crate::{
     orientation::{self, Euler, Orientations},
     output,
     result::{self, Results},
-    settings::{self, load_config, Settings, MIN_DISTORTION},
+    settings::{load_config, Settings, MIN_DISTORTION},
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use macroquad::prelude::*;
