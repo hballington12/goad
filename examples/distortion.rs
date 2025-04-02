@@ -9,7 +9,7 @@ use nalgebra::Vector3;
 async fn main() {
     let mut geom = geom::Geom::from_file("./examples/data/octo.obj").unwrap();
 
-    geom.distort(0.5);
+    geom.distort(0.5, None);
     geom.recentre();
 
     let result = geom.euler_rotate(

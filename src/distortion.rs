@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use nalgebra::{Matrix3, Vector3};
-use rand::Rng;
+use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 };
 
 impl Geom {
-    pub fn distort(&mut self, sigma: f32) {
+    pub fn distort(&mut self, sigma: f32, seed: Option<u64>) {
         if sigma <= MIN_DISTORTION {
             return;
         }
@@ -43,7 +43,7 @@ impl Geom {
                 attempt += 1;
 
                 // Perturb the normals of the faces
-                let perturbed_normals = perturb_normals(sigma, shape);
+                let perturbed_normals = perturb_normals(sigma, shape, seed);
 
                 // Solve the linear system to get the new vertex positions
                 solve_vertices(shape, &vertex_to_faces, &perturbed_normals);
@@ -190,7 +190,11 @@ fn fetch_face_data(
     (norms, pnorms, mids)
 }
 
-fn perturb_normals(sigma: f32, shape: &mut crate::geom::Shape) -> Vec<Vector3<f32>> {
+fn perturb_normals(
+    sigma: f32,
+    shape: &mut crate::geom::Shape,
+    seed: Option<u64>,
+) -> Vec<Vector3<f32>> {
     // this function is being updated with more mathematical rigour
     // we will first compute the theta and phi angle of the normal vector
     // then we will sample a theta and phi angle from a distribution
@@ -210,7 +214,11 @@ fn perturb_normals(sigma: f32, shape: &mut crate::geom::Shape) -> Vec<Vector3<f3
         // and a uniform distribution for phi from 0 to 2pi
 
         // get the theta and phi distortion angles
-        let mut rng = rand::rng();
+        let mut rng = if let Some(seed) = seed {
+            rand::rngs::StdRng::seed_from_u64(seed)
+        } else {
+            rand::rngs::StdRng::from_rng(&mut rand::rng())
+        };
         let norm_dist = Normal::new(0.0, sigma).unwrap();
         let dtheta = norm_dist.sample(&mut rng);
         let dphi = rng.random_range(0.0..std::f32::consts::PI * 2.0);
