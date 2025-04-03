@@ -184,6 +184,10 @@ impl Problem {
 
     /// Initialises the geometry and scales it.
     pub fn init(&mut self) {
+        // Apply geometry scaling if set
+        if let Some(scale) = &self.settings.geom_scale {
+            self.geom.vector_scale(scale);
+        }
         // Apply distortion if set
         if let Some(distortion) = self.settings.distortion {
             self.geom.distort(distortion, self.settings.seed);

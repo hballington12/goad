@@ -9,3 +9,4 @@ config/local.toml
 **/.env/
 log**
 goad-py/.env
+goad_run/

@@ -57,12 +57,18 @@ pub struct Settings {
     #[serde(default = "default_scale_factor")]
     pub scale: f32,
     pub distortion: Option<f32>,
+    #[serde(default = "default_geom_scale")]
+    pub geom_scale: Option<Vec<f32>>,
     #[serde(default = "default_directory")]
     pub directory: PathBuf,
 }
 
 fn default_scale_factor() -> f32 {
     1.0
+}
+
+fn default_geom_scale() -> Option<Vec<f32>> {
+    None
 }
 
 fn default_directory() -> PathBuf {
@@ -142,8 +148,9 @@ impl Settings {
             max_tir,
             binning,
             seed: None,
-            scale: 1.0,
+            scale: default_scale_factor(),
             distortion: None,
+            geom_scale: default_geom_scale(),
             directory: std::env::current_dir().unwrap_or_else(|_| PathBuf::new()),
         }
     }
@@ -371,6 +378,14 @@ pub fn load_config() -> Result<Settings> {
         config.distortion = Some(distortion);
     }
 
+    if let Some(geom_scale) = args.material.geom_scale {
+        if geom_scale.len() != 3 {
+            panic!("Geometry scale must have exactly 3 values (x, y, z)");
+        } else {
+            config.geom_scale = Some(geom_scale);
+        }
+    }
+
     validate_config(&config);
 
     println!("{:#?}", config);
@@ -537,6 +552,12 @@ pub struct MaterialArgs {
     /// Sigma is the standard deviation of the facet theta tilt (in radians).
     #[arg(long)]
     pub distortion: Option<f32>,
+
+    /// Geometry scale factors for each axis (x, y, z).
+    /// Format: "x y z" (e.g., "1.0 1.0 1.0").
+    /// Default: "1.0 1.0 1.0" (no scaling).
+    #[arg(long, value_parser, num_args = 1..=3, value_delimiter = ' ')]
+    pub geom_scale: Option<Vec<f32>>,
 }
 
 /// Orientation parameters - control how the particle is oriented relative to the incident beam

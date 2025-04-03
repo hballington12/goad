@@ -1409,6 +1409,51 @@ impl Geom {
 
         Ok(())
     }
+
+    pub fn vector_scale(&mut self, scale: &Vec<f32>) {
+        if scale.len() != 3 {
+            panic!("Scale vector must have length 3");
+        }
+
+        let scale_vec = Vector3::new(scale[0], scale[1], scale[2]);
+
+        for shape in self.shapes.iter_mut() {
+            for vertex in shape.vertices.iter_mut() {
+                vertex.coords.component_mul_assign(&scale_vec);
+            }
+
+            for face in shape.faces.iter_mut() {
+                match face {
+                    Face::Simple(data) => {
+                        data.midpoint.coords.component_mul_assign(&scale_vec);
+                        data.normal.component_mul_assign(&scale_vec);
+                        data.normal.normalize_mut(); // Re-normalize after scaling
+
+                        for vertex in data.exterior.iter_mut() {
+                            vertex.coords.component_mul_assign(&scale_vec);
+                        }
+                    }
+
+                    Face::Complex { data, interiors } => {
+                        data.midpoint.coords.component_mul_assign(&scale_vec);
+                        data.normal.component_mul_assign(&scale_vec);
+                        data.normal.normalize_mut(); // Re-normalize after scaling
+
+                        for vertex in data.exterior.iter_mut() {
+                            vertex.coords.component_mul_assign(&scale_vec);
+                        }
+
+                        for interior in interiors.iter_mut() {
+                            for vertex in interior.iter_mut() {
+                                vertex.coords.component_mul_assign(&scale_vec);
+                            }
+                        }
+                    }
+                }
+            }
+            shape.set_aabb();
+        }
+    }
 }
 
 /// Python bindings for the `Geom` struct.
