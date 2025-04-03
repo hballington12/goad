@@ -22,5 +22,6 @@ fn main() {
     let theta_phi_combinations = bins::simple_bins(180, 180);
     let ampl_far_field = diff::diffraction(&verts, ampl, prop, vk7, &theta_phi_combinations, 1.0);
     let mueller = output::ampl_to_mueller(&theta_phi_combinations, &ampl_far_field);
-    let _ = output::write_mueller(&theta_phi_combinations, &mueller, "");
+    let cwd = std::env::current_dir().expect("Failed to get current directory");
+    let _ = output::write_mueller(&theta_phi_combinations, &mueller, "", &cwd);
 }

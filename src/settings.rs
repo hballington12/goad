@@ -7,6 +7,7 @@ use pyo3::prelude::*;
 use serde::Deserialize;
 use std::env;
 use std::fmt;
+use std::path::PathBuf;
 
 use crate::bins;
 use crate::orientation::Euler;
@@ -56,10 +57,42 @@ pub struct Settings {
     #[serde(default = "default_scale_factor")]
     pub scale: f32,
     pub distortion: Option<f32>,
+    #[serde(default = "default_directory")]
+    pub directory: PathBuf,
 }
 
 fn default_scale_factor() -> f32 {
     1.0
+}
+
+fn default_directory() -> PathBuf {
+    // Get current directory or default to a new PathBuf if it fails
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::new());
+
+    // Find the next available run number by checking existing directories
+    let mut run_number = 1;
+    let mut run_dir;
+
+    loop {
+        let run_name = format!("run{:05}", run_number);
+        run_dir = current_dir.join(&run_name);
+
+        if !run_dir.exists() {
+            break;
+        }
+
+        run_number += 1;
+
+        // Safety check to prevent infinite loops in extreme cases
+        if run_number > 99999 {
+            eprintln!("Warning: Exceeded maximum run number. Using timestamp instead.");
+            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+            run_dir = current_dir.join(format!("run_{}", timestamp));
+            break;
+        }
+    }
+
+    run_dir
 }
 
 #[pymethods]
@@ -111,6 +144,7 @@ impl Settings {
             seed: None,
             scale: 1.0,
             distortion: None,
+            directory: std::env::current_dir().unwrap_or_else(|_| PathBuf::new()),
         }
     }
 
@@ -327,6 +361,11 @@ pub fn load_config() -> Result<Settings> {
         }
     }
 
+    // Handle output directory if specified
+    if let Some(dir) = args.dir {
+        config.directory = dir;
+    }
+
     // Distortion
     if let Some(distortion) = args.material.distortion {
         config.distortion = Some(distortion);
@@ -407,6 +446,9 @@ fn validate_config(config: &Settings) {
 
     \x1b[32m# Run with multiple shapes with different refractive indices\x1b[0m
     \x1b[36mgoad --ri 1.31+0.0i 1.5+0.1i --geo geometries.obj\x1b[0m
+    
+    \x1b[32m# Save output to a specific directory\x1b[0m
+    \x1b[36mgoad --dir /path/to/output\x1b[0m
     ")]
 pub struct CliArgs {
     #[command(flatten)]
@@ -425,6 +467,11 @@ pub struct CliArgs {
     /// Omit for a randomized seed.
     #[arg(short, long)]
     pub seed: Option<u64>,
+
+    /// Output directory for simulation results.
+    /// If not specified, a directory in the format 'run00001' will be created automatically.
+    #[arg(long)]
+    pub dir: Option<PathBuf>,
 }
 
 /// Beam propagation parameters - control how beams are traced through the geometry

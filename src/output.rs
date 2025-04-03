@@ -1,4 +1,6 @@
+use std::fs;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::{fs::File, io::BufWriter};
 
 use anyhow::Result;
@@ -96,10 +98,16 @@ fn unique_grid(tuple_slice: &[(f32, f32)]) -> Vec<(f32, f32)> {
 }
 
 /// Write the 1d Mueller matrix to a file against the theta and phi bins
-pub fn write_mueller_1d(bins: &[f32], mueller_1d: &Array2<f32>, suffix: &str) -> Result<()> {
-    // Open a file for writing
+pub fn write_mueller_1d(
+    bins: &[f32],
+    mueller_1d: &Array2<f32>,
+    suffix: &str,
+    output_dir: &Path,
+) -> Result<()> {
     let file_name = format!("mueller_scatgrid_1d{}", suffix);
-    let file = File::create(&file_name).unwrap();
+    let path = output_path(Some(output_dir), &file_name)?;
+
+    let file = File::create(&path)?;
     let mut writer = BufWriter::new(file);
 
     // Iterate over the array and write data to the file
@@ -116,10 +124,16 @@ pub fn write_mueller_1d(bins: &[f32], mueller_1d: &Array2<f32>, suffix: &str) ->
 }
 
 /// Write the Mueller matrix to a file against the theta and phi bins
-pub fn write_mueller(bins: &[(f32, f32)], mueller: &Array2<f32>, suffix: &str) -> Result<()> {
-    // Open a file for writing
+pub fn write_mueller(
+    bins: &[(f32, f32)],
+    mueller: &Array2<f32>,
+    suffix: &str,
+    output_dir: &Path,
+) -> Result<()> {
     let file_name = format!("mueller_scatgrid{}", suffix);
-    let file = File::create(&file_name).unwrap();
+    let path = output_path(Some(output_dir), &file_name)?;
+
+    let file = File::create(&path)?;
     let mut writer = BufWriter::new(file);
 
     // Iterate over the array and write data to the file
@@ -133,6 +147,17 @@ pub fn write_mueller(bins: &[(f32, f32)], mueller: &Array2<f32>, suffix: &str) -
     }
 
     Ok(())
+}
+
+// Helper function to construct the output path and ensure the directory exists
+fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
+    match output_dir {
+        Some(dir) => {
+            fs::create_dir_all(dir)?;
+            Ok(dir.join(file_name))
+        }
+        None => Ok(PathBuf::from(file_name)),
+    }
 }
 
 pub fn ampl_to_mueller(

@@ -358,9 +358,24 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller, "");
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_beam, "_beam");
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_ext, "_ext");
+        let _ = output::write_mueller(
+            &self.result.bins,
+            &self.result.mueller,
+            "",
+            &self.settings.directory,
+        );
+        let _ = output::write_mueller(
+            &self.result.bins,
+            &self.result.mueller_beam,
+            "_beam",
+            &self.settings.directory,
+        );
+        let _ = output::write_mueller(
+            &self.result.bins,
+            &self.result.mueller_ext,
+            "_ext",
+            &self.settings.directory,
+        );
     }
 
     /// Propagates the next beam in the queue.
@@ -664,7 +679,12 @@ impl MultiProblem {
             _ => {
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
                     Ok((theta, mueller_1d)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
+                        let _ = output::write_mueller_1d(
+                            &theta,
+                            &mueller_1d,
+                            "",
+                            &self.settings.directory,
+                        );
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d = Some(mueller_1d);
 
@@ -675,7 +695,12 @@ impl MultiProblem {
                 };
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
                     Ok((theta, mueller_1d_beam)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
+                        let _ = output::write_mueller_1d(
+                            &theta,
+                            &mueller_1d_beam,
+                            "_beam",
+                            &self.settings.directory,
+                        );
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d_beam = Some(mueller_1d_beam);
                     }
@@ -685,7 +710,12 @@ impl MultiProblem {
                 };
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
                     Ok((theta, mueller_1d_ext)) => {
-                        let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
+                        let _ = output::write_mueller_1d(
+                            &theta,
+                            &mueller_1d_ext,
+                            "_ext",
+                            &self.settings.directory,
+                        );
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d_ext = Some(mueller_1d_ext);
                     }
@@ -771,9 +801,24 @@ impl MultiProblem {
     }
 
     pub fn writeup(&self) {
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller, "");
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_beam, "_beam");
-        let _ = output::write_mueller(&self.result.bins, &self.result.mueller_ext, "_ext");
+        let _ = output::write_mueller(
+            &self.result.bins,
+            &self.result.mueller,
+            "",
+            &self.settings.directory,
+        );
+        let _ = output::write_mueller(
+            &self.result.bins,
+            &self.result.mueller_beam,
+            "_beam",
+            &self.settings.directory,
+        );
+        let _ = output::write_mueller(
+            &self.result.bins,
+            &self.result.mueller_ext,
+            "_ext",
+            &self.settings.directory,
+        );
     }
 }
 
