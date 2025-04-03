@@ -7,6 +7,8 @@ use anyhow::Result;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2};
 
+use crate::result::Results;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +148,107 @@ pub fn write_mueller(
         writeln!(writer)?;
     }
 
+    Ok(())
+}
+
+/// Write the Mueller matrix to a file against the theta and phi bins
+pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
+    let file_name = format!("results.dat");
+    let path = output_path(Some(output_dir), &file_name)?;
+
+    let file = File::create(&path)?;
+    let mut writer = BufWriter::new(file);
+
+    // Write the results to a file
+    writeln!(writer, "# GOAD Simulation Results")?;
+    writeln!(writer, "# ======================")?;
+
+    // Write parameters section
+    writeln!(writer, "\n# Parameters")?;
+    writeln!(writer, "# ----------")?;
+    if let Some(scat) = result.params.scat_cross {
+        writeln!(writer, "Scattering Cross Section: {:.6}", scat)?;
+    }
+    if let Some(ext) = result.params.ext_cross {
+        writeln!(writer, "Extinction Cross Section: {:.6}", ext)?;
+    }
+    if let Some(albedo) = result.params.albedo {
+        writeln!(writer, "Single Scattering Albedo: {:.6}", albedo)?;
+    }
+    if let Some(asym) = result.params.asymettry {
+        writeln!(writer, "Asymmetry Parameter: {:.6}", asym)?;
+    }
+
+    // Write powers section
+    writeln!(writer, "\n# Power Distribution")?;
+    writeln!(writer, "# ----------------")?;
+    writeln!(writer, "Input Power:           {:.6}", result.powers.input)?;
+    writeln!(writer, "Output Power:          {:.6}", result.powers.output)?;
+    writeln!(
+        writer,
+        "Absorbed Power:        {:.6}",
+        result.powers.absorbed
+    )?;
+    writeln!(
+        writer,
+        "Truncated Reflections: {:.6}",
+        result.powers.trnc_ref
+    )?;
+    writeln!(
+        writer,
+        "Truncated Recursions:  {:.6}",
+        result.powers.trnc_rec
+    )?;
+    writeln!(
+        writer,
+        "Truncated Clip Error:  {:.6}",
+        result.powers.clip_err
+    )?;
+    writeln!(
+        writer,
+        "Truncated Energy:      {:.6}",
+        result.powers.trnc_energy
+    )?;
+    writeln!(
+        writer,
+        "Truncated Area:        {:.6}",
+        result.powers.trnc_area
+    )?;
+    writeln!(
+        writer,
+        "Truncated Cutoff:      {:.6}",
+        result.powers.trnc_cop
+    )?;
+    writeln!(
+        writer,
+        "External Diffraction:  {:.6}",
+        result.powers.ext_diff
+    )?;
+    writeln!(
+        writer,
+        "Missing Power:         {:.6}",
+        result.powers.missing()
+    )?;
+
+    // Write ratios
+    writeln!(writer, "\n# Power Ratios")?;
+    writeln!(writer, "# ------------")?;
+    let output_ratio = result.powers.output / result.powers.input;
+    let absorbed_ratio = result.powers.absorbed / result.powers.input;
+    let total_ratio = (result.powers.output + result.powers.absorbed) / result.powers.input;
+    writeln!(writer, "Scattered/Input Ratio: {:.6}", output_ratio)?;
+    writeln!(writer, "Absorbed/Input Ratio:  {:.6}", absorbed_ratio)?;
+    writeln!(writer, "Total/Input Ratio:     {:.6}", total_ratio)?;
+
+    // Write binning information
+    writeln!(writer, "\n# Simulation Information")?;
+    writeln!(writer, "# ---------------------")?;
+    writeln!(writer, "Number of bins: {}", result.bins.len())?;
+    if let Some(bins_1d) = &result.bins_1d {
+        writeln!(writer, "Number of 1D bins: {}", bins_1d.len())?;
+    }
+
+    println!("Results written to: {}", path.display());
     Ok(())
 }
 

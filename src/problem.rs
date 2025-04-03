@@ -376,6 +376,7 @@ impl Problem {
             "_ext",
             &self.settings.directory,
         );
+        let _ = output::write_result(&self.result, &self.settings.directory);
     }
 
     /// Propagates the next beam in the queue.
@@ -819,6 +820,7 @@ impl MultiProblem {
             "_ext",
             &self.settings.directory,
         );
+        let _ = output::write_result(&self.result, &self.settings.directory);
     }
 }
 
