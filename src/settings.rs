@@ -240,7 +240,7 @@ pub fn load_config() -> Result<Settings> {
             std::process::exit(1);
         });
 
-    println!("config: {:#?}", settings);
+    // println!("config: {:#?}", settings);
 
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
@@ -453,7 +453,7 @@ fn validate_config(config: &Settings) {
     \x1b[36mgoad --ri 1.31+0.01i --uniform 100\x1b[0m
     
     \x1b[32m# Run over discrete orientations with an interval binning scheme\x1b[0m
-    \x1b[36mgoad --discrete 0.0,0.0,0.0 90.0,0.0,0.0 --interval \\\x1b[0m
+    \x1b[36mgoad --discrete=\"-30.0,20.0,1.0 -40.0,13.0,12.1\" --interval \\\x1b[0m
     \x1b[36m     --theta 0 1 10 2 180 --phi 0 2 180\x1b[0m
 
     \x1b[32m# Run inside a medium other than air\x1b[0m
