@@ -86,13 +86,77 @@ else
     )
     
     cargo_found=false
+    cargo_location=""
     for location in "${COMMON_CARGO_LOCATIONS[@]}"; do
         if [ -x "$location" ]; then
-            echo -e "${YELLOW}Cargo was found at:${RESET} $location"
-            echo -e "${YELLOW}But it's not in your PATH. You may need to add it:${RESET}"
-            echo -e "  echo 'export PATH=\"$HOME/.cargo/bin:\$PATH\"' >> ~/.bashrc"
-            echo -e "  source ~/.bashrc"
             cargo_found=true
+            cargo_location=$(dirname "$location")
+            echo -e "${YELLOW}Cargo was found at:${RESET} $location"
+            echo -e "${YELLOW}But it's not in your PATH.${RESET}"
+            
+            # Detect user's shell
+            current_shell=$(basename "$SHELL")
+            echo -e "${BLUE}Detected shell:${RESET} $current_shell"
+            
+            case "$current_shell" in
+                bash)
+                    echo -e "${YELLOW}To add Cargo to your PATH in bash, run:${RESET}"
+                    echo -e "  echo 'export PATH=\"$cargo_location:\$PATH\"' >> ~/.bashrc"
+                    echo -e "  source ~/.bashrc"
+                    ;;
+                zsh)
+                    echo -e "${YELLOW}To add Cargo to your PATH in zsh, run:${RESET}"
+                    echo -e "  echo 'export PATH=\"$cargo_location:\$PATH\"' >> ~/.zshrc"
+                    echo -e "  source ~/.zshrc"
+                    ;;
+                fish)
+                    echo -e "${YELLOW}To add Cargo to your PATH in fish, run:${RESET}"
+                    echo -e "  fish_add_path $cargo_location"
+                    echo -e "  # Or for older fish versions:"
+                    echo -e "  # set -U fish_user_paths $cargo_location \$fish_user_paths"
+                    ;;
+                *)
+                    echo -e "${YELLOW}To add Cargo to your PATH, add this line to your shell's config file:${RESET}"
+                    echo -e "  export PATH=\"$cargo_location:\$PATH\""
+                    echo -e "${YELLOW}Then restart your terminal or source your config file.${RESET}"
+                    ;;
+            esac
+            
+            # Ask if user wants to add Cargo to PATH automatically
+            echo
+            read -p "Would you like to try adding Cargo to PATH automatically? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                case "$current_shell" in
+                    bash)
+                        echo 'export PATH="'"$cargo_location"':$PATH"' >> ~/.bashrc
+                        echo -e "${GREEN}Added Cargo to PATH in ~/.bashrc${RESET}"
+                        echo -e "${YELLOW}To apply changes in current session, run: source ~/.bashrc${RESET}"
+                        ;;
+                    zsh)
+                        echo 'export PATH="'"$cargo_location"':$PATH"' >> ~/.zshrc
+                        echo -e "${GREEN}Added Cargo to PATH in ~/.zshrc${RESET}"
+                        echo -e "${YELLOW}To apply changes in current session, run: source ~/.zshrc${RESET}"
+                        ;;
+                    fish)
+                        # Check if fish_add_path is available (fish 3.2.0+)
+                        if type -q fish_add_path 2>/dev/null; then
+                            fish -c "fish_add_path $cargo_location"
+                            echo -e "${GREEN}Added Cargo to PATH using fish_add_path${RESET}"
+                        else
+                            fish -c "set -U fish_user_paths $cargo_location \$fish_user_paths"
+                            echo -e "${GREEN}Added Cargo to PATH using fish_user_paths${RESET}"
+                        fi
+                        ;;
+                    *)
+                        echo -e "${YELLOW}Unable to automatically add to PATH for your shell.${RESET}"
+                        echo -e "${YELLOW}Please follow the manual instructions above.${RESET}"
+                        ;;
+                esac
+                
+                echo -e "${YELLOW}Please restart this script after restarting your terminal or sourcing your config.${RESET}"
+                exit 0
+            fi
             break
         fi
     done
