@@ -109,6 +109,11 @@ else
                     echo -e "  echo 'export PATH=\"$cargo_location:\$PATH\"' >> ~/.zshrc"
                     echo -e "  source ~/.zshrc"
                     ;;
+                tcsh|csh)
+                    echo -e "${YELLOW}To add Cargo to your PATH in tcsh/csh, run:${RESET}"
+                    echo -e "  echo 'set path = ($cargo_location \$path)' >> ~/.tcshrc"
+                    echo -e "  source ~/.tcshrc"
+                    ;;
                 fish)
                     echo -e "${YELLOW}To add Cargo to your PATH in fish, run:${RESET}"
                     echo -e "  fish_add_path $cargo_location"
@@ -138,8 +143,12 @@ else
                         echo -e "${GREEN}Added Cargo to PATH in ~/.zshrc${RESET}"
                         echo -e "${YELLOW}To apply changes in current session, run: source ~/.zshrc${RESET}"
                         ;;
+                    tcsh|csh)
+                        echo "set path = ($cargo_location \$path)" >> ~/.tcshrc
+                        echo -e "${GREEN}Added Cargo to PATH in ~/.tcshrc${RESET}"
+                        echo -e "${YELLOW}To apply changes in current session, run: source ~/.tcshrc${RESET}"
+                        ;;
                     fish)
-                        # Check if fish_add_path is available (fish 3.2.0+)
                         if type -q fish_add_path 2>/dev/null; then
                             fish -c "fish_add_path $cargo_location"
                             echo -e "${GREEN}Added Cargo to PATH using fish_add_path${RESET}"
