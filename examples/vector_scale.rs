@@ -1,7 +1,6 @@
 use goad::clip::Clipping;
 use goad::geom;
 use goad::helpers::draw_face;
-use goad::orientation::Euler;
 use macroquad::prelude::*;
 use nalgebra::Vector3;
 
