@@ -144,18 +144,21 @@ pub fn try_mueller_to_1d(
         ));
     }
 
-    // Sort the bins and mueller by theta
-    let mut bins = bins.to_owned();
-    bins.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    // Create indices and sort them by corresponding theta values
     let mueller = mueller.to_owned();
+    let mut bins = bins.to_owned();
+    let mut indices: Vec<usize> = (0..bins.len()).collect();
+    indices.sort_by(|&i, &j| bins[i].0.partial_cmp(&bins[j].0).unwrap());
 
-    // Create a new sorted mueller matrix
-    let mut sorted_mueller = mueller.clone();
-    for (i, bin) in bins.iter().enumerate() {
-        let index = bins.iter().position(|b| b == bin).unwrap();
+    // Sort bins according to the sorted indices
+    bins = indices.iter().map(|&i| bins[i]).collect();
+
+    // Create a new sorted mueller matrix using the same indices
+    let mut sorted_mueller = Array2::<f32>::zeros(mueller.dim());
+    for (new_idx, &old_idx) in indices.iter().enumerate() {
         sorted_mueller
-            .slice_mut(s![i, ..])
-            .assign(&mueller.slice(s![index, ..]));
+            .slice_mut(s![new_idx, ..])
+            .assign(&mueller.slice(s![old_idx, ..]));
     }
 
     // zip the bins and mueller matrix
