@@ -344,6 +344,22 @@ impl Problem {
         }
     }
 
+    pub fn run(&mut self, euler: Option<&orientation::Euler>) {
+        self.init();
+        match euler {
+            Some(euler) => {
+                self.orient(euler);
+            }
+            None => {
+                // No rotation
+            }
+        }
+        self.illuminate();
+        self.solve();
+        self.try_mueller_to_1d();
+        self.try_params();
+    }
+
     /// Trace beams to solve the near-field problem.
     pub fn solve_near(&mut self) {
         loop {

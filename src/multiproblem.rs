@@ -75,12 +75,7 @@ impl MultiProblem {
                 let mut problem = problem_base.clone();
                 let euler = Euler::new(*a, *b, *g);
 
-                problem.init();
-                problem.orient(&euler);
-                problem.illuminate();
-                problem.solve();
-                problem.try_mueller_to_1d();
-                problem.try_params();
+                problem.run(Some(&euler)); // run the problem with an euler rotation
 
                 pb.inc(1);
                 problem.result
