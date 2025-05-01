@@ -9,6 +9,7 @@ pub mod field;
 pub mod fresnel;
 pub mod geom;
 pub mod helpers;
+pub mod multiproblem;
 pub mod orientation;
 pub mod output;
 pub mod params;

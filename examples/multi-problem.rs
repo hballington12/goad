@@ -1,4 +1,4 @@
-use goad::problem::MultiProblem;
+use goad::multiproblem::MultiProblem;
 use goad::settings::{self};
 
 fn main() {

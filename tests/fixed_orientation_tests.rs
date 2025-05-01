@@ -2,8 +2,9 @@ use std::{fs::File, io::BufReader, path::Path};
 
 use goad::{
     bins::{self, BinningScheme},
+    multiproblem::MultiProblem,
     orientation::Euler,
-    problem::{collect_mueller, MultiProblem},
+    problem::collect_mueller,
     settings,
 };
 use num_complex::Complex32;
