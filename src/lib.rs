@@ -1,3 +1,14 @@
+//! > **Geometric Optics with Aperture Diffraction**
+//!
+//! # What is GOAD?
+//! - GOAD is a rust crate for simulating light propagation through the use of
+//! geometric optics combined with diffraction theory of a plane wave at an
+//! aperture.
+//! - Most users will likely be interested in running the `goad` binary, which
+//! provides a command line interface for running a general problem. To get
+//! started, have a look at the [quick start guide][_quickstart].
+
+pub mod _quickstart;
 pub mod beam;
 pub mod bins;
 pub mod clip;

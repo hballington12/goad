@@ -1,3 +1,6 @@
+//! > **Geometric Optics with Aperture Diffraction**
+//!
+
 use goad::multiproblem::MultiProblem;
 use goad::settings::{self};
 
