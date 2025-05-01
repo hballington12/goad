@@ -1274,7 +1274,7 @@ impl Geom {
 
     /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in degrees)
     /// Uses Mishchenko's Euler rotation matrix convention.
-    pub fn euler_rotate(&mut self, euler: Euler, convention: EulerConvention) -> Result<()> {
+    pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
         if !self.is_centered() {
             return Err(anyhow::anyhow!(
                 "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"

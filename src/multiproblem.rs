@@ -73,16 +73,10 @@ impl MultiProblem {
             .par_iter()
             .map(|(a, b, g)| {
                 let mut problem = problem_base.clone();
+                let euler = Euler::new(*a, *b, *g);
 
                 problem.init();
-
-                if let Err(error) = problem.geom.euler_rotate(
-                    Euler::new(*a, *b, *g),
-                    problem.settings.orientation.euler_convention,
-                ) {
-                    panic!("Error rotating geometry: {}", error);
-                }
-
+                problem.orient(&euler);
                 problem.illuminate();
                 problem.solve();
                 problem.try_mueller_to_1d();

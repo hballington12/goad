@@ -14,7 +14,7 @@ async fn main() {
     let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
 
     let euler = Euler::new(0.0, 30.0, 0.0);
-    let _ = geom.euler_rotate(euler, EulerConvention::ZYZ);
+    let _ = geom.euler_rotate(&euler, EulerConvention::ZYZ);
 
     let projection = Vector3::new(0.0, -1.0, 0.0).normalize();
     let e_perp = Vector3::x(); // choose e_perp along z-axis for now

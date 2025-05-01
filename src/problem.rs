@@ -92,7 +92,7 @@ impl Problem {
                 let euler = &eulers[0];
                 self.geom.clone_from(&self.base_geom); // reclone the original geometry
                 self.geom
-                    .euler_rotate(euler.clone(), self.settings.orientation.euler_convention)
+                    .euler_rotate(euler, self.settings.orientation.euler_convention)
                     .unwrap();
             }
             _ => {}
@@ -513,6 +513,15 @@ impl Problem {
     pub fn insert_outbeam(&mut self, beam: Beam) {
         let pos = get_position_by_power(beam.power(), &self.out_beam_queue, false);
         self.out_beam_queue.insert(pos, beam);
+    }
+
+    pub fn orient(&mut self, euler: &orientation::Euler) {
+        if let Err(error) = self
+            .geom
+            .euler_rotate(euler, self.settings.orientation.euler_convention)
+        {
+            panic!("Error rotating geometry: {}", error);
+        }
     }
 }
 

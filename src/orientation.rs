@@ -45,7 +45,7 @@ impl Euler {
     pub fn new(alpha: f32, beta: f32, gamma: f32) -> Self {
         Self { alpha, beta, gamma }
     }
-    pub fn rotation_matrix(self, convention: EulerConvention) -> Matrix3<f32> {
+    pub fn rotation_matrix(&self, convention: EulerConvention) -> Matrix3<f32> {
         let alpha = self.alpha.to_radians();
         let beta = self.beta.to_radians();
         let gamma = self.gamma.to_radians();

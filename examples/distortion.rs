@@ -11,11 +11,9 @@ async fn main() {
 
     geom.distort(0.5, None);
     geom.recentre();
+    let euler = Euler::new(0.0, 30.0, 0.0);
 
-    let result = geom.euler_rotate(
-        Euler::new(30.0, 30.0, 30.0),
-        goad::orientation::EulerConvention::XYX,
-    );
+    let result = geom.euler_rotate(&euler, goad::orientation::EulerConvention::XYX);
 
     println!("result is {:?}", result);
 
