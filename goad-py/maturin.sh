@@ -3,6 +3,10 @@
 # $BLENDER_PYTHON -m pip install --upgrade maturin
 pip install --upgrade maturin
 
+cd ..
+cargo build --release
+cd -
+
 maturin develop --release
 maturin build --release
 

@@ -12,7 +12,6 @@ use crate::{
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use macroquad::prelude::*;
 use nalgebra::Complex;
-use pyo3::prelude::*;
 use rayon::prelude::*;
 
 /// A problem for a single geometry with multiple orientations.

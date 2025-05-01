@@ -58,7 +58,10 @@ pub struct Problem {
 impl Problem {
     #[new]
     fn py_new(settings: Settings) -> Self {
+        // let default_settings = load_config().expect("Failed to load config"); // load settings from config file
+        println!("Reading geometry from file: {}", settings.geom_name);
         let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
+        println!("Creating problem...");
         Problem::new(geom, Some(settings))
     }
 
@@ -83,23 +86,22 @@ impl Problem {
     pub fn py_solve(&mut self) -> PyResult<()> {
         self.reset();
 
-        println!("Solve with settings: {:#?}", self.settings);
+        println!("{:#?}", self.settings);
 
-        match self.settings.orientation.scheme {
+        let euler = match self.settings.orientation.scheme {
             orientation::Scheme::Discrete { ref eulers } => {
-                let euler = &eulers[0];
-                self.geom.clone_from(&self.base_geom); // reclone the original geometry
-                self.geom
-                    .euler_rotate(euler, self.settings.orientation.euler_convention)
-                    .unwrap();
+                &eulers[0].clone()
+                // self.geom.clone_from(&self.base_geom); // reclone the original geometry
+                // self.geom
+                //     .euler_rotate(euler, self.settings.orientation.euler_convention)
+                //     .unwrap();
             }
-            _ => {}
-        }
+            _ => {
+                panic!("Python solve is only supperted for discrete orientation scheme")
+            }
+        };
 
-        self.init();
-        self.illuminate();
-        self.solve();
-        self.try_mueller_to_1d();
+        self.run(Some(euler));
         Ok(())
     }
 
@@ -113,6 +115,30 @@ impl Problem {
     #[getter]
     pub fn get_mueller(&self) -> Vec<Vec<f32>> {
         collect_mueller(&self.result.mueller)
+    }
+
+    // getter function to retrieve Python object containing the asymmetry parameter
+    #[getter]
+    pub fn get_asymmetry(&self) -> Option<f32> {
+        self.result.params.asymettry
+    }
+
+    // getter function to retrieve Python object containing the scattering cross section
+    #[getter]
+    pub fn get_scat_cross(&self) -> Option<f32> {
+        self.result.params.scat_cross
+    }
+
+    // getter function to retrieve Python object containing the extinction cross section
+    #[getter]
+    pub fn get_ext_cross(&self) -> Option<f32> {
+        self.result.params.ext_cross
+    }
+
+    // getter function to retrieve Python object containing the albedo
+    #[getter]
+    pub fn get_albedo(&self) -> Option<f32> {
+        self.result.params.albedo
     }
 
     // getter function to retrieve Python object containing the 1d mueller matrix
@@ -343,6 +369,8 @@ impl Problem {
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>) {
+        println!("Running problem...");
+        println!("{:#?}", self.settings);
         self.init();
         match euler {
             Some(euler) => {

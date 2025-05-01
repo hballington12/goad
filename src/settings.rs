@@ -6,7 +6,6 @@ use nalgebra::Complex;
 use pyo3::prelude::*;
 use serde::Deserialize;
 use std::env;
-use std::fmt;
 use std::path::PathBuf;
 
 use crate::bins;
@@ -104,55 +103,122 @@ fn default_directory() -> PathBuf {
 #[pymethods]
 impl Settings {
     #[new]
+    #[pyo3(signature = (
+        wavelength = None, 
+        beam_power_threshold = None, 
+        beam_area_threshold_fac = None, 
+        cutoff = None, 
+        medium_refr_index_re = None, 
+        medium_refr_index_im = None, 
+        particle_refr_index_re = None, 
+        particle_refr_index_im = None, 
+        geom_name = None, 
+        max_rec = None, 
+        max_tir = None, 
+        theta_res = None, 
+        phi_res = None, 
+        euler = None
+    ))]
     fn py_new(
-        wavelength: f32,
-        beam_power_threshold: f32,
-        beam_area_threshold_fac: f32,
-        cutoff: f32,
-        medium_refr_index_re: f32,
-        medium_refr_index_im: f32,
-        particle_refr_index_re: f32,
-        particle_refr_index_im: f32,
-        geom_name: String,
-        max_rec: i32,
-        max_tir: i32,
-        theta_res: usize,
-        phi_res: usize,
-        euler: Vec<f32>,
+        wavelength: Option<f32>,
+        beam_power_threshold: Option<f32>,
+        beam_area_threshold_fac: Option<f32>,
+        cutoff: Option<f32>,
+        medium_refr_index_re: Option<f32>,
+        medium_refr_index_im: Option<f32>,
+        particle_refr_index_re: Option<f32>,
+        particle_refr_index_im: Option<f32>,
+        geom_name: Option<String>,
+        max_rec: Option<i32>,
+        max_tir: Option<i32>,
+        theta_res: Option<usize>,
+        phi_res: Option<usize>,
+        euler: Option<Vec<f32>>,
     ) -> Self {
-        let medium_refr_index = Complex::new(medium_refr_index_re, medium_refr_index_im);
-        let particle_refr_index =
-            vec![Complex::new(particle_refr_index_re, particle_refr_index_im)];
-        let orientation: Orientation = Orientation {
-            scheme: Scheme::Discrete {
-                eulers: vec![Euler::new(euler[0], euler[1], euler[2])],
-            },
-            euler_convention: EulerConvention::XYZ,
-        };
-        let binning = BinningScheme {
-            scheme: bins::Scheme::Simple {
-                num_theta: theta_res,
-                num_phi: phi_res,
-            },
-        };
-        Settings {
-            wavelength,
-            beam_power_threshold,
-            beam_area_threshold_fac,
-            cutoff,
-            medium_refr_index,
-            particle_refr_index,
-            orientation,
-            geom_name,
-            max_rec,
-            max_tir,
-            binning,
-            seed: None,
-            scale: default_scale_factor(),
-            distortion: None,
-            geom_scale: default_geom_scale(),
-            directory: std::env::current_dir().unwrap_or_else(|_| PathBuf::new()),
+        // Load default settings from config file
+        let mut settings = load_config_with_cli(false).expect("Failed to load config");
+        
+        // Override with provided parameters if they exist
+        if let Some(w) = wavelength {
+            settings.wavelength = w;
         }
+        
+        if let Some(bpt) = beam_power_threshold {
+            settings.beam_power_threshold = bpt;
+        }
+        
+        if let Some(batf) = beam_area_threshold_fac {
+            settings.beam_area_threshold_fac = batf;
+        }
+        
+        if let Some(c) = cutoff {
+            settings.cutoff = c;
+        }
+        
+        // Update medium refractive index if either component is provided
+        if medium_refr_index_re.is_some() || medium_refr_index_im.is_some() {
+            let re = medium_refr_index_re.unwrap_or(settings.medium_refr_index.re);
+            let im = medium_refr_index_im.unwrap_or(settings.medium_refr_index.im);
+            settings.medium_refr_index = Complex::new(re, im);
+        }
+        
+        // Update particle refractive index if either component is provided
+        if particle_refr_index_re.is_some() || particle_refr_index_im.is_some() {
+            let re = particle_refr_index_re.unwrap_or(
+                settings.particle_refr_index.first().map_or(1.0, |c| c.re)
+            );
+            let im = particle_refr_index_im.unwrap_or(
+                settings.particle_refr_index.first().map_or(0.0, |c| c.im)
+            );
+            settings.particle_refr_index = vec![Complex::new(re, im)];
+        }
+        
+        if let Some(name) = geom_name {
+            settings.geom_name = name;
+        }
+        
+        if let Some(rec) = max_rec {
+            settings.max_rec = rec;
+        }
+        
+        if let Some(tir) = max_tir {
+            settings.max_tir = tir;
+        }
+        
+        // Update binning if either theta_res or phi_res is provided
+        if theta_res.is_some() || phi_res.is_some() {
+            // Get the current values or extract from the current binning scheme
+            let current_theta = match &settings.binning.scheme {
+                bins::Scheme::Simple { num_theta, .. } => *num_theta,
+                _ => 180, // Default if not a simple scheme
+            };
+            
+            let current_phi = match &settings.binning.scheme {
+                bins::Scheme::Simple { num_phi, .. } => *num_phi,
+                _ => 360, // Default if not a simple scheme
+            };
+            
+            settings.binning = BinningScheme {
+                scheme: bins::Scheme::Simple {
+                    num_theta: theta_res.unwrap_or(current_theta),
+                    num_phi: phi_res.unwrap_or(current_phi),
+                },
+            };
+        }
+        
+        // Update orientation if euler is provided
+        if let Some(e) = euler {
+            if e.len() >= 3 {
+                settings.orientation = Orientation {
+                    scheme: Scheme::Discrete {
+                        eulers: vec![Euler::new(e[0], e[1], e[2])],
+                    },
+                    euler_convention: settings.orientation.euler_convention
+                };
+            }
+        }
+        
+        settings
     }
 
     /// Set the euler angles
@@ -183,7 +249,7 @@ impl Settings {
 }
 
 pub fn load_default_config() -> Result<Settings> {
-    let goad_dir = retrieve_project_root();
+    let goad_dir = retrieve_project_root()?;
     let default_config_file = goad_dir.join("config/default.toml");
 
     let settings: Config = Config::builder()
@@ -205,32 +271,14 @@ pub fn load_default_config() -> Result<Settings> {
 }
 
 pub fn load_config() -> Result<Settings> {
-    // Try to find the project directory in different ways
-    let goad_dir = retrieve_project_root();
+    load_config_with_cli(true)
+}
 
-    let default_config_file = goad_dir.join("config/default.toml");
-    let local_config = goad_dir.join("config/local.toml");
-    let current_dir_config = std::env::current_dir()
-        .map(|dir| dir.join("local.toml"))
-        .unwrap();
+pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
+    println!("Loading configuration...");
+    let config_file = get_config_file()?;
 
-    println!("current_dir_config: {:?}", current_dir_config);
-
-    // Check if config exists in current dir, then local, then use default
-    let config_file = if current_dir_config.exists() {
-        println!(
-            "Using current directory configuration: {:?}",
-            current_dir_config
-        );
-        current_dir_config
-    } else if local_config.exists() {
-        println!("Using local configuration: {:?}", local_config);
-        local_config
-    } else {
-        println!("Using default configuration: {:?}", default_config_file);
-        default_config_file
-    };
-
+    println!("Using configuration file: {:?}", config_file);
     let settings: Config = Config::builder()
         .add_source(File::from(config_file).required(true))
         .add_source(Environment::with_prefix("goad"))
@@ -242,11 +290,26 @@ pub fn load_config() -> Result<Settings> {
 
     // println!("config: {:#?}", settings);
 
+    println!("Deserializing configuration...");
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
         std::process::exit(1);
     });
 
+    if apply_cli_updates {
+        println!("Updating configuration from command line arguments...");
+        update_settings_from_cli(&mut config);
+    }
+
+    println!("Final configuration:");
+    validate_config(&config);
+
+    println!("{:#?}", config);
+
+    Ok(config)
+}
+
+fn update_settings_from_cli(config: &mut Settings) {
     // Parse command-line arguments and override values
     let args = CliArgs::parse();
 
@@ -385,12 +448,34 @@ pub fn load_config() -> Result<Settings> {
             config.geom_scale = Some(geom_scale);
         }
     }
+}
 
-    validate_config(&config);
+fn get_config_file() -> Result<PathBuf, anyhow::Error> {
+    let current_dir_config = std::env::current_dir()
+        .map(|dir| dir.join("local.toml"))
+        .unwrap();
+    let config_file = if current_dir_config.exists() {
+        println!(
+            "Using current directory configuration: {:?}",
+            current_dir_config
+        );
+        current_dir_config
+    } else {
+        // then check local config file, then use default
+        let goad_dir = retrieve_project_root()?;
+        let default_config_file = goad_dir.join("config/default.toml");
+        let local_config = goad_dir.join("config/local.toml");
+        println!("current_dir_config: {:?}", current_dir_config);
 
-    println!("{:#?}", config);
-
-    Ok(config)
+        if local_config.exists() {
+            println!("Using local configuration: {:?}", local_config);
+            local_config
+        } else {
+            println!("Using default configuration: {:?}", default_config_file);
+            default_config_file
+        }
+    };
+    Ok(config_file)
 }
 
 /// Retrieve the project root directory.
@@ -399,13 +484,13 @@ pub fn load_config() -> Result<Settings> {
 /// 2. If the GOAD_ROOT_DIR environment variable is set, use it.
 /// 3. If the "config" subdirectory is found in the exectuable directory or any of its parents, use it.
 /// If none of these methods work, the function will panic.
-fn retrieve_project_root() -> std::path::PathBuf {
-    let goad_dir = if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+fn retrieve_project_root() -> Result<std::path::PathBuf> {
+    if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         // When running through cargo (e.g. cargo run, cargo test)
-        std::path::PathBuf::from(manifest_dir)
+        Ok(std::path::PathBuf::from(manifest_dir))
     } else if let Ok(path) = env::var("GOAD_ROOT_DIR") {
         // Allow explicit configuration via environment variable
-        std::path::PathBuf::from(path)
+        Ok(std::path::PathBuf::from(path))
     } else {
         // Fallback: try to find the nearest directory containing a "config" subdirectory
         // Start from the executable directory and walk upward
@@ -425,12 +510,11 @@ fn retrieve_project_root() -> std::path::PathBuf {
         }
 
         if found {
-            current_dir
+            Ok(current_dir)
         } else {
-            panic!("Could not find project root directory");
+            Err(anyhow::anyhow!("Could not find project root directory"))
         }
-    };
-    goad_dir
+    }
 }
 
 fn validate_config(config: &Settings) {
@@ -574,7 +658,7 @@ pub struct OrientationArgs {
     pub discrete: Option<Vec<Euler>>,
 
     /// Specify Euler angle convention for orientation.
-    /// Valid values: XYZ, XZY, YXZ, YZX, ZXY, ZYZ, etc.
+    /// Valid values: XYZ, XZY, YXZ, YZX, ZXY, ZYX, etc.
     /// Default: ZYZ
     #[arg(long, value_parser = parse_euler_convention)]
     pub euler: Option<EulerConvention>,
@@ -707,30 +791,5 @@ fn parse_euler_convention(s: &str) -> Result<EulerConvention, String> {
         "ZXZ" => Ok(EulerConvention::ZXZ),
         "ZYZ" => Ok(EulerConvention::ZYZ),
         _ => Err(format!("Invalid Euler convention: '{}'. Valid values are: XYZ, XZY, YXZ, YZX, ZXY, ZYX, XYX, XZX, YXY, YZY, ZXZ, ZYZ", s)),
-    }
-}
-
-impl fmt::Display for Settings {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Settings:
-  - Wavelength: {:.6}
-  - Beam Power Threshold: {:.6}
-  - Total Power Cutoff: {:.6}
-  - Medium Refractive Index: {:.6} + {:.6}i
-  - Particle Refractive Indices: {:?}
-  - Max Rec: {}
-  - Max TIR: {}
-  ",
-            self.wavelength,
-            self.beam_power_threshold,
-            self.cutoff,
-            self.medium_refr_index.re,
-            self.medium_refr_index.im,
-            self.particle_refr_index,
-            self.max_rec,
-            self.max_tir,
-        )
     }
 }

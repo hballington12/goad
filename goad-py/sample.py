@@ -17,15 +17,15 @@ settings = goad.Settings(
     medium_refr_index_im=0.0,
     particle_refr_index_re=1.31,
     particle_refr_index_im=0.0,
-    geom_name="hex.obj",
+    geom_name="concave2.obj",
     max_rec=10,
     max_tir=10,
-    theta_res=361,
+    theta_res=181,
     phi_res=181,
-    euler=[0.0, 20.0, 0.0]
+    euler=[0.0, 10.0, 0.0]
 )
 
-print("creating goad problem")
+print("creating goad problem1")
 
 problem = goad.Problem(settings)
 
@@ -50,3 +50,7 @@ mueller = problem.mueller
 mueller_1d = problem.mueller_1d
 
 print("mueller_1d shape:", mueller_1d[0][0])
+
+asymmetry = problem.asymmetry
+
+print("asymmetry parameter:", asymmetry)
