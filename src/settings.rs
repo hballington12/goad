@@ -187,7 +187,7 @@ impl Settings {
         
         // Update binning if either theta_res or phi_res is provided
         if theta_res.is_some() || phi_res.is_some() {
-            // Get the current values or extract from the current binning scheme
+           /// Get the current values or extract from the current binning scheme
             let current_theta = match &settings.binning.scheme {
                 bins::Scheme::Simple { num_theta, .. } => *num_theta,
                 _ => 180, // Default if not a simple scheme
@@ -275,10 +275,8 @@ pub fn load_config() -> Result<Settings> {
 }
 
 pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
-    println!("Loading configuration...");
     let config_file = get_config_file()?;
 
-    println!("Using configuration file: {:?}", config_file);
     let settings: Config = Config::builder()
         .add_source(File::from(config_file).required(true))
         .add_source(Environment::with_prefix("goad"))
@@ -290,21 +288,18 @@ pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
 
     // println!("config: {:#?}", settings);
 
-    println!("Deserializing configuration...");
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
         std::process::exit(1);
     });
 
     if apply_cli_updates {
-        println!("Updating configuration from command line arguments...");
         update_settings_from_cli(&mut config);
     }
 
-    println!("Final configuration:");
     validate_config(&config);
 
-    println!("{:#?}", config);
+    // println!("{:#?}", config);
 
     Ok(config)
 }

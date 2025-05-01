@@ -58,10 +58,7 @@ pub struct Problem {
 impl Problem {
     #[new]
     fn py_new(settings: Settings) -> Self {
-        // let default_settings = load_config().expect("Failed to load config"); // load settings from config file
-        println!("Reading geometry from file: {}", settings.geom_name);
         let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
-        println!("Creating problem...");
         Problem::new(geom, Some(settings))
     }
 
@@ -86,16 +83,10 @@ impl Problem {
     pub fn py_solve(&mut self) -> PyResult<()> {
         self.reset();
 
-        println!("{:#?}", self.settings);
+        // println!("{:#?}", self.settings);
 
         let euler = match self.settings.orientation.scheme {
-            orientation::Scheme::Discrete { ref eulers } => {
-                &eulers[0].clone()
-                // self.geom.clone_from(&self.base_geom); // reclone the original geometry
-                // self.geom
-                //     .euler_rotate(euler, self.settings.orientation.euler_convention)
-                //     .unwrap();
-            }
+            orientation::Scheme::Discrete { ref eulers } => &eulers[0].clone(),
             _ => {
                 panic!("Python solve is only supperted for discrete orientation scheme")
             }
