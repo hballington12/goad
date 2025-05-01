@@ -187,7 +187,7 @@ impl Settings {
         
         // Update binning if either theta_res or phi_res is provided
         if theta_res.is_some() || phi_res.is_some() {
-           /// Get the current values or extract from the current binning scheme
+            // Get the current values or extract from the current binning scheme
             let current_theta = match &settings.binning.scheme {
                 bins::Scheme::Simple { num_theta, .. } => *num_theta,
                 _ => 180, // Default if not a simple scheme
