@@ -58,9 +58,7 @@ pub struct Problem {
 impl Problem {
     #[new]
     fn py_new(settings: Settings) -> Self {
-        let mut geom = geom::Geom::from_file(&settings.geom_name).unwrap();
-        init_geom(&settings, &mut geom);
-
+        let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
         Problem::new(geom, Some(settings))
     }
 
