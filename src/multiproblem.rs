@@ -80,7 +80,7 @@ impl MultiProblem {
                 problem.illuminate();
                 problem.solve();
                 problem.try_mueller_to_1d();
-                let _ = problem.result.compute_params(problem.settings.wavelength);
+                problem.try_params();
 
                 pb.inc(1);
                 problem.result

@@ -333,6 +333,17 @@ impl Problem {
         }
     }
 
+    pub fn try_params(&mut self) {
+        match self.result.compute_params(self.settings.wavelength) {
+            Ok(()) => {
+                // println!("Params computed successfully");
+            }
+            Err(e) => {
+                println!("Failed to compute params: {}", e);
+            }
+        }
+    }
+
     /// Trace beams to solve the near-field problem.
     pub fn solve_near(&mut self) {
         loop {
