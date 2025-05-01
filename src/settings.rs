@@ -450,17 +450,17 @@ fn get_config_file() -> Result<PathBuf, anyhow::Error> {
         .map(|dir| dir.join("local.toml"))
         .unwrap();
     let config_file = if current_dir_config.exists() {
-        println!(
-            "Using current directory configuration: {:?}",
-            current_dir_config
-        );
+        // println!(
+        //     "Using current directory configuration: {:?}",
+        //     current_dir_config
+        // );
         current_dir_config
     } else {
         // then check local config file, then use default
         let goad_dir = retrieve_project_root()?;
         let default_config_file = goad_dir.join("config/default.toml");
         let local_config = goad_dir.join("config/local.toml");
-        println!("current_dir_config: {:?}", current_dir_config);
+        // println!("current_dir_config: {:?}", current_dir_config);
 
         if local_config.exists() {
             println!("Using local configuration: {:?}", local_config);

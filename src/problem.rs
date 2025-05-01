@@ -360,8 +360,8 @@ impl Problem {
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>) {
-        println!("Running problem...");
-        println!("{:#?}", self.settings);
+        // println!("Running problem...");
+        // println!("{:#?}", self.settings);
         self.init();
         match euler {
             Some(euler) => {

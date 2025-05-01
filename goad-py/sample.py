@@ -9,19 +9,7 @@ goad.goad_py_add()
 print("creating goad settings")
 
 settings = goad.Settings(
-    wavelength=0.532,
-    beam_power_threshold=1e-1,
-    beam_area_threshold_fac=1e-1,
-    cutoff=0.99,
-    medium_refr_index_re=1.0,
-    medium_refr_index_im=0.0,
-    particle_refr_index_re=1.31,
-    particle_refr_index_im=0.0,
-    geom_name="concave2.obj",
-    max_rec=10,
-    max_tir=10,
-    theta_res=181,
-    phi_res=181,
+    geom_name="hex.obj",
     euler=[0.0, 10.0, 0.0]
 )
 

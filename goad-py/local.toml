@@ -1,0 +1,65 @@
+# Configuration file for the GOAD simulation.
+# This file contains the default values for all config options.
+# The user should not modify this config, but may make a local copy of it 
+#   in this directory called `local.toml`.
+# If `local.toml` exists, GOAD will use the values specified in that file.
+# Environment variables can be set to override values in this file. 
+#   eg. `export GOAD_WAVELENGTH=632.8`
+# Configuration options specified on the command line will override values given
+#   in this file, as well as those set by environment variables.
+
+# Generic configuration
+wavelength = 0.532 # wavelength in dimension of the geometry file
+medium_refr_index = [
+    1.0,
+    0.0,
+] # refractive index of the medium [real, imaginary]
+particle_refr_index = [
+    [
+        1.3117,
+        0.0,
+    ],
+] # Refractive index of the particle/s (real and imaginary parts)
+# For files containing multiple shapes, use a nested list for different values
+# for each shape, eg. [[1.31,0.0],[1.5,0.001]]
+geom_name = "./hex.obj"       # Geometry file name for the particle
+beam_power_threshold = 0.005  # Threshold for truncation by beam power
+beam_area_threshold_fac = 0.1 # Factor for truncating beams by area
+cutoff = 0.99                 # Total power cutoff fraction
+max_rec = 10                  # Maximum number of recursions
+max_tir = 10                  # Maximum number of total internal reflections
+distortion = 0.0              # Distortion factor for the geometry
+directory = "goad_run"        # Directory for output files
+seed = 6                      # Seed (comment out for no seed)
+geom_scale = [1.0, 1.0, 1.0]  # Scale factor for the geometry
+
+[binning] # Binning configuration
+
+    [binning.scheme] # Uncomment the desired binning scheme below
+
+        [binning.scheme.Simple] # Simple square grid binning
+            num_theta = 181 # Number of theta bins
+            num_phi = 181   # Number of phi bins
+
+            # [binning.scheme.Interval] # Interval binning with specified theta and phi spacings
+            # thetas = [0, 1, 175, 179, 180]
+            # theta_spacings = [0.1, 1, 0.5, 0.1]
+            # phis = [0, 360]
+            # phi_spacings = [2]
+
+            # [binning.scheme.Custom] # Custom binning with specified [theta,phi] angular bins
+            #     bins = [[0, 0], [0, 40], [20, 180]] # custom bins, unless a file is specified below
+            # file = "custom_bins.toml"           # File containing custom bins, relative to working directory
+
+
+[orientation] # Orientation configuration
+    euler_convention = "XYZ" # Euler angle convention 
+
+    [orientation.scheme] # Uncomment the desired orientation scheme below
+
+        # [orientation.scheme.Discrete] # Disscrete orientation with specified Euler angles
+        #     eulers = [[110, 5, 19]] # Array of Euler angles in degrees
+
+        [orientation.scheme.Uniform] # Random uniform distribution
+            num_orients = 1 # Number of orientations to generate
+            #
