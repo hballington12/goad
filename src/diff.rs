@@ -18,9 +18,58 @@ pub fn diffraction(
     let (center_of_mass, relative_vertices, rot3, prop2) =
         init_diff(verts, &mut ampl, prop, vk7, wavenumber);
 
+    // --- Optimizations Start ---
+    // Pre-calculate transformed vertices and related quantities outside the main loop
+    let nv = relative_vertices.len();
+    let mut v1_data = Vec::with_capacity(nv * 3);
+    let mut transformed_vertices_vec = Vec::with_capacity(nv);
+    for vertex in &relative_vertices {
+        let transformed_vertex = rot3 * vertex;
+        transformed_vertices_vec.push(transformed_vertex);
+        v1_data.push(transformed_vertex.x);
+        v1_data.push(transformed_vertex.y);
+        v1_data.push(transformed_vertex.z);
+    }
+    let v1 = Array2::from_shape_vec((nv, 3), v1_data).expect("Shape error creating v1");
+
+    let x: Vec<f32> = v1.column(0).iter().cloned().collect();
+    let y: Vec<f32> = v1.column(1).iter().cloned().collect();
+    let m: Vec<f32> = (0..nv)
+        .map(|j| {
+            let next_j = (j + 1) % nv;
+            let dx = x[next_j] - x[j];
+            let dy = y[next_j] - y[j];
+            if dx.abs() < settings::DIFF_DMIN {
+                if dy.signum() == dx.signum() {
+                    1e6
+                } else {
+                    -1e6
+                }
+            } else {
+                dy / dx
+            }
+        })
+        .collect();
+    let n: Vec<f32> = m
+        .iter()
+        .map(|&mj| {
+            if mj.abs() < 1e-6 {
+                if mj.signum() > 0.0 {
+                    1e6
+                } else {
+                    -1e6
+                }
+            } else {
+                1.0 / mj
+            }
+        })
+        .collect();
+    // --- Optimizations End ---
+
     // Define the output variables.
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
     let mut area_facs2 = vec![Complex::<f32>::default(); theta_phi_combinations.len()];
+    let kinc = prop2 * wavenumber;
 
     // Iterate over the flattened combinations
     for (index, (theta, phi)) in theta_phi_combinations.iter().enumerate() {
@@ -53,72 +102,49 @@ pub fn diffraction(
             * ampl
             * prerotation.map(Complex::from);
 
-        ampl_far_field[(0, 0)] = ampl_temp[(0, 0)];
-        ampl_far_field[(1, 0)] = ampl_temp[(1, 0)];
-        ampl_far_field[(0, 1)] = ampl_temp[(0, 1)];
-        ampl_far_field[(1, 1)] = ampl_temp[(1, 1)];
-
-        let nv = relative_vertices.len();
-        let mut v1 = Array2::<f32>::zeros((nv, 3));
-        for (i, vertex) in relative_vertices.iter().enumerate() {
-            let transformed_vertex = rot3 * vertex;
-            v1[[i, 0]] = transformed_vertex.x;
-            v1[[i, 1]] = transformed_vertex.y;
-            v1[[i, 2]] = transformed_vertex.z;
-        }
-
-        let kinc = prop2 * wavenumber;
-        let x: Vec<f32> = v1.column(0).iter().cloned().collect();
-        let y: Vec<f32> = v1.column(1).iter().cloned().collect();
-        let m: Vec<f32> = (0..nv)
-            .map(|j| {
-                if j == nv - 1 {
-                    (y[0] - y[j]) / (x[0] - x[j])
-                } else {
-                    (y[j + 1] - y[j]) / (x[j + 1] - x[j])
-                }
-            })
-            .collect();
-        let n: Vec<f32> = m.iter().map(|&mj| 1.0 / mj).collect();
+        *ampl_far_field = ampl_temp;
 
         let fraunhofer = &mut area_facs2[index];
-        let mut fraunhofer_sum = Complex::new(0.0, 0.0); // Example, modify as needed
+        let mut fraunhofer_sum = Complex::new(0.0, 0.0);
 
-        for (j, vertex) in v1.rows().into_iter().enumerate() {
+        let (kxx, kyy) = calculate_kxx_kyy(
+            &kinc
+                .fixed_rows::<2>(0)
+                .into_owned()
+                .as_slice()
+                .try_into()
+                .unwrap(),
+            &rotated_pos,
+            bvsk,
+            wavenumber,
+        );
+
+        for j in 0..nv {
             let mj = m[j];
             let nj = n[j];
-            let xj = vertex[0];
-            let yj = vertex[1];
+            let xj = x[j];
+            let yj = y[j];
 
-            // Adjust mj and nj
             let (mj, nj) = adjust_mj_nj(mj, nj);
 
-            let (xj_plus1, yj_plus1) = if j == nv - 1 {
-                (x[0], y[0])
-            } else {
-                (x[j + 1], y[j + 1])
-            };
+            let next_j = (j + 1) % nv;
+            let xj_plus1 = x[next_j];
+            let yj_plus1 = y[next_j];
 
             let dx = xj_plus1 - xj;
             let dy = yj_plus1 - yj;
 
             let dx = if dx.abs() < settings::DIFF_DMIN {
-                settings::DIFF_DMIN
+                settings::DIFF_DMIN * dx.signum()
             } else {
                 dx
             };
             let dy = if dy.abs() < settings::DIFF_DMIN {
-                settings::DIFF_DMIN
+                settings::DIFF_DMIN * dy.signum()
             } else {
                 dy
             };
 
-            let (kxx, kyy) = calculate_kxx_kyy(
-                &kinc.fixed_rows::<2>(0).into(),
-                &rotated_pos,
-                bvsk,
-                wavenumber,
-            );
             let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
             let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
@@ -134,14 +160,12 @@ pub fn diffraction(
 
         *fraunhofer = fraunhofer_sum;
 
-        ampl_far_field[(0, 0)] *= *fraunhofer;
-        ampl_far_field[(1, 0)] *= *fraunhofer;
-        ampl_far_field[(0, 1)] *= *fraunhofer;
-        ampl_far_field[(1, 1)] *= *fraunhofer;
+        *ampl_far_field *= *fraunhofer;
     }
     ampl_cs
 }
 
+// Other functions remain unchanged
 fn get_rotations(
     rot3: Matrix3<f32>,
     prop2: Vector3<f32>,
@@ -149,10 +173,8 @@ fn get_rotations(
     cos_phi: f32,
     k: Vector3<f32>,
 ) -> (Matrix2<f32>, Matrix2<f32>, Matrix2<f32>) {
-    // Compute Karczewski polarisation matrix for each element
     let (karczewski, m) = karczewski(&prop2, &k);
 
-    // Vector perpendicular to the scattering plane in the aperture system
     let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
     let evo2 = k.cross(&m);
     let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
@@ -173,7 +195,6 @@ fn init_diff(
     vk7: Vector3<f32>,
     wavenumber: f32,
 ) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
-    // -1. Apply a small perturbation to the propagation vector to reduce numerical errors
     let prop = (prop
         + Vector3::new(
             settings::PROP_PERTURBATION,
@@ -182,28 +203,22 @@ fn init_diff(
         ))
     .normalize();
 
-    // 0. Account for 1/waveno factor in Bohren & Huffman eq 3.12
-    *ampl *= Complex::new(wavenumber, 0.0); // // TODO add this back in
+    *ampl *= Complex::new(wavenumber, 0.0);
 
-    // 1. Compute the center of mass
     let center_of_mass = geom::calculate_center_of_mass(verts);
 
-    // 2. Transform vertices relative to the center of mass
     let relative_vertices = geom::translate(verts, &center_of_mass);
 
-    // 3. Compute rotation matrices
     let rot1 = get_rotation_matrix2(&relative_vertices);
     let prop1 = rot1 * prop;
     let perp1 = rot1 * vk7;
     let rot2 = calculate_rotation_matrix(prop1);
     let rot3 = rot2 * rot1;
 
-    // 4. Transform propagation and auxiliary vectors
     let prop2 = rot2 * prop1;
     let perp2 = rot2 * perp1;
     let e_par2 = perp2.cross(&prop2).normalize();
 
-    // 5. Update amplitude based on anti-parallel condition
     if e_par2.z > settings::COLINEAR_THRESHOLD {
         *ampl = -*ampl;
     }
@@ -287,18 +302,11 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     rot
 }
 
-pub fn karczewski(
-    prop2: &Vector3<f32>, // Outgoing propagation direction in aperture system
-    bvk: &Vector3<f32>,   // bin unit vector
-) -> (Matrix2<f32>, Vector3<f32>) {
-    // Compute the diff ampl matrix for polarisation of far-field diffraction at a far-field bin
-
-    // Propagation direction in aperture system
+pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Vector3<f32>) {
     let big_kx = prop2.x;
     let big_ky = prop2.y;
     let big_kz = prop2.z;
 
-    // Perpendicular field direction
     let sqrt_1_minus_k2y2 = (1.0 - bvk.y.powi(2)).sqrt();
     let sqrt_1_minus_k2y2 = if sqrt_1_minus_k2y2.abs() < settings::DIFF_EPSILON {
         settings::DIFF_EPSILON
@@ -312,7 +320,6 @@ pub fn karczewski(
         -bvk.y * bvk.z / sqrt_1_minus_k2y2,
     );
 
-    // Pre-calculate factor
     let frac = ((1.0 - bvk.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
     let frac = if frac.abs() < settings::DIFF_EPSILON {
         settings::DIFF_EPSILON
@@ -320,7 +327,6 @@ pub fn karczewski(
         frac
     };
 
-    // KW coefficients
     let a1m = -big_kz * frac;
     let b2m = -bvk.z / frac;
     let a1e = b2m;
@@ -328,16 +334,13 @@ pub fn karczewski(
     let b1m = -bvk.x * bvk.y / frac + big_kx * big_ky * frac;
     let a2e = -b1m;
 
-    // Combined (e-m theory) KW coefficients
     let a1em = 0.5 * (a1m + a1e);
     let a2em = 0.5 * a2e;
     let b1em = 0.5 * b1m;
     let b2em = 0.5 * (b2m + b2e);
 
-    // Fill the diff_ampl matrix (e-m theory)
     let diff_ampl = Matrix2::new(a1em, b1em, a2em, b2em);
 
-    // Return the outputs
     (diff_ampl, m)
 }
 
@@ -373,7 +376,6 @@ pub fn calculate_kxx_kyy(
     let kxx = kinc[0] - wavenumber.powi(2) * rotated_pos.x / bvsk;
     let kyy = kinc[1] - wavenumber.powi(2) * rotated_pos.y / bvsk;
 
-    // numerical fix for kxx and kyy
     let kxx = if kxx.abs() < settings::KXY_EPSILON {
         settings::KXY_EPSILON
     } else {
@@ -416,11 +418,15 @@ pub fn calculate_summand(
     beta: f32,
     wavenumber: f32,
 ) -> Complex<f32> {
-    let sumim = alpha * (delta.cos() - (delta + omega1).cos())
-        - beta * (delta.cos() - (delta + omega2).cos());
-    let sumre = -alpha * (delta.sin() - (delta + omega1).sin())
-        + beta * (delta.sin() - (delta + omega2).sin());
+    let (sin_delta, cos_delta) = delta.sin_cos();
+    let (sin_delta_omega1, cos_delta_omega1) = (delta + omega1).sin_cos();
+    let (sin_delta_omega2, cos_delta_omega2) = (delta + omega2).sin_cos();
 
-    Complex::new((bvsk).cos(), (bvsk).sin()) * Complex::new(sumre, sumim)
-        / Complex::new(2.0 * PI / wavenumber, 0.0)
+    let sumim = alpha * (cos_delta - cos_delta_omega1) - beta * (cos_delta - cos_delta_omega2);
+    let sumre = -alpha * (sin_delta - sin_delta_omega1) + beta * (sin_delta - sin_delta_omega2);
+
+    let exp_factor = Complex::new(bvsk.cos(), bvsk.sin());
+    let denom = Complex::new(2.0 * PI / wavenumber, 0.0);
+
+    exp_factor * Complex::new(sumre, sumim) / denom
 }
