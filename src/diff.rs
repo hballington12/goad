@@ -74,10 +74,8 @@ pub fn diffraction(
     // Iterate over the flattened combinations
     for (index, (theta, phi)) in theta_phi_combinations.iter().enumerate() {
         // Compute sin and cos values for current theta and phi
-        let sin_theta = theta.to_radians().sin();
-        let cos_theta = theta.to_radians().cos();
-        let sin_phi = phi.to_radians().sin();
-        let cos_phi = phi.to_radians().cos();
+        let (sin_theta, cos_theta) = theta.to_radians().sin_cos();
+        let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
 
         // Calculate pos (xfar, yfar, zfar) for the current (theta, phi)
         let radius = settings::RADIUS * 2.0 * PI / wavenumber;
