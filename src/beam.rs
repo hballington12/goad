@@ -593,7 +593,11 @@ impl Beam {
         2.0 * PI / self.wavelength
     }
 
-    pub fn diffract(&self, theta_phi_combinations: &[(f32, f32)]) -> Vec<Matrix2<Complex<f32>>> {
+    pub fn diffract(
+        &self,
+        theta_phi_combinations: &[(f32, f32)],
+        fov_factor: Option<f32>,
+    ) -> Vec<Matrix2<Complex<f32>>> {
         match &self.face {
             Face::Simple(face) => {
                 let verts = &face.exterior;
@@ -607,6 +611,7 @@ impl Beam {
                     vk7,
                     &theta_phi_combinations,
                     self.wavenumber(),
+                    fov_factor,
                 )
             }
             Face::Complex { .. } => {

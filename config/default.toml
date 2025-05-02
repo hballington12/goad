@@ -31,6 +31,8 @@ max_tir = 10                          # Maximum number of total internal reflect
 distortion = 0.0                      # Distortion factor for the geometry
 directory = "goad_run"                # Directory for output files
 # seed = 6                              # Seed (comment out for no seed)
+# geom_scale = [1.0, 1.0, 1.0] # Scale factor for the geometry
+# fov_factor = 1.0                      # Field of view factor for diffraction (comment out for no truncation)
 
 [binning] # Binning configuration
 

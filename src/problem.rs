@@ -242,10 +242,11 @@ impl Problem {
         queue: &mut Vec<Beam>,
         bins: &[(f32, f32)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
+        fov_factor: Option<f32>,
     ) {
         let ampl_far_field = queue
             .par_iter()
-            .map(|outbeam| outbeam.diffract(bins))
+            .map(|outbeam| outbeam.diffract(bins, fov_factor))
             .reduce(
                 || vec![Matrix2::<Complex<f32>>::zeros(); bins.len()],
                 |mut acc, local| {
@@ -271,18 +272,22 @@ impl Problem {
     }
 
     pub fn solve_far_ext_diff(&mut self) {
+        let fov_factor = None; // don't truncate by field of view for external diffraction
         Self::diffract_outbeams(
             &mut self.ext_diff_beam_queue,
             &self.result.bins,
             &mut self.result.ampl_ext,
+            fov_factor,
         );
     }
 
     pub fn solve_far_outbeams(&mut self) {
+        let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
         Self::diffract_outbeams(
             &mut self.out_beam_queue,
             &self.result.bins,
             &mut self.result.ampl_beam,
+            fov_factor,
         );
     }
     pub fn solve_far(&mut self) {

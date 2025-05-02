@@ -13,6 +13,7 @@ pub fn diffraction(
     vk7: Vector3<f32>,
     theta_phi_combinations: &[(f32, f32)],
     wavenumber: f32,
+    fov_factor: Option<f32>,
 ) -> Vec<Matrix2<Complex<f32>>> {
     // Translate to aperture system, rotate, and transform propagation and auxiliary vectors.
     let (center_of_mass, relative_vertices, rot3, prop2) =
@@ -30,6 +31,17 @@ pub fn diffraction(
         v1_data.push(transformed_vertex.y);
         v1_data.push(transformed_vertex.z);
     }
+
+    // Get estimated field of view cosine
+    let aperture_dimension = transformed_vertices_vec
+        .iter()
+        .map(|v| v.norm())
+        .fold(0.0, f32::max);
+
+    // fov_factor * lambda / 2 * r
+    let cos_fov =
+        (fov_factor.unwrap_or(1.0) * 2.0 * 2.0 * PI / (wavenumber * aperture_dimension)).cos();
+
     let v1 = Array2::from_shape_vec((nv, 3), v1_data).expect("Shape error creating v1");
 
     let x: Vec<f32> = v1.column(0).iter().cloned().collect();
@@ -93,8 +105,11 @@ pub fn diffraction(
 
     // Define the output variables.
     let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
-    let mut area_facs2 = vec![Complex::<f32>::default(); theta_phi_combinations.len()];
     let kinc = prop2 * wavenumber;
+
+    // Pre-calculate constants dependent only on wavenumber
+    let radius = settings::RADIUS * 2.0 * PI / wavenumber;
+    let inv_denom = Complex::new(wavenumber / (2.0 * PI), 0.0); // Pre-calculate 1.0 / (2*PI/wavenumber)
 
     // Iterate over the flattened combinations
     for (index, (theta, phi)) in theta_phi_combinations.iter().enumerate() {
@@ -103,7 +118,7 @@ pub fn diffraction(
         let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
 
         // Calculate pos (xfar, yfar, zfar) for the current (theta, phi)
-        let radius = settings::RADIUS * 2.0 * PI / wavenumber;
+        // Use pre-calculated radius
         let r_sin_theta = radius * sin_theta;
         let rotated_pos = rot3
             * (Vector3::new(
@@ -115,6 +130,12 @@ pub fn diffraction(
         // Calculate distance to bins and bin unit vectors
         let bvs = rotated_pos.norm();
         let k = rotated_pos / bvs;
+
+        // Apply filtering based on field of view if specified
+        if fov_factor.is_some() && k.dot(&prop2) < cos_fov {
+            continue;
+        }
+
         let bvsk = bvs * wavenumber;
         let ampl_far_field = &mut ampl_cs[index];
 
@@ -127,7 +148,7 @@ pub fn diffraction(
 
         *ampl_far_field = ampl_temp;
 
-        let fraunhofer = &mut area_facs2[index];
+        // Calculate fraunhofer factor for this direction
         let mut fraunhofer_sum = Complex::new(0.0, 0.0);
 
         let (kxx, kyy) = calculate_kxx_kyy(
@@ -161,14 +182,12 @@ pub fn diffraction(
                 continue;
             }
 
-            let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, wavenumber);
+            let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, inv_denom); // Pass inv_denom
 
             fraunhofer_sum += summand;
         }
 
-        *fraunhofer = fraunhofer_sum;
-
-        *ampl_far_field *= *fraunhofer;
+        *ampl_far_field *= fraunhofer_sum;
     }
     ampl_cs
 }
@@ -434,7 +453,7 @@ pub fn calculate_summand(
     omega2: f32,
     alpha: f32,
     beta: f32,
-    wavenumber: f32,
+    inv_denom: Complex<f32>, // Accept pre-calculated inverse denominator
 ) -> Complex<f32> {
     let (sin_delta, cos_delta) = delta.sin_cos();
     let (sin_delta_omega1, cos_delta_omega1) = (delta + omega1).sin_cos();
@@ -443,8 +462,7 @@ pub fn calculate_summand(
     let sumim = alpha * (cos_delta - cos_delta_omega1) - beta * (cos_delta - cos_delta_omega2);
     let sumre = -alpha * (sin_delta - sin_delta_omega1) + beta * (sin_delta - sin_delta_omega2);
 
-    let exp_factor = Complex::new(bvsk.cos(), bvsk.sin());
-    let denom = Complex::new(2.0 * PI / wavenumber, 0.0);
+    let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
 
-    exp_factor * Complex::new(sumre, sumim) / denom
+    exp_factor * Complex::new(sumre, sumim) * inv_denom // Multiply by inverse denominator
 }

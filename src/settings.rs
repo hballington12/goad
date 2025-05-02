@@ -60,6 +60,8 @@ pub struct Settings {
     pub geom_scale: Option<Vec<f32>>,
     #[serde(default = "default_directory")]
     pub directory: PathBuf,
+    #[serde(default = "default_fov_factor")]
+    pub fov_factor: Option<f32>,
 }
 
 fn default_scale_factor() -> f32 {
@@ -67,6 +69,10 @@ fn default_scale_factor() -> f32 {
 }
 
 fn default_geom_scale() -> Option<Vec<f32>> {
+    None
+}
+
+fn default_fov_factor() -> Option<f32> {
     None
 }
 
@@ -436,6 +442,11 @@ fn update_settings_from_cli(config: &mut Settings) {
         config.distortion = Some(distortion);
     }
 
+    // Field of view factor
+    if let Some(fov_factor) = args.fov_factor {
+        config.fov_factor = Some(fov_factor);
+    }
+
     if let Some(geom_scale) = args.material.geom_scale {
         if geom_scale.len() != 3 {
             panic!("Geometry scale must have exactly 3 values (x, y, z)");
@@ -566,6 +577,12 @@ pub struct CliArgs {
     /// If not specified, a directory in the format 'run00001' will be created automatically.
     #[arg(long)]
     pub dir: Option<PathBuf>,
+
+    /// Set the field of view truncation factor for diffraction of beams.
+    /// Beams outside an angle of lambda/d * fov_factor will be truncated,
+    /// where d is the maximum dimension of the aperture
+    #[arg(long)]
+    pub fov_factor: Option<f32>,
 }
 
 /// Beam propagation parameters - control how beams are traced through the geometry
