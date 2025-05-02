@@ -34,36 +34,61 @@ pub fn diffraction(
 
     let x: Vec<f32> = v1.column(0).iter().cloned().collect();
     let y: Vec<f32> = v1.column(1).iter().cloned().collect();
-    let m: Vec<f32> = (0..nv)
-        .map(|j| {
-            let next_j = (j + 1) % nv;
-            let dx = x[next_j] - x[j];
-            let dy = y[next_j] - y[j];
-            if dx.abs() < settings::DIFF_DMIN {
-                if dy.signum() == dx.signum() {
-                    1e6
-                } else {
-                    -1e6
-                }
+
+    // Pre-calculate dx, dy, m, n, m_adj, n_adj
+    let mut dx_vec = Vec::with_capacity(nv);
+    let mut dy_vec = Vec::with_capacity(nv);
+    let mut m = Vec::with_capacity(nv);
+    let mut n = Vec::with_capacity(nv);
+    let mut m_adj = Vec::with_capacity(nv);
+    let mut n_adj = Vec::with_capacity(nv);
+
+    for j in 0..nv {
+        let next_j = (j + 1) % nv;
+        let mut dx = x[next_j] - x[j];
+        let mut dy = y[next_j] - y[j];
+
+        let mj = if dx.abs() < settings::DIFF_DMIN {
+            if dy.signum() == dx.signum() {
+                1e6
             } else {
-                dy / dx
+                -1e6
             }
-        })
-        .collect();
-    let n: Vec<f32> = m
-        .iter()
-        .map(|&mj| {
-            if mj.abs() < 1e-6 {
-                if mj.signum() > 0.0 {
-                    1e6
-                } else {
-                    -1e6
-                }
+        } else {
+            dy / dx
+        };
+        m.push(mj);
+
+        let nj = if mj.abs() < 1e-6 {
+            if mj.signum() > 0.0 {
+                1e6
             } else {
-                1.0 / mj
+                -1e6
             }
-        })
-        .collect();
+        } else {
+            1.0 / mj
+        };
+        n.push(nj);
+
+        // Adjust dx/dy based on DIFF_DMIN *after* calculating m
+        dx = if dx.abs() < settings::DIFF_DMIN {
+            settings::DIFF_DMIN * dx.signum()
+        } else {
+            dx
+        };
+        dy = if dy.abs() < settings::DIFF_DMIN {
+            settings::DIFF_DMIN * dy.signum()
+        } else {
+            dy
+        };
+        dx_vec.push(dx);
+        dy_vec.push(dy);
+
+        // Pre-calculate adjusted m and n
+        let (adj_mj, adj_nj) = adjust_mj_nj(mj, nj);
+        m_adj.push(adj_mj);
+        n_adj.push(adj_nj);
+    }
     // --- Optimizations End ---
 
     // Define the output variables.
@@ -118,30 +143,15 @@ pub fn diffraction(
         );
 
         for j in 0..nv {
-            let mj = m[j];
-            let nj = n[j];
+            // Use pre-calculated values
+            let mj = m_adj[j];
+            let nj = n_adj[j];
             let xj = x[j];
             let yj = y[j];
+            let dx = dx_vec[j];
+            let dy = dy_vec[j];
 
-            let (mj, nj) = adjust_mj_nj(mj, nj);
-
-            let next_j = (j + 1) % nv;
-            let xj_plus1 = x[next_j];
-            let yj_plus1 = y[next_j];
-
-            let dx = xj_plus1 - xj;
-            let dy = yj_plus1 - yj;
-
-            let dx = if dx.abs() < settings::DIFF_DMIN {
-                settings::DIFF_DMIN * dx.signum()
-            } else {
-                dx
-            };
-            let dy = if dy.abs() < settings::DIFF_DMIN {
-                settings::DIFF_DMIN * dy.signum()
-            } else {
-                dy
-            };
+            // mj, nj are already adjusted, dx/dy already handled DIFF_DMIN
 
             let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
@@ -164,6 +174,7 @@ pub fn diffraction(
 }
 
 // Other functions remain unchanged
+#[inline]
 fn get_rotations(
     rot3: Matrix3<f32>,
     prop2: Vector3<f32>,
@@ -300,6 +311,7 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     rot
 }
 
+#[inline]
 pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Vector3<f32>) {
     let big_kx = prop2.x;
     let big_ky = prop2.y;
@@ -342,6 +354,7 @@ pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Ve
     (diff_ampl, m)
 }
 
+#[inline]
 pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
     let angle = -prop1.y.atan2(prop1.x);
     let (sin_angle, cos_angle) = angle.sin_cos();
@@ -351,6 +364,7 @@ pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
     )
 }
 
+#[inline]
 pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
     if mj.abs() > 1e6 || nj.abs() < 1e-6 {
         (1e6, 1e-6)
@@ -361,10 +375,12 @@ pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
     }
 }
 
+#[inline]
 pub fn calculate_bvsk(rotated_pos: &Vector3<f32>, wavenumber: f32) -> f32 {
     wavenumber * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
 }
 
+#[inline]
 pub fn calculate_kxx_kyy(
     kinc: &[f32; 2],
     rotated_pos: &Vector3<f32>,
@@ -388,6 +404,7 @@ pub fn calculate_kxx_kyy(
     (kxx, kyy)
 }
 
+#[inline]
 pub fn calculate_deltas(kxx: f32, kyy: f32, xj: f32, yj: f32, mj: f32, nj: f32) -> (f32, f32, f32) {
     let delta = kxx * xj + kyy * yj;
     let delta1 = kyy * mj + kxx;
@@ -395,18 +412,21 @@ pub fn calculate_deltas(kxx: f32, kyy: f32, xj: f32, yj: f32, mj: f32, nj: f32) 
     (delta, delta1, delta2)
 }
 
+#[inline]
 pub fn calculate_omegas(dx: f32, dy: f32, delta1: f32, delta2: f32) -> (f32, f32) {
     let omega1 = dx * delta1;
     let omega2 = dy * delta2;
     (omega1, omega2)
 }
 
+#[inline]
 pub fn calculate_alpha_beta(delta1: f32, delta2: f32, kxx: f32, kyy: f32) -> (f32, f32) {
     let alpha = 1.0 / (2.0 * kyy * delta1);
     let beta = 1.0 / (2.0 * kxx * delta2);
     (alpha, beta)
 }
 
+#[inline]
 pub fn calculate_summand(
     bvsk: f32,
     delta: f32,
