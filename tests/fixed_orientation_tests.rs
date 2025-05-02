@@ -11,7 +11,8 @@ use num_complex::Complex32;
 pub mod helpers;
 
 // Tolerance for comparing Mueller matrix elements
-const TOL: f32 = 1e2;
+const FRAC_TOL: f32 = 1e-4; // fractional error
+const ABS_TOL: f32 = 1e2; // absolute error
 
 #[test]
 fn fixed_hex_30_30_30() {
@@ -35,7 +36,7 @@ fn fixed_hex_30_30_30() {
 
     let result = collect_mueller(&multiproblem.result.mueller);
     let reference = load_reference_mueller("fixed_hex_30_30_30_mueller_scatgrid").unwrap();
-    compare_results(result, reference, TOL).unwrap();
+    compare_results(result, reference, FRAC_TOL, ABS_TOL).unwrap();
 }
 
 #[test]
@@ -62,5 +63,5 @@ fn fixed_hex_30_20_20() {
 
     let result = collect_mueller(&multiproblem.result.mueller);
     let reference = load_reference_mueller("fixed_hex_30_20_20_mueller_scatgrid").unwrap();
-    compare_results(result, reference, TOL).unwrap();
+    compare_results(result, reference, FRAC_TOL, ABS_TOL).unwrap();
 }
