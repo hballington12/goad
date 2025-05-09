@@ -110,7 +110,7 @@ fn default_directory() -> PathBuf {
 impl Settings {
     #[new]
     #[pyo3(signature = (
-        wavelength = None, 
+        wavelength = None,
         beam_power_threshold = None, 
         beam_area_threshold_fac = None, 
         cutoff = None, 
@@ -143,54 +143,52 @@ impl Settings {
     ) -> Self {
         // Load default settings from config file
         let mut settings = load_config_with_cli(false).expect("Failed to load config");
-        
+
         // Override with provided parameters if they exist
         if let Some(w) = wavelength {
             settings.wavelength = w;
         }
-        
+
         if let Some(bpt) = beam_power_threshold {
             settings.beam_power_threshold = bpt;
         }
-        
+
         if let Some(batf) = beam_area_threshold_fac {
             settings.beam_area_threshold_fac = batf;
         }
-        
+
         if let Some(c) = cutoff {
             settings.cutoff = c;
         }
-        
+
         // Update medium refractive index if either component is provided
         if medium_refr_index_re.is_some() || medium_refr_index_im.is_some() {
             let re = medium_refr_index_re.unwrap_or(settings.medium_refr_index.re);
             let im = medium_refr_index_im.unwrap_or(settings.medium_refr_index.im);
             settings.medium_refr_index = Complex::new(re, im);
         }
-        
+
         // Update particle refractive index if either component is provided
         if particle_refr_index_re.is_some() || particle_refr_index_im.is_some() {
-            let re = particle_refr_index_re.unwrap_or(
-                settings.particle_refr_index.first().map_or(1.0, |c| c.re)
-            );
-            let im = particle_refr_index_im.unwrap_or(
-                settings.particle_refr_index.first().map_or(0.0, |c| c.im)
-            );
+            let re = particle_refr_index_re
+                .unwrap_or(settings.particle_refr_index.first().map_or(1.0, |c| c.re));
+            let im = particle_refr_index_im
+                .unwrap_or(settings.particle_refr_index.first().map_or(0.0, |c| c.im));
             settings.particle_refr_index = vec![Complex::new(re, im)];
         }
-        
+
         if let Some(name) = geom_name {
             settings.geom_name = name;
         }
-        
+
         if let Some(rec) = max_rec {
             settings.max_rec = rec;
         }
-        
+
         if let Some(tir) = max_tir {
             settings.max_tir = tir;
         }
-        
+
         // Update binning if either theta_res or phi_res is provided
         if theta_res.is_some() || phi_res.is_some() {
             // Get the current values or extract from the current binning scheme
@@ -198,12 +196,12 @@ impl Settings {
                 bins::Scheme::Simple { num_theta, .. } => *num_theta,
                 _ => 180, // Default if not a simple scheme
             };
-            
+
             let current_phi = match &settings.binning.scheme {
                 bins::Scheme::Simple { num_phi, .. } => *num_phi,
                 _ => 360, // Default if not a simple scheme
             };
-            
+
             settings.binning = BinningScheme {
                 scheme: bins::Scheme::Simple {
                     num_theta: theta_res.unwrap_or(current_theta),
@@ -211,7 +209,7 @@ impl Settings {
                 },
             };
         }
-        
+
         // Update orientation if euler is provided
         if let Some(e) = euler {
             if e.len() >= 3 {
@@ -219,11 +217,11 @@ impl Settings {
                     scheme: Scheme::Discrete {
                         eulers: vec![Euler::new(e[0], e[1], e[2])],
                     },
-                    euler_convention: settings.orientation.euler_convention
+                    euler_convention: settings.orientation.euler_convention,
                 };
             }
         }
-        
+
         settings
     }
 

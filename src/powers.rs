@@ -1,6 +1,6 @@
 use std::{fmt, ops::*};
 
-#[derive(Debug, Copy,  Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Powers {
     pub input: f32,       // near-field input power
     pub output: f32,      // near-field output power
@@ -9,7 +9,7 @@ pub struct Powers {
     pub trnc_rec: f32,    // truncated power due to max recursions
     pub trnc_clip: f32,   // truncated power due to clipping
     pub trnc_energy: f32, // truncated power due to threshold beam power
-    pub clip_err: f32, // truncated power due to clipping error
+    pub clip_err: f32,    // truncated power due to clipping error
     pub trnc_area: f32,   // truncated power due to area threshold
     pub trnc_cop: f32,    // truncated power due to cutoff power
     pub ext_diff: f32,    // external diffraction power
@@ -50,7 +50,6 @@ impl Add for Powers {
         }
     }
 }
-
 
 impl AddAssign for Powers {
     fn add_assign(&mut self, other: Self) {
@@ -95,7 +94,7 @@ impl Powers {
                 + self.trnc_ref
                 + self.trnc_rec
                 // + self.trnc_clip
-                + self.trnc_area    
+                + self.trnc_area
                 + self.clip_err
                 + self.trnc_cop
                 + self.trnc_energy)
