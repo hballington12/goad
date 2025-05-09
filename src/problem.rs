@@ -57,9 +57,16 @@ pub struct Problem {
 #[pymethods]
 impl Problem {
     #[new]
-    fn py_new(settings: Settings) -> Self {
-        let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
-        Problem::new(geom, Some(settings))
+    fn py_new(settings: Settings, geom: Option<Geom>) -> Self {
+        match geom {
+            // If a geometry is provided, use it
+            Some(geom) => Problem::new(geom, Some(settings)),
+            None => {
+                // If no geometry is provided, load geometry from file
+                let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
+                Problem::new(geom, Some(settings))
+            }
+        }
     }
 
     /// Setter function for the problem settings
