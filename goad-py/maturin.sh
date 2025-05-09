@@ -8,6 +8,7 @@ cargo build --release
 cd -
 
 maturin develop --release
+maturin build --release -i python3.12
 maturin build --release
 
 source .venv/bin/activate
