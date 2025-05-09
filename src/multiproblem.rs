@@ -32,7 +32,7 @@ impl MultiProblem {
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = generate_bins(&settings.binning.scheme);
-        let result = Results::new_empty(bins);
+        let result = Results::new_empty(&bins);
 
         Self {
             geom,
@@ -40,6 +40,11 @@ impl MultiProblem {
             settings,
             result,
         }
+    }
+
+    /// Resets a `MultiOrientProblem` to its initial state.
+    pub fn reset(&mut self) {
+        self.result = Results::new_empty(&self.result.bins);
     }
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
@@ -77,7 +82,7 @@ impl MultiProblem {
                 problem.result
             })
             .reduce(
-                || Results::new_empty(self.result.bins.clone()),
+                || Results::new_empty(&self.result.bins),
                 |accum, item| self.reduce_results(accum, item),
             );
 

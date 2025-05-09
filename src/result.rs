@@ -30,7 +30,7 @@ pub struct Results {
 
 impl Results {
     /// Creates a new `Result` with empty mueller and amplitude matrix
-    pub fn new_empty(bins: Vec<(f32, f32)>) -> Self {
+    pub fn new_empty(bins: &[(f32, f32)]) -> Self {
         let mueller = Array2::<f32>::zeros((bins.len(), 16));
         let mueller_beam = mueller.clone();
         let mueller_ext = mueller.clone();
@@ -39,7 +39,7 @@ impl Results {
         let ampl_ext = ampl.clone();
         Self {
             powers: Powers::new(),
-            bins,
+            bins: bins.to_vec(),
             mueller,
             mueller_beam,
             mueller_ext,

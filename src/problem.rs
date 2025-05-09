@@ -176,7 +176,7 @@ impl Problem {
         init_geom(&settings, &mut geom);
 
         let bins = generate_bins(&settings.binning.scheme);
-        let solution = Results::new_empty(bins);
+        let solution = Results::new_empty(&bins);
 
         let problem = Self {
             base_geom: geom.clone(),
@@ -196,7 +196,7 @@ impl Problem {
         self.beam_queue.clear();
         self.out_beam_queue.clear();
         self.ext_diff_beam_queue.clear();
-        self.result = Results::new_empty(self.result.bins.clone());
+        self.result = Results::new_empty(&self.result.bins);
         self.geom.clone_from(&self.base_geom);
     }
 
@@ -232,7 +232,7 @@ impl Problem {
         let settings = load_config().expect("Failed to load config");
 
         let bins = generate_bins(&settings.binning.scheme);
-        let solution = Results::new_empty(bins);
+        let solution = Results::new_empty(&bins);
 
         Self {
             base_geom: geom.clone(),
