@@ -99,12 +99,6 @@ impl MultiProblem {
             _ => {
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
                     Ok((theta, mueller_1d)) => {
-                        let _ = output::write_mueller_1d(
-                            &theta,
-                            &mueller_1d,
-                            "",
-                            &self.settings.directory,
-                        );
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d = Some(mueller_1d);
 
@@ -115,12 +109,6 @@ impl MultiProblem {
                 };
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
                     Ok((theta, mueller_1d_beam)) => {
-                        let _ = output::write_mueller_1d(
-                            &theta,
-                            &mueller_1d_beam,
-                            "_beam",
-                            &self.settings.directory,
-                        );
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d_beam = Some(mueller_1d_beam);
                     }
@@ -130,12 +118,6 @@ impl MultiProblem {
                 };
                 match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
                     Ok((theta, mueller_1d_ext)) => {
-                        let _ = output::write_mueller_1d(
-                            &theta,
-                            &mueller_1d_ext,
-                            "_ext",
-                            &self.settings.directory,
-                        );
                         self.result.bins_1d = Some(theta);
                         self.result.mueller_1d_ext = Some(mueller_1d_ext);
                     }
@@ -221,6 +203,7 @@ impl MultiProblem {
     }
 
     pub fn writeup(&self) {
+        // Write 2D mueller matrices
         let _ = output::write_mueller(
             &self.result.bins,
             &self.result.mueller,
@@ -239,6 +222,49 @@ impl MultiProblem {
             "_ext",
             &self.settings.directory,
         );
+
+        // Write generic results
         let _ = output::write_result(&self.result, &self.settings.directory);
+
+        // (Try to) write 1D mueller matrices
+        match self.result.mueller_1d {
+            Some(ref mueller_1d) => {
+                let _ = output::write_mueller_1d(
+                    &self.result.bins_1d.as_ref().unwrap(),
+                    mueller_1d,
+                    "",
+                    &self.settings.directory,
+                );
+            }
+            None => {
+                println!("Failed to write 1D mueller matrix");
+            }
+        }
+        match self.result.mueller_1d_beam {
+            Some(ref mueller_1d) => {
+                let _ = output::write_mueller_1d(
+                    &self.result.bins_1d.as_ref().unwrap(),
+                    mueller_1d,
+                    "_beam",
+                    &self.settings.directory,
+                );
+            }
+            None => {
+                println!("Failed to write 1D mueller matrix (beam)");
+            }
+        }
+        match self.result.mueller_1d_ext {
+            Some(ref mueller_1d) => {
+                let _ = output::write_mueller_1d(
+                    &self.result.bins_1d.as_ref().unwrap(),
+                    mueller_1d,
+                    "_ext",
+                    &self.settings.directory,
+                );
+            }
+            None => {
+                println!("Failed to write 1D mueller matrix (ext)");
+            }
+        }
     }
 }
