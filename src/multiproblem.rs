@@ -18,7 +18,6 @@ use rayon::prelude::*;
 #[derive(Debug)] // Added Default derive
 pub struct MultiProblem {
     pub geom: Geom,
-    pub problems: Vec<Problem>,
     pub orientations: Orientations,
     pub settings: Settings, // runtime settings
     pub result: Results,    // averaged result of the problems
@@ -32,13 +31,11 @@ impl MultiProblem {
         problem::init_geom(&settings, &mut geom);
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let problems = Vec::new();
         let bins = generate_bins(&settings.binning.scheme);
         let result = Results::new_empty(bins);
 
         Self {
             geom,
-            problems,
             orientations,
             settings,
             result,
