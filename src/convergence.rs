@@ -31,9 +31,15 @@ pub trait ConvergenceDataSource {
 
 #[derive(Debug)]
 pub struct Convergence<T: ConvergenceDataSource> {
+    /// Runtime settings
     pub settings: Settings,
+    /// Geometry of the problem
     pub geom: Geom,
-    pub result: T, // Changed from Results to a generic type T
+    /// Batch of results to check
+    pub batch: T,
+    /// Size of the batch
+    pub batch_size: usize,
+    /// Types of convergence to check
     pub convergence_types: Vec<ConvergenceType>,
 }
 
@@ -43,13 +49,15 @@ impl<T: ConvergenceDataSource> Convergence<T> {
     pub fn new(
         settings: Settings,
         geom: Geom,
-        result: T,
+        batch: T,
+        batch_size: usize,
         convergence_types: Vec<ConvergenceType>,
     ) -> Self {
         Self {
             settings,
             geom,
-            result,
+            batch,
+            batch_size,
             convergence_types,
         }
     }
@@ -59,7 +67,7 @@ impl<T: ConvergenceDataSource> Convergence<T> {
         for conv_type in &self.convergence_types {
             match conv_type {
                 ConvergenceType::Asymmetry => {
-                    if let Some(asym) = self.result.get_asymmetry_parameter() {
+                    if let Some(asym) = self.batch.get_asymmetry_parameter() {
                         // Perform convergence check for asymmetry
                         println!("Checking asymmetry: {}", asym);
                         // ... logic to compare with previous values or a threshold ...
@@ -69,7 +77,7 @@ impl<T: ConvergenceDataSource> Convergence<T> {
                     }
                 }
                 ConvergenceType::ScatteringCrossSection => {
-                    if let Some(scat) = self.result.get_scattering_cross_section() {
+                    if let Some(scat) = self.batch.get_scattering_cross_section() {
                         // Perform convergence check for scattering cross section
                         println!("Checking scattering cross section: {}", scat);
                         // ... logic ...
