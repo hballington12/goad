@@ -42,9 +42,17 @@ impl MultiProblem {
         }
     }
 
+    /// Regenerates the orientations for the problem.
+    /// Useful for rerunning a random orientation problem with no seed set.
+    pub fn regenerate_orientations(&mut self) {
+        self.orientations =
+            Orientations::generate(&self.settings.orientation.scheme, self.settings.seed);
+    }
+
     /// Resets a `MultiOrientProblem` to its initial state.
     pub fn reset(&mut self) {
         self.result = Results::new_empty(&self.result.bins);
+        self.regenerate_orientations();
     }
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
