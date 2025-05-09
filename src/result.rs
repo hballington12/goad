@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use crate::convergence::Convergence;
+use crate::convergence::ConvergenceDataSource; // Import the new trait
 use crate::output;
 use crate::params::Params;
 use crate::powers::Powers;
@@ -26,7 +26,6 @@ pub struct Results {
     pub mueller_1d_beam: Option<Array2<f32>>,
     pub mueller_1d_ext: Option<Array2<f32>>,
     pub params: Params,
-    pub convergence: Convergence<Params>,
 }
 
 impl Results {
@@ -52,7 +51,6 @@ impl Results {
             mueller_1d_beam: None,
             mueller_1d_ext: None,
             params: Params::new(),
-            convergence: Convergence::new(0.1, 10),
         }
     }
 
@@ -124,6 +122,24 @@ impl Results {
         println!("Scat Cross: {:?}", self.params.scat_cross);
         println!("Ext Cross: {:?}", self.params.ext_cross);
         println!("Albedo: {:?}", self.params.albedo);
+    }
+}
+
+impl ConvergenceDataSource for Results {
+    fn get_asymmetry_parameter(&self) -> Option<f32> {
+        self.params.asymettry
+    }
+
+    fn get_scattering_cross_section(&self) -> Option<f32> {
+        self.params.scat_cross
+    }
+
+    fn get_single_scattering_albedo(&self) -> Option<f32> {
+        self.params.albedo
+    }
+
+    fn get_mueller_1d(&self) -> Option<&Array2<f32>> {
+        self.mueller_1d.as_ref()
     }
 }
 
