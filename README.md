@@ -1,3 +1,9 @@
+<!-- badges: start -->
+![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
+![minimum rustc 1.85](https://img.shields.io/badge/rustc-1.85+-red.svg)
+[![Rust](https://github.com/hballington12/goad/actions/workflows/rust.yml/badge.svg)](https://github.com/hballington12/goad/actions/workflows/rust.yml)
+<!-- badges: end -->
+
 # GOAD - Geometric Optics with Aperture Diffraction
 
 GOAD is a Rust-based physical-optics hybrid light scattering model based on geometric optics with aperture diffraction. It computes the 2D mueller matrix by using geometric optics and a polygon clipping algorithm to approximate the electric field on the particle surface. The surface field is then mapped to the far-field on the basis of the electromagnetic equivalence theorem, which takes the form of a vector surface integral diffraction equation. Green's theorem is used to reduce the surface integral to a line integral around the contours of outgoing beam cross sections, which is important for computational efficiency.
