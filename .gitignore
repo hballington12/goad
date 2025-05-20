@@ -10,3 +10,4 @@ config/local.toml
 log**
 goad-py/.env
 goad_run/
+**.vscode/
