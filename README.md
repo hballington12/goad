@@ -15,7 +15,7 @@ GOAD is a Rust-based physical-optics hybrid light scattering model based on geom
 <div align="center">
 
 > **📖 Reference Paper**  
-> If you use this code, please cite:  
+> If you use this code in your work, please cite:  
 > [A Light Scattering Model for Large Particles with Surface Roughness](https://doi.org/10.1016/j.jqsrt.2024.109054)  
 > *H. Ballington, E. Hesse*  
 > [JQSRT, 2024](https://www.journals.elsevier.com/journal-of-quantitative-spectroscopy-and-radiative-transfer)
