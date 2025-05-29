@@ -1,6 +1,7 @@
 <div align="center">
 
 <!-- badges: start -->
+[![Rayon crate](https://img.shields.io/crates/v/goad.svg)](https://crates.io/crates/goad)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![minimum rustc 1.85](https://img.shields.io/badge/rustc-1.85+-red.svg)
 [![Rust](https://github.com/hballington12/goad/actions/workflows/rust.yml/badge.svg)](https://github.com/hballington12/goad/actions/workflows/rust.yml)
