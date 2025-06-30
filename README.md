@@ -1,7 +1,6 @@
 <div align="center">
 
 <!-- badges: start -->
-[![Rayon crate](https://img.shields.io/crates/v/goad.svg)](https://crates.io/crates/goad)
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 ![minimum rustc 1.85](https://img.shields.io/badge/rustc-1.85+-red.svg)
 [![Rust](https://github.com/hballington12/goad/actions/workflows/rust.yml/badge.svg)](https://github.com/hballington12/goad/actions/workflows/rust.yml)
@@ -11,14 +10,14 @@
 
 # GOAD - Geometric Optics with Aperture Diffraction
 
-GOAD is a Rust-based physical-optics hybrid light scattering model based on geometric optics with aperture diffraction. It computes the 2D Mueller matrix by using geometric optics and a polygon clipping algorithm to compute the electric field on the particle surface. The surface field is then mapped to the far-field on the basis of the electromagnetic equivalence theorem, which takes the form of a vector surface integral diffraction equation. Green's theorem is used to reduce the surface integral to a line integral around the contours of outgoing beam cross sections, which leads to fast computations compared to some other methods.
+GOAD is a Rust-based physical-optics hybrid light scattering model based on geometric optics with aperture diffraction. It computes the 2D Mueller matrix by using geometric optics and a polygon clipping algorithm to compute the electric field on the particle surface. The surface field is then mapped to the far-field on the basis of the electromagnetic equivalence theorem, which takes the form of a vector surface integral diffraction equation. Green's theorem is used to reduce the surface integral to a line integral around the contours of outgoing beam cross sections, which leads to fast computations compared to some other methods. Compared to the [PBT](https://github.com/hballington12/pbt) method, GOAD uses a beam clipping algorithm instead of ray backtracing on a meshed geometry, which makes the computation more accurate and faster if the particle has smooth planar surfaces.
 
 <div align="center">
 
-> **📖 Reference Paper**  
-> If you use this code in your work, please cite:  
-> [A Light Scattering Model for Large Particles with Surface Roughness](https://doi.org/10.1016/j.jqsrt.2024.109054)  
-> *H. Ballington, E. Hesse*  
+> **📖 Reference Paper**
+> If you use this code in your work, please cite:
+> [A Light Scattering Model for Large Particles with Surface Roughness](https://doi.org/10.1016/j.jqsrt.2024.109054)
+> *H. Ballington, E. Hesse*
 > [JQSRT, 2024](https://www.journals.elsevier.com/journal-of-quantitative-spectroscopy-and-radiative-transfer)
 
 </div>
@@ -56,6 +55,8 @@ GOAD is a Rust-based physical-optics hybrid light scattering model based on geom
     ./target/release/goad [OPTIONS]
     ```
 
+For more information, see the [quickstart guide](https://docs.rs/goad/0.1.0/goad/_quickstart/index.html) in the docs.
+
 ---
 
 ## ✨ Features
@@ -68,7 +69,7 @@ GOAD is a Rust-based physical-optics hybrid light scattering model based on geom
 
 ## 🛠️ Installation
 
-Before building the project, ensure you have Rust's package manager, Cargo, installed.  
+Before building the project, ensure you have Rust's package manager, Cargo, installed.
 You can install Rust and Cargo by following the instructions on the [official Rust website](https://doc.rust-lang.org/cargo/getting-started/installation.html).
 
 On Linux and macOS:
@@ -93,8 +94,8 @@ After building, the binary will be in the `target/release` directory.
 
 ### Configuration
 
-The application uses a default configuration file (`config/default.toml`).  
-**To customise:**  
+The application uses a default configuration file (`config/default.toml`).
+**To customise:**
 
 - Copy it to `config/local.toml` and edit as needed.
 - Options in config files are overridden by command line arguments, which are in turn overridden by environment variables.
@@ -179,10 +180,10 @@ Options:
 EXAMPLES:
     # Run with a specific wavelength and geometry file
     goad -w 0.5 --geo geometry.obj
-    
+
     # Run with a specific refractive index and random orientations
     goad --ri 1.31+0.01i --uniform 100
-    
+
     # Run over discrete orientations with an interval binning scheme
     goad --discrete="-30.0,20.0,1.0 -40.0,13.0,12.1" --interval \
          --theta 0 1 10 2 180 --phi 0 2 180
@@ -192,7 +193,7 @@ EXAMPLES:
 
     # Run with multiple shapes with different refractive indices
     goad --ri 1.31+0.0i 1.5+0.1i --geo geometries.obj
-    
+
     # Save output to a specific directory
     goad --dir /path/to/output
 ```
@@ -225,12 +226,12 @@ cargo test
 
 ## 🤝 Contributing
 
-Contributions are welcome!  
+Contributions are welcome!
 Please open an issue or submit a pull request on [GitHub](https://github.com/hballington12/goad).
 
 ---
 
 ## 📜 License
 
-This project is licensed under the GNU General Public License.  
+This project is licensed under the GNU General Public License.
 See the [LICENSE](LICENSE) file for details.
