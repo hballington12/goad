@@ -353,7 +353,16 @@ impl FaceData {
         Ok(face)
     }
 
-    /// Compute the normal vector for the face.
+    /// Computes the normal vector for the face.
+    /// 
+    /// **Context**: Face normals are required for lighting calculations,
+    /// ray-surface intersection tests, and determining face orientation
+    /// in electromagnetic field computations.
+    /// 
+    /// **How it Works**: Finds two vertices with sufficient separation,
+    /// uses the face midpoint as a third point, then computes the cross
+    /// product to get the normal vector. Normalizes the result and verifies
+    /// orthogonality to the face plane.
     fn set_normal(&mut self) -> Result<()> {
         let vertices = &self.exterior;
 
@@ -416,7 +425,14 @@ impl FaceData {
         }
     }
 
-    /// Compute the midpoint of the facet.
+    /// Computes the geometric center of the face.
+    /// 
+    /// **Context**: Face midpoints serve as reference points for normal
+    /// vector calculations and provide representative positions for
+    /// face-based operations in the electromagnetic solver.
+    /// 
+    /// **How it Works**: Averages the coordinates of all exterior vertices
+    /// to find the centroid of the face polygon.
     fn set_midpoint(&mut self) {
         let vertices = &self.exterior;
         let len = vertices.len() as f32;
@@ -430,9 +446,16 @@ impl FaceData {
         self.midpoint = sum;
     }
 
-    /// Computes the plane containing the face.
-    /// The components of the normal are a, b, and c, and the offset is d,
-    /// such that ax + by + cz + d = 0
+    /// Computes the plane equation containing this face.
+    /// 
+    /// **Context**: Many geometric algorithms require the plane equation
+    /// (ax + by + cz + d = 0) for intersection tests, distance calculations,
+    /// and coordinate transformations.
+    /// 
+    /// **How it Works**: Uses the face normal as the plane normal (a,b,c)
+    /// and computes the offset d from the dot product of the normal with
+    /// any point on the face. The components of the normal are a, b, and c,
+    /// and the offset is d, such that ax + by + cz + d = 0.
     pub fn plane(&self) -> Plane {
         Plane {
             normal: self.normal,
@@ -517,8 +540,15 @@ impl FaceData {
 
         highest - lowest
     }
-    /// Determines if all vertices of a Face are in front of the plane
-    /// of another Face.
+    /// Tests if all vertices of this face lie in front of another face's plane.
+    /// 
+    /// **Context**: Visibility and occlusion calculations in ray tracing require
+    /// determining the spatial relationship between faces. This test helps
+    /// establish which faces can potentially obstruct others.
+    /// 
+    /// **How it Works**: Computes the signed distance from each vertex to the
+    /// other face's plane using dot products. Returns true only if all vertices
+    /// are on the positive side of the plane (in front).
     pub fn is_in_front_of(&self, face: &FaceData) -> bool {
         let origin = face.exterior[0]; // choose point in plane of face
         for point in &self.exterior {
@@ -531,7 +561,15 @@ impl FaceData {
         true
     }
 
-    /// Transforms a Face in place using a `nalgebra` matrix transformation.
+    /// Applies a transformation matrix to the face geometry.
+    /// 
+    /// **Context**: Coordinate system transformations are required for aligning
+    /// geometry with beam propagation directions and for various geometric
+    /// operations in the electromagnetic solver.
+    /// 
+    /// **How it Works**: Transforms all exterior vertices using the 4x4 matrix,
+    /// then recomputes the face midpoint and normal vector to maintain geometric
+    /// consistency after the transformation.
     pub fn transform(&mut self, model_view: &Matrix4<f32>) -> Result<()> {
         for point in &mut self.exterior {
             point.transform(model_view)?;
@@ -540,7 +578,15 @@ impl FaceData {
         self.set_normal()
     }
 
-    /// Determine if a Face intersects itself using the exterior vertices.
+    /// Checks if the face polygon intersects itself.
+    /// 
+    /// **Context**: Self-intersecting faces can cause problems in electromagnetic
+    /// field calculations and ray tracing algorithms. Detecting these geometric
+    /// anomalies helps ensure mesh quality.
+    /// 
+    /// **How it Works**: Tests all pairs of non-adjacent edges for 3D intersection
+    /// using parametric line segment intersection tests. Returns true if any
+    /// edge pair intersects within their segments.
     pub fn self_intersects(&self) -> bool {
         let vertices = &self.exterior;
         let n = vertices.len();
@@ -636,8 +682,16 @@ impl FaceData {
         false
     }
 
-    /// Determine if a Face is convex by projecting it onto a suitable 2D plane
-    /// and checking the convexity of the resulting polygon.
+    /// Determines if the face represents a convex polygon.
+    /// 
+    /// **Context**: Some algorithms work more efficiently with convex polygons,
+    /// and triangulation methods may behave differently for convex vs concave
+    /// faces. This provides a geometric classification of the face.
+    /// 
+    /// **How it Works**: Projects the face onto its best-fitting 2D plane
+    /// based on the largest component of the face normal, then checks if all 
+    /// cross products of consecutive edges have the same sign, which indicates
+    /// convexity.
     pub fn is_convex(&self) -> bool {
         let vertices = &self.exterior;
         let n = vertices.len();
@@ -851,6 +905,28 @@ impl Face {
         }
     }
 
+    /// Triangulates a face using the ear clipping algorithm.
+    /// 
+    /// **Context**: Many algorithms in computational geometry work more efficiently
+    /// with triangular faces rather than arbitrary polygons. Triangulation breaks
+    /// complex faces into simpler triangular elements while preserving the surface.
+    /// 
+    /// **How it Works**: Projects the face onto a 2D plane aligned with its normal,
+    /// applies the earcut triangulation algorithm, then projects the resulting
+    /// triangles back to 3D space. Returns a vector of triangular faces that
+    /// collectively represent the original face.
+    /// 
+    /// # Example
+    /// ```rust
+    /// #[test]
+    /// fn earcut_xy() {
+    ///     let mut geom = Geom::from_file("./examples/data/plane_xy.obj").unwrap();
+    ///     let face = geom.shapes[0].faces.remove(0);
+    ///     let triangles = Face::earcut(&face);  // Triangulation call
+    ///     assert_eq!(triangles.len(), 2);
+    ///     assert_eq!(triangles[0].data().normal, face.data().normal);
+    /// }
+    /// ```
     pub fn earcut(face: &Face) -> Vec<Face> {
         let mut face = face.clone();
         // use nalgebra to get transform to xy plane
@@ -901,7 +977,27 @@ impl Face {
     }
 }
 
-/// Represents a 3D surface mesh.
+/// A closed 3D surface representing a single optical scatterer.
+/// 
+/// **Context**: Light scattering simulations require geometric representations
+/// of particles. Each particle must be modeled as a closed surface with well-defined 
+/// interior and exterior regions, along with its optical properties.
+/// 
+/// **How it Works**: A Shape stores geometric and material information for
+/// electromagnetic field calculations. The mesh contains vertices defining 3D positions,
+/// faces describing surface polygons (which should be planar - error checking for 
+/// non-planar faces will be added in future versions), and a complex refractive index 
+/// characterizing how light interacts with the material. Each face maintains its own 
+/// copy of vertex positions (rather than shared references) to enable independent 
+/// geometric operations like distortion - though this requires careful synchronization 
+/// when vertices change.
+/// 
+/// The axis-aligned bounding box enables spatial queries for determining containment 
+/// relationships between nested shapes, necessary for hierarchical geometries.
+/// 
+/// **Initialization**: Shapes are created by loading OBJ files through
+/// `Geom::from_file()` which calls `Shape::from_model()`, or directly via the
+/// Python bindings for programmatic geometry generation.
 #[pyclass]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
@@ -929,6 +1025,19 @@ impl Shape {
         }
     }
 
+    /// Converts a tobj::Model into a Shape.
+    /// 
+    /// **Context**: The tobj library provides raw mesh data (vertices, indices, face counts)
+    /// but this needs to be restructured into the Shape format required for electromagnetic
+    /// calculations. The conversion must handle arbitrary polygon faces, establish proper 
+    /// vertex-face relationships, and set up the geometric properties needed for subsequent
+    /// operations.
+    /// 
+    /// **How it Works**: Extracts vertex positions from the model's position array, then
+    /// processes face definitions using the face_arities to group indices into individual
+    /// faces. Each face becomes a Face::Simple containing its vertex data and optional
+    /// index references. The axis-aligned bounding box is computed from all vertices
+    /// to enable spatial queries.
     fn from_model(model: Model, id: Option<usize>) -> Result<Shape> {
         let mesh = &model.mesh;
 
@@ -992,6 +1101,22 @@ impl Shape {
         self.aabb = Some(AABB { min, max });
     }
 
+    /// Uniformly scales all vertices and faces by a given factor.
+    /// 
+    /// **Context**: Shape-level scaling is needed during distortion recovery
+    /// and for maintaining consistent geometry sizes after various operations.
+    /// This operates on individual shapes rather than the entire geometry.
+    /// 
+    /// **How it Works**: Multiplies all vertex coordinates and face vertex
+    /// coordinates by the scale factor, then recomputes the axis-aligned
+    /// bounding box to reflect the new dimensions.
+    /// 
+    /// # Example
+    /// ```rust
+    /// // From distortion recovery
+    /// let rescale_fac = max_dim / new_max_dim;
+    /// shape.rescale(rescale_fac);  // Rescale after distortion to maintain size
+    /// ```
     pub fn rescale(&mut self, scale: f32) {
         for vertex in &mut self.vertices {
             vertex.coords *= scale;
@@ -1026,6 +1151,27 @@ impl Shape {
 
     /// Determines if the axis-aligned bounding box of this shape contains
     /// that of another.
+    /// Tests if this shape's bounding box completely contains another's.
+    /// 
+    /// **Context**: Determining hierarchical relationships between shapes
+    /// requires testing spatial containment. This is used during containment
+    /// graph construction to establish parent-child relationships.
+    /// 
+    /// **How it Works**: Compares axis-aligned bounding boxes, checking that
+    /// the other shape's bounding box lies entirely within this shape's
+    /// bounding box across all three dimensions.
+    /// 
+    /// # Example
+    /// ```rust
+    /// // Iterate over distinct pairs of shapes
+    /// for (id_a, a) in &shapes_with_ids {
+    ///     for (id_b, b) in &shapes_with_ids {
+    ///         if id_a != id_b && a.contains(b) {  // Containment testing
+    ///             containment_graph.set_parent(*id_b, *id_a);
+    ///         }
+    ///     }
+    /// }
+    /// ```
     pub fn contains(&self, other: &Shape) -> bool {
         match (&self.aabb, &other.aabb) {
             (Some(a), Some(b)) => (0..3).all(|i| b.min[i] > a.min[i] && a.max[i] > b.max[i]),
@@ -1035,6 +1181,27 @@ impl Shape {
 
     /// determines if a shape in a geometry is inside another. Returns `true`
     /// if the two shapes have the same id.
+    /// Checks if this shape is contained within another shape in the hierarchy.
+    /// 
+    /// **Context**: Ray tracing and clipping operations need to determine
+    /// whether faces belong to internal or external boundaries. This requires
+    /// understanding the containment relationships between shapes.
+    /// 
+    /// **How it Works**: Traverses up the containment graph starting from this
+    /// shape's ID, checking each parent until either finding the target shape ID
+    /// or reaching the top level. Returns true if the target shape is found
+    /// in the ancestry chain.
+    /// 
+    /// # Example
+    /// ```rust
+    /// // From clipping logic
+    /// for shape in self.geom.shapes.iter() {
+    ///     if internal && !shape.is_within(&self.geom, clip_shape_id) {
+    ///         continue;  // Skip shapes not within the clipping shape
+    ///     }
+    ///     // Process faces...
+    /// }
+    /// ```
     pub fn is_within(&self, geom: &Geom, other_id: Option<usize>) -> bool {
         if other_id.is_none() {
             return false;
@@ -1098,6 +1265,23 @@ impl Shape {
     }
 }
 
+/// A geometric model for light scattering simulations.
+/// 
+/// **Context**: Light scattering scenarios involve multi-particle systems where
+/// particles may contain hierarchical relationships, with some particles existing 
+/// inside others. Each physics problem requires working with an ensemble of shapes 
+/// that maintain these spatial relationships.
+/// 
+/// **How it Works**: A Geom manages a collection of closed-surface shapes and their
+/// spatial relationships through a containment graph. This graph tracks
+/// parent-child relationships based on bounding box containment, enabling handling
+/// of nested geometries during ray tracing and field calculations. The containment
+/// information determines refractive indices at shape boundaries and manages
+/// optical interfaces.
+/// 
+/// Each physics problem operates on exactly one Geom instance, but that geometry can
+/// represent hierarchical structures. All shapes must be closed surfaces to ensure 
+/// well-defined interior/exterior boundaries for electromagnetic field calculations.
 #[pyclass]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geom {
@@ -1107,6 +1291,28 @@ pub struct Geom {
 }
 
 impl Geom {
+    /// Loads a geometric model from a Wavefront OBJ file.
+    /// 
+    /// **Context**: Geometry for light scattering simulations typically originates
+    /// from external sources - CAD models, 3D scanners, or mesh generation software.
+    /// The standard OBJ format provides a widely-supported way to import these geometries,
+    /// but the raw mesh data needs to be processed into the internal representation
+    /// required for electromagnetic field calculations.
+    /// 
+    /// **How it Works**: Parses the OBJ file using the tobj library to extract vertices
+    /// and face definitions. Each mesh object in the file becomes a separate Shape with
+    /// automatically assigned IDs. Face polygons are converted to the internal Face
+    /// representation, and axis-aligned bounding boxes are computed for each shape.
+    /// A containment graph is constructed by testing bounding box relationships between
+    /// all shape pairs, establishing parent-child hierarchies for nested geometries.
+    /// 
+    /// # Example
+    /// ```rust
+    /// let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
+    /// geom.shapes[0].refr_index.re = 1.5;
+    /// geom.shapes[0].refr_index.im = 0.0001;
+    /// let mut problem = Problem::new(geom, None);
+    /// ```
     pub fn from_file(filename: &str) -> Result<Self> {
         // Log current directory only in debug builds
         #[cfg(debug_assertions)]
@@ -1171,6 +1377,17 @@ impl Geom {
             .collect()
     }
 
+    /// Applies a 4x4 transformation matrix to all geometry.
+    /// 
+    /// **Context**: Computing how beams intersect with faces requires rotating 
+    /// beam cross-section polygons and faces in the geometry into the plane normal 
+    /// to the beam propagation direction. This coordinate transformation is essential 
+    /// for ray-tracing calculations and field propagation algorithms.
+    /// 
+    /// **How it Works**: Applies the transformation matrix to every face in every shape.
+    /// Each face handles its own transformation, updating vertex positions, midpoints,
+    /// and normals according to the matrix. This enables arbitrary rotations, scaling,
+    /// and translations of the entire geometric model.
     pub fn transform(&mut self, transform: &Matrix4<f32>) -> Result<()> {
         for shape in &mut self.shapes {
             shape.transform(transform)?;
@@ -1178,6 +1395,17 @@ impl Geom {
         Ok(())
     }
 
+    /// Computes the center of mass of all vertices across all shapes.
+    /// 
+    /// **Context**: Many geometric operations require a reference point for
+    /// the geometry, particularly rotations which should occur around the
+    /// geometric center rather than an arbitrary origin. This function provides
+    /// that reference point for centering operations.
+    /// 
+    /// **How it Works**: Averages the positions of all vertices in all shapes
+    /// to find the centroid. This is not a true center of mass calculation
+    /// (which would require mass/density information) but rather a geometric
+    /// centroid suitable for coordinate system operations.
     pub fn centre_of_mass(&self) -> Point3<f32> {
         let mut centre = Point3::origin();
 
@@ -1189,6 +1417,17 @@ impl Geom {
     }
 
     /// Returns the refractive outside a shape
+    /// Returns the refractive index outside a given shape.
+    /// 
+    /// **Context**: Fresnel reflection and refraction calculations at shape
+    /// boundaries require knowing the refractive indices on both sides of
+    /// the interface. For nested geometries, the "outside" medium may be
+    /// another shape rather than the background medium.
+    /// 
+    /// **How it Works**: Uses the containment graph to find the parent shape
+    /// of the given shape ID. If a parent exists, returns its refractive index;
+    /// otherwise returns the provided medium refractive index for the outermost
+    /// background.
     pub fn n_out(&self, shape_id: usize, medium_refr_index: Complex<f32>) -> Complex<f32> {
         self.containment_graph
             .get_parent(shape_id)
@@ -1197,6 +1436,26 @@ impl Geom {
             })
     }
 
+    /// Returns the axis-aligned bounding box encompassing all shapes.
+    /// 
+    /// **Context**: Beam initialization requires knowing the spatial extent
+    /// of the geometry to create appropriate illumination areas. The bounding
+    /// box provides the minimum and maximum coordinates needed for this setup.
+    /// 
+    /// **How it Works**: Iterates through all shape bounding boxes to find
+    /// the global minimum and maximum coordinates across all three dimensions.
+    /// Returns (min_point, max_point) defining the overall geometric extent.
+    /// 
+    /// # Example
+    /// ```rust
+    /// fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
+    ///     const FAC: f32 = 1.1; // scale factor to stretch beam to cover geometry
+    ///     let bounds = geom.bounds();
+    ///     let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
+    ///     // Create beam cross-section to fully illuminate the geometry
+    ///     // ...
+    /// }
+    /// ```
     pub fn bounds(&self) -> (Point3<f32>, Point3<f32>) {
         let (min, max) = self.shapes.iter().fold(
             ([f32::INFINITY; 3], [-f32::INFINITY; 3]),
@@ -1222,6 +1481,22 @@ impl Geom {
 
     /// Rescales the geometry so that the largest dimension is 1. Returns the
     /// scaling factor.
+    /// Rescales the geometry so that the largest dimension is 1.
+    /// 
+    /// **Context**: Electromagnetic field calculations can suffer from numerical
+    /// instability when geometry dimensions vary widely. Normalizing to unit scale
+    /// provides better numerical conditioning for the solver algorithms.
+    /// 
+    /// **How it Works**: Computes the bounding box of all shapes, finds the
+    /// maximum dimension, then scales all vertices and faces by 1/max_dimension.
+    /// Returns the scaling factor applied, which can be used to scale results
+    /// back to original units if needed.
+    /// 
+    /// # Example
+    /// ```rust
+    /// self.geom.recentre();
+    /// self.settings.scale = self.geom.rescale();  // Returns scaling factor
+    /// ```
     pub fn rescale(&mut self) -> f32 {
         let bounds = self.bounds();
         let max_dim = bounds.1.iter().fold(0.0, |acc: f32, &x| acc.max(x));
@@ -1234,9 +1509,27 @@ impl Geom {
         scale
     }
 
-    /// Recentres the geometry so that the centre of mass is at the origin.
-    /// This is done by translating all vertices in each shape and all copies of
-    /// these vertices in the faces.
+    /// Translates the geometry so its center of mass is at the origin.
+    /// 
+    /// **Context**: Rotations and other transformations typically need to occur
+    /// around the geometric center rather than an arbitrary coordinate system
+    /// origin. This function ensures the geometry is properly centered before
+    /// such operations.
+    /// 
+    /// **How it Works**: Computes the center of mass, then subtracts this offset
+    /// from all vertex positions in both the shape vertex arrays and the face
+    /// vertex data. This dual update maintains consistency between the two
+    /// vertex representations.
+    /// 
+    /// # Example
+    /// ```rust
+    /// // From problem initialization workflow
+    /// if let Some(distortion) = self.settings.distortion {
+    ///     self.geom.distort(distortion, self.settings.seed);
+    /// }
+    /// self.geom.recentre();  // Center before rescaling
+    /// self.settings.scale = self.geom.rescale();
+    /// ```
     pub fn recentre(&mut self) {
         let com = self.centre_of_mass();
 
@@ -1268,12 +1561,55 @@ impl Geom {
         }
     }
 
+    /// Checks if the geometry's center of mass is at the origin.
+    /// 
+    /// **Context**: Some operations, particularly rotations, require the
+    /// geometry to be centered at the origin. This function provides a
+    /// precondition check to ensure transformations will behave correctly.
+    /// 
+    /// **How it Works**: Computes the center of mass and checks if its
+    /// magnitude is below a tolerance threshold (1e-6).
+    /// 
+    /// # Example
+    /// ```rust
+    /// pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
+    ///     if !self.is_centered() {
+    ///         return Err(anyhow::anyhow!(
+    ///             "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
+    ///         ));
+    ///     }
+    ///     // ... proceed with rotation
+    /// }
+    /// ```
     pub fn is_centered(&self) -> bool {
         self.centre_of_mass().coords.norm() < 1e-6
     }
 
     /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in degrees)
     /// Uses Mishchenko's Euler rotation matrix convention.
+    /// Rotates the geometry using Euler angles.
+    /// 
+    /// **Context**: Light scattering calculations often require analyzing
+    /// particles at different orientations. Euler rotations provide a
+    /// systematic way to orient the geometry for scattering analysis.
+    /// 
+    /// **How it Works**: Converts the Euler angles to a rotation matrix
+    /// using the specified convention, then applies this rotation to all
+    /// vertices, face midpoints, and normals. Requires the geometry to be
+    /// centered at the origin first to ensure rotation occurs around the
+    /// geometric center.
+    /// 
+    /// # Example
+    /// ```rust
+    /// pub fn orient(&mut self, euler: &orientation::Euler) {
+    ///     if let Err(error) = self
+    ///         .geom
+    ///         .euler_rotate(euler, self.settings.orientation.euler_convention)
+    ///     {
+    ///         panic!("Error rotating geometry: {}", error);
+    ///     }
+    /// }
+    /// ```
     pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
         if !self.is_centered() {
             return Err(anyhow::anyhow!(
@@ -1317,11 +1653,29 @@ impl Geom {
         Ok(())
     }
 
-    /// Writes the geometry to a file in OBJ format.
-    ///
-    /// This function writes all shapes in the geometry to an OBJ file.
-    /// It writes vertices, normals, and face indices for each shape.
-    /// Note that Complex faces with interior holes are not supported and will cause a panic.
+    /// Exports the geometry to a Wavefront OBJ file.
+    /// 
+    /// **Context**: After geometric processing and transformations, it's often
+    /// necessary to export the modified geometry for visualization, verification,
+    /// or use in other software. The OBJ format provides a standard interchange
+    /// format for 3D geometry.
+    /// 
+    /// **How it Works**: Writes vertices, normals, and face definitions for all
+    /// shapes in standard OBJ format. Each shape becomes a separate group with
+    /// metadata comments for shape ID and refractive index. Does not support
+    /// complex faces with interior holes.
+    /// 
+    /// # Example
+    /// ```rust
+    /// // From distortion example
+    /// geom.distort(0.5, None);
+    /// geom.recentre();
+    /// let euler = Euler::new(0.0, 30.0, 0.0);
+    /// let result = geom.euler_rotate(&euler, goad::orientation::EulerConvention::XYX);
+    /// 
+    /// // write the distorted object to a file
+    /// geom.write_obj("hex_distorted.obj").unwrap();
+    /// ```
     pub fn write_obj<P: AsRef<Path>>(&self, filename: P) -> Result<()> {
         use std::fs::File;
         use std::io::{BufWriter, Write};
@@ -1410,6 +1764,16 @@ impl Geom {
         Ok(())
     }
 
+    /// Applies non-uniform scaling with different factors for each dimension.
+    /// 
+    /// **Context**: Some simulations require anisotropic deformation of particles
+    /// to study aspect ratio effects or simulate non-spherical geometries.
+    /// This enables independent scaling along X, Y, and Z axes.
+    /// 
+    /// **How it Works**: Multiplies vertex coordinates by the corresponding
+    /// scale factors, updates face midpoints and normals accordingly, then
+    /// renormalizes the normals and recomputes bounding boxes. Requires a
+    /// 3-element scale vector.
     pub fn vector_scale(&mut self, scale: &Vec<f32>) {
         if scale.len() != 3 {
             panic!("Scale vector must have length 3");
@@ -1502,10 +1866,15 @@ impl Geom {
     }
 }
 
-/// Calculates, rather inaccurately, the center of mass of a set of vertices.
-/// This is done by averaging the coordinates of all vertices.
-/// This is not a true center of mass calculation, but it is sufficient for
-/// most purposes in this application.
+/// Computes the geometric centroid of a vertex set.
+/// 
+/// **Context**: Various geometric operations require finding a representative
+/// center point for a collection of vertices. While not a true center of mass
+/// (which would require density information), this centroid is sufficient
+/// for coordinate system operations.
+/// 
+/// **How it Works**: Averages the coordinates of all vertices to find the
+/// geometric center point of the vertex cloud.
 pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
     Point3::from(
         verts
@@ -1516,6 +1885,14 @@ pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
     )
 }
 
+/// Translates vertices relative to a reference point.
+/// 
+/// **Context**: Coordinate system transformations often require expressing
+/// vertex positions relative to a reference point rather than the global
+/// origin. This is commonly used for centering operations.
+/// 
+/// **How it Works**: Subtracts the reference point coordinates from each
+/// vertex position, returning the translated positions as vectors.
 pub fn translate(verts: &[Point3<f32>], center_of_mass: &Point3<f32>) -> Vec<Vector3<f32>> {
     verts
         .iter()
