@@ -1,3 +1,25 @@
+//! Electromagnetic beam representation and propagation for geometric optics.
+//!
+//! This module implements the core electromagnetic field segments (beams) that
+//! propagate through particle geometries in the GOAD method. Each beam carries
+//! field amplitude information, geometric cross-section data, and propagation
+//! state for tracking reflection, refraction, and absorption processes.
+//!
+//! The beam system provides:
+//! - Polarized electromagnetic field representation
+//! - Surface interaction through Fresnel equations
+//! - Geometric clipping and intersection handling
+//! - Power conservation tracking
+//! - Far-field diffraction calculation
+//!
+//! # Key Components
+//!
+//! - [`Beam`]: Individual electromagnetic field segments
+//! - [`BeamPropagation`]: Results from beam-surface interactions
+//! - [`BeamType`] and [`BeamVariant`]: Classification and origin tracking
+//! - Surface interaction functions (reflection, refraction, TIR)
+//! - Triangulation for complex apertures
+
 use anyhow::Result;
 use std::f32::consts::PI;
 
@@ -16,15 +38,37 @@ use crate::{
     snell::get_theta_t,
 };
 
+/// Result of a single beam propagation step through geometry.
+/// 
+/// **Context**: Beam propagation involves complex interactions with particle surfaces
+/// that can split a single input [`Beam`] into multiple output beams through reflection,
+/// refraction, and diffraction. This structure captures the complete result of one
+/// propagation step for analysis and visualization.
+/// 
+/// **How it Works**: Stores the input [`Beam`] that was propagated, the medium refractive
+/// index used for calculations, and all output beams produced by surface interactions.
+/// Used for debugging, visualization, and power conservation verification.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
-    pub input: Beam,
-    pub refr_index: Complex<f32>,
-    pub outputs: Vec<Beam>,
+    pub input: Beam,              // The [`Beam`] that was propagated
+    pub refr_index: Complex<f32>, // Medium refractive index used
+    pub outputs: Vec<Beam>,       // Resulting [`Beam`] objects from interactions
 }
 
 impl BeamPropagation {
-    /// Makes a new `BeamPropagation` struct, which represents a beam propagation.
+    /// Creates a propagation result from input beam and output beams.
+    /// 
+    /// **Context**: After beam propagation completes, the results need to be
+    /// packaged for analysis, visualization, or debugging. This constructor
+    /// captures the complete propagation step.
+    /// 
+    /// **How it Works**: Copies the refractive index from the input beam
+    /// and stores both input and output beams for later analysis.
+    /// 
+    /// # Example
+    /// ```rust,no_run
+    /// // Some(BeamPropagation::new(beam, outputs))
+    /// ```
     pub fn new(input: Beam, outputs: Vec<Beam>) -> Self {
         let refr_index = input.refr_index.clone();
         Self {
@@ -34,7 +78,15 @@ impl BeamPropagation {
         }
     }
 
-    /// Draws a `Beam Propagation`
+    /// Renders the propagation for visualization.
+    /// 
+    /// **Context**: Interactive debugging and educational visualization require
+    /// showing both the input beam and resulting output beams from surface
+    /// interactions, along with propagation directions.
+    /// 
+    /// **How it Works**: Draws the input beam face in yellow, output beam faces
+    /// in different colors based on type, and lines connecting output vertices
+    /// to the input beam to show the interaction relationships.
     pub fn draw(&self) {
         // draw the input
         draw_face(&self.input.face, YELLOW, 4.0);
@@ -115,10 +167,24 @@ impl BeamPropagation {
         ]
     }
 
+    /// Returns the power of the input beam.
+    /// 
+    /// **Context**: Power conservation analysis requires tracking power flow
+    /// through each propagation step to verify energy conservation and
+    /// identify power losses.
+    /// 
+    /// **How it Works**: Calls the power method on the input beam.
     pub fn input_power(&self) -> f32 {
         self.input.power()
     }
 
+    /// Returns the total power of all output beams.
+    /// 
+    /// **Context**: Power conservation verification requires summing the power
+    /// of all output beams to compare with the input power and identify
+    /// absorption or numerical losses.
+    /// 
+    /// **How it Works**: Sums the power of all beams in the outputs vector.
     pub fn output_power(&self) -> f32 {
         let total = self.outputs.iter().fold(0.0, |acc, x| acc + x.power());
 
@@ -127,8 +193,27 @@ impl BeamPropagation {
 }
 
 impl Beam {
-    /// Creates a new initial field. The amplitude matrix is the identity matrix
-    /// with the specified perpendicular field vector.
+    /// Creates an initial incident beam with identity amplitude matrix.
+    /// 
+    /// **Context**: Scattering simulations begin with an incident electromagnetic
+    /// wave that must be represented as a beam with appropriate field properties.
+    /// Initial beams use identity amplitude matrices to represent unscattered
+    /// incident radiation.
+    /// 
+    /// **How it Works**: Constructs a [`crate::field::Field`] with identity amplitude matrix using
+    /// the specified perpendicular polarization vector, then creates a beam
+    /// with [`BeamType::Initial`] and zero interaction counters.
+    /// 
+    /// # Example
+    /// ```rust,no_run
+    /// // let beam = Beam::new_initial(
+    /// //     clip,
+    /// //     projection,                    // propagation direction
+    /// //     Complex::new(1.00, 0.0),      // refractive index
+    /// //     e_perp,                       // perpendicular polarization vector
+    /// //     wavelength,                   // wavelength
+    /// // ).unwrap();
+    /// ```
     pub fn new_initial(
         face: Face,
         prop: Vector3<f32>,
@@ -150,6 +235,14 @@ impl Beam {
         ))
     }
 
+    /// Creates a beam with a pre-constructed electromagnetic field.
+    /// 
+    /// **Context**: Some simulation setups require specific [`crate::field::Field`] configurations
+    /// that differ from the standard identity matrix initialization. This
+    /// constructor allows direct specification of field properties.
+    /// 
+    /// **How it Works**: Uses the provided [`crate::field::Field`] directly without modification,
+    /// creating an initial-type beam with the specified field properties.
     pub fn new_from_field(
         face: Face,
         prop: Vector3<f32>,
@@ -170,8 +263,35 @@ impl Beam {
         )
     }
 
-    /// Processes data from a beam. The beam is propagated, the remainders, reflected,
-    /// and refracted beams are computed and output.
+    /// Propagates the beam through geometry to compute surface interactions.
+    /// 
+    /// **Context**: Beam propagation is the core of near-field electromagnetic simulation.
+    /// Each beam must be tested for intersections with particle surfaces, and
+    /// appropriate reflection and refraction beams must be generated according
+    /// to electromagnetic boundary conditions.
+    /// 
+    /// **How it Works**: Uses geometric [`crate::clip::Clipping`] to find surface intersections,
+    /// creates new beams for reflected and refracted components based on [`crate::fresnel`]
+    /// equations, handles remainder beams that don't interact with surfaces,
+    /// and tracks power absorption. Returns output beams and power loss information.
+    /// 
+    /// # Example
+    /// ```rust,no_run
+    /// // match beam.propagate(
+    /// //     &mut self.geom,
+    /// //     self.settings.medium_refr_index,
+    /// //     self.settings.beam_area_threshold(),
+    /// // ) {
+    /// //     Ok((outputs, area_power_loss)) => {
+    /// //         self.result.powers.trnc_area += area_power_loss / self.settings.scale.powi(2);
+    /// //         outputs
+    /// //     }
+    /// //     Err(_) => {
+    /// //         self.result.powers.clip_err += beam.power() / self.settings.scale.powi(2);
+    /// //         Vec::new()
+    /// //     }
+    /// // }
+    /// ```
     pub fn propagate(
         &mut self,
         geom: &mut Geom,
@@ -255,9 +375,17 @@ impl Beam {
         outputs
     }
 
-    /// Uses the earcut function from the geom crate to convert a beam with
-    /// a complex face into beams with simple faces. The medium refractive index
-    /// is required to map the phase.
+    /// Converts a beam with complex face geometry into triangular beams.
+    /// 
+    /// **Context**: Some geometric faces contain holes or complex polygonal shapes
+    /// that cannot be processed directly by diffraction algorithms. These faces
+    /// must be triangulated into simpler elements while preserving electromagnetic
+    /// field continuity.
+    /// 
+    /// **How it Works**: Uses ear clipping triangulation to split complex faces
+    /// into triangular faces, creates new beams for each triangle with appropriate
+    /// phase corrections based on the distance from the original face midpoint.
+    /// Simple faces are passed through unchanged.
     fn earcut(beam: &Beam, medium_refr_index: Complex<f32>) -> Vec<Beam> {
         let mut outputs = Vec::new();
         let midpoint = beam.face.data().midpoint;
@@ -530,24 +658,59 @@ impl Beam {
     }
 }
 
-/// Contains information about a beam.
+/// A segment of electromagnetic radiation with defined cross-section and field properties.
+/// 
+/// **Context**: Electromagnetic field propagation through particles requires discretizing
+/// the field into manageable segments that can interact with surfaces independently.
+/// Each beam carries electromagnetic [`crate::field::Field`] information, geometric cross-section data,
+/// and propagation state for tracking reflection, refraction, and absorption processes.
+/// 
+/// **How it Works**: A [`Beam`] combines a geometric [`crate::geom::Face`] (defining the cross-sectional area),
+/// a propagation direction, electromagnetic [`crate::field::Field`] properties, and interaction history.
+/// The field contains amplitude and polarization information, while counters track
+/// interaction depth for convergence control. The beam can be classified by [`BeamType`]
+/// (initial, internal, outgoing) and [`BeamVariant`] (reflected, refracted, total internal reflection).
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Beam {
-    pub face: Face,
-    pub prop: Vector3<f32>,
-    pub refr_index: Complex<f32>,
-    pub rec_count: i32,
-    pub tir_count: i32,
-    pub field: Field,
+    pub face: Face,                   // [`crate::geom::Face`] defining the cross-sectional area
+    pub prop: Vector3<f32>,           // propagation direction vector
+    pub refr_index: Complex<f32>,     // refractive index of current medium
+    pub rec_count: i32,               // recursion depth counter for convergence
+    pub tir_count: i32,               // total internal reflection event counter
+    pub field: Field,                 // electromagnetic [`crate::field::Field`] properties
     pub absorbed_power: f32,          // power absorbed by the medium
     pub clipping_area: f32,           // total area accounted for by intersections and remainders
     pub variant: Option<BeamVariant>, // variant of beam, e.g. reflection, refraction, total internal reflection
-    pub type_: BeamType, // type of beam, e.g. initial, default, outgoing, external diff
-    pub wavelength: f32,
+    pub type_: BeamType,              // [`BeamType`] classification (initial, default, outgoing, external diff)
+    pub wavelength: f32,              // wavelength in current medium
 }
 
-/// Creates a new beam
 impl Beam {
+    /// Creates a new beam with specified properties.
+    /// 
+    /// **Context**: Beam creation occurs throughout the simulation as initial beams
+    /// are established and surface interactions generate new reflected and refracted
+    /// beams. Each beam requires electromagnetic [`crate::field::Field`] properties, geometric information,
+    /// and interaction history for proper propagation.
+    /// 
+    /// **How it Works**: Normalizes the propagation direction and initializes all
+    /// beam properties including [`crate::geom::Face`] geometry, [`crate::field::Field`] information, interaction counters,
+    /// and [`BeamType`] classification. Sets absorbed power and clipping area to zero for new beams.
+    /// 
+    /// # Example
+    /// ```rust,no_run
+    /// // let new_beam = Beam::new(
+    /// //     face,
+    /// //     beam.prop,
+    /// //     beam.refr_index,
+    /// //     beam.rec_count,
+    /// //     beam.tir_count,
+    /// //     Field::new(beam.field.e_perp, beam.prop, ampl).unwrap(),
+    /// //     beam.variant.clone(),
+    /// //     beam.type_.clone(),
+    /// //     beam.wavelength,
+    /// // );
+    /// ```
     pub fn new(
         face: Face,
         prop: Vector3<f32>,
@@ -575,7 +738,14 @@ impl Beam {
         }
     }
 
-    /// Returns the cross sectional area of the beam.
+    /// Returns the effective cross-sectional area for power calculations.
+    /// 
+    /// **Context**: Beam power calculations require the geometric cross-sectional
+    /// area projected along the propagation direction. This accounts for oblique
+    /// incidence where the effective area differs from the face area.
+    /// 
+    /// **How it Works**: Multiplies the face area by the cosine of the angle
+    /// between the face normal and propagation direction to get the projected area.
     pub fn csa(&self) -> f32 {
         let area = self.face.data().area.unwrap();
         let norm = self.face.data().normal;
@@ -584,15 +754,46 @@ impl Beam {
         area * cosine
     }
 
-    /// Returns the power of a beam.
+    /// Calculates the electromagnetic power carried by the beam.
+    /// 
+    /// **Context**: Power tracking is essential for energy conservation verification,
+    /// threshold-based beam termination, and scattering cross-section calculations.
+    /// Power determines the relative importance of beams in the simulation.
+    /// 
+    /// **How it Works**: Multiplies field intensity by the real part of the
+    /// refractive index and the effective cross-sectional area to get total power.
     pub fn power(&self) -> f32 {
         self.field.intensity() * self.refr_index.re * self.csa()
     }
 
+    /// Returns the wavenumber for the beam's wavelength.
+    /// 
+    /// **Context**: Phase calculations for beam propagation and interference
+    /// require the wavenumber, which relates wavelength to spatial frequency.
+    /// 
+    /// **How it Works**: Calculates 2π/wavelength to get the wavenumber
+    /// in the vacuum (refractive index effects are handled elsewhere).
     pub fn wavenumber(&self) -> f32 {
         2.0 * PI / self.wavelength
     }
 
+    /// Computes far-field diffraction amplitudes at specified angles.
+    /// 
+    /// **Context**: Converting near-field beams to far-field scattering requires
+    /// computing diffraction integrals over the beam cross-section. This transformation
+    /// connects the geometric optics beam representation to scattering observables.
+    /// 
+    /// **How it Works**: Calls the diffraction module to compute Fourier transforms
+    /// of the field distribution over the beam face vertices at each requested
+    /// scattering angle. Returns amplitude matrices for polarization analysis.
+    /// 
+    /// # Example
+    /// ```rust,no_run
+    /// // let ampl_far_field = queue
+    /// //     .par_iter()
+    /// //     .map(|outbeam| outbeam.diffract(bins, fov_factor))
+    /// //     .reduce(/* combine results */);
+    /// ```
     pub fn diffract(
         &self,
         theta_phi_combinations: &[(f32, f32)],
@@ -622,17 +823,33 @@ impl Beam {
     }
 }
 
+/// Classification of beam based on surface interaction mechanism.
+/// 
+/// **Context**: When beams interact with particle surfaces, they can undergo
+/// different physical processes depending on the interface properties and
+/// incident angles. Each mechanism requires different field calculations.
+/// 
+/// **How it Works**: Variants track the physical origin of the beam to enable
+/// appropriate handling in power tracking and result analysis.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BeamVariant {
-    Refl, // refraction
-    Refr, // reflection
+    Refl, // reflection
+    Refr, // refraction
     Tir,  // total internal reflection
 }
 
+/// Classification of beam based on its role in the simulation pipeline.
+/// 
+/// **Context**: Different stages of the simulation require different handling
+/// of beams. Initial beams need special processing, internal beams require
+/// threshold checks, and outgoing beams undergo far-field diffraction.
+/// 
+/// **How it Works**: Types determine which processing path the beam follows
+/// and how its power contributions are categorized in the results.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BeamType {
-    Initial,
-    Default,
-    OutGoing,
-    ExternalDiff,
+    Initial,      // Incident beam from illumination
+    Default,      // Internal beam undergoing propagation
+    OutGoing,     // Beam exiting the particle
+    ExternalDiff, // Beam contributing to external diffraction
 }

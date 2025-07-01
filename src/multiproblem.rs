@@ -1,3 +1,27 @@
+//! Multi-orientation simulation orchestration and ensemble averaging.
+//!
+//! This module manages electromagnetic scattering simulations across multiple
+//! particle orientations to compute ensemble-averaged scattering properties.
+//! It provides parallel computation, progress tracking, and proper statistical
+//! averaging for both discrete orientation sets and random orientation sampling.
+//!
+//! The multi-orientation system provides:
+//! - Parallel orientation processing with rayon
+//! - Progress tracking for long-running calculations
+//! - Statistical averaging with proper normalization
+//! - Result aggregation across orientations
+//! - Comprehensive output for ensemble analysis
+//! - Memory-efficient streaming computation
+//!
+//! # Key Features
+//!
+//! - [`MultiProblem`]: Main orchestrator for multi-orientation simulations
+//! - Parallel execution with progress bars
+//! - On-the-fly result reduction for memory efficiency
+//! - Automatic 1D integration for symmetric cases
+//! - Complete output file generation
+//! - Performance timing and analysis
+
 use std::time::Instant;
 
 use crate::{
@@ -15,7 +39,17 @@ use nalgebra::Complex;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
-/// A problem for a single geometry with multiple orientations.
+/// Multi-orientation scattering simulation with orientation averaging.
+/// 
+/// **Context**: Many scattering applications require orientation-averaged results
+/// to model ensembles of randomly oriented particles or systematic orientation
+/// studies. This requires running multiple single-orientation simulations and
+/// properly averaging the results with parallel computation for efficiency.
+/// 
+/// **How it Works**: Manages a set of orientations, runs parallel simulations
+/// for each orientation using the same base geometry, and aggregates results
+/// through proper averaging. Handles progress tracking, result normalization,
+/// and output file generation for the ensemble-averaged scattering patterns.
 #[pyclass]
 #[derive(Debug)] // Added Default derive
 pub struct MultiProblem {
@@ -26,9 +60,15 @@ pub struct MultiProblem {
 }
 
 impl MultiProblem {
-    /// Creates a new `MultiProblem` from optional `Geom` and `Settings`.
-    /// If settings not provided, loads from config file.
-    /// If geom not provided, loads from file using settings.geom_name.
+    /// Creates a multi-orientation simulation from configuration settings.
+    /// 
+    /// **Context**: Multi-orientation simulations require initialization of
+    /// the base geometry, orientation sets, and result storage before
+    /// simulation execution.
+    /// 
+    /// **How it Works**: Loads geometry from file, applies initial transformations,
+    /// generates the orientation set from the specified scheme, and allocates
+    /// result storage for the expected angular bins.
     pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
         let settings = settings.unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
         let mut geom = geom.unwrap_or_else(|| Geom::from_file(&settings.geom_name).expect("Failed to load geometry"));
@@ -47,20 +87,41 @@ impl MultiProblem {
         }
     }
 
-    /// Regenerates the orientations for the problem.
-    /// Useful for rerunning a random orientation problem with no seed set.
+    /// Regenerates orientation set for repeated random sampling.
+    /// 
+    /// **Context**: Statistical convergence studies may require multiple
+    /// independent realizations of random orientation sets to assess
+    /// convergence and estimate uncertainties.
+    /// 
+    /// **How it Works**: Generates a new orientation set using the same
+    /// scheme parameters but different random values if no seed is set.
     pub fn regenerate_orientations(&mut self) {
         self.orientations =
             Orientations::generate(&self.settings.orientation.scheme, self.settings.seed);
     }
 
-    /// Resets a `MultiOrientProblem` to its initial state.
+    /// Resets simulation to initial state for rerunning.
+    /// 
+    /// **Context**: Parameter studies or convergence analysis may require
+    /// resetting the simulation state while preserving the configuration.
+    /// 
+    /// **How it Works**: Clears accumulated results and optionally regenerates
+    /// orientations to prepare for a fresh simulation run.
     pub fn reset(&mut self) {
         self.result = Results::new_empty(&self.result.bins);
         self.regenerate_orientations();
     }
 
-    /// Solves a `MultiOrientProblem` by averaging over the problems.
+    /// Executes parallel multi-orientation simulation with progress tracking.
+    /// 
+    /// **Context**: Multi-orientation simulations involve substantial computational
+    /// work that benefits from parallel execution. Progress tracking provides
+    /// user feedback for long-running calculations.
+    /// 
+    /// **How it Works**: Creates a base problem template, runs parallel simulations
+    /// for each orientation using rayon, aggregates results on-the-fly using
+    /// reduction, normalizes by orientation count, and post-processes to compute
+    /// 1D results and integral parameters.
     pub fn solve(&mut self) {
         let start = Instant::now();
         println!("Solving problem...");
@@ -150,7 +211,15 @@ impl MultiProblem {
         self.result.print();
     }
 
-    /// Combines two Results objects by adding their fields
+    /// Aggregates simulation results from individual orientations.
+    /// 
+    /// **Context**: Parallel reduction requires a function to combine results
+    /// from different orientation simulations. This must handle all result
+    /// components including amplitude matrices, Mueller matrices, and power data.
+    /// 
+    /// **How it Works**: Element-wise addition of all result arrays and
+    /// structures, accumulating contributions from each orientation simulation
+    /// for later normalization by orientation count.
     fn reduce_results(&self, mut acc: Results, item: Results) -> Results {
         // Add Mueller matrix elements
         for (a, i) in acc.mueller.iter_mut().zip(item.mueller.iter()) {
@@ -184,7 +253,15 @@ impl MultiProblem {
         acc
     }
 
-    /// Normalizes the results by dividing by the number of orientations
+    /// Normalizes accumulated results by the number of orientations.
+    /// 
+    /// **Context**: Orientation averaging requires dividing accumulated
+    /// results by the number of orientations to obtain proper ensemble
+    /// averages. This applies to all result components.
+    /// 
+    /// **How it Works**: Divides all accumulated amplitude matrices, Mueller
+    /// matrices, and power values by the orientation count to get ensemble
+    /// averages representing the orientation-averaged scattering properties.
     fn normalize_results(&mut self, num_orientations: f32) {
         // Normalize powers
         self.result.powers /= num_orientations;
@@ -220,6 +297,15 @@ impl MultiProblem {
         }
     }
 
+    /// Writes all simulation results to output files.
+    /// 
+    /// **Context**: Multi-orientation results include multiple data types
+    /// (2D and 1D Mueller matrices, amplitude data, summary statistics)
+    /// that need to be written in appropriate formats for analysis.
+    /// 
+    /// **How it Works**: Calls output functions for each result type,
+    /// handling both successful writes and cases where certain results
+    /// (like 1D data) may not be available.
     pub fn writeup(&self) {
         // Write 2D mueller matrices
         let _ = output::write_mueller(

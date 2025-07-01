@@ -1,3 +1,26 @@
+//! Surface roughness modeling through geometric distortion.
+//!
+//! This module implements surface roughness effects by applying controlled
+//! geometric distortions to particle surfaces. Real particles have surface
+//! roughness that affects electromagnetic scattering, particularly at high
+//! angles where surface details become important.
+//!
+//! The distortion system provides:
+//! - Gaussian normal perturbation for surface roughness
+//! - Physically consistent vertex repositioning
+//! - Geometric validity preservation (no self-intersections)
+//! - Automatic retry and reversion for failed distortions
+//! - Scale preservation through renormalization
+//! - Reproducible distortions via seeded random generation
+//!
+//! # Algorithm Overview
+//!
+//! 1. Perturb face normals using Gaussian angular distribution
+//! 2. Solve for new vertex positions satisfying plane constraints
+//! 3. Validate geometry for self-intersections and convexity
+//! 4. Retry with new random realization if validation fails
+//! 5. Preserve overall particle scale through renormalization
+
 use std::collections::HashMap;
 
 use nalgebra::{Matrix3, Vector3};
@@ -10,6 +33,22 @@ use crate::{
 };
 
 impl Geom {
+    /// Applies surface roughness distortion to particle geometry.
+    /// 
+    /// **Context**: Real particles rarely have perfectly smooth surfaces. Surface
+    /// roughness affects scattering patterns, particularly at high scattering angles.
+    /// This distortion models roughness by perturbing face normals while maintaining
+    /// physical validity of the geometry.
+    /// 
+    /// **How it Works**: Perturbs face normals by sampling from a Gaussian distribution
+    /// with standard deviation sigma (in radians), then solves for new vertex positions
+    /// that satisfy the perturbed plane equations. Includes validation to prevent
+    /// self-intersections and non-convex faces, with automatic retry and reversion.
+    /// 
+    /// # Example
+    /// ```rust,no_run
+    /// // geom.distort(distortion_factor, settings.seed);
+    /// ```
     pub fn distort(&mut self, sigma: f32, seed: Option<u64>) {
         if sigma <= MIN_DISTORTION {
             return;
@@ -94,6 +133,14 @@ impl Geom {
     }
 }
 
+/// Updates face vertex coordinates after distortion solving.
+/// 
+/// **Context**: Distortion solves for new vertex positions in the shape's
+/// vertex array, but faces maintain their own vertex copies that must
+/// be synchronized for consistency.
+/// 
+/// **How it Works**: Iterates through all faces and updates their vertex
+/// coordinates from the shape's master vertex array using stored indices.
 fn update_face_vertices(shape: &mut crate::geom::Shape) {
     // Update vertex positions in faces
     for face in shape.faces.iter_mut() {
@@ -117,6 +164,15 @@ fn update_face_vertices(shape: &mut crate::geom::Shape) {
     }
 }
 
+/// Computes new vertex positions satisfying perturbed plane constraints.
+/// 
+/// **Context**: After perturbing face normals, vertices must be repositioned
+/// to maintain face planarity. Each vertex position is constrained by the
+/// planes of all faces containing that vertex.
+/// 
+/// **How it Works**: For each vertex, collects the perturbed normals and
+/// face midpoints of all incident faces, then solves the linear system
+/// to find the vertex position satisfying all plane equations.
 fn solve_vertices(
     shape: &mut crate::geom::Shape,
     vertex_to_faces: &HashMap<usize, Vec<usize>>,
@@ -135,6 +191,15 @@ fn solve_vertices(
     }
 }
 
+/// Solves for vertex position satisfying multiple plane constraints.
+/// 
+/// **Context**: A vertex shared by multiple faces must lie on all face planes
+/// simultaneously. This requires solving a system of linear equations where
+/// each plane provides one constraint.
+/// 
+/// **How it Works**: Constructs matrix A from perturbed normals and vector b
+/// from plane offset constraints, then solves Ax = b for the new vertex position.
+/// Assumes exactly three incident faces for unique solution.
 fn solve_linear_system(
     norms: Vec<Vector3<f32>>,
     pnorms: Vec<Vector3<f32>>,
@@ -164,6 +229,15 @@ fn solve_linear_system(
     new_vertex
 }
 
+/// Collects geometric data for faces incident to a vertex.
+/// 
+/// **Context**: Solving for a new vertex position requires data from all
+/// faces containing that vertex - their original normals, perturbed normals,
+/// and midpoints for plane equation constraints.
+/// 
+/// **How it Works**: Extracts and returns three parallel vectors containing
+/// original normals, perturbed normals, and face midpoints for the specified
+/// face indices.
 fn fetch_face_data(
     shape: &mut crate::geom::Shape,
     perturbed_normals: &Vec<Vector3<f32>>,
@@ -190,6 +264,16 @@ fn fetch_face_data(
     (norms, pnorms, mids)
 }
 
+/// Generates perturbed face normals for surface roughness modeling.
+/// 
+/// **Context**: Surface roughness is modeled by tilting face normals from
+/// their original orientations. The perturbation must be physically plausible
+/// and controllable through the sigma parameter.
+/// 
+/// **How it Works**: For each face normal, samples angular perturbations from
+/// a Gaussian distribution for tilt angle (theta) and uniform distribution for
+/// azimuthal direction (phi). Uses Rodrigues' rotation formula to apply the
+/// perturbation in the face's local coordinate system.
 fn perturb_normals(
     sigma: f32,
     shape: &mut crate::geom::Shape,
@@ -265,6 +349,15 @@ fn perturb_normals(
     perturbed_normals
 }
 
+/// Validates shape topology for distortion compatibility.
+/// 
+/// **Context**: The distortion algorithm requires each vertex to be shared
+/// by exactly three faces to ensure a unique solution when solving for
+/// new vertex positions. This constraint limits distortion to specific
+/// mesh topologies.
+/// 
+/// **How it Works**: Checks that every vertex in the shape belongs to
+/// exactly three faces, returning false if this constraint is violated.
 fn shape_can_be_distorted(vertex_to_faces: &HashMap<usize, Vec<usize>>) -> bool {
     if vertex_to_faces.values().any(|faces| faces.len() != 3) {
         println!("Shape has vertices that do not belong to exactly 3 faces. Skipping distortion.");
@@ -274,6 +367,15 @@ fn shape_can_be_distorted(vertex_to_faces: &HashMap<usize, Vec<usize>>) -> bool 
     }
 }
 
+/// Constructs vertex-to-face incidence mapping for distortion solving.
+/// 
+/// **Context**: Efficient distortion solving requires quick lookup of all
+/// faces containing a given vertex. This reverse mapping accelerates the
+/// constraint gathering process.
+/// 
+/// **How it Works**: Iterates through all faces, recording which faces
+/// contain each vertex by matching vertex coordinates to the shape's
+/// vertex array.
 fn build_vertex_to_face_map(shape: &mut crate::geom::Shape) -> HashMap<usize, Vec<usize>> {
     let mut vertex_to_faces: HashMap<usize, Vec<usize>> = HashMap::new();
     for (face_index, face) in shape.faces.iter().enumerate() {

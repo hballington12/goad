@@ -1,3 +1,28 @@
+//! Configuration management and command-line interface for GOAD simulations.
+//!
+//! This module provides comprehensive configuration management with hierarchical
+//! loading from configuration files, environment variables, and command-line
+//! arguments. It handles all simulation parameters including physical properties,
+//! numerical settings, and output specifications with proper validation.
+//!
+//! The configuration system provides:
+//! - Hierarchical parameter loading (files → env → CLI)
+//! - TOML configuration file support
+//! - Comprehensive command-line interface
+//! - Parameter validation and error handling
+//! - Default value management
+//! - Python integration for programmatic use
+//!
+//! # Configuration Hierarchy
+//!
+//! 1. Default configuration file (`config/default.toml`)
+//! 2. Local configuration file (`config/local.toml`)
+//! 3. Environment variables (prefixed with `GOAD_`)
+//! 4. Command-line arguments (highest priority)
+//!
+//! The [`Settings`] struct consolidates all configuration parameters with
+//! appropriate types and validation for electromagnetic scattering simulations.
+
 use anyhow::Result;
 use clap::Args;
 use clap::Parser;
@@ -37,7 +62,18 @@ pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
 /// Minimum Distortion factor for the geometry.
 pub const MIN_DISTORTION: f32 = 1e-5;
 
-/// Runtime configuration for the application.
+/// Central configuration for electromagnetic scattering simulations.
+/// 
+/// **Context**: Electromagnetic scattering simulations require numerous physical
+/// and numerical parameters that control beam propagation, material properties,
+/// geometric discretization, and result analysis. These settings must be
+/// configurable through files, environment variables, and command-line arguments
+/// while maintaining physical consistency.
+/// 
+/// **How it Works**: Combines all simulation parameters into a single structure
+/// with hierarchical loading from default configuration files, local overrides,
+/// environment variables, and command-line arguments. Includes validation to
+/// ensure physical plausibility and numerical stability.
 #[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Settings {
@@ -266,11 +302,27 @@ impl Settings {
 }
 
 impl Settings {
+    /// Computes the absolute beam area threshold for simulation termination.
+    /// 
+    /// **Context**: Geometric optics becomes invalid for beam cross-sections smaller
+    /// than approximately one wavelength squared. This threshold prevents numerical
+    /// instabilities and maintains physical validity by terminating sub-wavelength beams.
+    /// 
+    /// **How it Works**: Scales the wavelength-squared by the user-specified factor
+    /// and geometry scaling to get the absolute area threshold in geometry units.
     pub fn beam_area_threshold(&self) -> f32 {
         self.wavelength * self.wavelength * self.beam_area_threshold_fac * self.scale.powi(2)
     }
 }
 
+/// Loads the default configuration from the project's default.toml file.
+/// 
+/// **Context**: Default configurations provide baseline parameter sets that
+/// ensure the simulation runs with physically reasonable values. These defaults
+/// serve as starting points for user customization.
+/// 
+/// **How it Works**: Locates the project root directory and loads the default
+/// configuration file, applying validation to ensure parameter consistency.
 pub fn load_default_config() -> Result<Settings> {
     let goad_dir = retrieve_project_root()?;
     let default_config_file = goad_dir.join("config/default.toml");
@@ -293,10 +345,25 @@ pub fn load_default_config() -> Result<Settings> {
     Ok(config)
 }
 
+/// Loads configuration with full hierarchy including CLI argument processing.
+/// 
+/// **Context**: Production simulations require loading configurations from
+/// multiple sources with proper precedence ordering. This provides the complete
+/// configuration loading workflow.
+/// 
+/// **How it Works**: Calls load_config_with_cli with CLI processing enabled.
 pub fn load_config() -> Result<Settings> {
     load_config_with_cli(true)
 }
 
+/// Loads configuration with optional CLI argument integration.
+/// 
+/// **Context**: Different use cases require different levels of configuration
+/// processing. Library usage may skip CLI processing while command-line tools
+/// need full argument parsing and override capability.
+/// 
+/// **How it Works**: Loads configuration from files and environment variables,
+/// optionally applies CLI argument overrides, and validates the final configuration.
 pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
     let config_file = get_config_file()?;
 
@@ -327,6 +394,15 @@ pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
     Ok(config)
 }
 
+/// Updates configuration settings from parsed command-line arguments.
+/// 
+/// **Context**: Command-line arguments provide the highest precedence in the
+/// configuration hierarchy, allowing users to override file-based settings
+/// for individual simulation runs.
+/// 
+/// **How it Works**: Parses CLI arguments and selectively updates configuration
+/// fields, handling complex nested structures like orientation schemes and
+/// binning configurations with validation.
 fn update_settings_from_cli(config: &mut Settings) {
     // Parse command-line arguments and override values
     let args = CliArgs::parse();
@@ -501,12 +577,15 @@ fn get_config_file() -> Result<PathBuf, anyhow::Error> {
     Ok(config_file)
 }
 
-/// Retrieve the project root directory.
-/// This function tries to find the project root directory in different ways:
-/// 1. If the CARGO_MANIFEST_DIR environment variable is set, use it.
-/// 2. If the GOAD_ROOT_DIR environment variable is set, use it.
-/// 3. If the "config" subdirectory is found in the exectuable directory or any of its parents, use it.
-/// If none of these methods work, the function will panic.
+/// Locates the project root directory for configuration file access.
+/// 
+/// **Context**: Configuration files are stored relative to the project root,
+/// but the executable may be located in different directories depending on
+/// the deployment method (cargo run, installed binary, development build).
+/// 
+/// **How it Works**: Uses multiple fallback strategies to locate the project
+/// root: CARGO_MANIFEST_DIR for development, GOAD_ROOT_DIR for deployment,
+/// and directory traversal to find the nearest config directory.
 fn retrieve_project_root() -> Result<std::path::PathBuf> {
     if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
         // When running through cargo (e.g. cargo run, cargo test)
@@ -540,6 +619,14 @@ fn retrieve_project_root() -> Result<std::path::PathBuf> {
     }
 }
 
+/// Validates configuration parameters for physical plausibility.
+/// 
+/// **Context**: Invalid configuration parameters can cause simulation failures,
+/// numerical instabilities, or unphysical results. Validation catches common
+/// parameter errors before expensive computations begin.
+/// 
+/// **How it Works**: Applies assertion checks for critical parameters like
+/// positive wavelengths and reasonable threshold values.
 fn validate_config(config: &Settings) {
     assert!(
         config.beam_area_threshold_fac > 1e-5,
@@ -602,7 +689,14 @@ pub struct CliArgs {
     pub fov_factor: Option<f32>,
 }
 
-/// Beam propagation parameters - control how beams are traced through the geometry
+/// Command-line arguments controlling beam propagation behavior.
+/// 
+/// **Context**: Beam propagation parameters directly affect simulation accuracy,
+/// computational cost, and convergence properties. These parameters need
+/// accessible command-line control for parameter studies and optimization.
+/// 
+/// **How it Works**: Groups propagation-related CLI arguments with descriptive
+/// help text and appropriate validation constraints.
 #[derive(Args, Debug)]
 pub struct PropagationArgs {
     /// Wavelength in units of the geometry.
@@ -640,7 +734,14 @@ pub struct PropagationArgs {
     pub tir: Option<i32>,
 }
 
-/// Material and geometry parameters - control the physical properties of the simulation
+/// Command-line arguments for material properties and geometry specification.
+/// 
+/// **Context**: Material properties and geometric parameters define the physical
+/// system being simulated. These fundamental parameters require easy modification
+/// for comparing different materials and particle shapes.
+/// 
+/// **How it Works**: Groups material and geometry CLI arguments with appropriate
+/// parsing for complex numbers and file paths.
 #[derive(Args, Debug)]
 pub struct MaterialArgs {
     /// Path to geometry file (.obj format).
@@ -673,7 +774,14 @@ pub struct MaterialArgs {
     pub geom_scale: Option<Vec<f32>>,
 }
 
-/// Orientation parameters - control how the particle is oriented relative to the incident beam
+/// Command-line arguments for particle orientation specification.
+/// 
+/// **Context**: Particle orientation significantly affects scattering patterns.
+/// Different applications require fixed orientations, random orientation
+/// averaging, or discrete orientation sets for systematic studies.
+/// 
+/// **How it Works**: Provides mutually exclusive orientation schemes with
+/// appropriate parsing for Euler angles and orientation conventions.
 #[derive(Args, Debug)]
 pub struct OrientationArgs {
     /// Use uniform random orientation scheme.
@@ -693,7 +801,14 @@ pub struct OrientationArgs {
     pub euler: Option<EulerConvention>,
 }
 
-/// Output binning parameters - control how scattered light is binned by angle
+/// Command-line arguments for angular binning scheme configuration.
+/// 
+/// **Context**: Far-field scattering analysis requires discretization of the
+/// observation sphere into angular bins. Different applications need different
+/// angular resolutions and sampling patterns.
+/// 
+/// **How it Works**: Provides multiple binning schemes with validation for
+/// interval specifications and custom file formats.
 #[derive(Args, Debug)]
 pub struct BinningArgs {
     /// Use simple equal-spacing binning scheme.
@@ -725,7 +840,14 @@ pub struct BinningArgs {
     pub custom: Option<String>,
 }
 
-/// Parse a string of Euler angles in the format "alpha,beta,gamma"
+/// Parses command-line Euler angle specification into structured format.
+/// 
+/// **Context**: Euler angles from command-line arguments arrive as comma-separated
+/// strings but need validation and conversion to structured types for use
+/// in rotation calculations.
+/// 
+/// **How it Works**: Splits the input string on commas, validates that exactly
+/// three angles are provided, and parses each component as a floating-point value.
 fn parse_euler_angles(s: &str) -> Result<Euler, String> {
     println!("Parsing Euler angles: '{}'", s);
 
@@ -752,11 +874,14 @@ fn parse_euler_angles(s: &str) -> Result<Euler, String> {
     Ok(Euler::new(alpha, beta, gamma))
 }
 
-/// Parse interval specification in the format:
-/// start step1 mid1 step2 mid2 ... stepN end
-/// This returns two vectors:
-/// 1. positions: [start, mid1, mid2, ..., end]
-/// 2. spacings: [step1, step2, ..., stepN]
+/// Parses variable-spacing interval specification for angular binning.
+/// 
+/// **Context**: Variable-spacing angular grids require specification of both
+/// breakpoints and spacing values. The command-line format must be intuitive
+/// while supporting arbitrary numbers of intervals.
+/// 
+/// **How it Works**: Interprets alternating step/position values to build
+/// position and spacing vectors, validating monotonicity and positive step sizes.
 fn parse_interval_specification(values: &[f32]) -> Result<(Vec<f32>, Vec<f32>), String> {
     if values.len() < 3 {
         return Err(format!(
@@ -804,7 +929,14 @@ fn parse_interval_specification(values: &[f32]) -> Result<(Vec<f32>, Vec<f32>), 
     Ok((positions, spacings))
 }
 
-/// Parse a string into a valid Euler angle convention
+/// Parses Euler angle convention string into enumerated type.
+/// 
+/// **Context**: Euler angle conventions affect rotation sequence interpretation.
+/// Command-line specification needs validation against supported conventions
+/// with clear error messages for invalid inputs.
+/// 
+/// **How it Works**: Case-insensitive string matching against all supported
+/// Euler conventions with descriptive error messages listing valid options.
 fn parse_euler_convention(s: &str) -> Result<EulerConvention, String> {
     match s.to_uppercase().as_str() {
         "XYZ" => Ok(EulerConvention::XYZ),
