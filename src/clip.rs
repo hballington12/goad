@@ -62,14 +62,31 @@ trait Point3Extensions {
 }
 
 impl Point3Extensions for Point3<f32> {
-    /// Returns the ray-cast distance along the -z axis from a point to its intersection with a plane in 3D
+    /// Computes ray casting distance for occlusion testing in clipping operations.
+    /// 
+    /// **Context**: During clipping, intersections must be tested to determine
+    /// whether they occur in front of or behind the clipping plane. This
+    /// ray casting operation enables proper depth ordering.
+    /// 
+    /// **How it Works**: Calculates the z-distance from a point to its projection
+    /// onto a plane along the negative z-axis direction used in clipping coordinates.
     fn ray_cast_z(&self, plane: &Plane) -> f32 {
         -(plane.normal.x * self.x + plane.normal.y * self.y + plane.offset) / plane.normal.z
             - self.z
     }
 }
 
-/// Statistics for a `Clipping` object.
+/// Area conservation statistics for geometric clipping operations.
+/// 
+/// **Context**: Geometric clipping can introduce numerical errors that result
+/// in area loss or gain. Tracking area conservation is essential for power
+/// conservation verification in electromagnetic simulations where geometric
+/// cross-sections determine beam power.
+/// 
+/// **How it Works**: Computes area statistics by comparing the original clipping
+/// face area with the sum of intersection and remaining areas after clipping.
+/// Conservation ratios indicate the fraction of area properly accounted for
+/// versus numerical losses from polygon operations.
 #[derive(Debug, PartialEq, Clone, Default)] // Added Default derive
 pub struct Stats {
     pub clipping_area: f32,     // the total input clipping area
@@ -81,6 +98,15 @@ pub struct Stats {
 }
 
 impl Stats {
+    /// Computes area conservation statistics for a clipping operation.
+    /// 
+    /// **Context**: Geometric clipping algorithms can introduce numerical errors
+    /// that cause area loss or gain. These statistics quantify conservation
+    /// to verify that beam power is properly tracked through the simulation.
+    /// 
+    /// **How it Works**: Sums areas of intersection and remaining faces,
+    /// computes conservation ratios relative to the original clipping area,
+    /// and calculates total area loss from numerical operations.
     pub fn new(clip: &Face, intersection: &Vec<Face>, remaining: &Vec<Face>) -> Self {
         let clipping_area = clip.to_polygon().unsigned_area();
         let intersection_area = intersection
@@ -129,7 +155,21 @@ impl fmt::Display for Stats {
     }
 }
 
-/// A clipping object
+/// Geometric clipping engine for beam-surface intersection calculations.
+/// 
+/// **Context**: Electromagnetic beam propagation requires determining which portions
+/// of beam cross-sections intersect with particle surfaces and which portions
+/// continue propagating. This geometric clipping operation is fundamental to
+/// the geometric optics approach, where beams are discretized into polygonal
+/// cross-sections that interact with particle faces.
+/// 
+/// **How it Works**: Transforms both the beam cross-section (clip) and particle
+/// geometry into a coordinate system aligned with the beam propagation direction.
+/// Uses 2D polygon clipping algorithms to compute intersections between the beam
+/// and each relevant particle face, sorted by depth. Tracks area conservation
+/// and handles complex polygon operations including holes and non-convex shapes.
+/// Returns intersection faces (portions interacting with surfaces) and remaining
+/// faces (portions continuing propagation).
 #[derive(Debug, PartialEq)]
 pub struct Clipping<'a> {
     pub geom: &'a mut Geom,       // a geometry holding subjects to clip against
@@ -144,8 +184,23 @@ pub struct Clipping<'a> {
 }
 
 impl<'a> Clipping<'a> {
-    /// A new clipping object.
-    /// If `clip` exists inside `geom`, it is ommitted from the subjects.
+    /// Creates a clipping operation for beam-surface intersection analysis.
+    /// 
+    /// **Context**: Each beam propagation step requires determining intersections
+    /// with particle surfaces along the propagation direction. The clipping
+    /// operation must be set up with appropriate coordinate transformations
+    /// for numerical stability.
+    /// 
+    /// **How it Works**: Establishes coordinate transformation matrices to align
+    /// the clipping face with the xy-plane and propagation direction with the
+    /// negative z-axis. This reduces the 3D clipping problem to efficient 2D
+    /// polygon operations.
+    /// 
+    /// # Example
+    /// ```rust
+    /// let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
+    /// clipping.clip(area_threshold)?;
+    /// ```
     pub fn new(geom: &'a mut Geom, clip: &'a mut Face, proj: &'a Vector3<f32>) -> Self {
         let mut clipping = Self {
             geom,
@@ -163,7 +218,17 @@ impl<'a> Clipping<'a> {
         clipping
     }
 
-    /// Sets the forward and inverse transform for the clipping
+    /// Establishes coordinate transformation for optimal clipping geometry.
+    /// 
+    /// **Context**: 2D polygon clipping algorithms are most efficient and
+    /// numerically stable when the clipping face lies in the xy-plane.
+    /// The transformation aligns the coordinate system with the beam
+    /// propagation direction.
+    /// 
+    /// **How it Works**: Creates a look-at transformation that places the
+    /// clipping face in the xy-plane with the propagation direction along
+    /// the negative z-axis. Handles colinear cases by choosing appropriate
+    /// up vectors.
     fn set_transform(&mut self) {
         let model = Isometry3::new(Vector3::zeros(), na::zero()); // do some sort of projection - set to nothing
         let origin = Point3::origin(); // camera location
@@ -182,6 +247,15 @@ impl<'a> Clipping<'a> {
         self.itransform = self.transform.try_inverse().unwrap(); // inverse transform
     }
 
+    /// Initializes clipping operation by transforming geometry and selecting subjects.
+    /// 
+    /// **Context**: Not all faces in the geometry are relevant for clipping
+    /// against a given beam. Subject selection depends on containment relationships
+    /// and the beam's interaction with internal versus external surfaces.
+    /// 
+    /// **How it Works**: Transforms geometry to clipping coordinates, determines
+    /// whether the beam is internal or external based on face normal direction,
+    /// and selects appropriate subject faces based on containment rules.
     pub fn init_clip(&mut self) -> Result<(&Face, Vec<&Face>)> {
         if self.is_done {
             panic!("Method clip() called, but the clipping was already done previously.");
@@ -218,6 +292,15 @@ impl<'a> Clipping<'a> {
         Ok((self.clip, subjects))
     }
 
+    /// Transforms clipping results back to world coordinates and finalizes operation.
+    /// 
+    /// **Context**: Clipping operations are performed in the transformed coordinate
+    /// system for numerical efficiency. Results must be transformed back to
+    /// world coordinates for use in beam propagation.
+    /// 
+    /// **How it Works**: Applies inverse transformation to geometry, intersection
+    /// faces, remaining faces, and the clipping face itself. Stores results
+    /// in the clipping structure and marks the operation as complete.
     pub fn finalise_clip(
         &mut self,
         mut intersection: Vec<Face>,
@@ -240,7 +323,27 @@ impl<'a> Clipping<'a> {
         Ok(())
     }
 
-    /// Performs the clip on a `Clipping` object.
+    /// Executes the geometric clipping operation to find beam-surface intersections.
+    /// 
+    /// **Context**: This is the main clipping operation that determines which portions
+    /// of a beam cross-section intersect with particle surfaces and which portions
+    /// remain for continued propagation. Area thresholding prevents processing
+    /// of tiny polygon fragments that contribute negligible power.
+    /// 
+    /// **How it Works**: Transforms geometry to clipping coordinates, identifies
+    /// relevant subject faces based on containment rules, performs depth-sorted
+    /// polygon clipping operations, computes area statistics, and transforms
+    /// results back to world coordinates.
+    /// 
+    /// # Example
+    /// ```rust
+    /// let mut clipping = Clipping::new(&mut geom, &mut self.face, &self.prop);
+    /// clipping.clip(area_threshold)?;
+    /// let (intersections, remainders) = (
+    ///     clipping.intersections.into_iter().collect(),
+    ///     clipping.remaining.into_iter().collect(),
+    /// );
+    /// ```
     pub fn clip(&mut self, area_threshold: f32) -> Result<()> {
         if self.is_done {
             panic!("Method clip() called, but the clipping was already done previously.");
@@ -259,12 +362,31 @@ impl<'a> Clipping<'a> {
         Ok(())
     }
 
+    /// Computes and stores area conservation statistics for the clipping operation.
+    /// 
+    /// **Context**: Area conservation statistics are computed in the clipping
+    /// coordinate system before transformation back to world coordinates
+    /// to avoid transformation-induced numerical errors.
+    /// 
+    /// **How it Works**: Creates a Stats object from the clipping face and
+    /// computed intersection and remaining faces.
     fn set_stats(&mut self, intersection: &Vec<Face>, remaining: &Vec<Face>) {
         self.stats = Some(Stats::new(self.clip, intersection, remaining));
     }
 }
 
-/// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
+/// Performs 2D polygon clipping between beam cross-section and particle faces.
+/// 
+/// **Context**: Once transformed to the clipping coordinate system, the 3D
+/// beam-surface intersection problem reduces to 2D polygon clipping operations.
+/// Multiple particle faces may intersect the beam, requiring depth-sorted
+/// processing to handle occlusion correctly.
+/// 
+/// **How it Works**: Sorts subject faces by depth, iteratively clips the remaining
+/// beam area against each face using Boolean polygon operations (intersection
+/// and difference). Applies area thresholding to filter insignificant fragments.
+/// Uses ray casting to distinguish intersections in front of the beam from
+/// those behind, ensuring correct occlusion handling.
 pub fn clip_faces<'a>(
     clip_in: &Face,
     subjects_in: &Vec<&'a Face>,
