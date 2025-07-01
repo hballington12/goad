@@ -38,16 +38,16 @@ use ndarray::{s, Array1, Array2, Axis};
 /// **Context**: Scattering simulations produce multiple types of output data including
 /// power tracking, Mueller matrices at different angular bins, amplitude matrices
 /// for polarization analysis, and derived parameters like cross sections. This
-/// structure consolidates all results for analysis and output.
+/// structure consolidates all results for analysis and [`crate::output`].
 /// 
 /// **How it Works**: Stores raw amplitude matrices and derived Mueller matrices for
 /// total scattering, beam-only contributions, and external diffraction. Optionally
-/// includes phi-integrated 1D results for azimuthally symmetric cases. The params
+/// includes phi-integrated 1D results for azimuthally symmetric cases. The [`crate::params::Params`]
 /// field contains derived integral parameters computed from the angular distributions.
 #[derive(Debug, Clone)]
 pub struct Results {
-    pub powers: Powers,
-    pub bins: Vec<(f32, f32)>,
+    pub powers: Powers,           // [`crate::powers::Powers`] conservation data
+    pub bins: Vec<(f32, f32)>,    // Angular bins (theta, phi) for 2D results
     pub mueller: Array2<f32>,
     pub mueller_beam: Array2<f32>,
     pub mueller_ext: Array2<f32>,

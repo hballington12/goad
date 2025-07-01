@@ -56,7 +56,7 @@ mod tests {
 /// **Context**: Electromagnetic waves in scattering simulations require tracking
 /// both field amplitude and polarization state. The field must be decomposed
 /// into perpendicular and parallel components relative to the scattering plane
-/// for proper application of Fresnel equations and Mueller matrix calculations.
+/// for proper application of [`crate::fresnel`] equations and Mueller matrix calculations.
 /// 
 /// **How it Works**: Uses a 2x2 complex amplitude matrix to represent the field
 /// in a coordinate system defined by perpendicular (e_perp) and parallel (e_par)
@@ -65,9 +65,9 @@ mod tests {
 /// maintains orthogonality with the propagation direction.
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Field {
-    pub ampl: Matrix2<Complex<f32>>,
-    pub e_perp: Vector3<f32>,
-    pub e_par: Vector3<f32>,
+    pub ampl: Matrix2<Complex<f32>>,  // 2x2 complex amplitude matrix
+    pub e_perp: Vector3<f32>,         // perpendicular polarization vector
+    pub e_par: Vector3<f32>,          // parallel polarization vector
 }
 
 impl Field {

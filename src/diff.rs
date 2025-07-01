@@ -30,21 +30,21 @@ use crate::{geom, settings};
 
 /// Computes far-field electromagnetic diffraction from a convex aperture.
 /// 
-/// **Context**: Converting near-field beam representations to far-field scattering
+/// **Context**: Converting near-field [`crate::beam::Beam`] representations to far-field scattering
 /// observables requires computing diffraction integrals over aperture cross-sections.
 /// This transformation connects the geometric optics beam propagation to measurable
 /// scattering patterns at observation angles.
 /// 
 /// **How it Works**: Uses Fraunhofer diffraction theory to compute line integrals
 /// around the aperture boundary. Transforms coordinate systems to align the aperture
-/// with optimal calculation geometry, applies electromagnetic field rotations for
+/// with optimal calculation geometry, applies electromagnetic [`crate::field::Field`] rotations for
 /// polarization consistency, and evaluates diffraction integrals at each observation
 /// angle. Includes field-of-view filtering for computational efficiency.
 /// 
 /// # Example
 /// ```rust
-/// let ampl_far_field = diff::diffraction(
-///     &verts,                     // Face vertices from geometry
+/// let ampl_far_field = crate::diff::diffraction(
+///     &verts,                     // [`crate::geom::Face`] vertices from geometry
 ///     ampl,                       // 2x2 amplitude matrix
 ///     prop,                       // Propagation direction
 ///     vk7,                        // Perpendicular polarization vector
@@ -243,7 +243,7 @@ pub fn diffraction(
 /// Computes all rotation matrices needed for electromagnetic field transformations.
 /// 
 /// **Context**: Converting electromagnetic fields between incident and scattered
-/// coordinate systems requires multiple rotation matrices. The field components
+/// coordinate systems requires multiple rotation matrices. The [`crate::field::Field`] components
 /// must maintain physical consistency while accounting for changes in propagation
 /// direction and observation geometry.
 /// 
@@ -277,7 +277,7 @@ fn get_rotations(
 /// 
 /// **Context**: Diffraction calculations require coordinate systems aligned with
 /// the aperture geometry for numerical stability. The aperture must be centered
-/// and oriented optimally, while electromagnetic field amplitudes need scaling
+/// and oriented optimally, while electromagnetic [`crate::field::Field`] amplitudes need scaling
 /// by the wavenumber.
 /// 
 /// **How it Works**: Applies small perturbations to the propagation vector to avoid
@@ -409,13 +409,13 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
 
 /// Implements Karczewski transformation for electromagnetic field components.
 /// 
-/// **Context**: Electromagnetic scattering requires transforming incident field
+/// **Context**: Electromagnetic scattering requires transforming incident [`crate::field::Field`]
 /// components to scattered field components while maintaining the physical
 /// relationships between electric and magnetic fields. The Karczewski transformation
 /// provides this coupling between incident and observation directions.
 /// 
 /// **How it Works**: Computes transformation matrices based on incident and scattered
-/// wave vectors, handles numerical singularities with epsilon thresholds, and
+/// wave vectors, handles numerical singularities with epsilon thresholds from [`crate::settings`], and
 /// returns both the transformation matrix and magnetic field vector.
 #[inline]
 pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Vector3<f32>) {

@@ -1003,34 +1003,36 @@ impl Face {
 /// 
 /// **Context**: Light scattering simulations require geometric representations
 /// of particles. Each particle must be modeled as a closed surface with well-defined 
-/// interior and exterior regions, along with its optical properties.
+/// interior and exterior regions, along with its optical properties for [`crate::beam::Beam`]
+/// propagation and [`crate::clip::Clipping`] operations.
 /// 
-/// **How it Works**: A Shape stores geometric and material information for
-/// electromagnetic field calculations. The mesh contains vertices defining 3D positions,
-/// faces describing surface polygons (which should be planar - error checking for 
-/// non-planar faces will be added in future versions), and a complex refractive index 
-/// characterizing how light interacts with the material. Each face maintains its own 
-/// copy of vertex positions (rather than shared references) to enable independent 
-/// geometric operations like distortion - though this requires careful synchronization 
-/// when vertices change.
+/// **How it Works**: A [`Shape`] stores geometric and material information for
+/// electromagnetic field calculations. The mesh contains [`nalgebra::Point3<f32>`] vertices 
+/// defining 3D positions, [`Face`] collections describing surface polygons (which should 
+/// be planar - error checking for non-planar faces will be added in future versions), 
+/// and a [`nalgebra::Complex<f32>`] refractive index characterizing how light interacts 
+/// with the material. Each [`Face`] maintains its own copy of vertex positions (rather 
+/// than shared references) to enable independent geometric operations like 
+/// [`crate::distortion::distort`] - though this requires careful synchronization when vertices change.
 /// 
-/// The axis-aligned bounding box enables spatial queries for determining containment 
-/// relationships between nested shapes, necessary for hierarchical geometries.
+/// The [`crate::containment::AABB`] enables spatial queries for determining containment 
+/// relationships between nested shapes, necessary for hierarchical geometries managed 
+/// by [`crate::containment::ContainmentGraph`].
 /// 
-/// **Initialization**: Shapes are created by loading OBJ files through
-/// `Geom::from_file()` which calls `Shape::from_model()`, or directly via the
-/// Python bindings for programmatic geometry generation.
+/// **Initialization**: [`Shape`] objects are created by loading Wavefront OBJ files through
+/// [`Geom::from_file()`] which calls [`Shape::from_model()`], or directly via the
+/// [`pyo3`] Python bindings for programmatic geometry generation.
 #[pyclass]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
     pub vertices: Vec<Point3<f32>>, // List of all vertices in the mesh
     pub num_vertices: usize,        // Number of vertices in the mesh
-    pub faces: Vec<Face>,           // List of all facets in the mesh
+    pub faces: Vec<Face>,           // List of all [`Face`] elements in the mesh
     pub num_faces: usize,           // Number of facets in the mesh
     pub refr_index: Complex<f32>,   // Refractive index of this shape
-    pub id: Option<usize>,          // an id number
+    pub id: Option<usize>,          // an id number for [`crate::containment::ContainmentGraph`]
     pub parent_id: Option<usize>,   // An optional parent shape index, which encompasses this one
-    pub aabb: Option<AABB>,         // axis-aligned bounding box
+    pub aabb: Option<AABB>,         // axis-aligned bounding box for [`crate::containment`] operations
 }
 
 impl Shape {
@@ -1047,17 +1049,17 @@ impl Shape {
         }
     }
 
-    /// Converts a tobj::Model into a Shape.
+    /// Converts a [`tobj::Model`] into a [`Shape`].
     /// 
-    /// **Context**: The tobj library provides raw mesh data (vertices, indices, face counts)
-    /// but this needs to be restructured into the Shape format required for electromagnetic
+    /// **Context**: The [`tobj`] library provides raw mesh data (vertices, indices, face counts)
+    /// but this needs to be restructured into the [`Shape`] format required for electromagnetic
     /// calculations. The conversion must handle arbitrary polygon faces, establish proper 
     /// vertex-face relationships, and set up the geometric properties needed for subsequent
     /// operations.
     /// 
     /// **How it Works**: Extracts vertex positions from the model's position array, then
     /// processes face definitions using the face_arities to group indices into individual
-    /// faces. Each face becomes a Face::Simple containing its vertex data and optional
+    /// faces. Each face becomes a [`Face::Simple`] containing its vertex data and optional
     /// index references. The axis-aligned bounding box is computed from all vertices
     /// to enable spatial queries.
     fn from_model(model: Model, id: Option<usize>) -> Result<Shape> {
@@ -1291,25 +1293,25 @@ impl Shape {
 /// 
 /// **Context**: Light scattering scenarios involve multi-particle systems where
 /// particles may contain hierarchical relationships, with some particles existing 
-/// inside others. Each physics problem requires working with an ensemble of shapes 
+/// inside others. Each [`crate::problem::Problem`] requires working with an ensemble of shapes 
 /// that maintain these spatial relationships.
 /// 
-/// **How it Works**: A Geom manages a collection of closed-surface shapes and their
-/// spatial relationships through a containment graph. This graph tracks
+/// **How it Works**: A [`Geom`] manages a collection of closed-surface [`Shape`] objects and their
+/// spatial relationships through a [`crate::containment::ContainmentGraph`]. This graph tracks
 /// parent-child relationships based on bounding box containment, enabling handling
 /// of nested geometries during ray tracing and field calculations. The containment
 /// information determines refractive indices at shape boundaries and manages
-/// optical interfaces.
+/// optical interfaces with [`crate::fresnel`] calculations.
 /// 
-/// Each physics problem operates on exactly one Geom instance, but that geometry can
+/// Each [`crate::problem::Problem`] operates on exactly one [`Geom`] instance, but that geometry can
 /// represent hierarchical structures. All shapes must be closed surfaces to ensure 
 /// well-defined interior/exterior boundaries for electromagnetic field calculations.
 #[pyclass]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geom {
-    pub shapes: Vec<Shape>,
-    pub containment_graph: ContainmentGraph,
-    pub num_shapes: usize,
+    pub shapes: Vec<Shape>,                     // Vector of [`Shape`] objects
+    pub containment_graph: ContainmentGraph,    // Hierarchical relationships between shapes
+    pub num_shapes: usize,                      // Number of shapes in the collection
 }
 
 impl Geom {
@@ -1321,19 +1323,19 @@ impl Geom {
     /// but the raw mesh data needs to be processed into the internal representation
     /// required for electromagnetic field calculations.
     /// 
-    /// **How it Works**: Parses the OBJ file using the tobj library to extract vertices
-    /// and face definitions. Each mesh object in the file becomes a separate Shape with
-    /// automatically assigned IDs. Face polygons are converted to the internal Face
+    /// **How it Works**: Parses the OBJ file using the [`tobj`] library to extract vertices
+    /// and face definitions. Each mesh object in the file becomes a separate [`Shape`] with
+    /// automatically assigned IDs. Face polygons are converted to the internal [`Face`]
     /// representation, and axis-aligned bounding boxes are computed for each shape.
-    /// A containment graph is constructed by testing bounding box relationships between
+    /// A [`crate::containment::ContainmentGraph`] is constructed by testing bounding box relationships between
     /// all shape pairs, establishing parent-child hierarchies for nested geometries.
     /// 
     /// # Example
     /// ```rust
-    /// let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
+    /// let mut geom = Geom::from_file("./examples/data/hex2.obj").unwrap();
     /// geom.shapes[0].refr_index.re = 1.5;
     /// geom.shapes[0].refr_index.im = 0.0001;
-    /// let mut problem = Problem::new(geom, None);
+    /// let mut problem = crate::problem::Problem::new(geom, None);
     /// ```
     pub fn from_file(filename: &str) -> Result<Self> {
         // Log current directory only in debug builds
@@ -1401,14 +1403,14 @@ impl Geom {
 
     /// Applies a 4x4 transformation matrix to all geometry.
     /// 
-    /// **Context**: Computing how beams intersect with faces requires rotating 
+    /// **Context**: Computing how [`crate::beam::Beam`] segments intersect with faces requires rotating 
     /// beam cross-section polygons and faces in the geometry into the plane normal 
     /// to the beam propagation direction. This coordinate transformation is essential 
-    /// for ray-tracing calculations and field propagation algorithms.
+    /// for ray-tracing calculations and [`crate::field`] propagation algorithms.
     /// 
-    /// **How it Works**: Applies the transformation matrix to every face in every shape.
+    /// **How it Works**: Applies the transformation matrix to every [`Face`] in every [`Shape`].
     /// Each face handles its own transformation, updating vertex positions, midpoints,
-    /// and normals according to the matrix. This enables arbitrary rotations, scaling,
+    /// and normals according to the [`nalgebra::Matrix4<f32>`]. This enables arbitrary rotations, scaling,
     /// and translations of the entire geometric model.
     pub fn transform(&mut self, transform: &Matrix4<f32>) -> Result<()> {
         for shape in &mut self.shapes {

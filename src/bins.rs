@@ -4,6 +4,7 @@
 //! the far-field scattering patterns. Different applications require different
 //! angular resolutions and sampling strategies, from uniform grids for general
 //! analysis to variable spacing for capturing specific scattering features.
+//! Used by [`crate::result::Results`] for organizing scattering data.
 //!
 //! The binning system supports:
 //! - Simple uniform grids in theta and phi

@@ -41,18 +41,18 @@ use crate::{
 /// Result of a single beam propagation step through geometry.
 /// 
 /// **Context**: Beam propagation involves complex interactions with particle surfaces
-/// that can split a single input beam into multiple output beams through reflection,
+/// that can split a single input [`Beam`] into multiple output beams through reflection,
 /// refraction, and diffraction. This structure captures the complete result of one
 /// propagation step for analysis and visualization.
 /// 
-/// **How it Works**: Stores the input beam that was propagated, the medium refractive
+/// **How it Works**: Stores the input [`Beam`] that was propagated, the medium refractive
 /// index used for calculations, and all output beams produced by surface interactions.
 /// Used for debugging, visualization, and power conservation verification.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeamPropagation {
-    pub input: Beam,              // The beam that was propagated
+    pub input: Beam,              // The [`Beam`] that was propagated
     pub refr_index: Complex<f32>, // Medium refractive index used
-    pub outputs: Vec<Beam>,       // Resulting beams from interactions
+    pub outputs: Vec<Beam>,       // Resulting [`Beam`] objects from interactions
 }
 
 impl BeamPropagation {
@@ -200,9 +200,9 @@ impl Beam {
     /// Initial beams use identity amplitude matrices to represent unscattered
     /// incident radiation.
     /// 
-    /// **How it Works**: Constructs a Field with identity amplitude matrix using
+    /// **How it Works**: Constructs a [`crate::field::Field`] with identity amplitude matrix using
     /// the specified perpendicular polarization vector, then creates a beam
-    /// with BeamType::Initial and zero interaction counters.
+    /// with [`BeamType::Initial`] and zero interaction counters.
     /// 
     /// # Example
     /// ```rust
@@ -237,11 +237,11 @@ impl Beam {
 
     /// Creates a beam with a pre-constructed electromagnetic field.
     /// 
-    /// **Context**: Some simulation setups require specific field configurations
+    /// **Context**: Some simulation setups require specific [`crate::field::Field`] configurations
     /// that differ from the standard identity matrix initialization. This
     /// constructor allows direct specification of field properties.
     /// 
-    /// **How it Works**: Uses the provided Field directly without modification,
+    /// **How it Works**: Uses the provided [`crate::field::Field`] directly without modification,
     /// creating an initial-type beam with the specified field properties.
     pub fn new_from_field(
         face: Face,
@@ -270,8 +270,8 @@ impl Beam {
     /// appropriate reflection and refraction beams must be generated according
     /// to electromagnetic boundary conditions.
     /// 
-    /// **How it Works**: Uses geometric clipping to find surface intersections,
-    /// creates new beams for reflected and refracted components based on Fresnel
+    /// **How it Works**: Uses geometric [`crate::clip::Clipping`] to find surface intersections,
+    /// creates new beams for reflected and refracted components based on [`crate::fresnel`]
     /// equations, handles remainder beams that don't interact with surfaces,
     /// and tracks power absorption. Returns output beams and power loss information.
     /// 
@@ -662,27 +662,27 @@ impl Beam {
 /// 
 /// **Context**: Electromagnetic field propagation through particles requires discretizing
 /// the field into manageable segments that can interact with surfaces independently.
-/// Each beam carries electromagnetic field information, geometric cross-section data,
+/// Each beam carries electromagnetic [`crate::field::Field`] information, geometric cross-section data,
 /// and propagation state for tracking reflection, refraction, and absorption processes.
 /// 
-/// **How it Works**: A Beam combines a geometric face (defining the cross-sectional area),
-/// a propagation direction, electromagnetic field properties, and interaction history.
+/// **How it Works**: A [`Beam`] combines a geometric [`crate::geom::Face`] (defining the cross-sectional area),
+/// a propagation direction, electromagnetic [`crate::field::Field`] properties, and interaction history.
 /// The field contains amplitude and polarization information, while counters track
-/// interaction depth for convergence control. The beam can be classified by type
-/// (initial, internal, outgoing) and variant (reflected, refracted, total internal reflection).
+/// interaction depth for convergence control. The beam can be classified by [`BeamType`]
+/// (initial, internal, outgoing) and [`BeamVariant`] (reflected, refracted, total internal reflection).
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Beam {
-    pub face: Face,
-    pub prop: Vector3<f32>,
-    pub refr_index: Complex<f32>,
-    pub rec_count: i32,
-    pub tir_count: i32,
-    pub field: Field,
+    pub face: Face,                   // [`crate::geom::Face`] defining the cross-sectional area
+    pub prop: Vector3<f32>,           // propagation direction vector
+    pub refr_index: Complex<f32>,     // refractive index of current medium
+    pub rec_count: i32,               // recursion depth counter for convergence
+    pub tir_count: i32,               // total internal reflection event counter
+    pub field: Field,                 // electromagnetic [`crate::field::Field`] properties
     pub absorbed_power: f32,          // power absorbed by the medium
     pub clipping_area: f32,           // total area accounted for by intersections and remainders
     pub variant: Option<BeamVariant>, // variant of beam, e.g. reflection, refraction, total internal reflection
-    pub type_: BeamType, // type of beam, e.g. initial, default, outgoing, external diff
-    pub wavelength: f32,
+    pub type_: BeamType,              // [`BeamType`] classification (initial, default, outgoing, external diff)
+    pub wavelength: f32,              // wavelength in current medium
 }
 
 impl Beam {
@@ -690,12 +690,12 @@ impl Beam {
     /// 
     /// **Context**: Beam creation occurs throughout the simulation as initial beams
     /// are established and surface interactions generate new reflected and refracted
-    /// beams. Each beam requires electromagnetic field properties, geometric information,
+    /// beams. Each beam requires electromagnetic [`crate::field::Field`] properties, geometric information,
     /// and interaction history for proper propagation.
     /// 
     /// **How it Works**: Normalizes the propagation direction and initializes all
-    /// beam properties including face geometry, field information, interaction counters,
-    /// and classification. Sets absorbed power and clipping area to zero for new beams.
+    /// beam properties including [`crate::geom::Face`] geometry, [`crate::field::Field`] information, interaction counters,
+    /// and [`BeamType`] classification. Sets absorbed power and clipping area to zero for new beams.
     /// 
     /// # Example
     /// ```rust

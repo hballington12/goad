@@ -67,30 +67,30 @@ mod tests {
 /// 
 /// **Context**: Electromagnetic scattering simulations require coordinating geometry setup,
 /// beam generation, near-field propagation through the particle, far-field diffraction
-/// calculations, and result analysis. Each simulation tracks beam segments as they interact
+/// calculations, and result analysis. Each simulation tracks [`crate::beam::Beam`] segments as they interact
 /// with particle surfaces, undergo reflection and refraction, and escape to produce the
 /// scattered field.
 /// 
-/// **How it Works**: A Problem manages the simulation through multiple queues and state
-/// tracking. The beam_queue holds beams awaiting near-field propagation, while out_beam_queue
-/// and ext_diff_beam_queue manage beams ready for far-field diffraction. The base_geom
-/// preserves the original geometry for reset operations, while geom is the working copy
-/// that can be oriented and modified. Results accumulate in the result field, tracking
+/// **How it Works**: A [`Problem`] manages the simulation through multiple queues and state
+/// tracking. The `beam_queue` holds beams awaiting near-field propagation, while `out_beam_queue`
+/// and `ext_diff_beam_queue` manage beams ready for far-field diffraction. The `base_geom`
+/// preserves the original [`crate::geom::Geom`] for reset operations, while `geom` is the working copy
+/// that can be oriented and modified. Results accumulate in the [`crate::result::Results`] field, tracking
 /// power flows, Mueller matrices, and derived parameters.
 /// 
 /// The simulation proceeds through initialization (geometry setup, centering, scaling),
 /// illumination (initial beam creation), near-field solving (beam propagation and interaction),
-/// and far-field solving (diffraction to scattering angles).
+/// and far-field solving ([`crate::diff`] to scattering angles).
 #[pyclass]
 #[derive(Debug, Clone)] // Added Default derive
 pub struct Problem {
-    pub base_geom: Geom,                // original geometry
-    pub geom: Geom,                     // geometry to trace beams in
-    pub beam_queue: Vec<Beam>,          // beams awaiting near-field propagation
-    pub out_beam_queue: Vec<Beam>,      // beams awaiting diffraction
+    pub base_geom: Geom,                // original [`crate::geom::Geom`] for reset operations
+    pub geom: Geom,                     // working [`crate::geom::Geom`] copy for beam tracing
+    pub beam_queue: Vec<Beam>,          // [`crate::beam::Beam`] objects awaiting near-field propagation
+    pub out_beam_queue: Vec<Beam>,      // beams awaiting [`crate::diff`] calculations
     pub ext_diff_beam_queue: Vec<Beam>, // beams awaiting external diffraction
-    pub settings: Settings,             // runtime settings
-    pub result: Results,                // results of the problem
+    pub settings: Settings,             // runtime [`crate::settings::Settings`]
+    pub result: Results,                // accumulated [`crate::result::Results`] of the simulation
 }
 
 #[pymethods]
@@ -213,20 +213,20 @@ impl Problem {
 impl Problem {
     /// Creates a new electromagnetic scattering problem.
     /// 
-    /// **Context**: Setting up a scattering simulation requires initializing the geometry
+    /// **Context**: Setting up a scattering simulation requires initializing the [`crate::geom::Geom`]
     /// with appropriate material properties, configuring simulation parameters, and
-    /// preparing the result structures. The problem needs both the original geometry
+    /// preparing the [`crate::result::Results`] structures. The problem needs both the original geometry
     /// for reset operations and a working copy for transformations.
     /// 
-    /// **How it Works**: Applies initial geometry processing through init_geom(), 
-    /// generates angular bins for result collection, and initializes empty result
-    /// structures. Creates both base_geom (immutable reference) and geom (working copy)
-    /// to enable multiple runs with different orientations while preserving the
+    /// **How it Works**: Applies initial geometry processing through [`init_geom()`], 
+    /// generates angular bins for result collection using [`crate::bins::generate_bins`], and initializes empty result
+    /// structures. Creates both `base_geom` (immutable reference) and `geom` (working copy)
+    /// to enable multiple runs with different [`crate::orientation`] settings while preserving the
     /// original geometry state.
     /// 
     /// # Example
     /// ```rust
-    /// let mut geom = geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
+    /// let mut geom = crate::geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
     /// geom.shapes[0].refr_index.re = 1.5;
     /// geom.shapes[0].refr_index.im = 0.0001;
     /// let mut problem = Problem::new(geom, None);
@@ -255,12 +255,12 @@ impl Problem {
     /// 
     /// **Context**: Multi-orientation simulations require running the same base
     /// problem with different particle orientations. Each run must start from
-    /// a clean state with empty beam queues and fresh result structures while
+    /// a clean state with empty [`crate::beam::Beam`] queues and fresh [`crate::result::Results`] structures while
     /// preserving the original geometry configuration.
     /// 
-    /// **How it Works**: Clears all beam queues, resets the result structure
+    /// **How it Works**: Clears all beam queues, resets the [`crate::result::Results`] structure
     /// to empty while preserving the angular bins, and restores the working
-    /// geometry from the preserved base_geom copy.
+    /// geometry from the preserved `base_geom` copy.
     /// 
     /// # Example
     /// ```rust
@@ -280,10 +280,10 @@ impl Problem {
     /// **Context**: Raw geometry from files needs processing before electromagnetic
     /// simulation - applying scaling transformations, distortions for roughness studies,
     /// centering for rotation operations, and normalizing to unit scale for numerical
-    /// stability in the field calculations.
+    /// stability in the [`crate::field`] calculations.
     /// 
-    /// **How it Works**: Applies optional anisotropic scaling from settings, applies
-    /// optional distortion for surface roughness simulation, centers the geometry at
+    /// **How it Works**: Applies optional anisotropic scaling from [`crate::settings::Settings`], applies
+    /// optional [`crate::distortion::distort`] for surface roughness simulation, centers the geometry at
     /// the origin, then rescales to unit size. Stores the scaling factor for later
     /// conversion of results back to physical units.
     /// 
@@ -315,11 +315,11 @@ impl Problem {
     /// Creates the incident beam for the simulation.
     /// 
     /// **Context**: Electromagnetic scattering simulations require an incident
-    /// electromagnetic wave to interact with the particle. The incident beam
+    /// electromagnetic wave to interact with the particle. The incident [`crate::beam::Beam`]
     /// must fully illuminate the particle geometry to capture all scattering
     /// interactions.
     /// 
-    /// **How it Works**: Creates a plane wave beam with cross-section large enough
+    /// **How it Works**: Creates a plane wave [`crate::beam::Beam`] with cross-section large enough
     /// to encompass the particle bounds, propagating along the negative z-axis.
     /// The beam wavelength is scaled according to the geometry normalization
     /// factor to maintain consistent physics.
@@ -343,12 +343,12 @@ impl Problem {
 
     /// Creates a problem with a custom initial beam.
     /// 
-    /// **Context**: Some simulations require specific incident beam configurations
+    /// **Context**: Some simulations require specific incident [`crate::beam::Beam`] configurations
     /// rather than the standard plane wave illumination. This constructor allows
-    /// direct specification of the initial electromagnetic field.
+    /// direct specification of the initial electromagnetic [`crate::field::Field`].
     /// 
-    /// **How it Works**: Sets up the problem structure with the provided beam
-    /// already in the beam_queue, bypassing the standard illuminate() step.
+    /// **How it Works**: Sets up the [`Problem`] structure with the provided [`crate::beam::Beam`]
+    /// already in the `beam_queue`, bypassing the standard [`illuminate()`] step.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
         let settings = load_config().expect("Failed to load config");
 
@@ -368,9 +368,9 @@ impl Problem {
 
     /// Computes far-field diffraction from outgoing beams.
     /// 
-    /// **Context**: Beams exiting the particle geometry must be converted to
+    /// **Context**: [`crate::beam::Beam`] objects exiting the particle geometry must be converted to
     /// far-field scattering amplitudes at specific angular bins. This involves
-    /// Fourier transform calculations for each beam.
+    /// Fourier transform calculations in [`crate::diff`] for each beam.
     /// 
     /// **How it Works**: Applies diffraction calculations to each beam in parallel,
     /// accumulates the resulting amplitude matrices, and adds them to the total
