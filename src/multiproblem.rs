@@ -24,9 +24,12 @@ pub struct MultiProblem {
 }
 
 impl MultiProblem {
-    /// Creates a new `MultiOrientProblem` from a `settings: Settings` configuration.
-    pub fn new(settings: Settings) -> Self {
-        let mut geom = Geom::from_file(&settings.geom_name).unwrap();
+    /// Creates a new `MultiProblem` from optional `Geom` and `Settings`.
+    /// If settings not provided, loads from config file.
+    /// If geom not provided, loads from file using settings.geom_name.
+    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
+        let settings = settings.unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
+        let mut geom = geom.unwrap_or_else(|| Geom::from_file(&settings.geom_name).expect("Failed to load geometry"));
 
         problem::init_geom(&settings, &mut geom);
 
@@ -61,7 +64,7 @@ impl MultiProblem {
         println!("Solving problem...");
 
         // init a base problem that can be reset
-        let problem_base = Problem::new(self.geom.clone(), Some(self.settings.clone()));
+        let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
 
         let m = MultiProgress::new();
         let n = self.orientations.num_orientations;

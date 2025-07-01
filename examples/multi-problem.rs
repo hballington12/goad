@@ -3,7 +3,7 @@ use goad::settings::{self};
 
 fn main() {
     let settings = settings::load_config();
-    let mut multiproblem = MultiProblem::new(settings.unwrap());
+    let mut multiproblem = MultiProblem::new(None, settings.ok());
 
     multiproblem.solve();
     multiproblem.writeup();

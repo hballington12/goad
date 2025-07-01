@@ -7,7 +7,7 @@ fn main() {
     geom.shapes[0].refr_index.re = 1.31;
     geom.shapes[0].refr_index.im = 0.001;
 
-    let mut problem = Problem::new(geom, None);
+    let mut problem = Problem::new(Some(geom), None);
     problem.geom.write_obj("hex_hollow_rot.obj").unwrap();
 
     println!("Resetting problem...");
