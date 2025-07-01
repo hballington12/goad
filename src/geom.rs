@@ -377,9 +377,9 @@ impl FaceData {
 
     /// Computes the normal vector for the face.
     /// 
-    /// **Context**: Face normals are required for lighting calculations,
-    /// ray-surface intersection tests, and determining face orientation
-    /// in electromagnetic field computations.
+    /// **Context**: Face normals are required for ray-surface intersection tests,
+    /// determining face orientation in electromagnetic field computations, and
+    /// geometric analysis.
     /// 
     /// **How it Works**: Finds two vertices with sufficient separation,
     /// uses the face midpoint as a third point, then computes the cross
@@ -471,13 +471,13 @@ impl FaceData {
     /// Computes the plane equation containing this face.
     /// 
     /// **Context**: Many geometric algorithms require the plane equation
-    /// (ax + by + cz + d = 0) for intersection tests, distance calculations,
+    /// (`ax + by + cz + d = 0`) for intersection tests, distance calculations,
     /// and coordinate transformations.
     /// 
-    /// **How it Works**: Uses the face normal as the plane normal (a,b,c)
-    /// and computes the offset d from the dot product of the normal with
-    /// any point on the face. The components of the normal are a, b, and c,
-    /// and the offset is d, such that ax + by + cz + d = 0.
+    /// **How it Works**: Uses the face normal as the plane normal (`a`,`b`,`c`)
+    /// and computes the offset `d` from the dot product of the normal with
+    /// any point on the face. The components of the normal are `a`, `b`, and `c`,
+    /// and the offset is `d`, such that `ax + by + cz + d = 0`.
     pub fn plane(&self) -> Plane {
         Plane {
             normal: self.normal,
@@ -706,9 +706,9 @@ impl FaceData {
 
     /// Determines if the face represents a convex polygon.
     /// 
-    /// **Context**: Some algorithms work more efficiently with convex polygons,
-    /// and triangulation methods may behave differently for convex vs concave
-    /// faces. This provides a geometric classification of the face.
+    /// **Context**: Convex faces are important for reliable beam tracing and
+    /// diffraction calculations. Some geometric algorithms behave differently
+    /// for convex vs concave faces, affecting numerical stability.
     /// 
     /// **How it Works**: Projects the face onto its best-fitting 2D plane
     /// based on the largest component of the face normal, then checks if all 
@@ -929,9 +929,9 @@ impl Face {
 
     /// Triangulates a face using the ear clipping algorithm.
     /// 
-    /// **Context**: Many algorithms in computational geometry work more efficiently
-    /// with triangular faces rather than arbitrary polygons. Triangulation breaks
-    /// complex faces into simpler triangular elements while preserving the surface.
+    /// **Context**: Diffraction and beam tracing algorithms require triangular faces
+    /// for reliable computations. Triangulation breaks complex faces into simpler
+    /// triangular elements while preserving the surface geometry.
     /// 
     /// **How it Works**: Projects the face onto a 2D plane aligned with its normal,
     /// applies the earcut triangulation algorithm, then projects the resulting
@@ -1051,7 +1051,7 @@ impl Shape {
 
     /// Converts a [`tobj::Model`] into a [`Shape`].
     /// 
-    /// **Context**: The [`tobj`] library provides raw mesh data (vertices, indices, face counts)
+    /// **Context**: The [`tobj`](https://crates.io/crates/tobj) library provides raw mesh data (vertices, indices, face counts)
     /// but this needs to be restructured into the [`Shape`] format required for electromagnetic
     /// calculations. The conversion must handle arbitrary polygon faces, establish proper 
     /// vertex-face relationships, and set up the geometric properties needed for subsequent
@@ -1183,7 +1183,8 @@ impl Shape {
     /// 
     /// **How it Works**: Compares axis-aligned bounding boxes, checking that
     /// the other shape's bounding box lies entirely within this shape's
-    /// bounding box across all three dimensions.
+    /// bounding box across all three dimensions. Note: This is an approximate
+    /// test based on bounding boxes.
     /// 
     /// # Example
     /// ```rust,no_run
@@ -1319,11 +1320,11 @@ impl Geom {
     /// 
     /// **Context**: Geometry for light scattering simulations typically originates
     /// from external sources - CAD models, 3D scanners, or mesh generation software.
-    /// The standard OBJ format provides a widely-supported way to import these geometries,
-    /// but the raw mesh data needs to be processed into the internal representation
-    /// required for electromagnetic field calculations.
+    /// The standard OBJ format provides a widely-supported way to import these geometries.
+    /// Only .obj files are currently supported. The raw mesh data needs to be processed 
+    /// into the internal representation required for electromagnetic field calculations.
     /// 
-    /// **How it Works**: Parses the OBJ file using the [`tobj`] library to extract vertices
+    /// **How it Works**: Parses the OBJ file using the [`tobj`](https://crates.io/crates/tobj) library to extract vertices
     /// and face definitions. Each mesh object in the file becomes a separate [`Shape`] with
     /// automatically assigned IDs. Face polygons are converted to the internal [`Face`]
     /// representation, and axis-aligned bounding boxes are computed for each shape.
@@ -1509,9 +1510,9 @@ impl Geom {
     /// scaling factor.
     /// Rescales the geometry so that the largest dimension is 1.
     /// 
-    /// **Context**: Electromagnetic field calculations can suffer from numerical
-    /// instability when geometry dimensions vary widely. Normalizing to unit scale
-    /// provides better numerical conditioning for the solver algorithms.
+    /// **Context**: Rescaling establishes the proper wavelength-to-particle size ratio
+    /// for the simulation. Electromagnetic field calculations can suffer from numerical
+    /// precision issues when geometry dimensions vary widely.
     /// 
     /// **How it Works**: Computes the bounding box of all shapes, finds the
     /// maximum dimension, then scales all vertices and faces by 1/max_dimension.
@@ -1794,7 +1795,7 @@ impl Geom {
     /// 
     /// **Context**: Some simulations require anisotropic deformation of particles
     /// to study aspect ratio effects or simulate non-spherical geometries.
-    /// This enables independent scaling along X, Y, and Z axes.
+    /// Users can rescale input geometry prior to simulation if desired.
     /// 
     /// **How it Works**: Multiplies vertex coordinates by the corresponding
     /// scale factors, updates face midpoints and normals accordingly, then

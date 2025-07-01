@@ -79,7 +79,7 @@ mod tests {
 /// power flows, Mueller matrices, and derived parameters.
 /// 
 /// The simulation proceeds through initialization (geometry setup, centering, scaling),
-/// illumination (initial beam creation), near-field solving (beam propagation and interaction),
+/// illumination (initial beam creation for reflection/refraction field generation), near-field solving (beam propagation and interaction),
 /// and far-field solving ([`crate::diff`] to scattering angles).
 #[pyclass]
 #[derive(Debug, Clone)] // Added Default derive
@@ -380,8 +380,8 @@ impl Problem {
     /// Solves beam diffraction contribution to far-field.
     /// 
     /// **Context**: Beams exiting the particle after reflection and refraction
-    /// interactions contribute to the scattered field through diffraction.
-    /// These contributions are typically the dominant scattering mechanism.
+    /// interactions contribute to the scattered field through diffraction
+    /// using Babinet's principle on upward-facing facets.
     /// 
     /// **How it Works**: Processes beams in the outgoing beam queue with
     /// optional field-of-view truncation for computational efficiency.
@@ -478,9 +478,9 @@ impl Problem {
 
     /// Attempts to compute 1D Mueller matrix from 2D results.
     /// 
-    /// **Context**: When angular bins have appropriate symmetry, the 2D Mueller
-    /// matrix can be reduced to a 1D angular distribution for easier analysis
-    /// and comparison with other codes.
+    /// **Context**: When angular bins form a rectangular grid with appropriate 
+    /// symmetry, the 2D Mueller matrix can be reduced to a 1D angular distribution 
+    /// for easier analysis and comparison with other codes.
     /// 
     /// **How it Works**: Calls the result structure's try_mueller_to_1d method
     /// and handles any errors that occur during the reduction process.
@@ -499,7 +499,7 @@ impl Problem {
     /// 
     /// **Context**: The Mueller matrix contains all scattering information, but
     /// specific parameters like scattering cross-section, asymmetry parameter,
-    /// and albedo are often needed for analysis and comparison.
+    /// and albedo are often useful for analysis and comparison.
     /// 
     /// **How it Works**: Calls the result structure's compute_params method
     /// using the simulation wavelength and handles any computation errors.
@@ -624,11 +624,11 @@ impl Problem {
     /// multiple reflected and transmitted beams at interfaces, creating a tree of
     /// interactions that must be processed iteratively until convergence.
     /// 
-    /// **How it Works**: Pops the highest-power beam from the queue, propagates it
-    /// through the geometry to find surface intersections, and generates output beams
-    /// from reflection/refraction. Tracks power flows for different beam types and
-    /// adds new beams to appropriate queues. Returns the propagation result for
-    /// visualization or analysis.
+    /// **How it Works**: Beams are dequeued by sorted energy. Pops the highest-power 
+    /// beam from the queue, propagates it through the geometry to find surface 
+    /// intersections, and generates output beams from reflection/refraction. Tracks 
+    /// power flows for different beam types and adds new beams to appropriate queues. 
+    /// Returns the propagation result for visualization or analysis.
     /// 
     /// # Example
     /// ```rust,no_run
@@ -689,7 +689,8 @@ impl Problem {
     /// 
     /// **Context**: Initial beams require different handling than internal beams
     /// since they haven't yet been subject to splitting and attenuation within
-    /// the particle geometry.
+    /// the particle geometry. Tracks initial beam propagation for external 
+    /// diffraction contribution.
     /// 
     /// **How it Works**: Directly calls the beam propagation method without
     /// applying power, area, or recursion threshold checks.
