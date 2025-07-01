@@ -21,7 +21,7 @@ settings = goad.Settings(
 # Note: both settings and geom parameters are now optional
 # If geom is None, it will be loaded from settings.geom_name
 print("Creating GOAD problem...")
-problem = goad.Problem(settings, geom=None)
+problem = goad.Problem(settings=settings, geom=None)
 
 # Solve the problem and measure computation time
 print("Solving GOAD problem...")

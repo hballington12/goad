@@ -3,10 +3,12 @@ use nalgebra::Matrix3;
 use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
+use pyo3::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
 use serde::Deserialize;
 
+#[pyclass]
 #[derive(Subcommand, Debug, Clone, Deserialize, PartialEq)]
 pub enum Scheme {
     /// Solve the problem by averaging over a uniform distribution of angles.
@@ -18,6 +20,7 @@ pub enum Scheme {
 }
 
 /// Euler angle order for the discrete orientation scheme.
+#[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq, Copy)]
 pub enum EulerConvention {
     XZX,
@@ -34,10 +37,14 @@ pub enum EulerConvention {
     ZXY,
 }
 
+#[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Euler {
+    #[pyo3(get, set)]
     pub alpha: f32,
+    #[pyo3(get, set)]
     pub beta: f32,
+    #[pyo3(get, set)]
     pub gamma: f32,
 }
 
@@ -213,10 +220,40 @@ impl FromStr for Euler {
     }
 }
 
+#[pymethods]
+impl Euler {
+    #[new]
+    fn py_new(alpha: f32, beta: f32, gamma: f32) -> Self {
+        Euler::new(alpha, beta, gamma)
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Euler(alpha={}, beta={}, gamma={})", self.alpha, self.beta, self.gamma)
+    }
+}
+
+#[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Orientation {
+    #[pyo3(get, set)]
     pub scheme: Scheme,
+    #[pyo3(get, set)]
     pub euler_convention: EulerConvention,
+}
+
+#[pymethods]
+impl Orientation {
+    #[new]
+    fn py_new(scheme: Scheme, euler_convention: Option<EulerConvention>) -> Self {
+        Orientation {
+            scheme,
+            euler_convention: euler_convention.unwrap_or(EulerConvention::ZYZ),
+        }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Orientation(scheme={:?}, euler_convention={:?})", self.scheme, self.euler_convention)
+    }
 }
 
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles

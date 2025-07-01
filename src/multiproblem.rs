@@ -12,9 +12,11 @@ use crate::{
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use macroquad::prelude::*;
 use nalgebra::Complex;
+use pyo3::prelude::*;
 use rayon::prelude::*;
 
 /// A problem for a single geometry with multiple orientations.
+#[pyclass]
 #[derive(Debug)] // Added Default derive
 pub struct MultiProblem {
     pub geom: Geom,
@@ -282,5 +284,50 @@ impl MultiProblem {
                 println!("Failed to write 1D mueller matrix (ext)");
             }
         }
+    }
+}
+
+#[pymethods]
+impl MultiProblem {
+    #[new]
+    #[pyo3(signature = (settings = None, geom = None))]
+    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> Self {
+        MultiProblem::new(geom, settings)
+    }
+
+    /// Python wrapper for solve method
+    pub fn py_solve(&mut self) -> PyResult<()> {
+        self.solve();
+        Ok(())
+    }
+
+    /// Get the results object (same pattern as Problem)
+    #[getter]
+    pub fn get_results(&self) -> Results {
+        self.result.clone()
+    }
+
+    /// Python wrapper for writeup method
+    pub fn py_writeup(&self) -> PyResult<()> {
+        self.writeup();
+        Ok(())
+    }
+
+    /// Reset the multiproblem to initial state
+    pub fn py_reset(&mut self) -> PyResult<()> {
+        self.reset();
+        Ok(())
+    }
+
+    /// Regenerate orientations (useful for random schemes)
+    pub fn py_regenerate_orientations(&mut self) -> PyResult<()> {
+        self.regenerate_orientations();
+        Ok(())
+    }
+
+    /// Get the number of orientations
+    #[getter]
+    pub fn get_num_orientations(&self) -> usize {
+        self.orientations.num_orientations
     }
 }

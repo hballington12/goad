@@ -57,6 +57,7 @@ pub struct Problem {
 #[pymethods]
 impl Problem {
     #[new]
+    #[pyo3(signature = (settings = None, geom = None))]
     fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> Self {
         Problem::new(geom, settings)
     }
