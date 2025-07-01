@@ -32,6 +32,7 @@ use itertools::Itertools;
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2, Axis};
+use pyo3::prelude::*;
 
 /// Aggregated results from electromagnetic scattering simulations.
 /// 
@@ -44,6 +45,7 @@ use ndarray::{s, Array1, Array2, Axis};
 /// total scattering, beam-only contributions, and external diffraction. Optionally
 /// includes phi-integrated 1D results for azimuthally symmetric cases. The [`crate::params::Params`]
 /// field contains derived integral parameters computed from the angular distributions.
+#[pyclass]
 #[derive(Debug, Clone)]
 pub struct Results {
     pub powers: Powers,           // [`crate::powers::Powers`] conservation data
@@ -206,6 +208,127 @@ impl Results {
         println!("Scat Cross: {:?}", self.params.scat_cross);
         println!("Ext Cross: {:?}", self.params.ext_cross);
         println!("Albedo: {:?}", self.params.albedo);
+    }
+}
+
+#[pymethods]
+impl Results {
+    /// Get the bins as a list of tuples
+    #[getter]
+    pub fn get_bins(&self) -> Vec<(f32, f32)> {
+        self.bins.clone()
+    }
+
+    /// Get the 1D bins (theta values)
+    #[getter]
+    pub fn get_bins_1d(&self) -> Option<Vec<f32>> {
+        self.bins_1d.clone()
+    }
+
+    /// Get the Mueller matrix as a list of lists
+    #[getter]
+    pub fn get_mueller(&self) -> Vec<Vec<f32>> {
+        crate::problem::collect_mueller(&self.mueller)
+    }
+
+    /// Get the beam Mueller matrix as a list of lists
+    #[getter]
+    pub fn get_mueller_beam(&self) -> Vec<Vec<f32>> {
+        crate::problem::collect_mueller(&self.mueller_beam)
+    }
+
+    /// Get the external diffraction Mueller matrix as a list of lists
+    #[getter]
+    pub fn get_mueller_ext(&self) -> Vec<Vec<f32>> {
+        crate::problem::collect_mueller(&self.mueller_ext)
+    }
+
+    /// Get the 1D Mueller matrix as a list of lists
+    #[getter]
+    pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
+        if let Some(ref mueller_1d) = self.mueller_1d {
+            crate::problem::collect_mueller(mueller_1d)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the 1D beam Mueller matrix as a list of lists
+    #[getter]
+    pub fn get_mueller_1d_beam(&self) -> Vec<Vec<f32>> {
+        if let Some(ref mueller_1d_beam) = self.mueller_1d_beam {
+            crate::problem::collect_mueller(mueller_1d_beam)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the 1D external diffraction Mueller matrix as a list of lists
+    #[getter]
+    pub fn get_mueller_1d_ext(&self) -> Vec<Vec<f32>> {
+        if let Some(ref mueller_1d_ext) = self.mueller_1d_ext {
+            crate::problem::collect_mueller(mueller_1d_ext)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the asymmetry parameter
+    #[getter]
+    pub fn get_asymmetry(&self) -> Option<f32> {
+        self.params.asymettry
+    }
+
+    /// Get the scattering cross section
+    #[getter]
+    pub fn get_scat_cross(&self) -> Option<f32> {
+        self.params.scat_cross
+    }
+
+    /// Get the extinction cross section
+    #[getter]
+    pub fn get_ext_cross(&self) -> Option<f32> {
+        self.params.ext_cross
+    }
+
+    /// Get the albedo
+    #[getter]
+    pub fn get_albedo(&self) -> Option<f32> {
+        self.params.albedo
+    }
+
+    /// Get all parameters as a dictionary
+    #[getter]
+    pub fn get_params(&self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let dict = pyo3::types::PyDict::new(py);
+            dict.set_item("asymmetry", self.params.asymettry)?;
+            dict.set_item("scat_cross", self.params.scat_cross)?;
+            dict.set_item("ext_cross", self.params.ext_cross)?;
+            dict.set_item("albedo", self.params.albedo)?;
+            Ok(dict.into())
+        })
+    }
+
+    /// Get the powers as a dictionary
+    #[getter]
+    pub fn get_powers(&self) -> PyResult<PyObject> {
+        Python::with_gil(|py| {
+            let dict = pyo3::types::PyDict::new(py);
+            dict.set_item("input", self.powers.input)?;
+            dict.set_item("output", self.powers.output)?;
+            dict.set_item("absorbed", self.powers.absorbed)?;
+            dict.set_item("trnc_ref", self.powers.trnc_ref)?;
+            dict.set_item("trnc_rec", self.powers.trnc_rec)?;
+            dict.set_item("trnc_clip", self.powers.trnc_clip)?;
+            dict.set_item("trnc_energy", self.powers.trnc_energy)?;
+            dict.set_item("clip_err", self.powers.clip_err)?;
+            dict.set_item("trnc_area", self.powers.trnc_area)?;
+            dict.set_item("trnc_cop", self.powers.trnc_cop)?;
+            dict.set_item("ext_diff", self.powers.ext_diff)?;
+            dict.set_item("missing", self.powers.missing())?;
+            Ok(dict.into())
+        })
     }
 }
 

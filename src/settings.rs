@@ -159,7 +159,8 @@ impl Settings {
         max_tir = None, 
         theta_res = None, 
         phi_res = None, 
-        euler = None
+        euler = None,
+        orientation = None
     ))]
     fn py_new(
         wavelength: Option<f32>,
@@ -176,6 +177,7 @@ impl Settings {
         theta_res: Option<usize>,
         phi_res: Option<usize>,
         euler: Option<Vec<f32>>,
+        orientation: Option<Orientation>,
     ) -> Self {
         // Load default settings from config file
         let mut settings = load_config_with_cli(false).expect("Failed to load config");
@@ -246,7 +248,7 @@ impl Settings {
             };
         }
 
-        // Update orientation if euler is provided
+        // Update orientation if euler is provided (legacy support)
         if let Some(e) = euler {
             if e.len() >= 3 {
                 settings.orientation = Orientation {
@@ -256,6 +258,11 @@ impl Settings {
                     euler_convention: settings.orientation.euler_convention,
                 };
             }
+        }
+
+        // Update orientation if full orientation object is provided (preferred)
+        if let Some(orient) = orientation {
+            settings.orientation = orient;
         }
 
         settings
@@ -279,6 +286,18 @@ impl Settings {
             Scheme::Discrete { eulers } => vec![eulers[0].alpha, eulers[0].beta, eulers[0].gamma],
             _ => vec![0.0, 0.0, 0.0],
         }
+    }
+
+    /// Set the full orientation object
+    #[setter]
+    fn set_orientation(&mut self, orientation: Orientation) {
+        self.orientation = orientation;
+    }
+
+    /// Get the full orientation object
+    #[getter]
+    fn get_orientation(&self) -> Orientation {
+        self.orientation.clone()
     }
 }
 
