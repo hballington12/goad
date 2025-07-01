@@ -30,7 +30,7 @@ fn fixed_hex_30_30_30() {
         euler_convention: goad::orientation::EulerConvention::ZYZ,
     };
 
-    let mut multiproblem = MultiProblem::new(settings);
+    let mut multiproblem = MultiProblem::new(None, Some(settings));
     multiproblem.solve();
 
     let result = collect_mueller(&multiproblem.result.mueller);
@@ -57,7 +57,7 @@ fn fixed_hex_30_20_20() {
     // Change the refractive index
     settings.particle_refr_index = vec![Complex32::new(1.3117, 0.1)];
 
-    let mut multiproblem = MultiProblem::new(settings);
+    let mut multiproblem = MultiProblem::new(None, Some(settings));
     multiproblem.solve();
 
     let result = collect_mueller(&multiproblem.result.mueller);

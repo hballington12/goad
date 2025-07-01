@@ -2,7 +2,7 @@ use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, Scheme},
     field::Field,
-    geom::{self, Face, Geom},
+    geom::{Face, Geom},
     helpers::draw_face,
     orientation, output,
     result::{self, Results},
@@ -35,7 +35,7 @@ mod tests {
             geom.shapes[geom.shapes[1].parent_id.unwrap()]
         );
 
-        let mut problem = Problem::new(geom, None);
+        let mut problem = Problem::new(Some(geom), None);
 
         problem.propagate_next();
     }
@@ -57,16 +57,9 @@ pub struct Problem {
 #[pymethods]
 impl Problem {
     #[new]
-    fn py_new(settings: Settings, geom: Option<Geom>) -> Self {
-        match geom {
-            // If a geometry is provided, use it
-            Some(geom) => Problem::new(geom, Some(settings)),
-            None => {
-                // If no geometry is provided, load geometry from file
-                let geom = geom::Geom::from_file(&settings.geom_name).unwrap();
-                Problem::new(geom, Some(settings))
-            }
-        }
+    #[pyo3(signature = (settings = None, geom = None))]
+    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> Self {
+        Problem::new(geom, settings)
     }
 
     /// Setter function for the problem settings
@@ -108,71 +101,20 @@ impl Problem {
         Ok(())
     }
 
-    // getter function to retrieve Python object containing the mueller matrix
-    // convert the Array2 to a list of lists and return
+    /// Get the results object
     #[getter]
-    pub fn get_mueller(&self) -> Vec<Vec<f32>> {
-        collect_mueller(&self.result.mueller)
-    }
-
-    // getter function to retrieve Python object containing the asymmetry parameter
-    #[getter]
-    pub fn get_asymmetry(&self) -> Option<f32> {
-        self.result.params.asymettry
-    }
-
-    // getter function to retrieve Python object containing the scattering cross section
-    #[getter]
-    pub fn get_scat_cross(&self) -> Option<f32> {
-        self.result.params.scat_cross
-    }
-
-    // getter function to retrieve Python object containing the extinction cross section
-    #[getter]
-    pub fn get_ext_cross(&self) -> Option<f32> {
-        self.result.params.ext_cross
-    }
-
-    // getter function to retrieve Python object containing the albedo
-    #[getter]
-    pub fn get_albedo(&self) -> Option<f32> {
-        self.result.params.albedo
-    }
-
-    // getter function to retrieve Python object containing the 1d mueller matrix
-    // convert the Array2 to a list of lists and return
-    #[getter]
-    pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
-        if let Some(mueller_1d) = &self.result.mueller_1d {
-            let mut mueller_list = Vec::new();
-            for row in mueller_1d.outer_iter() {
-                let mut row_list = Vec::new();
-                for val in row.iter() {
-                    row_list.push(*val);
-                }
-                mueller_list.push(row_list);
-            }
-            mueller_list
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// getter function to retrieve Python object containing the theta values for the 1d mueller matrix
-    #[getter]
-    pub fn get_theta_1d(&self) -> Vec<f32> {
-        if let Some(theta) = &self.result.bins_1d {
-            theta.clone()
-        } else {
-            Vec::new()
-        }
+    pub fn get_results(&self) -> Results {
+        self.result.clone()
     }
 }
 
 impl Problem {
-    /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
-    pub fn new(mut geom: Geom, settings: Option<Settings>) -> Self {
+    /// Creates a new `Problem` from optional `Geom` and `Settings`.
+    /// If settings not provided, loads from config file.
+    /// If geom not provided, loads from file using settings.geom_name.
+    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
         let settings = settings.unwrap_or_else(|| load_config().expect("Failed to load config"));
+        let mut geom = geom.unwrap_or_else(|| Geom::from_file(&settings.geom_name).expect("Failed to load geometry"));
         init_geom(&settings, &mut geom);
 
         let bins = generate_bins(&settings.binning.scheme);
