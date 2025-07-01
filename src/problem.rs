@@ -100,64 +100,10 @@ impl Problem {
         Ok(())
     }
 
-    // getter function to retrieve Python object containing the mueller matrix
-    // convert the Array2 to a list of lists and return
+    /// Get the results object
     #[getter]
-    pub fn get_mueller(&self) -> Vec<Vec<f32>> {
-        collect_mueller(&self.result.mueller)
-    }
-
-    // getter function to retrieve Python object containing the asymmetry parameter
-    #[getter]
-    pub fn get_asymmetry(&self) -> Option<f32> {
-        self.result.params.asymettry
-    }
-
-    // getter function to retrieve Python object containing the scattering cross section
-    #[getter]
-    pub fn get_scat_cross(&self) -> Option<f32> {
-        self.result.params.scat_cross
-    }
-
-    // getter function to retrieve Python object containing the extinction cross section
-    #[getter]
-    pub fn get_ext_cross(&self) -> Option<f32> {
-        self.result.params.ext_cross
-    }
-
-    // getter function to retrieve Python object containing the albedo
-    #[getter]
-    pub fn get_albedo(&self) -> Option<f32> {
-        self.result.params.albedo
-    }
-
-    // getter function to retrieve Python object containing the 1d mueller matrix
-    // convert the Array2 to a list of lists and return
-    #[getter]
-    pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
-        if let Some(mueller_1d) = &self.result.mueller_1d {
-            let mut mueller_list = Vec::new();
-            for row in mueller_1d.outer_iter() {
-                let mut row_list = Vec::new();
-                for val in row.iter() {
-                    row_list.push(*val);
-                }
-                mueller_list.push(row_list);
-            }
-            mueller_list
-        } else {
-            Vec::new()
-        }
-    }
-
-    /// getter function to retrieve Python object containing the theta values for the 1d mueller matrix
-    #[getter]
-    pub fn get_theta_1d(&self) -> Vec<f32> {
-        if let Some(theta) = &self.result.bins_1d {
-            theta.clone()
-        } else {
-            Vec::new()
-        }
+    pub fn get_results(&self) -> Results {
+        self.result.clone()
     }
 }
 

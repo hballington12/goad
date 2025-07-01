@@ -1,4 +1,4 @@
-use goad::{self, geom::Geom, geom::Shape, problem::Problem, settings::Settings};
+use goad::{self, geom::Geom, geom::Shape, problem::Problem, result::Results, settings::Settings};
 use pyo3::prelude::*;
 
 /// Formats the sum of two numbers as string.
@@ -25,5 +25,6 @@ fn goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Geom>()?;
     m.add_class::<Settings>()?;
     m.add_class::<Problem>()?;
+    m.add_class::<Results>()?;
     Ok(())
 }
