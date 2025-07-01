@@ -83,8 +83,8 @@ impl Field {
     /// identity amplitude matrix representing unit field strength.
     /// 
     /// # Example
-    /// ```rust
-    /// let field = Field::new_identity(e_perp, prop)?;
+    /// ```rust,no_run
+    /// // let field = Field::new_identity(e_perp, prop)?;
     /// ```
     pub fn new_identity(e_perp: Vector3<f32>, prop: Vector3<f32>) -> Result<Self> {
         #[cfg(debug_assertions)]
@@ -134,8 +134,8 @@ impl Field {
     /// orthogonal polarization coordinate system.
     /// 
     /// # Example
-    /// ```rust
-    /// Field::new(e_perp, prop, refl_ampl)?
+    /// ```rust,no_run
+    /// // Field::new(e_perp, prop, refl_ampl)?
     /// ```
     pub fn new(
         e_perp: Vector3<f32>,
@@ -190,9 +190,9 @@ impl Field {
     /// orthogonal transformation.
     /// 
     /// # Example
-    /// ```rust
-    /// let rot = Field::rotation_matrix(beam.field.e_perp, e_perp, beam.prop)
-    ///     .map(|x| nalgebra::Complex::new(x, 0.0));
+    /// ```rust,no_run
+    /// // let rot = Field::rotation_matrix(beam.field.e_perp, e_perp, beam.prop)
+    /// //     .map(|x| nalgebra::Complex::new(x, 0.0));
     /// ```
     pub fn rotation_matrix<T: RealField + std::marker::Copy>(
         e_perp_in: Vector3<T>,

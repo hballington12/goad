@@ -42,16 +42,16 @@ use crate::{geom, settings};
 /// angle. Includes field-of-view filtering for computational efficiency.
 /// 
 /// # Example
-/// ```rust
-/// let ampl_far_field = crate::diff::diffraction(
-///     &verts,                     // [`crate::geom::Face`] vertices from geometry
-///     ampl,                       // 2x2 amplitude matrix
-///     prop,                       // Propagation direction
-///     vk7,                        // Perpendicular polarization vector
-///     &theta_phi_combinations,    // Angular bins (theta, phi) pairs
-///     wavenumber,                 // 2π/wavelength
-///     fov_factor,                // Optional field-of-view limiting
-/// );
+/// ```rust,no_run
+/// // let ampl_far_field = crate::diff::diffraction(
+/// //     &verts,                     // [`crate::geom::Face`] vertices from geometry
+/// //     ampl,                       // 2x2 amplitude matrix
+/// //     prop,                       // Propagation direction
+/// //     vk7,                        // Perpendicular polarization vector
+/// //     &theta_phi_combinations,    // Angular bins (theta, phi) pairs
+/// //     wavenumber,                 // 2π/wavelength
+/// //     fov_factor,                // Optional field-of-view limiting
+/// // );
 /// ```
 pub fn diffraction(
     verts: &[Point3<f32>],

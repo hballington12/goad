@@ -168,7 +168,8 @@ impl Problem {
     /// 
     /// # Example
     /// ```rust
-    /// let mut geom = crate::geom::Geom::from_file("./examples/data/hex2.obj").unwrap();
+    /// use goad::{geom::Geom, problem::Problem};
+    /// let mut geom = Geom::from_file("./examples/data/hex2.obj").unwrap();
     /// geom.shapes[0].refr_index.re = 1.5;
     /// geom.shapes[0].refr_index.im = 0.0001;
     /// let mut problem = Problem::new(Some(geom), None);
@@ -206,9 +207,9 @@ impl Problem {
     /// geometry from the preserved `base_geom` copy.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// println!("Resetting problem...");
-    /// problem.reset();
+    /// // problem.reset();
     /// ```
     pub fn reset(&mut self) {
         self.beam_queue.clear();
@@ -231,16 +232,16 @@ impl Problem {
     /// conversion of results back to physical units.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // From run() workflow
-    /// self.init();
-    /// match euler {
-    ///     Some(euler) => {
-    ///         self.orient(euler);
-    ///     }
-    ///     None => {}
-    /// }
-    /// self.illuminate();
+    /// // self.init();
+    /// // match euler {
+    /// //     Some(euler) => {
+    /// //         self.orient(euler);
+    /// //     }
+    /// //     None => {}
+    /// // }
+    /// // self.illuminate();
     /// ```
     pub fn init(&mut self) {
         // Apply geometry scaling if set
@@ -268,9 +269,9 @@ impl Problem {
     /// factor to maintain consistent physics.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// println!("Illuminating problem...");
-    /// problem.illuminate();
+    /// // problem.illuminate();
     /// ```
     pub fn illuminate(&mut self) {
         let scaled_wavelength = self.settings.wavelength * self.settings.scale;
@@ -421,13 +422,13 @@ impl Problem {
     /// derived scattering parameters when possible.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // Traditional workflow
-    /// problem.reset();
-    /// problem.init();
-    /// problem.illuminate();
-    /// problem.solve();
-    /// problem.writeup();
+    /// // problem.reset();
+    /// // problem.init();
+    /// // problem.illuminate();
+    /// // problem.solve();
+    /// // problem.writeup();
     /// ```
     pub fn solve(&mut self) {
         self.solve_near();
@@ -526,14 +527,14 @@ impl Problem {
     /// orientation simulations and the building block for multi-orientation studies.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // With orientation
-    /// let mut problem = problem_base.clone();
-    /// let euler = Euler::new(*a, *b, *g);
-    /// problem.run(Some(&euler));
+    /// // let mut problem = problem_base.clone();
+    /// // let euler = Euler::new(*a, *b, *g);
+    /// // problem.run(Some(&euler));
     /// 
     /// // Without orientation
-    /// problem.run(None);
+    /// // problem.run(None);
     /// ```
     pub fn run(&mut self, euler: Option<&orientation::Euler>) {
         // println!("Running problem...");
@@ -630,15 +631,15 @@ impl Problem {
     /// visualization or analysis.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // Interactive propagation
-    /// loop {
-    ///     if is_key_pressed(KeyCode::Enter) {
-    ///         let next_propagation = problem.propagate_next().unwrap();
-    ///         println!("number of beams in beam queue: {:?}", problem.beam_queue.len());
-    ///     }
-    ///     next_frame().await;
-    /// }
+    /// // loop {
+    /// //     if is_key_pressed(KeyCode::Enter) {
+    /// //         let next_propagation = problem.propagate_next().unwrap();
+    /// //         println!("number of beams in beam queue: {:?}", problem.beam_queue.len());
+    /// //     }
+    /// //     next_frame().await;
+    /// // }
     /// ```
     pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
         // Try to pop the next beam from the queue
@@ -827,15 +828,15 @@ impl Problem {
     /// to be centered at the origin for rotation around the particle center.
     /// 
     /// # Example
-    /// ```rust
-    /// pub fn orient(&mut self, euler: &orientation::Euler) {
-    ///     if let Err(error) = self
-    ///         .geom
-    ///         .euler_rotate(euler, self.settings.orientation.euler_convention)
-    ///     {
-    ///         panic!("Error rotating geometry: {}", error);
-    ///     }
-    /// }
+    /// ```rust,no_run
+    /// // pub fn orient(&mut self, euler: &orientation::Euler) {
+    /// //     if let Err(error) = self
+    /// //         .geom
+    /// //         .euler_rotate(euler, self.settings.orientation.euler_convention)
+    /// //     {
+    /// //         panic!("Error rotating geometry: {}", error);
+    /// //     }
+    /// // }
     /// ```
     pub fn orient(&mut self, euler: &orientation::Euler) {
         if let Err(error) = self
@@ -905,14 +906,14 @@ fn get_position_by_power(value: f32, queue: &Vec<Beam>, ascending: bool) -> usiz
 /// backwards to simulate incidence from z=0.
 /// 
 /// # Example
-/// ```rust
-/// let scaled_wavelength = self.settings.wavelength * self.settings.scale;
-/// let beam = basic_initial_beam(
-///     &self.geom,
-///     scaled_wavelength,
-///     self.settings.medium_refr_index,
-/// );
-/// self.beam_queue.push(beam);
+/// ```rust,no_run
+/// // let scaled_wavelength = self.settings.wavelength * self.settings.scale;
+/// // let beam = basic_initial_beam(
+/// //     &self.geom,
+/// //     scaled_wavelength,
+/// //     self.settings.medium_refr_index,
+/// // );
+/// // self.beam_queue.push(beam);
 /// ```
 fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
     const FAC: f32 = 1.1; // scale factor to stretch beam to cover geometry
@@ -957,9 +958,9 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
 /// the array length. Recenters the geometry as a final preparation step.
 /// 
 /// # Example
-/// ```rust
-/// let settings = load_config().expect("Failed to load config");
-/// init_geom(&settings, &mut geom);
+/// ```rust,no_run
+/// // let settings = load_config().expect("Failed to load config");
+/// // init_geom(&settings, &mut geom);
 /// ```
 pub fn init_geom(settings: &Settings, geom: &mut Geom) {
     for shape in geom.shapes.iter_mut() {

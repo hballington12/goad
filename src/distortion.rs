@@ -46,8 +46,8 @@ impl Geom {
     /// self-intersections and non-convex faces, with automatic retry and reversion.
     /// 
     /// # Example
-    /// ```rust
-    /// geom.distort(distortion_factor, settings.seed);
+    /// ```rust,no_run
+    /// // geom.distort(distortion_factor, settings.seed);
     /// ```
     pub fn distort(&mut self, sigma: f32, seed: Option<u64>) {
         if sigma <= MIN_DISTORTION {

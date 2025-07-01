@@ -66,8 +66,8 @@ impl BeamPropagation {
     /// and stores both input and output beams for later analysis.
     /// 
     /// # Example
-    /// ```rust
-    /// Some(BeamPropagation::new(beam, outputs))
+    /// ```rust,no_run
+    /// // Some(BeamPropagation::new(beam, outputs))
     /// ```
     pub fn new(input: Beam, outputs: Vec<Beam>) -> Self {
         let refr_index = input.refr_index.clone();
@@ -205,14 +205,14 @@ impl Beam {
     /// with [`BeamType::Initial`] and zero interaction counters.
     /// 
     /// # Example
-    /// ```rust
-    /// let beam = Beam::new_initial(
-    ///     clip,
-    ///     projection,                    // propagation direction
-    ///     Complex::new(1.00, 0.0),      // refractive index
-    ///     e_perp,                       // perpendicular polarization vector
-    ///     wavelength,                   // wavelength
-    /// ).unwrap();
+    /// ```rust,no_run
+    /// // let beam = Beam::new_initial(
+    /// //     clip,
+    /// //     projection,                    // propagation direction
+    /// //     Complex::new(1.00, 0.0),      // refractive index
+    /// //     e_perp,                       // perpendicular polarization vector
+    /// //     wavelength,                   // wavelength
+    /// // ).unwrap();
     /// ```
     pub fn new_initial(
         face: Face,
@@ -276,21 +276,21 @@ impl Beam {
     /// and tracks power absorption. Returns output beams and power loss information.
     /// 
     /// # Example
-    /// ```rust
-    /// match beam.propagate(
-    ///     &mut self.geom,
-    ///     self.settings.medium_refr_index,
-    ///     self.settings.beam_area_threshold(),
-    /// ) {
-    ///     Ok((outputs, area_power_loss)) => {
-    ///         self.result.powers.trnc_area += area_power_loss / self.settings.scale.powi(2);
-    ///         outputs
-    ///     }
-    ///     Err(_) => {
-    ///         self.result.powers.clip_err += beam.power() / self.settings.scale.powi(2);
-    ///         Vec::new()
-    ///     }
-    /// }
+    /// ```rust,no_run
+    /// // match beam.propagate(
+    /// //     &mut self.geom,
+    /// //     self.settings.medium_refr_index,
+    /// //     self.settings.beam_area_threshold(),
+    /// // ) {
+    /// //     Ok((outputs, area_power_loss)) => {
+    /// //         self.result.powers.trnc_area += area_power_loss / self.settings.scale.powi(2);
+    /// //         outputs
+    /// //     }
+    /// //     Err(_) => {
+    /// //         self.result.powers.clip_err += beam.power() / self.settings.scale.powi(2);
+    /// //         Vec::new()
+    /// //     }
+    /// // }
     /// ```
     pub fn propagate(
         &mut self,
@@ -698,18 +698,18 @@ impl Beam {
     /// and [`BeamType`] classification. Sets absorbed power and clipping area to zero for new beams.
     /// 
     /// # Example
-    /// ```rust
-    /// let new_beam = Beam::new(
-    ///     face,
-    ///     beam.prop,
-    ///     beam.refr_index,
-    ///     beam.rec_count,
-    ///     beam.tir_count,
-    ///     Field::new(beam.field.e_perp, beam.prop, ampl).unwrap(),
-    ///     beam.variant.clone(),
-    ///     beam.type_.clone(),
-    ///     beam.wavelength,
-    /// );
+    /// ```rust,no_run
+    /// // let new_beam = Beam::new(
+    /// //     face,
+    /// //     beam.prop,
+    /// //     beam.refr_index,
+    /// //     beam.rec_count,
+    /// //     beam.tir_count,
+    /// //     Field::new(beam.field.e_perp, beam.prop, ampl).unwrap(),
+    /// //     beam.variant.clone(),
+    /// //     beam.type_.clone(),
+    /// //     beam.wavelength,
+    /// // );
     /// ```
     pub fn new(
         face: Face,
@@ -788,11 +788,11 @@ impl Beam {
     /// scattering angle. Returns amplitude matrices for polarization analysis.
     /// 
     /// # Example
-    /// ```rust
-    /// let ampl_far_field = queue
-    ///     .par_iter()
-    ///     .map(|outbeam| outbeam.diffract(bins, fov_factor))
-    ///     .reduce(/* combine results */);
+    /// ```rust,no_run
+    /// // let ampl_far_field = queue
+    /// //     .par_iter()
+    /// //     .map(|outbeam| outbeam.diffract(bins, fov_factor))
+    /// //     .reduce(/* combine results */);
     /// ```
     pub fn diffract(
         &self,

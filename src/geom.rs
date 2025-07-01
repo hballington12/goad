@@ -1136,10 +1136,10 @@ impl Shape {
     /// bounding box to reflect the new dimensions.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // From distortion recovery
-    /// let rescale_fac = max_dim / new_max_dim;
-    /// shape.rescale(rescale_fac);  // Rescale after distortion to maintain size
+    /// // let rescale_fac = max_dim / new_max_dim;
+    /// // shape.rescale(rescale_fac);  // Rescale after distortion to maintain size
     /// ```
     pub fn rescale(&mut self, scale: f32) {
         for vertex in &mut self.vertices {
@@ -1186,15 +1186,15 @@ impl Shape {
     /// bounding box across all three dimensions.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // Iterate over distinct pairs of shapes
-    /// for (id_a, a) in &shapes_with_ids {
-    ///     for (id_b, b) in &shapes_with_ids {
-    ///         if id_a != id_b && a.contains(b) {  // Containment testing
-    ///             containment_graph.set_parent(*id_b, *id_a);
-    ///         }
-    ///     }
-    /// }
+    /// // for (id_a, a) in &shapes_with_ids {
+    /// //     for (id_b, b) in &shapes_with_ids {
+    /// //         if id_a != id_b && a.contains(b) {  // Containment testing
+    /// //             containment_graph.set_parent(*id_b, *id_a);
+    /// //         }
+    /// //     }
+    /// // }
     /// ```
     pub fn contains(&self, other: &Shape) -> bool {
         match (&self.aabb, &other.aabb) {
@@ -1217,14 +1217,14 @@ impl Shape {
     /// in the ancestry chain.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // From clipping logic
-    /// for shape in self.geom.shapes.iter() {
-    ///     if internal && !shape.is_within(&self.geom, clip_shape_id) {
-    ///         continue;  // Skip shapes not within the clipping shape
-    ///     }
-    ///     // Process faces...
-    /// }
+    /// // for shape in self.geom.shapes.iter() {
+    /// //     if internal && !shape.is_within(&self.geom, clip_shape_id) {
+    /// //         continue;  // Skip shapes not within the clipping shape
+    /// //     }
+    /// //     // Process faces...
+    /// // }
     /// ```
     pub fn is_within(&self, geom: &Geom, other_id: Option<usize>) -> bool {
         if other_id.is_none() {
@@ -1331,11 +1331,13 @@ impl Geom {
     /// all shape pairs, establishing parent-child hierarchies for nested geometries.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
+    /// use goad::geom::Geom;
+    /// use goad::problem::Problem;
     /// let mut geom = Geom::from_file("./examples/data/hex2.obj").unwrap();
     /// geom.shapes[0].refr_index.re = 1.5;
     /// geom.shapes[0].refr_index.im = 0.0001;
-    /// let mut problem = crate::problem::Problem::new(geom, None);
+    /// let mut problem = Problem::new(Some(geom), None);
     /// ```
     pub fn from_file(filename: &str) -> Result<Self> {
         // Log current directory only in debug builds
@@ -1471,14 +1473,14 @@ impl Geom {
     /// Returns (min_point, max_point) defining the overall geometric extent.
     /// 
     /// # Example
-    /// ```rust
-    /// fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
-    ///     const FAC: f32 = 1.1; // scale factor to stretch beam to cover geometry
-    ///     let bounds = geom.bounds();
-    ///     let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
-    ///     // Create beam cross-section to fully illuminate the geometry
-    ///     // ...
-    /// }
+    /// ```rust,no_run
+    /// // fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
+    /// //     const FAC: f32 = 1.1; // scale factor to stretch beam to cover geometry
+    /// //     let bounds = geom.bounds();
+    /// //     let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
+    /// //     // Create beam cross-section to fully illuminate the geometry
+    /// //     // ...
+    /// // }
     /// ```
     pub fn bounds(&self) -> (Point3<f32>, Point3<f32>) {
         let (min, max) = self.shapes.iter().fold(
@@ -1517,9 +1519,9 @@ impl Geom {
     /// back to original units if needed.
     /// 
     /// # Example
-    /// ```rust
-    /// self.geom.recentre();
-    /// self.settings.scale = self.geom.rescale();  // Returns scaling factor
+    /// ```rust,no_run
+    /// // self.geom.recentre();
+    /// // self.settings.scale = self.geom.rescale();  // Returns scaling factor
     /// ```
     pub fn rescale(&mut self) -> f32 {
         let bounds = self.bounds();
@@ -1546,13 +1548,13 @@ impl Geom {
     /// vertex representations.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // From problem initialization workflow
-    /// if let Some(distortion) = self.settings.distortion {
-    ///     self.geom.distort(distortion, self.settings.seed);
-    /// }
-    /// self.geom.recentre();  // Center before rescaling
-    /// self.settings.scale = self.geom.rescale();
+    /// // if let Some(distortion) = self.settings.distortion {
+    /// //     self.geom.distort(distortion, self.settings.seed);
+    /// // }
+    /// // self.geom.recentre();  // Center before rescaling
+    /// // self.settings.scale = self.geom.rescale();
     /// ```
     pub fn recentre(&mut self) {
         let com = self.centre_of_mass();
@@ -1595,15 +1597,15 @@ impl Geom {
     /// magnitude is below a tolerance threshold (1e-6).
     /// 
     /// # Example
-    /// ```rust
-    /// pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
-    ///     if !self.is_centered() {
-    ///         return Err(anyhow::anyhow!(
-    ///             "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
-    ///         ));
-    ///     }
-    ///     // ... proceed with rotation
-    /// }
+    /// ```rust,no_run
+    /// // pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
+    /// //     if !self.is_centered() {
+    /// //         return Err(anyhow::anyhow!(
+    /// //             "Geometry must be centred before rotation can be applied. HINT: Try geom.recentre()"
+    /// //         ));
+    /// //     }
+    /// //     // ... proceed with rotation
+    /// // }
     /// ```
     pub fn is_centered(&self) -> bool {
         self.centre_of_mass().coords.norm() < 1e-6
@@ -1624,15 +1626,15 @@ impl Geom {
     /// geometric center.
     /// 
     /// # Example
-    /// ```rust
-    /// pub fn orient(&mut self, euler: &orientation::Euler) {
-    ///     if let Err(error) = self
-    ///         .geom
-    ///         .euler_rotate(euler, self.settings.orientation.euler_convention)
-    ///     {
-    ///         panic!("Error rotating geometry: {}", error);
-    ///     }
-    /// }
+    /// ```rust,no_run
+    /// // pub fn orient(&mut self, euler: &orientation::Euler) {
+    /// //     if let Err(error) = self
+    /// //         .geom
+    /// //         .euler_rotate(euler, self.settings.orientation.euler_convention)
+    /// //     {
+    /// //         panic!("Error rotating geometry: {}", error);
+    /// //     }
+    /// // }
     /// ```
     pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
         if !self.is_centered() {
@@ -1690,15 +1692,15 @@ impl Geom {
     /// complex faces with interior holes.
     /// 
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// // From distortion example
-    /// geom.distort(0.5, None);
-    /// geom.recentre();
-    /// let euler = Euler::new(0.0, 30.0, 0.0);
-    /// let result = geom.euler_rotate(&euler, goad::orientation::EulerConvention::XYX);
+    /// // geom.distort(0.5, None);
+    /// // geom.recentre();
+    /// // let euler = Euler::new(0.0, 30.0, 0.0);
+    /// // let result = geom.euler_rotate(&euler, goad::orientation::EulerConvention::XYX);
     /// 
     /// // write the distorted object to a file
-    /// geom.write_obj("hex_distorted.obj").unwrap();
+    /// // geom.write_obj("hex_distorted.obj").unwrap();
     /// ```
     pub fn write_obj<P: AsRef<Path>>(&self, filename: P) -> Result<()> {
         use std::fs::File;

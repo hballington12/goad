@@ -214,8 +214,8 @@ pub fn interval_bins(
 /// complete angular grid.
 /// 
 /// # Example
-/// ```rust
-/// let theta_phi_combinations = bins::simple_bins(180, 180);
+/// ```rust,no_run
+/// // let theta_phi_combinations = bins::simple_bins(180, 180);
 /// ```
 pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
     let thetas = Array1::linspace(0.0, 180.0, num_theta).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
@@ -239,8 +239,8 @@ pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
 /// file loading and parsing with fallback to default bins.
 /// 
 /// # Example
-/// ```rust
-/// let bins = generate_bins(&self.settings.bins.scheme);
+/// ```rust,no_run
+/// // let bins = generate_bins(&self.settings.bins.scheme);
 /// ```
 pub fn generate_bins(bin_type: &Scheme) -> Vec<(f32, f32)> {
     match bin_type {

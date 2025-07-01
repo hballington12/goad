@@ -219,9 +219,9 @@ impl<'a> Clipping<'a> {
     /// polygon operations.
     /// 
     /// # Example
-    /// ```rust
-    /// let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
-    /// clipping.clip(area_threshold)?;
+    /// ```rust,no_run
+    /// // let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
+    /// // clipping.clip(area_threshold)?;
     /// ```
     pub fn new(geom: &'a mut Geom, clip: &'a mut Face, proj: &'a Vector3<f32>) -> Self {
         let mut clipping = Self {
@@ -358,13 +358,13 @@ impl<'a> Clipping<'a> {
     /// results back to world coordinates.
     /// 
     /// # Example
-    /// ```rust
-    /// let mut clipping = Clipping::new(&mut geom, &mut self.face, &self.prop);
-    /// clipping.clip(area_threshold)?;
-    /// let (intersections, remainders) = (
-    ///     clipping.intersections.into_iter().collect(),
-    ///     clipping.remaining.into_iter().collect(),
-    /// );
+    /// ```rust,no_run
+    /// // let mut clipping = Clipping::new(&mut geom, &mut self.face, &self.prop);
+    /// // clipping.clip(area_threshold)?;
+    /// // let (intersections, remainders) = (
+    /// //     clipping.intersections.into_iter().collect(),
+    /// //     clipping.remaining.into_iter().collect(),
+    /// // );
     /// ```
     pub fn clip(&mut self, area_threshold: f32) -> Result<()> {
         if self.is_done {

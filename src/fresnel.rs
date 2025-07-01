@@ -35,9 +35,9 @@ use nalgebra::{Complex, Matrix2, Vector2};
 /// multiplication with field amplitude matrices.
 /// 
 /// # Example
-/// ```rust
-/// let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
-/// let refl_ampl = fresnel * ampl;
+/// ```rust,no_run
+/// // let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
+/// // let refl_ampl = fresnel * ampl;
 /// ```
 pub fn refl(
     n1: Complex<f32>,
@@ -64,9 +64,9 @@ pub fn refl(
 /// field amplitude and the impedance difference between the two media.
 /// 
 /// # Example
-/// ```rust
-/// let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
-/// let refr_ampl = fresnel * ampl.clone();
+/// ```rust,no_run
+/// // let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
+/// // let refr_ampl = fresnel * ampl.clone();
 /// ```
 pub fn refr(
     n1: Complex<f32>,

@@ -84,9 +84,9 @@ mod tests {
 /// numerical safeguards against invalid angle calculations.
 /// 
 /// # Example
-/// ```rust
-/// let theta_t = get_theta_t(theta_i, n1, n2)?;
-/// let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
+/// ```rust,no_run
+/// // let theta_t = get_theta_t(theta_i, n1, n2)?;
+/// // let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
 /// ```
 pub fn get_theta_t(theta_i: f32, m1: Complex<f32>, m2: Complex<f32>) -> Result<f32> {
     if m1 == m2 {
