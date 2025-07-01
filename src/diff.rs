@@ -5,7 +5,31 @@ use std::f32::consts::PI;
 use crate::field::Field;
 use crate::{geom, settings};
 
-// Diffraction. Face must be convex.
+/// Computes far-field electromagnetic diffraction from a convex aperture.
+/// 
+/// **Context**: Converting near-field beam representations to far-field scattering
+/// observables requires computing diffraction integrals over aperture cross-sections.
+/// This transformation connects the geometric optics beam propagation to measurable
+/// scattering patterns at observation angles.
+/// 
+/// **How it Works**: Uses Fraunhofer diffraction theory to compute line integrals
+/// around the aperture boundary. Transforms coordinate systems to align the aperture
+/// with optimal calculation geometry, applies electromagnetic field rotations for
+/// polarization consistency, and evaluates diffraction integrals at each observation
+/// angle. Includes field-of-view filtering for computational efficiency.
+/// 
+/// # Example
+/// ```rust
+/// let ampl_far_field = diff::diffraction(
+///     &verts,                     // Face vertices from geometry
+///     ampl,                       // 2x2 amplitude matrix
+///     prop,                       // Propagation direction
+///     vk7,                        // Perpendicular polarization vector
+///     &theta_phi_combinations,    // Angular bins (theta, phi) pairs
+///     wavenumber,                 // 2π/wavelength
+///     fov_factor,                // Optional field-of-view limiting
+/// );
+/// ```
 pub fn diffraction(
     verts: &[Point3<f32>],
     mut ampl: Matrix2<Complex<f32>>,
@@ -193,6 +217,16 @@ pub fn diffraction(
 }
 
 // Other functions remain unchanged
+/// Computes all rotation matrices needed for electromagnetic field transformations.
+/// 
+/// **Context**: Converting electromagnetic fields between incident and scattered
+/// coordinate systems requires multiple rotation matrices. The field components
+/// must maintain physical consistency while accounting for changes in propagation
+/// direction and observation geometry.
+/// 
+/// **How it Works**: Combines Karczewski transformation for electromagnetic coupling
+/// with geometric rotations for coordinate system changes. Returns matrices for
+/// transforming field components between incident and observation directions.
 #[inline]
 fn get_rotations(
     rot3: Matrix3<f32>,
@@ -216,6 +250,17 @@ fn get_rotations(
     (karczewski, rot4, prerotation)
 }
 
+/// Initializes coordinate transformations and geometry for diffraction calculation.
+/// 
+/// **Context**: Diffraction calculations require coordinate systems aligned with
+/// the aperture geometry for numerical stability. The aperture must be centered
+/// and oriented optimally, while electromagnetic field amplitudes need scaling
+/// by the wavenumber.
+/// 
+/// **How it Works**: Applies small perturbations to the propagation vector to avoid
+/// numerical singularities, scales amplitude by wavenumber, computes aperture
+/// center of mass and relative vertex positions, then determines rotation matrices
+/// for optimal coordinate alignment.
 fn init_diff(
     verts: &[Point3<f32>],
     ampl: &mut Matrix2<Complex<f32>>,
@@ -253,6 +298,15 @@ fn init_diff(
     (center_of_mass, relative_vertices, rot3, prop2)
 }
 
+/// Computes rotation matrix to align aperture with coordinate axes.
+/// 
+/// **Context**: Aperture diffraction calculations are numerically more stable
+/// when the aperture edges are aligned with coordinate axes. This reduces
+/// the range of slopes and angles that must be handled in the integration.
+/// 
+/// **How it Works**: Performs three sequential rotations based on the first
+/// two vertices of the aperture. Handles colinear edge cases by using default
+/// angles when vertex coordinates are near thresholds.
 pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     let a1 = verts[0];
     let b1 = verts[1];
@@ -330,6 +384,16 @@ pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
     rot
 }
 
+/// Implements Karczewski transformation for electromagnetic field components.
+/// 
+/// **Context**: Electromagnetic scattering requires transforming incident field
+/// components to scattered field components while maintaining the physical
+/// relationships between electric and magnetic fields. The Karczewski transformation
+/// provides this coupling between incident and observation directions.
+/// 
+/// **How it Works**: Computes transformation matrices based on incident and scattered
+/// wave vectors, handles numerical singularities with epsilon thresholds, and
+/// returns both the transformation matrix and magnetic field vector.
 #[inline]
 pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Vector3<f32>) {
     let big_kx = prop2.x;
@@ -373,6 +437,14 @@ pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Ve
     (diff_ampl, m)
 }
 
+/// Creates a 2D rotation matrix for propagation vector alignment.
+/// 
+/// **Context**: Diffraction calculations require aligning the propagation
+/// vector with the coordinate system. This rotation optimizes the geometry
+/// for numerical integration.
+/// 
+/// **How it Works**: Computes rotation angle from propagation vector components
+/// and creates a rotation matrix around the z-axis.
 #[inline]
 pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
     let angle = -prop1.y.atan2(prop1.x);
@@ -383,6 +455,14 @@ pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
     )
 }
 
+/// Handles numerical edge cases for slope calculations.
+/// 
+/// **Context**: Computing slopes of aperture edges can lead to division
+/// by zero or extremely large values near vertical or horizontal edges.
+/// These singularities must be handled consistently.
+/// 
+/// **How it Works**: Applies threshold limits to slope values, replacing
+/// extreme values with controlled limits to maintain numerical stability.
 #[inline]
 pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
     if mj.abs() > 1e6 || nj.abs() < 1e-6 {
@@ -394,11 +474,28 @@ pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
     }
 }
 
+/// Calculates the far-field phase factor for a given observation direction.
+/// 
+/// **Context**: Far-field diffraction calculations require phase factors
+/// that account for the optical path difference from the aperture to
+/// the observation point at effectively infinite distance.
+/// 
+/// **How it Works**: Multiplies the wavenumber by the magnitude of the
+/// observation vector to get the phase factor used in Fraunhofer diffraction.
 #[inline]
 pub fn calculate_bvsk(rotated_pos: &Vector3<f32>, wavenumber: f32) -> f32 {
     wavenumber * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
 }
 
+/// Calculates x and y components of effective wave vector.
+/// 
+/// **Context**: Diffraction integrals require wave vector components in
+/// the observation direction. These components determine the phase
+/// relationships in the integration.
+/// 
+/// **How it Works**: Transforms incident wave vector components to observation
+/// coordinate system and applies epsilon thresholding to prevent numerical
+/// instabilities in subsequent calculations.
 #[inline]
 pub fn calculate_kxx_kyy(
     kinc: &[f32; 2],
@@ -423,6 +520,15 @@ pub fn calculate_kxx_kyy(
     (kxx, kyy)
 }
 
+/// Computes phase factors for diffraction integral edge contributions.
+/// 
+/// **Context**: Fraunhofer diffraction integrals require computing phase
+/// differences between aperture edges and observation points. These phase
+/// factors determine the interference patterns in the far field.
+/// 
+/// **How it Works**: Calculates base phase delta at vertex position and
+/// modified phases delta1, delta2 for edge slopes to handle the line
+/// integral contributions along aperture boundaries.
 #[inline]
 pub fn calculate_deltas(kxx: f32, kyy: f32, xj: f32, yj: f32, mj: f32, nj: f32) -> (f32, f32, f32) {
     let delta = kxx * xj + kyy * yj;
@@ -431,6 +537,15 @@ pub fn calculate_deltas(kxx: f32, kyy: f32, xj: f32, yj: f32, mj: f32, nj: f32) 
     (delta, delta1, delta2)
 }
 
+/// Computes phase differences across aperture edge segments.
+/// 
+/// **Context**: Line integrals around aperture boundaries require phase
+/// variations along each edge segment. These omega terms capture the
+/// phase change from one edge endpoint to the other.
+/// 
+/// **How it Works**: Multiplies edge vector components dx, dy by corresponding
+/// phase gradient terms delta1, delta2 to get total phase differences
+/// across each edge segment.
 #[inline]
 pub fn calculate_omegas(dx: f32, dy: f32, delta1: f32, delta2: f32) -> (f32, f32) {
     let omega1 = dx * delta1;
@@ -438,6 +553,15 @@ pub fn calculate_omegas(dx: f32, dy: f32, delta1: f32, delta2: f32) -> (f32, f32
     (omega1, omega2)
 }
 
+/// Computes integration coefficients for diffraction line integrals.
+/// 
+/// **Context**: Analytical evaluation of diffraction line integrals requires
+/// specific weighting coefficients that account for the geometry of aperture
+/// edges and wave vector components.
+/// 
+/// **How it Works**: Calculates reciprocal terms alpha and beta from phase
+/// gradients and wave vector components, providing the proper scaling for
+/// the analytical integration of oscillatory functions.
 #[inline]
 pub fn calculate_alpha_beta(delta1: f32, delta2: f32, kxx: f32, kyy: f32) -> (f32, f32) {
     let alpha = 1.0 / (2.0 * kyy * delta1);
@@ -445,6 +569,16 @@ pub fn calculate_alpha_beta(delta1: f32, delta2: f32, kxx: f32, kyy: f32) -> (f3
     (alpha, beta)
 }
 
+/// Evaluates the analytical diffraction integral contribution from one aperture edge.
+/// 
+/// **Context**: Each edge of the aperture polygon contributes to the total
+/// diffraction integral through line integrals that can be evaluated analytically.
+/// The summand represents the complex amplitude contribution from one edge.
+/// 
+/// **How it Works**: Computes trigonometric terms from phase differences,
+/// combines them with integration coefficients alpha and beta to get real
+/// and imaginary parts, applies the far-field phase factor, and scales
+/// by the geometric normalization factor.
 #[inline]
 pub fn calculate_summand(
     bvsk: f32,
