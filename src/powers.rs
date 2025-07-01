@@ -1,5 +1,15 @@
 use std::{fmt, ops::*};
 
+/// Power conservation tracking for electromagnetic beam propagation.
+/// 
+/// **Context**: Energy conservation is a fundamental check for simulation accuracy.
+/// In geometric optics with beam truncation, perfect conservation is impossible,
+/// but tracking all power contributions enables validation and convergence analysis.
+/// Each truncation mechanism contributes to the power budget.
+/// 
+/// **How it Works**: Tracks input power, output power reaching far field, absorbed
+/// power in materials, and various truncation contributions. The missing() method
+/// computes unaccounted power, which should approach zero for well-converged simulations.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Powers {
     pub input: f32,       // near-field input power
@@ -70,6 +80,12 @@ impl AddAssign for Powers {
 }
 
 impl Powers {
+    /// Creates a new power tracking structure with zero initial values.
+    /// 
+    /// **Context**: Power tracking begins with zero values and accumulates
+    /// contributions throughout the simulation.
+    /// 
+    /// **How it Works**: Initializes all power components to zero.
     pub fn new() -> Self {
         Self {
             input: 0.0,
@@ -86,7 +102,14 @@ impl Powers {
         }
     }
 
-    /// Returns the power unaccounted for.
+    /// Computes power missing from the conservation budget.
+    /// 
+    /// **Context**: Perfect power conservation would show zero missing power.
+    /// Non-zero values indicate numerical errors, unconverged simulations,
+    /// or untracked truncation mechanisms.
+    /// 
+    /// **How it Works**: Subtracts all tracked power components from input
+    /// power to find the unaccounted remainder.
     pub fn missing(&self) -> f32 {
         self.input
             - (self.output

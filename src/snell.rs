@@ -49,9 +49,23 @@ mod tests {
     }
 }
 
-/// Returns the sine of the transmitted angle according to Snell's Law.
-/// Port from Fortran code rt_c.f90, Macke 1996.
-/// All angles are in radians.
+/// Computes transmitted angle using generalized Snell's law for complex refractive indices.
+/// 
+/// **Context**: Classical Snell's law applies to real refractive indices, but electromagnetic
+/// scattering simulations often involve absorbing materials with complex refractive indices.
+/// The generalized form accounts for both the real and imaginary parts of the refractive
+/// index, ensuring proper treatment of absorption and dispersion effects.
+/// 
+/// **How it Works**: Implements the algorithm from Macke (1996) that handles complex
+/// refractive indices by decomposing them into real and imaginary components, computing
+/// relative parameters, and solving the generalized form of Snell's law. Includes
+/// numerical safeguards against invalid angle calculations.
+/// 
+/// # Example
+/// ```rust
+/// let theta_t = get_theta_t(theta_i, n1, n2)?;
+/// let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
+/// ```
 pub fn get_theta_t(theta_i: f32, m1: Complex<f32>, m2: Complex<f32>) -> Result<f32> {
     if m1 == m2 {
         return Ok(theta_i);

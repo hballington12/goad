@@ -7,6 +7,16 @@ use rand::Rng;
 use rand::SeedableRng;
 use serde::Deserialize;
 
+/// Particle orientation schemes for scattering pattern analysis.
+/// 
+/// **Context**: Scattering patterns depend strongly on particle orientation relative
+/// to the incident beam. Different applications require different orientation approaches:
+/// fixed orientations for specific studies, random orientations for ensemble averaging,
+/// or systematic discrete sets for detailed pattern analysis.
+/// 
+/// **How it Works**: Provides two main schemes - Uniform generates random orientations
+/// following uniform distributions on the rotation group, while Discrete uses
+/// user-specified Euler angle sets for deterministic orientation control.
 #[derive(Subcommand, Debug, Clone, Deserialize, PartialEq)]
 pub enum Scheme {
     /// Solve the problem by averaging over a uniform distribution of angles.
@@ -17,7 +27,15 @@ pub enum Scheme {
     Discrete { eulers: Vec<Euler> },
 }
 
-/// Euler angle order for the discrete orientation scheme.
+/// Standard Euler angle rotation conventions for 3D orientation specification.
+/// 
+/// **Context**: Euler angles provide a three-parameter description of 3D rotations,
+/// but the order of rotations affects the final orientation. Different fields
+/// use different conventions, requiring support for multiple rotation sequences
+/// to maintain compatibility with external data sources.
+/// 
+/// **How it Works**: Enumerates all standard Euler conventions with both proper
+/// Euler angles (repeated axis) and Tait-Bryan angles (distinct axes).
 #[derive(Debug, Clone, Deserialize, PartialEq, Copy)]
 pub enum EulerConvention {
     XZX,
@@ -34,6 +52,15 @@ pub enum EulerConvention {
     ZXY,
 }
 
+/// Three-angle representation of 3D rotation using Euler angles.
+/// 
+/// **Context**: Euler angles provide an intuitive parameterization of 3D rotations
+/// using three sequential rotations about coordinate axes. This representation
+/// is widely used in crystallography, molecular dynamics, and engineering
+/// applications for specifying particle orientations.
+/// 
+/// **How it Works**: Stores three rotation angles (alpha, beta, gamma) in degrees
+/// that define sequential rotations according to the specified Euler convention.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Euler {
     pub alpha: f32,
@@ -42,9 +69,24 @@ pub struct Euler {
 }
 
 impl Euler {
+    /// Creates a new Euler angle specification.
+    /// 
+    /// **Context**: Euler angles are commonly specified from external sources
+    /// or user input and need validation and storage in a structured format.
+    /// 
+    /// **How it Works**: Simple constructor storing the three angles.
     pub fn new(alpha: f32, beta: f32, gamma: f32) -> Self {
         Self { alpha, beta, gamma }
     }
+    
+    /// Computes the 3D rotation matrix from Euler angles according to the specified convention.
+    /// 
+    /// **Context**: Converting Euler angles to rotation matrices enables geometric
+    /// transformations of particle coordinates and beam directions. Different
+    /// Euler conventions require different matrix formulations.
+    /// 
+    /// **How it Works**: Implements the closed-form rotation matrix for each
+    /// Euler convention by composing the three sequential rotations.
     pub fn rotation_matrix(&self, convention: EulerConvention) -> Matrix3<f32> {
         let alpha = self.alpha.to_radians();
         let beta = self.beta.to_radians();
@@ -213,14 +255,29 @@ impl FromStr for Euler {
     }
 }
 
+/// Complete orientation specification combining scheme and convention.
+/// 
+/// **Context**: Orientation analysis requires both the orientation scheme
+/// (how orientations are generated) and the Euler convention (how angles
+/// are interpreted), providing a complete specification for orientation
+/// handling throughout the simulation.
+/// 
+/// **How it Works**: Pairs an orientation scheme with an Euler convention
+/// to enable consistent orientation processing.
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Orientation {
     pub scheme: Scheme,
     pub euler_convention: EulerConvention,
 }
 
-/// Orientation scheme for problem averaging. Can either be a discrete list of angles
-/// or a distribution.
+/// Generated orientation set for multi-orientation simulations.
+/// 
+/// **Context**: Multi-orientation simulations require concrete sets of Euler
+/// angles for each simulation run. This structure provides the generated
+/// orientations in a consistent format regardless of the generation scheme.
+/// 
+/// **How it Works**: Stores the generated Euler angle tuples and count for
+/// use in orientation averaging calculations.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Orientations {
     pub num_orientations: usize,
@@ -228,6 +285,14 @@ pub struct Orientations {
 }
 
 impl Orientations {
+    /// Generates orientation sets according to the specified scheme.
+    /// 
+    /// **Context**: Different orientation schemes require different generation
+    /// algorithms. This factory method provides a unified interface for
+    /// creating orientation sets from scheme specifications.
+    /// 
+    /// **How it Works**: Dispatches to appropriate generation methods based
+    /// on scheme type, handling random number seeding for reproducibility.
     pub fn generate(scheme: &Scheme, seed: Option<u64>) -> Orientations {
         match &scheme {
             Scheme::Uniform {
@@ -242,7 +307,13 @@ impl Orientations {
         }
     }
 
-    /// Creates a new orientation scheme with the given discrete angles.
+    /// Creates an orientation set from explicit angle lists.
+    /// 
+    /// **Context**: Discrete orientation schemes require validation that
+    /// all angle lists have consistent lengths and contain valid values.
+    /// 
+    /// **How it Works**: Validates input consistency and packages the
+    /// angles into tuples for simulation use.
     pub fn new_discrete(alphas: Vec<f32>, betas: Vec<f32>, gammas: Vec<f32>) -> Result<Self> {
         if alphas.is_empty() || betas.is_empty() || gammas.is_empty() {
             return Err(anyhow::anyhow!("Empty angle list"));
@@ -261,6 +332,15 @@ impl Orientations {
         })
     }
 
+    /// Generates uniformly distributed random orientations on the rotation group.
+    /// 
+    /// **Context**: Uniform random orientation averaging requires proper sampling
+    /// from the rotation group SO(3). Naive uniform sampling in Euler angles
+    /// creates bias, requiring careful distribution design.
+    /// 
+    /// **How it Works**: Uses proper uniform distribution on SO(3) by sampling
+    /// alpha and gamma uniformly on [0, 2π] and beta with distribution proportional
+    /// to sin(beta) to ensure uniform coverage of the rotation group.
     pub fn random_uniform(num_orient: usize, seed: Option<u64>) -> Orientations {
         let mut rng = if let Some(seed) = seed {
             rand::rngs::StdRng::seed_from_u64(seed)

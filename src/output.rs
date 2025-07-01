@@ -58,6 +58,15 @@ mod tests {
     }
 }
 
+/// Performs numerical integration using the trapezoidal rule with transformation.
+/// 
+/// **Context**: Computing integral parameters from angular distributions requires
+/// numerical integration over irregular grids. The trapezoidal rule provides
+/// reasonable accuracy for smooth functions with moderate computational cost.
+/// 
+/// **How it Works**: Applies the trapezoidal rule between each pair of adjacent
+/// points, allowing an arbitrary transformation function to be applied to
+/// (x, y) pairs before integration.
 pub fn integrate_trapezoidal<F>(x: &Array1<f32>, y: &Array1<f32>, transform: F) -> f32
 where
     F: Fn(f32, f32) -> f32,
@@ -78,8 +87,15 @@ where
     sum
 }
 
+/// Generates unique angular grid from input coordinates.
+/// 
+/// **Context**: Some angular sampling schemes may produce duplicate or
+/// irregularly spaced (theta, phi) pairs. Analysis requires a clean
+/// unique grid for proper integration and interpolation.
+/// 
+/// **How it Works**: Extracts unique theta and phi values, sorts them,
+/// and generates the Cartesian product to create a regular grid.
 #[allow(dead_code)]
-/// Given a slice of 2-element tuples, return a Vec of unique tuples.
 fn unique_grid(tuple_slice: &[(f32, f32)]) -> Vec<(f32, f32)> {
     // separate the grid into two arrays
     let (mut thetas, mut phis): (Vec<f32>, Vec<f32>) = tuple_slice.iter().cloned().unzip();
@@ -99,7 +115,14 @@ fn unique_grid(tuple_slice: &[(f32, f32)]) -> Vec<(f32, f32)> {
     unique_grid
 }
 
-/// Write the 1d Mueller matrix to a file against the theta and phi bins
+/// Writes 1D Mueller matrix data to file for external analysis.
+/// 
+/// **Context**: 1D Mueller matrices from azimuthally symmetric problems require
+/// specialized output format with theta angles and 16 Mueller elements per line.
+/// External analysis tools expect this specific format for post-processing.
+/// 
+/// **How it Works**: Creates a space-separated text file with theta values
+/// followed by all 16 Mueller matrix elements for each angular bin.
 pub fn write_mueller_1d(
     bins: &[f32],
     mueller_1d: &Array2<f32>,
@@ -125,7 +148,14 @@ pub fn write_mueller_1d(
     Ok(())
 }
 
-/// Write the Mueller matrix to a file against the theta and phi bins
+/// Writes 2D Mueller matrix data to file for external analysis.
+/// 
+/// **Context**: Full 2D scattering patterns require output format with both
+/// theta and phi angles plus Mueller elements. This enables visualization
+/// and analysis of non-symmetric scattering patterns.
+/// 
+/// **How it Works**: Creates a space-separated text file with theta, phi,
+/// and all 16 Mueller matrix elements for each angular bin.
 pub fn write_mueller(
     bins: &[(f32, f32)],
     mueller: &Array2<f32>,
@@ -151,7 +181,15 @@ pub fn write_mueller(
     Ok(())
 }
 
-/// Write the Mueller matrix to a file against the theta and phi bins
+/// Writes comprehensive simulation results summary to file.
+/// 
+/// **Context**: Simulation results include multiple types of data - integral
+/// parameters, power conservation analysis, and metadata. A summary file
+/// provides quick access to key results without processing raw data.
+/// 
+/// **How it Works**: Creates a formatted text file with sections for
+/// integral parameters, power distribution, power ratios, and simulation
+/// metadata in human-readable format.
 pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     let file_name = format!("results.dat");
     let path = output_path(Some(output_dir), &file_name)?;
@@ -252,7 +290,14 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-// Helper function to construct the output path and ensure the directory exists
+/// Constructs output file path and ensures directory existence.
+/// 
+/// **Context**: Output files may be written to user-specified directories
+/// that might not exist yet. Path construction must handle both relative
+/// and absolute paths while ensuring directory creation.
+/// 
+/// **How it Works**: Creates the output directory if specified and needed,
+/// then constructs the full file path for writing.
 fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
     match output_dir {
         Some(dir) => {
@@ -263,6 +308,17 @@ fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
     }
 }
 
+/// Converts complex amplitude matrices to Mueller matrix representation.
+/// 
+/// **Context**: Electromagnetic scattering produces complex amplitude matrices
+/// relating incident and scattered field components. The Mueller matrix provides
+/// a real-valued representation suitable for analysis of partially polarized
+/// light and comparison with experimental measurements.
+/// 
+/// **How it Works**: Applies the standard transformation from 2x2 complex
+/// amplitude matrix to 4x4 real Mueller matrix, computing all 16 elements
+/// through appropriate combinations of amplitude matrix elements and their
+/// complex conjugates.
 pub fn ampl_to_mueller(
     theta_phi_combinations: &[(f32, f32)],
     ampl_cs: &[Matrix2<Complex<f32>>],

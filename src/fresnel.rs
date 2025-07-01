@@ -1,15 +1,22 @@
 use nalgebra::{Complex, Matrix2, Vector2};
 
-/// Returns the matrix representation of the Fresnel equations for reflection.
-///
-/// # Parameters
-/// - `n1`: Refractive index of the first medium (complex).
-/// - `n2`: Refractive index of the second medium (complex).
-/// - `theta_i`: Incident angle (in radians).
-/// - `theta_t`: Transmission angle (in radians).
-///
-/// # Returns
-/// A 2x2 diagonal matrix representing the Fresnel reflection coefficients.
+/// Computes Fresnel reflection coefficients for electromagnetic surface interactions.
+/// 
+/// **Context**: When electromagnetic waves encounter interfaces between materials
+/// with different refractive indices, the reflected field amplitudes depend on
+/// polarization, incident angle, and material properties. The Fresnel equations
+/// provide the exact electromagnetic boundary conditions for these interactions.
+/// 
+/// **How it Works**: Calculates reflection coefficients separately for s-polarized
+/// (perpendicular) and p-polarized (parallel) field components using the classic
+/// Fresnel formulas. Returns a diagonal matrix with these coefficients for direct
+/// multiplication with field amplitude matrices.
+/// 
+/// # Example
+/// ```rust
+/// let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
+/// let refl_ampl = fresnel * ampl;
+/// ```
 pub fn refl(
     n1: Complex<f32>,
     n2: Complex<f32>,
@@ -23,16 +30,22 @@ pub fn refl(
     Matrix2::from_diagonal(&Vector2::new(f11, f22))
 }
 
-/// Returns the matrix representation of the Fresnel equations for refraction.
-///
-/// # Parameters
-/// - `n1`: Refractive index of the first medium (complex).
-/// - `n2`: Refractive index of the second medium (complex).
-/// - `theta_i`: Incident angle (in radians).
-/// - `theta_t`: Transmission angle (in radians).
-///
-/// # Returns
-/// A 2x2 diagonal matrix representing the Fresnel transmission coefficients.
+/// Computes Fresnel transmission coefficients for electromagnetic surface interactions.
+/// 
+/// **Context**: Transmitted (refracted) electromagnetic fields at material interfaces
+/// require different amplitude scaling than reflected fields. The transmission
+/// coefficients account for impedance matching between media and ensure power
+/// conservation at the interface.
+/// 
+/// **How it Works**: Applies Fresnel transmission formulas for both s-polarized
+/// and p-polarized components. The coefficients account for both the change in
+/// field amplitude and the impedance difference between the two media.
+/// 
+/// # Example
+/// ```rust
+/// let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
+/// let refr_ampl = fresnel * ampl.clone();
+/// ```
 pub fn refr(
     n1: Complex<f32>,
     n2: Complex<f32>,

@@ -10,6 +10,17 @@ use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2, Axis};
 
+/// Aggregated results from electromagnetic scattering simulations.
+/// 
+/// **Context**: Scattering simulations produce multiple types of output data including
+/// power tracking, Mueller matrices at different angular bins, amplitude matrices
+/// for polarization analysis, and derived parameters like cross sections. This
+/// structure consolidates all results for analysis and output.
+/// 
+/// **How it Works**: Stores raw amplitude matrices and derived Mueller matrices for
+/// total scattering, beam-only contributions, and external diffraction. Optionally
+/// includes phi-integrated 1D results for azimuthally symmetric cases. The params
+/// field contains derived integral parameters computed from the angular distributions.
 #[derive(Debug, Clone)]
 pub struct Results {
     pub powers: Powers,
@@ -28,7 +39,13 @@ pub struct Results {
 }
 
 impl Results {
-    /// Creates a new `Result` with empty mueller and amplitude matrix
+    /// Creates empty result storage for the specified angular bins.
+    /// 
+    /// **Context**: Results structures must be pre-allocated with the correct
+    /// dimensions based on the angular binning scheme before simulation begins.
+    /// 
+    /// **How it Works**: Allocates zero-filled arrays for Mueller matrices
+    /// (16 elements per bin) and amplitude matrices (2x2 complex per bin).
     pub fn new_empty(bins: &[(f32, f32)]) -> Self {
         let mueller = Array2::<f32>::zeros((bins.len(), 16));
         let mueller_beam = mueller.clone();
@@ -53,6 +70,14 @@ impl Results {
         }
     }
 
+    /// Attempts phi integration to produce 1D theta-dependent results.
+    /// 
+    /// **Context**: Many scattering problems exhibit azimuthal symmetry, allowing
+    /// reduction from 2D (theta, phi) to 1D (theta) results through phi integration.
+    /// This simplifies analysis and visualization.
+    /// 
+    /// **How it Works**: Calls the integration function and stores the 1D results
+    /// if successful, enabling computation of integral parameters.
     pub fn try_mueller_to_1d(&mut self) -> std::result::Result<(), anyhow::Error> {
         match try_mueller_to_1d(&self.bins, &self.mueller) {
             Ok((theta, mueller_1d)) => {
@@ -65,7 +90,15 @@ impl Results {
         }
     }
 
-    /// Computes the parameters of the result
+    /// Computes integral scattering parameters from angular distributions.
+    /// 
+    /// **Context**: Key scattering parameters like cross sections, asymmetry parameter,
+    /// and albedo are computed by integrating the Mueller matrix over solid angle.
+    /// These parameters enable comparison with analytical theories and experiments.
+    /// 
+    /// **How it Works**: Sequentially computes scattering cross section, asymmetry
+    /// parameter, extinction cross section, and single-scattering albedo from the
+    /// 1D Mueller matrix and power absorption data.
     pub fn compute_params(&mut self, wavelength: f32) -> std::result::Result<(), anyhow::Error> {
         self.compute_scat_cross(wavelength);
         self.compute_asymmetry(wavelength);
@@ -75,6 +108,14 @@ impl Results {
         Ok(())
     }
 
+    /// Computes the asymmetry parameter from the phase function.
+    /// 
+    /// **Context**: The asymmetry parameter quantifies the average cosine of the
+    /// scattering angle, indicating forward (positive) or backward (negative)
+    /// scattering preference. This parameter is essential for radiative transfer.
+    /// 
+    /// **How it Works**: Integrates P11 * cos(theta) * sin(theta) over theta,
+    /// normalized by the scattering cross section.
     pub fn compute_asymmetry(&mut self, wavelength: f32) {
         if let (Some(theta), Some(mueller_1d), Some(scatt)) =
             (&self.bins_1d, &self.mueller_1d, self.params.scat_cross)
@@ -88,7 +129,14 @@ impl Results {
         }
     }
 
-    /// Computes the scattering cross section from the 1D Mueller matrix
+    /// Computes the scattering cross section from angular distribution.
+    /// 
+    /// **Context**: The scattering cross section quantifies the total scattered
+    /// power relative to incident intensity. This fundamental parameter enables
+    /// comparison with Mie theory and experimental measurements.
+    /// 
+    /// **How it Works**: Integrates the P11 Mueller element over solid angle
+    /// using the trapezoidal rule, accounting for the sin(theta) Jacobian.
     pub fn compute_scat_cross(&mut self, wavelength: f32) {
         if let (Some(theta), Some(mueller_1d)) = (&self.bins_1d, &self.mueller_1d) {
             self.params.scat_cross =
@@ -96,7 +144,14 @@ impl Results {
         }
     }
 
-    /// Computes the extinction cross section from the scattering cross section and absorbed power
+    /// Computes the extinction cross section from optical theorem.
+    /// 
+    /// **Context**: The extinction cross section represents total power removed
+    /// from the incident beam through both scattering and absorption. The optical
+    /// theorem relates this to the forward scattering amplitude.
+    /// 
+    /// **How it Works**: Sums the scattering cross section and absorbed power
+    /// to get total extinction following energy conservation.
     pub fn compute_ext_cross(&mut self) {
         match self.params.scat_cross {
             Some(scat) => {
@@ -108,7 +163,14 @@ impl Results {
         }
     }
 
-    /// Computes the albedo from the scattering and extinction cross sections
+    /// Computes the single-scattering albedo.
+    /// 
+    /// **Context**: The albedo quantifies the fraction of extinction due to
+    /// scattering versus absorption. This parameter is crucial for radiative
+    /// transfer in atmospheric and oceanic applications.
+    /// 
+    /// **How it Works**: Divides scattering cross section by extinction cross
+    /// section to get the scattering probability.
     pub fn compute_albedo(&mut self) {
         if let (Some(scat), Some(ext)) = (self.params.scat_cross, self.params.ext_cross) {
             self.params.albedo = Some(scat / ext);
@@ -124,10 +186,15 @@ impl Results {
     }
 }
 
-/// Integrate over phi (second bin of the tuple) to get the 1D Mueller matrix
-/// Uses the trapezoidal rule
-/// Returns a tuple of the theta bins and the 1D Mueller matrix
-/// NOTE: Assumes phi is ordered
+/// Integrates 2D Mueller matrix over azimuthal angle to produce 1D results.
+/// 
+/// **Context**: Azimuthally symmetric scattering patterns allow reduction from
+/// 2D (theta, phi) to 1D (theta) representation through phi integration. This
+/// simplifies analysis and enables direct comparison with 1D scattering theories.
+/// 
+/// **How it Works**: Groups Mueller matrix elements by theta value, integrates
+/// each group over phi using the trapezoidal rule, and returns theta values
+/// with corresponding integrated Mueller matrix elements.
 pub fn try_mueller_to_1d(
     bins: &[(f32, f32)],
     mueller: &Array2<f32>,
@@ -216,7 +283,14 @@ pub fn try_mueller_to_1d(
     Ok((thetas, mueller_1d))
 }
 
-/// Integrate the first mueller element over theta to get the asymmetry parameter
+/// Computes asymmetry parameter from 1D Mueller matrix.
+/// 
+/// **Context**: The asymmetry parameter (g) characterizes the angular distribution
+/// of scattered light, with g=0 for isotropic scattering, g>0 for forward
+/// scattering, and g<0 for backscattering. Essential for radiative transfer models.
+/// 
+/// **How it Works**: Integrates P11(theta) * sin(theta) * cos(theta) over theta,
+/// normalized by the scattering cross section and wavenumber squared.
 pub fn compute_asymmetry(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32, scatt: f32) -> f32 {
     // get first column of mueller matrix
     let y = mueller_1d.slice(s![.., 0]).to_owned();
@@ -231,7 +305,14 @@ pub fn compute_asymmetry(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32, s
     asymmetry
 }
 
-/// Integrate the first mueller element over theta to get the scattering cross section
+/// Computes scattering cross section from 1D Mueller matrix.
+/// 
+/// **Context**: The scattering cross section quantifies the effective area for
+/// electromagnetic scattering, enabling comparison between particles of different
+/// sizes and shapes. Normalized by wavenumber squared for dimensionless form.
+/// 
+/// **How it Works**: Integrates P11(theta) * sin(theta) over theta using
+/// trapezoidal rule, accounting for solid angle element and wavenumber normalization.
 pub fn compute_scat_cross(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32) -> f32 {
     // get first column of mueller matrix
     let y = mueller_1d.slice(s![.., 0]).to_owned();
