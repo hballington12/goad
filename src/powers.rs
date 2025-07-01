@@ -1,3 +1,26 @@
+//! Energy conservation tracking for electromagnetic simulations.
+//!
+//! This module provides comprehensive power tracking throughout electromagnetic
+//! beam propagation to validate energy conservation and identify sources of
+//! numerical error. It tracks all power contributions including absorbed power,
+//! output power, and various truncation mechanisms that limit simulation accuracy.
+//!
+//! The power tracking system provides:
+//! - Input and output power accounting
+//! - Material absorption tracking
+//! - Truncation power categorization by mechanism
+//! - Conservation validation and error analysis
+//! - Operator overloading for power combination
+//! - Formatted output for debugging and validation
+//!
+//! # Power Budget Components
+//!
+//! - Input power: Total incident electromagnetic energy
+//! - Output power: Far-field scattered power
+//! - Absorbed power: Energy absorbed in materials
+//! - Truncation categories: Power lost to various numerical limits
+//! - Missing power: Unaccounted energy indicating numerical errors
+
 use std::{fmt, ops::*};
 
 /// Power conservation tracking for electromagnetic beam propagation.

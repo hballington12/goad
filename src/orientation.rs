@@ -1,3 +1,26 @@
+//! Particle orientation handling and Euler angle operations.
+//!
+//! This module provides comprehensive support for 3D particle orientations using
+//! Euler angles with multiple convention support. It handles both discrete orientation
+//! sets for systematic studies and uniform random orientations for ensemble averaging
+//! in electromagnetic scattering simulations.
+//!
+//! The orientation system provides:
+//! - Multiple Euler angle conventions (proper and Tait-Bryan)
+//! - Discrete orientation specifications
+//! - Uniform random orientation generation on SO(3)
+//! - 3D rotation matrix computation
+//! - Command-line and file-based orientation input
+//! - Proper statistical sampling for ensemble averaging
+//!
+//! # Key Components
+//!
+//! - [`Euler`]: Three-angle rotation representation
+//! - [`EulerConvention`]: Standard rotation sequence specifications
+//! - [`Scheme`]: Orientation generation methods (discrete/uniform)
+//! - [`Orientations`]: Generated orientation sets for simulation
+//! - Rotation matrix computation for all conventions
+
 use clap::Subcommand;
 use nalgebra::Matrix3;
 use std::{f32::consts::PI, str::FromStr};

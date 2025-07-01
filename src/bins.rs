@@ -1,3 +1,25 @@
+//! Angular binning schemes for far-field scattering analysis.
+//!
+//! This module provides flexible angular discretization schemes for sampling
+//! the far-field scattering patterns. Different applications require different
+//! angular resolutions and sampling strategies, from uniform grids for general
+//! analysis to variable spacing for capturing specific scattering features.
+//!
+//! The binning system supports:
+//! - Simple uniform grids in theta and phi
+//! - Variable-spacing interval schemes
+//! - Custom user-defined angular patterns
+//! - TOML file loading for external specifications
+//! - Python integration for programmatic control
+//!
+//! # Binning Schemes
+//!
+//! - [`Scheme::Simple`]: Uniform angular grids
+//! - [`Scheme::Interval`]: Variable spacing with fine/coarse regions
+//! - [`Scheme::Custom`]: Arbitrary user-defined patterns
+//! - Validation and grid generation utilities
+//! - File I/O for external binning specifications
+
 use ndarray::Array1;
 use pyo3::prelude::*;
 use serde::Deserialize;

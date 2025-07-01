@@ -1,3 +1,25 @@
+//! Result output formatting and file I/O operations.
+//!
+//! This module handles the conversion of simulation results to external formats
+//! for analysis, visualization, and comparison with experimental data. It provides
+//! comprehensive output capabilities including Mueller matrices, amplitude data,
+//! summary statistics, and derived parameters in standard formats.
+//!
+//! The output system provides:
+//! - Mueller matrix output in 1D and 2D formats
+//! - Comprehensive result summaries with metadata
+//! - Amplitude matrix to Mueller matrix conversion
+//! - Numerical integration utilities for parameter computation
+//! - Flexible file path management and directory creation
+//! - Standard format compatibility for external tools
+//!
+//! # Output Formats
+//!
+//! - **Mueller matrices**: Space-separated text with angular coordinates
+//! - **Result summaries**: Human-readable parameter tables
+//! - **1D integration**: Trapezoidal rule with arbitrary transformations
+//! - **Directory management**: Automatic path creation and validation
+
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};

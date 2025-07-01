@@ -1,3 +1,25 @@
+//! Electromagnetic field representation and polarization operations.
+//!
+//! This module provides the fundamental electromagnetic field representation used
+//! throughout the GOAD simulation. It handles polarized wave propagation with
+//! proper coordinate system management and field transformations required for
+//! electromagnetic scattering calculations.
+//!
+//! The field system provides:
+//! - 2x2 complex amplitude matrix representation
+//! - Orthogonal polarization basis vectors
+//! - Field intensity calculations
+//! - Coordinate system rotations for polarization
+//! - Validation for physical consistency
+//!
+//! # Field Representation
+//!
+//! Fields are represented using:
+//! - Complex amplitude matrices for phase and magnitude
+//! - Perpendicular and parallel polarization vectors
+//! - Proper electromagnetic field relationships
+//! - Rotation matrices for coordinate transformations
+
 #[cfg(debug_assertions)]
 use crate::settings;
 

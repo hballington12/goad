@@ -1,3 +1,28 @@
+//! Configuration management and command-line interface for GOAD simulations.
+//!
+//! This module provides comprehensive configuration management with hierarchical
+//! loading from configuration files, environment variables, and command-line
+//! arguments. It handles all simulation parameters including physical properties,
+//! numerical settings, and output specifications with proper validation.
+//!
+//! The configuration system provides:
+//! - Hierarchical parameter loading (files → env → CLI)
+//! - TOML configuration file support
+//! - Comprehensive command-line interface
+//! - Parameter validation and error handling
+//! - Default value management
+//! - Python integration for programmatic use
+//!
+//! # Configuration Hierarchy
+//!
+//! 1. Default configuration file (`config/default.toml`)
+//! 2. Local configuration file (`config/local.toml`)
+//! 3. Environment variables (prefixed with `GOAD_`)
+//! 4. Command-line arguments (highest priority)
+//!
+//! The [`Settings`] struct consolidates all configuration parameters with
+//! appropriate types and validation for electromagnetic scattering simulations.
+
 use anyhow::Result;
 use clap::Args;
 use clap::Parser;

@@ -1,3 +1,26 @@
+//! Surface roughness modeling through geometric distortion.
+//!
+//! This module implements surface roughness effects by applying controlled
+//! geometric distortions to particle surfaces. Real particles have surface
+//! roughness that affects electromagnetic scattering, particularly at high
+//! angles where surface details become important.
+//!
+//! The distortion system provides:
+//! - Gaussian normal perturbation for surface roughness
+//! - Physically consistent vertex repositioning
+//! - Geometric validity preservation (no self-intersections)
+//! - Automatic retry and reversion for failed distortions
+//! - Scale preservation through renormalization
+//! - Reproducible distortions via seeded random generation
+//!
+//! # Algorithm Overview
+//!
+//! 1. Perturb face normals using Gaussian angular distribution
+//! 2. Solve for new vertex positions satisfying plane constraints
+//! 3. Validate geometry for self-intersections and convexity
+//! 4. Retry with new random realization if validation fails
+//! 5. Preserve overall particle scale through renormalization
+
 use std::collections::HashMap;
 
 use nalgebra::{Matrix3, Vector3};

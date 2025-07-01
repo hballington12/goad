@@ -1,3 +1,25 @@
+//! Fresnel equations for electromagnetic boundary conditions.
+//!
+//! This module implements the Fresnel equations that govern electromagnetic
+//! wave reflection and transmission at material interfaces. These equations
+//! provide the exact electromagnetic boundary conditions required for computing
+//! field amplitudes in reflection and refraction processes.
+//!
+//! The Fresnel calculations provide:
+//! - Reflection coefficients for s and p polarizations
+//! - Transmission coefficients with impedance matching
+//! - Complex refractive index support for absorbing materials
+//! - Matrix representation for direct amplitude computation
+//! - Proper treatment of polarization-dependent scattering
+//!
+//! # Physical Foundation
+//!
+//! Based on Maxwell's equations at material boundaries:
+//! - Continuity of tangential electric field
+//! - Continuity of tangential magnetic field
+//! - Proper impedance relationships
+//! - Conservation of electromagnetic energy
+
 use nalgebra::{Complex, Matrix2, Vector2};
 
 /// Computes Fresnel reflection coefficients for electromagnetic surface interactions.

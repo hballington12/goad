@@ -1,3 +1,26 @@
+//! Simulation result aggregation and analysis.
+//!
+//! This module handles the collection, processing, and analysis of electromagnetic
+//! scattering simulation results. It manages multiple data types including amplitude
+//! matrices, Mueller matrices, power conservation data, and derived integral
+//! parameters for comprehensive scattering characterization.
+//!
+//! The result system provides:
+//! - Multi-component result storage (amplitude, Mueller, power)
+//! - 2D to 1D integration for azimuthally symmetric cases
+//! - Integral parameter computation (cross sections, asymmetry, albedo)
+//! - Power conservation analysis and validation
+//! - Result combination for multi-orientation averaging
+//! - Comprehensive output formatting
+//!
+//! # Key Components
+//!
+//! - [`Results`]: Main result container with all simulation outputs
+//! - Integration utilities for parameter computation
+//! - Mueller matrix manipulation and analysis
+//! - Cross section and albedo calculations
+//! - Statistical analysis for ensemble results
+
 use std::f32::consts::PI;
 
 use crate::output;

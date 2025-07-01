@@ -1,3 +1,25 @@
+//! Generalized Snell's law for complex refractive indices.
+//!
+//! This module implements the generalized form of Snell's law that handles
+//! complex refractive indices for absorbing and dispersive materials. This
+//! extension is essential for electromagnetic scattering simulations involving
+//! realistic materials with absorption and dispersion effects.
+//!
+//! The implementation provides:
+//! - Generalized Snell's law for complex media
+//! - Proper handling of absorption and dispersion
+//! - Numerical stability for edge cases
+//! - Validation against limiting cases
+//! - Support for highly absorbing materials
+//!
+//! # Mathematical Foundation
+//!
+//! Based on the generalized Snell's law formulation from Macke (1996):
+//! - Decomposition of complex refractive indices
+//! - Proper treatment of phase and amplitude relationships
+//! - Numerical algorithms for stable computation
+//! - Validation of physical constraints
+
 use anyhow::Result;
 use nalgebra::Complex;
 

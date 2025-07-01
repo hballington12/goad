@@ -1,3 +1,25 @@
+//! Electromagnetic beam representation and propagation for geometric optics.
+//!
+//! This module implements the core electromagnetic field segments (beams) that
+//! propagate through particle geometries in the GOAD method. Each beam carries
+//! field amplitude information, geometric cross-section data, and propagation
+//! state for tracking reflection, refraction, and absorption processes.
+//!
+//! The beam system provides:
+//! - Polarized electromagnetic field representation
+//! - Surface interaction through Fresnel equations
+//! - Geometric clipping and intersection handling
+//! - Power conservation tracking
+//! - Far-field diffraction calculation
+//!
+//! # Key Components
+//!
+//! - [`Beam`]: Individual electromagnetic field segments
+//! - [`BeamPropagation`]: Results from beam-surface interactions
+//! - [`BeamType`] and [`BeamVariant`]: Classification and origin tracking
+//! - Surface interaction functions (reflection, refraction, TIR)
+//! - Triangulation for complex apertures
+
 use anyhow::Result;
 use std::f32::consts::PI;
 

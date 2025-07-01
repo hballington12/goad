@@ -1,3 +1,25 @@
+//! Geometric representation and operations for electromagnetic scattering simulations.
+//!
+//! This module provides the core geometric foundation for the GOAD (Geometric Optics
+//! with Aperture Diffraction) method. It handles 3D shape representation, geometric
+//! transformations, containment relationships, and mesh operations required for
+//! electromagnetic beam propagation through complex particle geometries.
+//!
+//! The geometric representation supports:
+//! - Complex polyhedral particles with arbitrary shapes
+//! - Nested geometries with inclusions and coatings
+//! - Material properties attached to geometric regions  
+//! - Coordinate transformations for beam alignment
+//! - Mesh validation and geometric quality checks
+//!
+//! # Key Components
+//!
+//! - [`Shape`]: Individual closed 3D surfaces with material properties
+//! - [`Geom`]: Collections of shapes with containment relationships
+//! - [`Face`]: Polygonal surface elements for beam-surface interactions
+//! - Geometric transformations and scaling operations
+//! - OBJ file loading and mesh processing
+
 use crate::containment::{ContainmentGraph, AABB};
 use crate::orientation::*;
 use crate::settings;

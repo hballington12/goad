@@ -1,3 +1,25 @@
+//! Geometric clipping algorithms for beam-surface intersection calculations.
+//!
+//! This module provides the geometric clipping engine that determines which portions
+//! of electromagnetic beam cross-sections intersect with particle surfaces. It
+//! implements 2D polygon clipping operations with coordinate transformations to
+//! efficiently compute beam-surface interactions for the GOAD method.
+//!
+//! The clipping system handles:
+//! - 3D to 2D coordinate transformation for optimal clipping
+//! - Depth-sorted polygon intersection operations
+//! - Area conservation tracking and validation
+//! - Complex polygons with holes and non-convex shapes
+//! - Numerical precision management and error handling
+//!
+//! # Key Features
+//!
+//! - [`Clipping`]: Main clipping engine with transformation management
+//! - [`Stats`]: Area conservation analysis for numerical validation
+//! - Boolean polygon operations (intersection, difference)
+//! - Ray casting for occlusion testing
+//! - Area thresholding for computational efficiency
+
 use super::geom::{Face, Geom, Plane};
 use super::settings;
 use crate::geom::PolygonExtensions;

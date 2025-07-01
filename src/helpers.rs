@@ -1,3 +1,25 @@
+//! Utility functions for visualization and debugging support.
+//!
+//! This module provides helper functions primarily focused on interactive
+//! visualization and debugging of geometric operations during development.
+//! It includes coordinate transformations, rendering utilities, and simple
+//! testing functions to support the development and validation process.
+//!
+//! The helper system provides:
+//! - Interactive geometric visualization
+//! - Coordinate system transformations for display
+//! - Face and polygon rendering utilities
+//! - Screen coordinate mapping
+//! - Development and testing support functions
+//!
+//! # Visualization Features
+//!
+//! - Real-time rendering of faces and polygons
+//! - Coordinate transformation for screen display
+//! - Color-coded visualization for different geometric elements
+//! - Interactive debugging support for geometric operations
+//! - Simple utility functions for framework validation
+
 use crate::geom::Face;
 use geo_types::{Coord, Polygon};
 use macroquad::prelude::*;

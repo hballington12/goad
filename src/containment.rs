@@ -1,3 +1,25 @@
+//! Geometric containment relationships and spatial acceleration structures.
+//!
+//! This module provides tools for managing hierarchical containment relationships
+//! between geometric shapes in complex particle structures. It supports nested
+//! geometries like coated particles, inclusions, and multi-material systems
+//! where understanding the containment hierarchy is essential for proper
+//! electromagnetic field propagation.
+//!
+//! The containment system provides:
+//! - Parent-child relationship tracking
+//! - Efficient containment queries
+//! - Axis-aligned bounding boxes for spatial acceleration
+//! - Support for arbitrary nesting levels
+//! - Integration with material property assignment
+//!
+//! # Key Components
+//!
+//! - [`ContainmentGraph`]: Hierarchical shape relationships
+//! - [`AABB`]: Axis-aligned bounding boxes for spatial queries
+//! - Containment validation and consistency checking
+//! - Material index resolution for nested structures
+
 use nalgebra::Point3;
 
 /// Hierarchical containment relationships between geometric shapes.

@@ -1,3 +1,27 @@
+//! Multi-orientation simulation orchestration and ensemble averaging.
+//!
+//! This module manages electromagnetic scattering simulations across multiple
+//! particle orientations to compute ensemble-averaged scattering properties.
+//! It provides parallel computation, progress tracking, and proper statistical
+//! averaging for both discrete orientation sets and random orientation sampling.
+//!
+//! The multi-orientation system provides:
+//! - Parallel orientation processing with rayon
+//! - Progress tracking for long-running calculations
+//! - Statistical averaging with proper normalization
+//! - Result aggregation across orientations
+//! - Comprehensive output for ensemble analysis
+//! - Memory-efficient streaming computation
+//!
+//! # Key Features
+//!
+//! - [`MultiProblem`]: Main orchestrator for multi-orientation simulations
+//! - Parallel execution with progress bars
+//! - On-the-fly result reduction for memory efficiency
+//! - Automatic 1D integration for symmetric cases
+//! - Complete output file generation
+//! - Performance timing and analysis
+
 use std::time::Instant;
 
 use crate::{

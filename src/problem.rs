@@ -1,3 +1,25 @@
+//! Main simulation orchestrator for electromagnetic scattering calculations.
+//!
+//! This module contains the [`Problem`] struct which coordinates the complete GOAD
+//! simulation pipeline from initial beam generation through near-field propagation
+//! to far-field diffraction analysis. It manages the electromagnetic beam lifecycle,
+//! handles surface interactions, and orchestrates result collection.
+//!
+//! The simulation process involves:
+//! - Geometry initialization and beam discretization
+//! - Near-field beam propagation with reflection/refraction
+//! - Beam queue management and power tracking
+//! - Far-field diffraction calculations
+//! - Result aggregation and analysis
+//!
+//! # Simulation Pipeline
+//!
+//! 1. **Initialization**: Geometry setup, scaling, and centering
+//! 2. **Illumination**: Initial beam creation and discretization
+//! 3. **Propagation**: Near-field beam tracing through particle
+//! 4. **Diffraction**: Far-field calculation from exit apertures
+//! 5. **Analysis**: Mueller matrix computation and parameter extraction
+
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, Scheme},

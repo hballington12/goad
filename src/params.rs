@@ -1,3 +1,25 @@
+//! Integral scattering parameters for comparative analysis.
+//!
+//! This module defines the storage and computation of key integral parameters
+//! that characterize electromagnetic scattering behavior. These parameters
+//! provide compact representations of complex angular scattering patterns
+//! for comparison with analytical theories, experimental data, and radiative
+//! transfer models.
+//!
+//! The parameter system provides:
+//! - Scattering and extinction cross sections
+//! - Single-scattering albedo
+//! - Asymmetry parameter for angular distribution characterization
+//! - Optional parameter storage for various analysis scenarios
+//! - Integration with result processing pipelines
+//!
+//! # Key Parameters
+//!
+//! - **Scattering cross section**: Total scattered power normalized by incident intensity
+//! - **Extinction cross section**: Total removed power (scattered + absorbed)
+//! - **Albedo**: Ratio of scattering to extinction (probability of scattering)
+//! - **Asymmetry parameter**: Average cosine of scattering angle
+
 /// Integral scattering parameters derived from angular distributions.
 /// 
 /// **Context**: While full angular scattering patterns provide detailed information,

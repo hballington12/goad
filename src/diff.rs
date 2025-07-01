@@ -1,3 +1,26 @@
+//! Far-field electromagnetic diffraction calculations for aperture scattering.
+//!
+//! This module implements Fraunhofer diffraction theory to compute far-field
+//! electromagnetic scattering from convex apertures. It bridges the near-field
+//! geometric optics beam propagation to observable far-field scattering patterns
+//! by evaluating diffraction integrals over aperture boundaries.
+//!
+//! The diffraction calculations provide:
+//! - Fraunhofer diffraction from polygonal apertures
+//! - Coordinate system transformations for optimal numerics
+//! - Electromagnetic field rotation matrices
+//! - Analytical line integral evaluation
+//! - Field-of-view filtering for computational efficiency
+//!
+//! # Physical Foundation
+//!
+//! The implementation is based on:
+//! - Electromagnetic equivalence theorem
+//! - Vector surface integral diffraction equations
+//! - Green's theorem reduction to line integrals
+//! - Karczewski transformation for polarization coupling
+//! - Far-field approximation (Fraunhofer limit)
+
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
 use ndarray::Array2;
 use std::f32::consts::PI;
