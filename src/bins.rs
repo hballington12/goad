@@ -156,7 +156,7 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<(f32, f32)> {
             phi_spacings,
         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
         Scheme::Custom { bins, file } => {
-            println!("Loading custom bins from file: {:?}", file);
+            // println!("Loading custom bins from file: {:?}", file);
             if let Some(file) = file {
                 let content = match std::fs::read_to_string(file) {
                     Ok(content) => content,
