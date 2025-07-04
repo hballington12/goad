@@ -75,6 +75,40 @@ impl BinningScheme {
             scheme: Scheme::Custom { bins, file: None },
         }
     }
+
+    /// Create a simple binning scheme with uniform theta and phi spacing
+    #[staticmethod]
+    fn simple(num_theta: usize, num_phi: usize) -> Self {
+        BinningScheme {
+            scheme: Scheme::Simple { num_theta, num_phi },
+        }
+    }
+
+    /// Create an interval binning scheme with variable spacing
+    #[staticmethod]
+    fn interval(
+        thetas: Vec<f32>,
+        theta_spacings: Vec<f32>,
+        phis: Vec<f32>,
+        phi_spacings: Vec<f32>,
+    ) -> Self {
+        BinningScheme {
+            scheme: Scheme::Interval {
+                thetas,
+                theta_spacings,
+                phis,
+                phi_spacings,
+            },
+        }
+    }
+
+    /// Create a custom binning scheme with explicit bin positions
+    #[staticmethod]
+    fn custom(bins: Vec<(f32, f32)>) -> Self {
+        BinningScheme {
+            scheme: Scheme::Custom { bins, file: None },
+        }
+    }
 }
 
 pub fn interval_spacings(splits: &Vec<f32>, spacings: &Vec<f32>) -> Vec<f32> {

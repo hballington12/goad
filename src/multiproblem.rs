@@ -290,9 +290,25 @@ impl MultiProblem {
 #[pymethods]
 impl MultiProblem {
     #[new]
-    #[pyo3(signature = (settings = None, geom = None))]
-    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> Self {
-        MultiProblem::new(geom, settings)
+    #[pyo3(signature = (settings, geom = None))]
+    fn py_new(settings: Settings, geom: Option<Geom>) -> Self {
+        // Load geometry from file if not provided
+        let mut geom = geom.unwrap_or_else(|| {
+            Geom::from_file(&settings.geom_name).expect("Failed to load geometry from path")
+        });
+
+        problem::init_geom(&settings, &mut geom);
+
+        let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
+        let bins = generate_bins(&settings.binning.scheme);
+        let result = Results::new_empty(&bins);
+
+        Self {
+            geom,
+            orientations,
+            settings,
+            result,
+        }
     }
 
     /// Python wrapper for solve method

@@ -37,6 +37,30 @@ pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
 /// Minimum Distortion factor for the geometry.
 pub const MIN_DISTORTION: f32 = 1e-5;
 
+// Default values for Python API (no config file dependencies)
+/// Default wavelength in geometry units (532nm green laser)
+pub const DEFAULT_WAVELENGTH: f32 = 0.532;
+/// Default beam power threshold for ray termination
+pub const DEFAULT_BEAM_POWER_THRESHOLD: f32 = 0.005;
+/// Default beam area threshold factor
+pub const DEFAULT_BEAM_AREA_THRESHOLD_FAC: f32 = 0.1;
+/// Default power cutoff fraction (0-1)
+pub const DEFAULT_CUTOFF: f32 = 0.99;
+/// Default medium refractive index (vacuum/air)
+pub const DEFAULT_MEDIUM_REFR_INDEX_RE: f32 = 1.0;
+pub const DEFAULT_MEDIUM_REFR_INDEX_IM: f32 = 0.0;
+/// Default particle refractive index (typical glass)
+pub const DEFAULT_PARTICLE_REFR_INDEX_RE: f32 = 1.31;
+pub const DEFAULT_PARTICLE_REFR_INDEX_IM: f32 = 0.0;
+/// Default maximum recursion depth
+pub const DEFAULT_MAX_REC: i32 = 10;
+/// Default maximum total internal reflections
+pub const DEFAULT_MAX_TIR: i32 = 10;
+/// Default number of theta bins
+pub const DEFAULT_THETA_BINS: usize = 181;
+/// Default number of phi bins
+pub const DEFAULT_PHI_BINS: usize = 181;
+
 /// Runtime configuration for the application.
 #[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -110,126 +134,74 @@ fn default_directory() -> PathBuf {
 impl Settings {
     #[new]
     #[pyo3(signature = (
-        wavelength = None,
-        beam_power_threshold = None, 
-        beam_area_threshold_fac = None, 
-        cutoff = None, 
-        medium_refr_index_re = None, 
-        medium_refr_index_im = None, 
-        particle_refr_index_re = None, 
-        particle_refr_index_im = None, 
-        geom_name = None, 
-        max_rec = None, 
-        max_tir = None, 
-        theta_res = None, 
-        phi_res = None, 
-        euler = None,
-        orientation = None
+        geom_path,
+        wavelength = DEFAULT_WAVELENGTH,
+        particle_refr_index_re = DEFAULT_PARTICLE_REFR_INDEX_RE,
+        particle_refr_index_im = DEFAULT_PARTICLE_REFR_INDEX_IM,
+        medium_refr_index_re = DEFAULT_MEDIUM_REFR_INDEX_RE,
+        medium_refr_index_im = DEFAULT_MEDIUM_REFR_INDEX_IM,
+        orientation = None,
+        binning = None,
+        beam_power_threshold = DEFAULT_BEAM_POWER_THRESHOLD,
+        beam_area_threshold_fac = DEFAULT_BEAM_AREA_THRESHOLD_FAC,
+        cutoff = DEFAULT_CUTOFF,
+        max_rec = DEFAULT_MAX_REC,
+        max_tir = DEFAULT_MAX_TIR,
+        scale = 1.0,
+        directory = "goad_run"
     ))]
     fn py_new(
-        wavelength: Option<f32>,
-        beam_power_threshold: Option<f32>,
-        beam_area_threshold_fac: Option<f32>,
-        cutoff: Option<f32>,
-        medium_refr_index_re: Option<f32>,
-        medium_refr_index_im: Option<f32>,
-        particle_refr_index_re: Option<f32>,
-        particle_refr_index_im: Option<f32>,
-        geom_name: Option<String>,
-        max_rec: Option<i32>,
-        max_tir: Option<i32>,
-        theta_res: Option<usize>,
-        phi_res: Option<usize>,
-        euler: Option<Vec<f32>>,
+        geom_path: String,
+        wavelength: f32,
+        particle_refr_index_re: f32,
+        particle_refr_index_im: f32,
+        medium_refr_index_re: f32,
+        medium_refr_index_im: f32,
         orientation: Option<Orientation>,
+        binning: Option<BinningScheme>,
+        beam_power_threshold: f32,
+        beam_area_threshold_fac: f32,
+        cutoff: f32,
+        max_rec: i32,
+        max_tir: i32,
+        scale: f32,
+        directory: &str,
     ) -> Self {
-        // Load default settings from config file
-        let mut settings = load_config_with_cli(false).expect("Failed to load config");
+        // Create default orientation if none provided (single orientation at origin)
+        let orientation = orientation.unwrap_or_else(|| Orientation {
+            scheme: Scheme::Discrete {
+                eulers: vec![Euler::new(0.0, 0.0, 0.0)],
+            },
+            euler_convention: DEFAULT_EULER_ORDER,
+        });
 
-        // Override with provided parameters if they exist
-        if let Some(w) = wavelength {
-            settings.wavelength = w;
+        // Create default binning if none provided
+        let binning = binning.unwrap_or_else(|| BinningScheme {
+            scheme: bins::Scheme::Simple {
+                num_theta: DEFAULT_THETA_BINS,
+                num_phi: DEFAULT_PHI_BINS,
+            },
+        });
+
+        Settings {
+            wavelength,
+            beam_power_threshold,
+            beam_area_threshold_fac,
+            cutoff,
+            medium_refr_index: Complex::new(medium_refr_index_re, medium_refr_index_im),
+            particle_refr_index: vec![Complex::new(particle_refr_index_re, particle_refr_index_im)],
+            orientation,
+            geom_name: geom_path,
+            max_rec,
+            max_tir,
+            binning,
+            seed: None,
+            scale,
+            distortion: None,
+            geom_scale: None,
+            directory: PathBuf::from(directory),
+            fov_factor: None,
         }
-
-        if let Some(bpt) = beam_power_threshold {
-            settings.beam_power_threshold = bpt;
-        }
-
-        if let Some(batf) = beam_area_threshold_fac {
-            settings.beam_area_threshold_fac = batf;
-        }
-
-        if let Some(c) = cutoff {
-            settings.cutoff = c;
-        }
-
-        // Update medium refractive index if either component is provided
-        if medium_refr_index_re.is_some() || medium_refr_index_im.is_some() {
-            let re = medium_refr_index_re.unwrap_or(settings.medium_refr_index.re);
-            let im = medium_refr_index_im.unwrap_or(settings.medium_refr_index.im);
-            settings.medium_refr_index = Complex::new(re, im);
-        }
-
-        // Update particle refractive index if either component is provided
-        if particle_refr_index_re.is_some() || particle_refr_index_im.is_some() {
-            let re = particle_refr_index_re
-                .unwrap_or(settings.particle_refr_index.first().map_or(1.0, |c| c.re));
-            let im = particle_refr_index_im
-                .unwrap_or(settings.particle_refr_index.first().map_or(0.0, |c| c.im));
-            settings.particle_refr_index = vec![Complex::new(re, im)];
-        }
-
-        if let Some(name) = geom_name {
-            settings.geom_name = name;
-        }
-
-        if let Some(rec) = max_rec {
-            settings.max_rec = rec;
-        }
-
-        if let Some(tir) = max_tir {
-            settings.max_tir = tir;
-        }
-
-        // Update binning if either theta_res or phi_res is provided
-        if theta_res.is_some() || phi_res.is_some() {
-            // Get the current values or extract from the current binning scheme
-            let current_theta = match &settings.binning.scheme {
-                bins::Scheme::Simple { num_theta, .. } => *num_theta,
-                _ => 180, // Default if not a simple scheme
-            };
-
-            let current_phi = match &settings.binning.scheme {
-                bins::Scheme::Simple { num_phi, .. } => *num_phi,
-                _ => 360, // Default if not a simple scheme
-            };
-
-            settings.binning = BinningScheme {
-                scheme: bins::Scheme::Simple {
-                    num_theta: theta_res.unwrap_or(current_theta),
-                    num_phi: phi_res.unwrap_or(current_phi),
-                },
-            };
-        }
-
-        // Update orientation if euler is provided (legacy support)
-        if let Some(e) = euler {
-            if e.len() >= 3 {
-                settings.orientation = Orientation {
-                    scheme: Scheme::Discrete {
-                        eulers: vec![Euler::new(e[0], e[1], e[2])],
-                    },
-                    euler_convention: settings.orientation.euler_convention,
-                };
-            }
-        }
-
-        // Update orientation if full orientation object is provided (preferred)
-        if let Some(orient) = orientation {
-            settings.orientation = orient;
-        }
-
-        settings
     }
 
     /// Set the euler angles
