@@ -78,10 +78,21 @@ impl BinningScheme {
 
     /// Create a simple binning scheme with uniform theta and phi spacing
     #[staticmethod]
-    fn simple(num_theta: usize, num_phi: usize) -> Self {
-        BinningScheme {
-            scheme: Scheme::Simple { num_theta, num_phi },
+    fn simple(num_theta: usize, num_phi: usize) -> PyResult<Self> {
+        if num_theta == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "num_theta must be greater than 0"
+            ));
         }
+        if num_phi == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "num_phi must be greater than 0"
+            ));
+        }
+        
+        Ok(BinningScheme {
+            scheme: Scheme::Simple { num_theta, num_phi },
+        })
     }
 
     /// Create an interval binning scheme with variable spacing

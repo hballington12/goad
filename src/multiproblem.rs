@@ -294,11 +294,19 @@ impl MultiProblem {
 impl MultiProblem {
     #[new]
     #[pyo3(signature = (settings, geom = None))]
-    fn py_new(settings: Settings, geom: Option<Geom>) -> Self {
+    fn py_new(settings: Settings, geom: Option<Geom>) -> PyResult<Self> {
         // Load geometry from file if not provided
-        let mut geom = geom.unwrap_or_else(|| {
-            Geom::from_file(&settings.geom_name).expect("Failed to load geometry from path")
-        });
+        let mut geom = match geom {
+            Some(g) => g,
+            None => {
+                Geom::from_file(&settings.geom_name).map_err(|e| {
+                    pyo3::exceptions::PyFileNotFoundError::new_err(format!(
+                        "Failed to load geometry file '{}': {}",
+                        settings.geom_name, e
+                    ))
+                })?
+            }
+        };
 
         problem::init_geom(&settings, &mut geom);
 
@@ -306,17 +314,19 @@ impl MultiProblem {
         let bins = generate_bins(&settings.binning.scheme);
         let result = Results::new_empty(&bins);
 
-        Self {
+        Ok(Self {
             geom,
             orientations,
             settings,
             result,
-        }
+        })
     }
 
-    /// Python wrapper for solve method
-    pub fn py_solve(&mut self) -> PyResult<()> {
-        self.solve();
+    /// Python wrapper for solve method (releases GIL during computation)
+    pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
+        py.allow_threads(|| {
+            self.solve();
+        });
         Ok(())
     }
 

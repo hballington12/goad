@@ -166,7 +166,37 @@ impl Settings {
         max_tir: i32,
         scale: f32,
         directory: &str,
-    ) -> Self {
+    ) -> PyResult<Self> {
+        // Input validation
+        if wavelength <= 0.0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Wavelength must be positive, got: {}", wavelength)
+            ));
+        }
+        
+        if !std::path::Path::new(&geom_path).exists() {
+            return Err(pyo3::exceptions::PyFileNotFoundError::new_err(
+                format!("Geometry file not found: {}", geom_path)
+            ));
+        }
+        
+        if cutoff < 0.0 || cutoff > 1.0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("Cutoff must be between 0 and 1, got: {}", cutoff)
+            ));
+        }
+        
+        if max_rec < 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("max_rec must be non-negative, got: {}", max_rec)
+            ));
+        }
+        
+        if max_tir < 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                format!("max_tir must be non-negative, got: {}", max_tir)
+            ));
+        }
         // Create default orientation if none provided (single orientation at origin)
         let orientation = orientation.unwrap_or_else(|| Orientation {
             scheme: Scheme::Discrete {
@@ -183,7 +213,7 @@ impl Settings {
             },
         });
 
-        Settings {
+        Ok(Settings {
             wavelength,
             beam_power_threshold,
             beam_area_threshold_fac,
@@ -201,7 +231,7 @@ impl Settings {
             geom_scale: None,
             directory: PathBuf::from(directory),
             fov_factor: None,
-        }
+        })
     }
 
     /// Set the euler angles
