@@ -30,8 +30,11 @@ impl MultiProblem {
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
     pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
-        let settings = settings.unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
-        let mut geom = geom.unwrap_or_else(|| Geom::from_file(&settings.geom_name).expect("Failed to load geometry"));
+        let settings = settings
+            .unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
+        let mut geom = geom.unwrap_or_else(|| {
+            Geom::from_file(&settings.geom_name).expect("Failed to load geometry")
+        });
 
         problem::init_geom(&settings, &mut geom);
 
@@ -63,7 +66,7 @@ impl MultiProblem {
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
         let start = Instant::now();
-        println!("Solving problem...");
+        // println!("Solving problem...");
 
         // init a base problem that can be reset
         let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
@@ -106,10 +109,10 @@ impl MultiProblem {
         let duration = end.duration_since(start);
         let time_per_orientation = duration / self.orientations.num_orientations as u32;
 
-        println!(
-            "Time taken: {:.2?}, Time per orientation: {:.2?}",
-            duration, time_per_orientation
-        );
+        // println!(
+        //     "Time taken: {:.2?}, Time per orientation: {:.2?}",
+        //     duration, time_per_orientation
+        // );
 
         // try compute 1d mueller
         match self.settings.binning.scheme {
@@ -146,8 +149,8 @@ impl MultiProblem {
             }
         }
 
-        println!("Results:");
-        self.result.print();
+        // println!("Results:");
+        // self.result.print();
     }
 
     /// Combines two Results objects by adding their fields
