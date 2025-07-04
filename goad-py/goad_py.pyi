@@ -93,26 +93,45 @@ class Results:
     @property
     def powers(self) -> Dict[str, float]: ...
 
+class BinningScheme:
+    """Binning scheme for scattering calculations."""
+    
+    def __init__(self, bins: List[tuple[float, float]]) -> None: ...
+    
+    @staticmethod
+    def simple(num_theta: int, num_phi: int) -> 'BinningScheme': ...
+    
+    @staticmethod
+    def interval(
+        thetas: List[float],
+        theta_spacings: List[float], 
+        phis: List[float],
+        phi_spacings: List[float]
+    ) -> 'BinningScheme': ...
+    
+    @staticmethod
+    def custom(bins: List[tuple[float, float]]) -> 'BinningScheme': ...
+
 class Settings:
     """Problem settings and configuration."""
     
     def __init__(
         self,
-        wavelength: Optional[float] = None,
-        beam_power_threshold: Optional[float] = None,
-        beam_area_threshold_fac: Optional[float] = None,
-        cutoff: Optional[float] = None,
-        medium_refr_index_re: Optional[float] = None,
-        medium_refr_index_im: Optional[float] = None,
-        particle_refr_index_re: Optional[float] = None,
-        particle_refr_index_im: Optional[float] = None,
-        geom_name: Optional[str] = None,
-        max_rec: Optional[int] = None,
-        max_tir: Optional[int] = None,
-        theta_res: Optional[int] = None,
-        phi_res: Optional[int] = None,
-        euler: Optional[List[float]] = None,
-        orientation: Optional[Orientation] = None
+        geom_path: str,
+        wavelength: float = 0.532,
+        particle_refr_index_re: float = 1.31,
+        particle_refr_index_im: float = 0.0,
+        medium_refr_index_re: float = 1.0,
+        medium_refr_index_im: float = 0.0,
+        orientation: Optional[Orientation] = None,
+        binning: Optional[BinningScheme] = None,
+        beam_power_threshold: float = 0.005,
+        beam_area_threshold_fac: float = 0.1,
+        cutoff: float = 0.99,
+        max_rec: int = 10,
+        max_tir: int = 10,
+        scale: float = 1.0,
+        directory: str = "goad_run"
     ) -> None: ...
     
     @property
@@ -142,7 +161,7 @@ class Problem:
 class MultiProblem:
     """Multi-orientation averaging problem."""
     
-    def __init__(self, settings: Optional[Settings] = None, geom: Optional[Geom] = None) -> None: ...
+    def __init__(self, settings: Settings, geom: Optional[Geom] = None) -> None: ...
     
     def py_solve(self) -> None: ...
     
