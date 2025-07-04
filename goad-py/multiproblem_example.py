@@ -3,7 +3,7 @@ Example script demonstrating MultiProblem Python API without config file depende
 
 This script shows how to:
 1. Create binning schemes explicitly
-2. Create orientation schemes explicitly  
+2. Create orientation schemes explicitly
 3. Use Settings with absolute geometry paths
 4. Use MultiProblem for multi-orientation averaging with no external dependencies
 """

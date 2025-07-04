@@ -1,5 +1,43 @@
 """
-Type stubs for goad_py module to help with editor syntax highlighting and autocompletion.
+GOAD Python API Type Definitions
+
+This file provides comprehensive type hints for the GOAD (Geometric Optics 
+Approximation for Diffraction) Python bindings. GOAD simulates light scattering 
+by arbitrary 3D geometries using geometric optics with diffraction corrections.
+
+The main workflow is:
+1. Create Settings with geometry path (all other parameters have sensible defaults)
+2. Use Problem for single-orientation or MultiProblem for multi-orientation simulations  
+3. Call py_solve() to run the computation
+4. Access results through the .results property
+
+Default behavior (minimal setup):
+- Single random orientation (perfect for initial exploration)
+- Interval angular binning with ~1000 bins (good coverage, reasonable performance)
+- Wavelength: 532nm (green laser)
+- Refractive index: 1.31 + 0.0i (typical glass particle in air)
+
+Example (minimal setup):
+    import goad_py as goad
+    
+    # Ultra-simple single orientation
+    settings = goad.Settings("particle.obj")
+    problem = goad.Problem(settings)
+    problem.py_solve()
+    print(f"Extinction: {problem.results.ext_cross}")
+    
+    # Multi-orientation averaging (100 random orientations)
+    orientations = goad.create_uniform_orientation(100)
+    settings = goad.Settings("particle.obj", orientation=orientations)
+    mp = goad.MultiProblem(settings)
+    mp.py_solve()
+    print(f"Average extinction: {mp.results.ext_cross}")
+    
+    # Truly minimal (just geometry path)
+    settings = goad.Settings("particle.obj")  # Everything else uses defaults!
+    mp = goad.MultiProblem(settings)
+    mp.py_solve()
+    print(f"Results: {mp.results.scat_cross}")
 """
 
 from typing import Optional, List, Dict, Any, Union
@@ -94,12 +132,30 @@ class Results:
     def powers(self) -> Dict[str, float]: ...
 
 class BinningScheme:
-    """Binning scheme for scattering calculations."""
+    """Angular binning scheme for scattering calculations.
+    
+    Defines how to discretize the scattering sphere into angular bins
+    for Mueller matrix and amplitude computations. Supports simple
+    regular grids, custom intervals, and arbitrary bin arrangements.
+    """
     
     def __init__(self, bins: List[tuple[float, float]]) -> None: ...
     
     @staticmethod
-    def simple(num_theta: int, num_phi: int) -> 'BinningScheme': ...
+    def simple(num_theta: int, num_phi: int) -> 'BinningScheme':
+        """Create a simple regular grid binning scheme.
+        
+        Args:
+            num_theta: Number of bins in theta direction (0 to 180 degrees)
+            num_phi: Number of bins in phi direction (0 to 360 degrees)
+            
+        Returns:
+            BinningScheme with regular angular grid
+            
+        Raises:
+            ValueError: If num_theta or num_phi is zero or negative
+        """
+        ...
     
     @staticmethod
     def interval(
@@ -107,13 +163,39 @@ class BinningScheme:
         theta_spacings: List[float], 
         phis: List[float],
         phi_spacings: List[float]
-    ) -> 'BinningScheme': ...
+    ) -> 'BinningScheme':
+        """Create binning scheme with custom intervals.
+        
+        Args:
+            thetas: Key theta angles in degrees
+            theta_spacings: Spacing around each theta value
+            phis: Key phi angles in degrees  
+            phi_spacings: Spacing around each phi value
+            
+        Returns:
+            BinningScheme with custom intervals
+        """
+        ...
     
     @staticmethod
-    def custom(bins: List[tuple[float, float]]) -> 'BinningScheme': ...
+    def custom(bins: List[tuple[float, float]]) -> 'BinningScheme':
+        """Create binning scheme from explicit (theta, phi) pairs.
+        
+        Args:
+            bins: List of (theta, phi) angle pairs in degrees
+            
+        Returns:
+            BinningScheme with custom bin locations
+        """
+        ...
 
 class Settings:
-    """Problem settings and configuration."""
+    """Simulation parameters and physical properties.
+    
+    Contains all parameters needed for a GOAD simulation including
+    geometry path, optical properties, orientation scheme, and
+    numerical settings. Most parameters have sensible defaults.
+    """
     
     def __init__(
         self,
@@ -132,7 +214,31 @@ class Settings:
         max_tir: int = 10,
         scale: float = 1.0,
         directory: str = "goad_run"
-    ) -> None: ...
+    ) -> None:
+        """Initialize simulation settings.
+        
+        Args:
+            geom_path: Path to geometry file (.obj format)
+            wavelength: Incident wavelength in geometry units (default: 0.532)
+            particle_refr_index_re: Real part of particle refractive index (default: 1.31)
+            particle_refr_index_im: Imaginary part of particle refractive index (default: 0.0)
+            medium_refr_index_re: Real part of medium refractive index (default: 1.0)
+            medium_refr_index_im: Imaginary part of medium refractive index (default: 0.0)
+            orientation: Orientation scheme (default: None → 1 random uniform orientation)
+            binning: Angular binning scheme (default: None → interval binning: theta=[0°,30°,60°,120°,180°] with spacings [2°,5°,10°,5°], phi=[0°,90°,180°,270°,360°] with 15° spacings, creating ~1000 bins)
+            beam_power_threshold: Ray termination threshold (default: 0.005)
+            beam_area_threshold_fac: Area threshold factor (default: 0.1)
+            cutoff: Power cutoff fraction 0-1 (default: 0.99)
+            max_rec: Maximum recursion depth (default: 10)
+            max_tir: Maximum total internal reflections (default: 10)
+            scale: Geometry scaling factor (default: 1.0)
+            directory: Output directory for results (default: "goad_run")
+            
+        Raises:
+            ValueError: If wavelength <= 0 or cutoff not in [0,1]
+            FileNotFoundError: If geometry file doesn't exist
+        """
+        ...
     
     @property
     def euler(self) -> List[float]: ...
@@ -159,23 +265,71 @@ class Problem:
     def results(self) -> Results: ...
 
 class MultiProblem:
-    """Multi-orientation averaging problem."""
+    """Multi-orientation light scattering simulation for a single geometry.
     
-    def __init__(self, settings: Settings, geom: Optional[Geom] = None) -> None: ...
+    Computes orientation-averaged scattering properties by running multiple
+    single-orientation simulations and averaging the results. Supports both
+    random and systematic orientation sampling schemes. Results include
+    Mueller matrices, cross-sections, and derived optical parameters.
     
-    def py_solve(self) -> None: ...
+    Example:
+        orientations = goad.create_uniform_orientation(100)
+        settings = goad.Settings("particle.obj", orientation=orientations)
+        mp = goad.MultiProblem(settings)
+        mp.py_solve()
+        print(f"Scattering cross-section: {mp.results.scat_cross}")
+    """
     
-    def py_writeup(self) -> None: ...
+    def __init__(self, settings: Settings, geom: Optional[Geom] = None) -> None:
+        """Initialize multi-orientation problem.
+        
+        Args:
+            settings: Simulation parameters including orientation scheme
+            geom: Geometry object (loaded from settings.geom_path if None)
+            
+        Raises:
+            FileNotFoundError: If geometry file cannot be loaded
+        """
+        ...
     
-    def py_reset(self) -> None: ...
+    def py_solve(self) -> None:
+        """Solve the multi-orientation scattering problem.
+        
+        Computes scattering properties averaged over all orientations using
+        parallel processing. The Global Interpreter Lock (GIL) is released
+        during computation to allow concurrent Python operations.
+        
+        Raises:
+            RuntimeError: If computation fails
+        """
+        ...
     
-    def py_regenerate_orientations(self) -> None: ...
+    def py_writeup(self) -> None:
+        """Write results to output files in the specified directory."""
+        ...
+    
+    def py_reset(self) -> None:
+        """Reset problem to initial state and regenerate orientations."""
+        ...
+    
+    def py_regenerate_orientations(self) -> None:
+        """Regenerate random orientations (useful for statistical sampling)."""
+        ...
     
     @property
-    def results(self) -> Results: ...
+    def results(self) -> Results:
+        """Access orientation-averaged simulation results.
+        
+        Returns the complete Results object containing Mueller matrices,
+        amplitude matrices, power distributions, and derived parameters
+        averaged over all orientations.
+        """
+        ...
     
     @property
-    def num_orientations(self) -> int: ...
+    def num_orientations(self) -> int:
+        """Number of orientations in the current simulation."""
+        ...
 
 # Helper functions
 def uniform_orientation(num_orients: int) -> Scheme: ...

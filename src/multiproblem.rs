@@ -15,7 +15,29 @@ use nalgebra::Complex;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
-/// A problem for a single geometry with multiple orientations.
+/// Multi-orientation light scattering simulation for a single geometry.
+/// 
+/// Computes orientation-averaged scattering properties by running multiple
+/// single-orientation simulations and averaging the results. Supports both
+/// random and systematic orientation sampling schemes. Results include
+/// Mueller matrices, cross-sections, and derived optical parameters.
+/// 
+/// # Examples
+/// ```python
+/// import goad_py as goad
+/// 
+/// # Create orientation scheme and settings
+/// orientations = goad.create_uniform_orientation(100)
+/// settings = goad.Settings("particle.obj", orientation=orientations)
+/// 
+/// # Run multi-orientation simulation
+/// mp = goad.MultiProblem(settings)
+/// mp.py_solve()
+/// 
+/// # Access averaged results
+/// results = mp.results
+/// print(f"Scattering cross-section: {results.scat_cross}")
+/// ```
 #[pyclass]
 #[derive(Debug)] // Added Default derive
 pub struct MultiProblem {
@@ -322,7 +344,14 @@ impl MultiProblem {
         })
     }
 
-    /// Python wrapper for solve method (releases GIL during computation)
+    /// Solve the multi-orientation scattering problem.
+    /// 
+    /// Computes scattering properties averaged over all orientations using
+    /// parallel processing. The Global Interpreter Lock (GIL) is released
+    /// during computation to allow concurrent Python operations.
+    /// 
+    /// # Returns
+    /// PyResult<()> - Success or error if computation fails
     pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
         py.allow_threads(|| {
             self.solve();
@@ -330,7 +359,14 @@ impl MultiProblem {
         Ok(())
     }
 
-    /// Get the results object (same pattern as Problem)
+    /// Access the orientation-averaged simulation results.
+    /// 
+    /// Returns the complete Results object containing Mueller matrices,
+    /// amplitude matrices, power distributions, and derived parameters
+    /// averaged over all orientations.
+    /// 
+    /// # Returns
+    /// Results - Complete scattering simulation results
     #[getter]
     pub fn get_results(&self) -> Results {
         self.result.clone()

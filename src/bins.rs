@@ -61,6 +61,11 @@ pub enum Scheme {
     },
 }
 
+/// Angular binning scheme for scattering calculations.
+/// 
+/// Defines how to discretize the scattering sphere into angular bins
+/// for Mueller matrix and amplitude computations. Supports simple
+/// regular grids, custom intervals, and arbitrary bin arrangements.
 #[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct BinningScheme {

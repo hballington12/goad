@@ -197,19 +197,21 @@ impl Settings {
                 format!("max_tir must be non-negative, got: {}", max_tir)
             ));
         }
-        // Create default orientation if none provided (single orientation at origin)
+        // Create default orientation if none provided (single random orientation)
         let orientation = orientation.unwrap_or_else(|| Orientation {
-            scheme: Scheme::Discrete {
-                eulers: vec![Euler::new(0.0, 0.0, 0.0)],
+            scheme: Scheme::Uniform {
+                num_orients: 1,
             },
             euler_convention: DEFAULT_EULER_ORDER,
         });
 
-        // Create default binning if none provided
+        // Create default binning if none provided (interval binning with good coverage)
         let binning = binning.unwrap_or_else(|| BinningScheme {
-            scheme: bins::Scheme::Simple {
-                num_theta: DEFAULT_THETA_BINS,
-                num_phi: DEFAULT_PHI_BINS,
+            scheme: bins::Scheme::Interval {
+                thetas: vec![0.0, 30.0, 60.0, 120.0, 180.0],      // Good angular coverage
+                theta_spacings: vec![2.0, 5.0, 10.0, 5.0],        // Fine near forward/back
+                phis: vec![0.0, 90.0, 180.0, 270.0, 360.0],       // Azimuthal coverage
+                phi_spacings: vec![15.0, 15.0, 15.0, 15.0],       // 15-degree phi spacing
             },
         });
 
