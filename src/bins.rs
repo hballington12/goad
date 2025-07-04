@@ -166,7 +166,7 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<(f32, f32)> {
                 // Parse the TOML file
                 match toml::from_str::<CustomBins>(&content) {
                     Ok(custom_bins) => {
-                        println!("Loaded {} custom bins from file", custom_bins.bins.len());
+                        // println!("Loaded {} custom bins from file", custom_bins.bins.len());
                         custom_bins.bins
                     }
                     Err(e) => {
