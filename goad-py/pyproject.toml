@@ -4,12 +4,36 @@ build-backend = "maturin"
 
 [project]
 name = "goad-py"
+version = "0.2.0"
+description = "Physical optics light scattering computation"
+authors = [{name = "Harry Ballington", email = "ballington@uni-wuppertal.de"}]
+license = {text = "GPL-3.0"}
+readme = "README.md"
 requires-python = ">=3.8"
+keywords = ["light-scattering", "optics", "simulation", "scientific-computing", "physics"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Physics",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
 ]
-dynamic = ["version"]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/hballington12/goad"
+Documentation = "https://docs.rs/goad/0.1.0/goad/index.html"
+Repository = "https://github.com/hballington12/goad"
+"Rust Crate" = "https://crates.io/crates/goad"
+
 [tool.maturin]
 features = ["pyo3/extension-module"]

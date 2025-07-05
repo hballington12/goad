@@ -31,6 +31,12 @@
     toml = "0.8.19"
 
 [workspace]
-    members = [
-        "goad-py",
-    ]
+members = [
+    "goad-py",
+]
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce parallel codegen units to improve optimization
+strip = true        # Strip symbols from binary
