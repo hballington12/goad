@@ -1,5 +1,6 @@
 use goad::{
     self, 
+    bins::BinningScheme,
     geom::Geom, 
     geom::Shape, 
     multiproblem::MultiProblem,
@@ -70,6 +71,7 @@ fn goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Problem>()?;
     m.add_class::<MultiProblem>()?;
     m.add_class::<Results>()?;
+    m.add_class::<BinningScheme>()?;
     
     // Orientation classes
     m.add_class::<Euler>()?;

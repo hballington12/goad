@@ -35,7 +35,9 @@ mod tests {
             geom.shapes[geom.shapes[1].parent_id.unwrap()]
         );
 
-        let mut problem = Problem::new(Some(geom), None);
+        // Use default config to avoid loading local.toml which may have test-breaking settings
+        let default_settings = crate::settings::load_default_config().expect("Failed to load default config");
+        let mut problem = Problem::new(Some(geom), Some(default_settings));
 
         problem.propagate_next();
     }

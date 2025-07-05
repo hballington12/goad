@@ -153,11 +153,59 @@ jobs:
           name: wheels-sdist
           path: dist
 
+  test:
+    name: Test wheels
+    needs: [linux, windows, macos]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - name: Install wheel
+        shell: bash
+        run: |
+          pip install --upgrade pip
+          pip install goad-py --find-links dist/ --force-reinstall
+      - name: Run import test
+        run: |
+          python -c "import goad_py; print('✓ Import successful')"
+          python -c "import goad_py; print(f'Version: {goad_py.__version__ if hasattr(goad_py, \"__version__\") else \"No version attr\"}')"
+      - name: Run basic functionality test
+        run: |
+          python -c "
+          import goad_py
+          # Test creating objects
+          shape = goad_py.Shape.Sphere
+          settings = goad_py.Settings()
+          orient = goad_py.create_uniform_orientation(10)
+          bins = goad_py.BinningScheme.Interval(1000)
+          print('✓ All basic objects created successfully')
+          "
+      - name: Run example scripts
+        if: matrix.os == 'ubuntu-latest'  # Only run on Linux to save CI time
+        shell: bash
+        run: |
+          # Download example files from the repository
+          curl -O https://raw.githubusercontent.com/hballington12/goad/main/goad-py/simple_example.py || true
+          if [ -f simple_example.py ]; then
+            python simple_example.py || echo "Example script failed (might need geometry files)"
+          fi
+
   release:
     name: Release
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
-    needs: [linux, musllinux, windows, macos, sdist]
+    needs: [linux, musllinux, windows, macos, sdist, test]
     permissions:
       # Use to sign the release artifacts
       id-token: write

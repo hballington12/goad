@@ -1,13 +1,13 @@
 [package]
-    name = "goad-py"
-    version = "0.2.0"
-    edition = "2021"
+name = "goad-py"
+version = "0.2.0"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-    name = "goad_py"
-    crate-type = ["cdylib"]
+name = "goad_py"
+crate-type = ["cdylib"]
 
 [dependencies]
-    pyo3 = "0.24.1"
-    goad = { path = "../" }
+pyo3 = { version = "0.24.1", features = ["extension-module", "abi3-py38"] }
+goad = { path = "../" }

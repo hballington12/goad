@@ -61,6 +61,11 @@ pub enum Scheme {
     },
 }
 
+/// Angular binning scheme for scattering calculations.
+/// 
+/// Defines how to discretize the scattering sphere into angular bins
+/// for Mueller matrix and amplitude computations. Supports simple
+/// regular grids, custom intervals, and arbitrary bin arrangements.
 #[pyclass]
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct BinningScheme {
@@ -71,6 +76,51 @@ pub struct BinningScheme {
 impl BinningScheme {
     #[new]
     fn py_new(bins: Vec<(f32, f32)>) -> Self {
+        BinningScheme {
+            scheme: Scheme::Custom { bins, file: None },
+        }
+    }
+
+    /// Create a simple binning scheme with uniform theta and phi spacing
+    #[staticmethod]
+    fn simple(num_theta: usize, num_phi: usize) -> PyResult<Self> {
+        if num_theta == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "num_theta must be greater than 0"
+            ));
+        }
+        if num_phi == 0 {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "num_phi must be greater than 0"
+            ));
+        }
+        
+        Ok(BinningScheme {
+            scheme: Scheme::Simple { num_theta, num_phi },
+        })
+    }
+
+    /// Create an interval binning scheme with variable spacing
+    #[staticmethod]
+    fn interval(
+        thetas: Vec<f32>,
+        theta_spacings: Vec<f32>,
+        phis: Vec<f32>,
+        phi_spacings: Vec<f32>,
+    ) -> Self {
+        BinningScheme {
+            scheme: Scheme::Interval {
+                thetas,
+                theta_spacings,
+                phis,
+                phi_spacings,
+            },
+        }
+    }
+
+    /// Create a custom binning scheme with explicit bin positions
+    #[staticmethod]
+    fn custom(bins: Vec<(f32, f32)>) -> Self {
         BinningScheme {
             scheme: Scheme::Custom { bins, file: None },
         }

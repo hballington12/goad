@@ -11,6 +11,11 @@ use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2, Axis};
 use pyo3::prelude::*;
 
+/// Complete results from a GOAD light scattering simulation.
+/// 
+/// Contains all computed scattering data including Mueller matrices,
+/// amplitude matrices, power distributions, and derived parameters.
+/// Supports both 2D angular distributions and 1D integrated results.
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Results {

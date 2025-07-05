@@ -15,7 +15,29 @@ use nalgebra::Complex;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
-/// A problem for a single geometry with multiple orientations.
+/// Multi-orientation light scattering simulation for a single geometry.
+/// 
+/// Computes orientation-averaged scattering properties by running multiple
+/// single-orientation simulations and averaging the results. Supports both
+/// random and systematic orientation sampling schemes. Results include
+/// Mueller matrices, cross-sections, and derived optical parameters.
+/// 
+/// # Examples
+/// ```python
+/// import goad_py as goad
+/// 
+/// # Create orientation scheme and settings
+/// orientations = goad.create_uniform_orientation(100)
+/// settings = goad.Settings("particle.obj", orientation=orientations)
+/// 
+/// # Run multi-orientation simulation
+/// mp = goad.MultiProblem(settings)
+/// mp.py_solve()
+/// 
+/// # Access averaged results
+/// results = mp.results
+/// print(f"Scattering cross-section: {results.scat_cross}")
+/// ```
 #[pyclass]
 #[derive(Debug)] // Added Default derive
 pub struct MultiProblem {
@@ -30,8 +52,11 @@ impl MultiProblem {
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
     pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
-        let settings = settings.unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
-        let mut geom = geom.unwrap_or_else(|| Geom::from_file(&settings.geom_name).expect("Failed to load geometry"));
+        let settings = settings
+            .unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
+        let mut geom = geom.unwrap_or_else(|| {
+            Geom::from_file(&settings.geom_name).expect("Failed to load geometry")
+        });
 
         problem::init_geom(&settings, &mut geom);
 
@@ -63,7 +88,7 @@ impl MultiProblem {
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
         let start = Instant::now();
-        println!("Solving problem...");
+        // println!("Solving problem...");
 
         // init a base problem that can be reset
         let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
@@ -106,10 +131,10 @@ impl MultiProblem {
         let duration = end.duration_since(start);
         let time_per_orientation = duration / self.orientations.num_orientations as u32;
 
-        println!(
-            "Time taken: {:.2?}, Time per orientation: {:.2?}",
-            duration, time_per_orientation
-        );
+        // println!(
+        //     "Time taken: {:.2?}, Time per orientation: {:.2?}",
+        //     duration, time_per_orientation
+        // );
 
         // try compute 1d mueller
         match self.settings.binning.scheme {
@@ -146,8 +171,8 @@ impl MultiProblem {
             }
         }
 
-        println!("Results:");
-        self.result.print();
+        // println!("Results:");
+        // self.result.print();
     }
 
     /// Combines two Results objects by adding their fields
@@ -290,18 +315,58 @@ impl MultiProblem {
 #[pymethods]
 impl MultiProblem {
     #[new]
-    #[pyo3(signature = (settings = None, geom = None))]
-    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> Self {
-        MultiProblem::new(geom, settings)
+    #[pyo3(signature = (settings, geom = None))]
+    fn py_new(settings: Settings, geom: Option<Geom>) -> PyResult<Self> {
+        // Load geometry from file if not provided
+        let mut geom = match geom {
+            Some(g) => g,
+            None => {
+                Geom::from_file(&settings.geom_name).map_err(|e| {
+                    pyo3::exceptions::PyFileNotFoundError::new_err(format!(
+                        "Failed to load geometry file '{}': {}",
+                        settings.geom_name, e
+                    ))
+                })?
+            }
+        };
+
+        problem::init_geom(&settings, &mut geom);
+
+        let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
+        let bins = generate_bins(&settings.binning.scheme);
+        let result = Results::new_empty(&bins);
+
+        Ok(Self {
+            geom,
+            orientations,
+            settings,
+            result,
+        })
     }
 
-    /// Python wrapper for solve method
-    pub fn py_solve(&mut self) -> PyResult<()> {
-        self.solve();
+    /// Solve the multi-orientation scattering problem.
+    /// 
+    /// Computes scattering properties averaged over all orientations using
+    /// parallel processing. The Global Interpreter Lock (GIL) is released
+    /// during computation to allow concurrent Python operations.
+    /// 
+    /// # Returns
+    /// PyResult<()> - Success or error if computation fails
+    pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
+        py.allow_threads(|| {
+            self.solve();
+        });
         Ok(())
     }
 
-    /// Get the results object (same pattern as Problem)
+    /// Access the orientation-averaged simulation results.
+    /// 
+    /// Returns the complete Results object containing Mueller matrices,
+    /// amplitude matrices, power distributions, and derived parameters
+    /// averaged over all orientations.
+    /// 
+    /// # Returns
+    /// Results - Complete scattering simulation results
     #[getter]
     pub fn get_results(&self) -> Results {
         self.result.clone()
