@@ -3,11 +3,12 @@ use crate::{
     bins::{generate_bins, Scheme},
     field::Field,
     geom::{Face, Geom},
-    helpers::draw_face,
+    helpers,
     orientation, output,
     result::{self, Results},
     settings::{load_config, Settings},
 };
+#[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use ndarray::Array2;
@@ -489,11 +490,13 @@ impl Problem {
     }
 
     /// Draws a `BeamPropagation` on top of a `Geom`.
+    #[cfg(feature = "macroquad")]
     pub fn draw_propagation(&self, propagation: &BeamPropagation) {
         // draw the geometry
         for shape in &self.geom.shapes {
             for face in &shape.faces {
-                draw_face(face, GREEN, 4.0);
+                #[cfg(feature = "macroquad")]
+                helpers::draw_face(face, GREEN, 4.0);
             }
         }
         propagation.draw();

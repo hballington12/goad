@@ -1,5 +1,6 @@
 use crate::geom::Face;
 use geo_types::{Coord, Polygon};
+#[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 
 const SCALE: f32 = 25.0; // modify this depending on widget size
@@ -9,6 +10,7 @@ const OFFSET_Y: f32 = 300.0;
 ///
 /// # Arguments
 /// * `multi_polygon` - A reference to a `MultiPolygon` containing the polygons to draw.
+#[cfg(feature = "macroquad")]
 pub fn draw_multipolygon(polygon: &Polygon<f32>, color: Color) {
     // Extract the exterior LineString
     let points = &polygon.exterior().0;
@@ -33,6 +35,7 @@ pub fn draw_multipolygon(polygon: &Polygon<f32>, color: Color) {
 ///
 /// # Arguments
 /// * `face` - A reference to a `Face` containing the polygon to draw.
+#[cfg(feature = "macroquad")]
 pub fn draw_face(face: &Face, color: Color, thickness: f32) {
     // Extract the exterior LineString
     let mut line_strings = Vec::new();
@@ -73,6 +76,7 @@ pub fn draw_face(face: &Face, color: Color, thickness: f32) {
     lines_to_screen(line_strings, color, thickness);
 }
 
+#[cfg(feature = "macroquad")]
 pub fn lines_to_screen(line_strings: Vec<Vec<Coord<f32>>>, color: Color, thickness: f32) {
     // Convert the points into macroquad-compatible coordinates
     for points in line_strings {

@@ -6,6 +6,7 @@ use crate::powers::Powers;
 use anyhow::anyhow;
 use anyhow::Result;
 use itertools::Itertools;
+#[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2, Axis};

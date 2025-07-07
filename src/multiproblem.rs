@@ -10,6 +10,7 @@ use crate::{
     settings::Settings,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+#[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::Complex;
 use pyo3::prelude::*;
