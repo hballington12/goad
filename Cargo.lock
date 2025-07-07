@@ -605,7 +605,7 @@ dependencies = [
 
 [[package]]
 name = "goad-py"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "goad",
  "pyo3",

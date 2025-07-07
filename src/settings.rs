@@ -169,49 +169,52 @@ impl Settings {
     ) -> PyResult<Self> {
         // Input validation
         if wavelength <= 0.0 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Wavelength must be positive, got: {}", wavelength)
-            ));
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Wavelength must be positive, got: {}",
+                wavelength
+            )));
         }
-        
+
         if !std::path::Path::new(&geom_path).exists() {
-            return Err(pyo3::exceptions::PyFileNotFoundError::new_err(
-                format!("Geometry file not found: {}", geom_path)
-            ));
+            return Err(pyo3::exceptions::PyFileNotFoundError::new_err(format!(
+                "Geometry file not found: {}",
+                geom_path
+            )));
         }
-        
+
         if cutoff < 0.0 || cutoff > 1.0 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("Cutoff must be between 0 and 1, got: {}", cutoff)
-            ));
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Cutoff must be between 0 and 1, got: {}",
+                cutoff
+            )));
         }
-        
+
         if max_rec < 0 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("max_rec must be non-negative, got: {}", max_rec)
-            ));
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "max_rec must be non-negative, got: {}",
+                max_rec
+            )));
         }
-        
+
         if max_tir < 0 {
-            return Err(pyo3::exceptions::PyValueError::new_err(
-                format!("max_tir must be non-negative, got: {}", max_tir)
-            ));
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "max_tir must be non-negative, got: {}",
+                max_tir
+            )));
         }
         // Create default orientation if none provided (single random orientation)
         let orientation = orientation.unwrap_or_else(|| Orientation {
-            scheme: Scheme::Uniform {
-                num_orients: 1,
-            },
+            scheme: Scheme::Uniform { num_orients: 1 },
             euler_convention: DEFAULT_EULER_ORDER,
         });
 
-        // Create default binning if none provided (interval binning with good coverage)
+        // Create default binning if none provided (interval binning with high resolution)
         let binning = binning.unwrap_or_else(|| BinningScheme {
             scheme: bins::Scheme::Interval {
-                thetas: vec![0.0, 30.0, 60.0, 120.0, 180.0],      // Good angular coverage
-                theta_spacings: vec![2.0, 5.0, 10.0, 5.0],        // Fine near forward/back
-                phis: vec![0.0, 90.0, 180.0, 270.0, 360.0],       // Azimuthal coverage
-                phi_spacings: vec![15.0, 15.0, 15.0, 15.0],       // 15-degree phi spacing
+                thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
+                theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
+                phis: vec![0.0, 360.0],
+                phi_spacings: vec![7.5],
             },
         });
 
@@ -559,10 +562,10 @@ fn validate_config(config: &Settings) {
 #[command(after_help = "\x1b[1;36mEXAMPLES:\x1b[0m
     \x1b[32m# Run with a specific wavelength and geometry file\x1b[0m
     \x1b[36mgoad -w 0.5 --geo geometry.obj\x1b[0m
-    
+
     \x1b[32m# Run with a specific refractive index and random orientations\x1b[0m
     \x1b[36mgoad --ri 1.31+0.01i --uniform 100\x1b[0m
-    
+
     \x1b[32m# Run over discrete orientations with an interval binning scheme\x1b[0m
     \x1b[36mgoad --discrete=\"-30.0,20.0,1.0 -40.0,13.0,12.1\" --interval \\\x1b[0m
     \x1b[36m     --theta 0 1 10 2 180 --phi 0 2 180\x1b[0m
@@ -572,7 +575,7 @@ fn validate_config(config: &Settings) {
 
     \x1b[32m# Run with multiple shapes with different refractive indices\x1b[0m
     \x1b[36mgoad --ri 1.31+0.0i 1.5+0.1i --geo geometries.obj\x1b[0m
-    
+
     \x1b[32m# Save output to a specific directory\x1b[0m
     \x1b[36mgoad --dir /path/to/output\x1b[0m
     ")]

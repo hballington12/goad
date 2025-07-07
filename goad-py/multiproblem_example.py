@@ -26,11 +26,11 @@ print("\n1. Creating MultiProblem with uniform orientations...")
 
 # Create custom binning scheme
 binning = goad.BinningScheme.simple(181, 181)  # 181x181 angular grid
-print(f"Created binning scheme: Simple 181x181")
+print("Created binning scheme: Simple 181x181")
 
 # Create uniform orientation (100 random orientations)
-uniform_orientation = goad.create_uniform_orientation(100)
-print(f"Created uniform orientation: 100 random orientations")
+uniform_orientation = goad.create_uniform_orientation(10000)
+print("Created uniform orientation: 100 random orientations")
 
 # Create settings with all parameters explicit (no config file dependencies)
 settings = goad.Settings(
@@ -71,7 +71,7 @@ interval_binning = goad.BinningScheme.interval(
     phis=[0.0, 360.0],              # Full phi range
     phi_spacings=[5.0]              # 5 degree phi spacing
 )
-print(f"Created interval binning scheme")
+print("Created interval binning scheme")
 
 # Create specific Euler angles
 euler1 = goad.Euler(0.0, 0.0, 0.0)      # No rotation
@@ -80,7 +80,7 @@ euler3 = goad.Euler(45.0, 60.0, 90.0)   # Mixed rotations
 
 # Create discrete orientation scheme
 discrete_orientation = goad.create_discrete_orientation([euler1, euler2, euler3])
-print(f"Created discrete orientation: 3 specific orientations")
+print("Created discrete orientation: 3 specific orientations")
 
 # Create settings with discrete orientation and custom binning
 settings2 = goad.Settings(
@@ -135,11 +135,3 @@ multi_problem3.py_solve()
 
 results3 = multi_problem3.results
 print(f"Custom binned results: {len(results3.mueller)} angle pairs")
-
-print("\n✓ Config-free MultiProblem examples completed successfully!")
-print("\nKey features of the new API:")
-print("- No external config file dependencies")
-print("- Explicit geometry file paths (absolute paths recommended)")
-print("- Configurable binning schemes (Simple, Interval, Custom)")
-print("- All parameters have sensible defaults")
-print("- Complete control over refractive indices and simulation parameters")
