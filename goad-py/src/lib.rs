@@ -57,7 +57,7 @@ fn create_discrete_orientation(
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn _goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
 
     // Core classes

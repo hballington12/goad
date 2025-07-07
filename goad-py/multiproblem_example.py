@@ -29,7 +29,7 @@ binning = goad.BinningScheme.simple(181, 181)  # 181x181 angular grid
 print("Created binning scheme: Simple 181x181")
 
 # Create uniform orientation (100 random orientations)
-uniform_orientation = goad.create_uniform_orientation(10000)
+uniform_orientation = goad.create_uniform_orientation(100)
 print("Created uniform orientation: 100 random orientations")
 
 # Create settings with all parameters explicit (no config file dependencies)

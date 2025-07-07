@@ -14,14 +14,38 @@ pip install goad-py
 import goad_py
 
 # Create a problem with minimal setup
-problem = goad_py.Problem("path/to/geometry.obj")
-
-# Solve and get results
-results = problem.py_solve()
+settings = goad_py.Settings("path/to/geometry.obj")
+mp = goad_py.MultiProblem(settings)
+mp.py_solve()
 
 # Access scattering data
-print(f"Number of angles: {results.num_angles}")
-print(f"Scattering cross section: {results.sca_cross_section}")
+results = mp.results
+print(f"Scattering cross-section: {results.scat_cross}")
+print(f"Extinction cross-section: {results.ext_cross}")
+print(f"Asymmetry parameter: {results.asymmetry}")
+```
+
+### Convergence Analysis
+
+For statistical error estimation, use the convergence analysis functionality:
+
+```python
+from goad_py import Convergence, Convergable
+
+# Set up convergence analysis
+convergence = Convergence(
+    settings=goad_py.Settings(geom_path="path/to/geometry.obj"),
+    convergables=[
+        Convergable('asymmetry', 'absolute', 0.005),  # absolute SEM < 0.005
+        Convergable('scatt', 'relative', 0.01),       # relative SEM < 1%
+    ],
+    batch_size=100
+)
+
+# Run until convergence
+results = convergence.run()
+print(f"Converged: {results.converged}")
+print(f"Final values: {results.values}")
 ```
 
 ## Features
@@ -30,6 +54,7 @@ print(f"Scattering cross section: {results.sca_cross_section}")
 - Support for various 3D geometry formats
 - Configurable wavelength, refractive index, and orientations
 - Multi-orientation averaging capabilities
+- Convergence analysis for statistical error estimation
 - Efficient parallel computation with GIL release
 
 ## Documentation

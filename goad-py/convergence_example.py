@@ -11,7 +11,7 @@
 # is generally larger and can only be inferred by comparing with other methods.
 
 import goad_py as goad
-from convergence import Convergence, Convergable
+from goad_py import Convergence, Convergable
 
 # Minimal setup
 convergence = Convergence(

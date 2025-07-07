@@ -9,7 +9,7 @@ repository = "https://github.com/hballington12/goad"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "goad_py"
+name = "_goad_py"
 crate-type = ["cdylib"]
 
 [dependencies]
