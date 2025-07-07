@@ -174,7 +174,6 @@ jobs:
         with:
           pattern: wheels-*
           merge-multiple: true
-          path: dist
       - name: Debug artifact structure
         shell: bash
         run: |
@@ -192,15 +191,15 @@ jobs:
       - name: List downloaded wheels
         shell: bash
         run: |
-          echo "Contents of dist directory:"
-          ls -la dist/
-          echo "Wheel files:"
-          ls -la dist/*.whl || echo "No .whl files found"
+          echo "Looking for wheel files in current directory:"
+          find . -name "*.whl" -type f
+          echo "All files in current directory:"
+          ls -la
       - name: Install wheel
         shell: bash
         run: |
           pip install --upgrade pip
-          pip install goad-py --find-links dist/ --force-reinstall
+          pip install goad-py --find-links . --force-reinstall
       - name: Run import test
         run: |
           python -c "import goad_py; print('✓ Import successful')"
