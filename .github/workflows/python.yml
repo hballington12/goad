@@ -169,11 +169,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
           merge-multiple: true
           path: dist
+      - name: Debug artifact structure
+        shell: bash
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
+          echo "Checking if dist exists:"
+          if [ -d "dist" ]; then
+            echo "dist/ exists"
+            ls -la dist/
+          else
+            echo "dist/ does not exist"
+          fi
       - name: List downloaded wheels
         shell: bash
         run: |
