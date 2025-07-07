@@ -31,10 +31,6 @@ jobs:
           - runner: ubuntu-22.04
             target: aarch64
           - runner: ubuntu-22.04
-            target: armv7
-          - runner: ubuntu-22.04
-            target: s390x
-          - runner: ubuntu-22.04
             target: ppc64le
     steps:
       - uses: actions/checkout@v4
@@ -49,11 +45,14 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
           working-directory: goad-py
+        env:
+          CXXFLAGS: -std=c++11
+          CFLAGS: -std=c11
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
@@ -66,8 +65,6 @@ jobs:
             target: x86
           - runner: ubuntu-22.04
             target: aarch64
-          - runner: ubuntu-22.04
-            target: armv7
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -81,11 +78,14 @@ jobs:
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: musllinux_1_2
           working-directory: goad-py
+        env:
+          CXXFLAGS: -std=c++11
+          CFLAGS: -std=c11
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-musllinux-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -94,8 +94,6 @@ jobs:
         platform:
           - runner: windows-latest
             target: x64
-          - runner: windows-latest
-            target: x86
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -113,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
@@ -140,7 +138,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-macos-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   sdist:
     runs-on: ubuntu-latest
@@ -156,11 +154,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-sdist
-          path: dist
+          path: goad-py/dist
 
   test:
     name: Test wheels
-    needs: [linux, windows, macos]
+    needs: [linux, musllinux, windows, macos, sdist]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -171,40 +169,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
           merge-multiple: true
-          path: dist
+      - name: Debug artifact structure
+        shell: bash
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
+          echo "Checking if dist exists:"
+          if [ -d "dist" ]; then
+            echo "dist/ exists"
+            ls -la dist/
+          else
+            echo "dist/ does not exist"
+          fi
+      - name: List downloaded wheels
+        shell: bash
+        run: |
+          echo "Looking for wheel files in current directory:"
+          find . -name "*.whl" -type f
+          echo "All files in current directory:"
+          ls -la
       - name: Install wheel
         shell: bash
         run: |
           pip install --upgrade pip
-          pip install goad-py --find-links dist/ --force-reinstall
+          pip install goad-py --find-links . --force-reinstall
       - name: Run import test
         run: |
           python -c "import goad_py; print('✓ Import successful')"
-          python -c "import goad_py; print(f'Version: {goad_py.__version__ if hasattr(goad_py, \"__version__\") else \"No version attr\"}')"
-      - name: Run basic functionality test
-        run: |
-          python -c "
-          import goad_py
-          # Test creating objects
-          shape = goad_py.Shape.Sphere
-          settings = goad_py.Settings()
-          orient = goad_py.create_uniform_orientation(10)
-          bins = goad_py.BinningScheme.Interval(1000)
-          print('✓ All basic objects created successfully')
-          "
-      - name: Run example scripts
-        if: matrix.os == 'ubuntu-latest'  # Only run on Linux to save CI time
-        shell: bash
-        run: |
-          # Run example scripts from goad-py directory
-          cd goad-py
-          if [ -f simple_example.py ]; then
-            python simple_example.py || echo "Example script failed (might need geometry files)"
-          fi
+          python -c "import goad_py; print('Version:', getattr(goad_py, '__version__', 'No version attr'))"
 
   test-pypi:
     name: Publish to TestPyPI

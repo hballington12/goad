@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::f32::consts::PI;
 
 use geo::Coord;
+#[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 
@@ -11,7 +12,7 @@ use crate::{
     field::Field,
     fresnel,
     geom::{Face, Geom},
-    helpers::{draw_face, lines_to_screen},
+    helpers,
     settings,
     snell::get_theta_t,
 };
@@ -35,15 +36,19 @@ impl BeamPropagation {
     }
 
     /// Draws a `Beam Propagation`
+    #[cfg(feature = "macroquad")]
     pub fn draw(&self) {
         // draw the input
-        draw_face(&self.input.face, YELLOW, 4.0);
+        #[cfg(feature = "macroquad")]
+        helpers::draw_face(&self.input.face, YELLOW, 4.0);
         // draw the outputs
         for beam in &self.outputs {
             if beam.type_ == BeamType::Default {
-                draw_face(&beam.face, BLUE, 4.0);
+                #[cfg(feature = "macroquad")]
+                helpers::draw_face(&beam.face, BLUE, 4.0);
             } else if beam.type_ == BeamType::OutGoing {
-                draw_face(&beam.face, RED, 3.0);
+                #[cfg(feature = "macroquad")]
+                helpers::draw_face(&beam.face, RED, 3.0);
             }
         }
         let input_mid = self.input.face.data().midpoint;
@@ -89,9 +94,12 @@ impl BeamPropagation {
             },
         ]];
 
-        lines_to_screen(line_strings, RED, 2.0);
-        lines_to_screen(propagation_line, MAGENTA, 5.0);
-        lines_to_screen(normal_line, WHITE, 2.5);
+        #[cfg(feature = "macroquad")]
+        helpers::lines_to_screen(line_strings, RED, 2.0);
+        #[cfg(feature = "macroquad")]
+        helpers::lines_to_screen(propagation_line, MAGENTA, 5.0);
+        #[cfg(feature = "macroquad")]
+        helpers::lines_to_screen(normal_line, WHITE, 2.5);
     }
 
     fn get_line(point: &Point3<f32>, input: &Beam) -> Vec<Coord<f32>> {
