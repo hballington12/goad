@@ -2,6 +2,10 @@
 name = "goad-py"
 version = "0.3.0"
 edition = "2021"
+description = "Physical optics light scattering computation"
+license = "GPL-3.0"
+homepage = "https://github.com/hballington12/goad"
+repository = "https://github.com/hballington12/goad"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
