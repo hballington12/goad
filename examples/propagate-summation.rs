@@ -11,6 +11,7 @@ use std::io::{self, Write};
 async fn main() {
     // let mut geom = geom::Geom::from_file("./examples/data/hex_20_30_30_face.obj").unwrap();
     let mut geom = geom::Geom::from_file("./examples/data/hex.obj").unwrap();
+    let mut geom = geom::Geom::from_file("./examples/data/hex_hollow.obj").unwrap();
 
     // let euler = Euler::new(0.0, 30.0, 0.0);
     // let _ = geom.euler_rotate(euler, EulerConvention::ZYZ);
@@ -97,7 +98,7 @@ async fn main() {
             );
             io::stdout().flush().unwrap();
         } else {
-            println!("No more beams to propagate.");
+            println!("Press Enter to propagate another beam.");
             // break;
         }
 
