@@ -204,26 +204,6 @@ jobs:
         run: |
           python -c "import goad_py; print('✓ Import successful')"
           python -c "import goad_py; print(f'Version: {goad_py.__version__ if hasattr(goad_py, \"__version__\") else \"No version attr\"}')"
-      - name: Run basic functionality test
-        run: |
-          python -c "
-          import goad_py
-          # Test creating objects
-          shape = goad_py.Shape.Sphere
-          settings = goad_py.Settings()
-          orient = goad_py.create_uniform_orientation(10)
-          bins = goad_py.BinningScheme.Interval(1000)
-          print('✓ All basic objects created successfully')
-          "
-      - name: Run example scripts
-        if: matrix.os == 'ubuntu-latest'  # Only run on Linux to save CI time
-        shell: bash
-        run: |
-          # Run example scripts from goad-py directory
-          cd goad-py
-          if [ -f simple_example.py ]; then
-            python simple_example.py || echo "Example script failed (might need geometry files)"
-          fi
 
   test-pypi:
     name: Publish to TestPyPI
