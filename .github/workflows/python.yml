@@ -203,7 +203,7 @@ jobs:
       - name: Run import test
         run: |
           python -c "import goad_py; print('✓ Import successful')"
-          python -c "import goad_py; print(f'Version: {goad_py.__version__ if hasattr(goad_py, \"__version__\") else \"No version attr\"}')"
+          python -c "import goad_py; print('Version:', getattr(goad_py, '__version__', 'No version attr'))"
 
   test-pypi:
     name: Publish to TestPyPI
