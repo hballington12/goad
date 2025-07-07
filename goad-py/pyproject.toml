@@ -37,3 +37,4 @@ Repository = "https://github.com/hballington12/goad"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+exclude = ["../README.md"]
