@@ -8,7 +8,7 @@ version = "0.3.0"
 description = "Physical optics light scattering computation"
 authors = [{name = "Harry Ballington", email = "ballington@uni-wuppertal.de"}]
 license = {text = "GPL-3.0"}
-readme = "./README.md"
+readme = "README-python.md"
 requires-python = ">=3.8"
 keywords = ["light-scattering", "optics", "simulation", "scientific-computing", "physics"]
 classifiers = [
@@ -37,4 +37,3 @@ Repository = "https://github.com/hballington12/goad"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-exclude = ["../README.md"]
