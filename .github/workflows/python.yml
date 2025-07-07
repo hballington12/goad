@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-linux-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   musllinux:
     runs-on: ${{ matrix.platform.runner }}
@@ -85,7 +85,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-musllinux-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   windows:
     runs-on: ${{ matrix.platform.runner }}
@@ -111,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   macos:
     runs-on: ${{ matrix.platform.runner }}
@@ -138,7 +138,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-macos-${{ matrix.platform.target }}
-          path: dist
+          path: goad-py/dist
 
   sdist:
     runs-on: ubuntu-latest
@@ -154,7 +154,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wheels-sdist
-          path: dist
+          path: goad-py/dist
 
   test:
     name: Test wheels
