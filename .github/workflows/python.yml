@@ -226,7 +226,6 @@ jobs:
         with:
           command: upload
           args: --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*
-          working-directory: goad-py
 
   release:
     name: Release to PyPI
@@ -258,4 +257,3 @@ jobs:
         with:
           command: upload
           args: --skip-existing dist/*
-          working-directory: goad-py
