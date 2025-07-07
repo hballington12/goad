@@ -48,6 +48,7 @@ jobs:
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: auto
+          working-directory: goad-py
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -79,6 +80,7 @@ jobs:
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
           manylinux: musllinux_1_2
+          working-directory: goad-py
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -106,6 +108,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          working-directory: goad-py
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -132,6 +135,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
+          working-directory: goad-py
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -147,6 +151,7 @@ jobs:
         with:
           command: sdist
           args: --out dist
+          working-directory: goad-py
       - name: Upload sdist
         uses: actions/upload-artifact@v4
         with:
@@ -195,8 +200,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'  # Only run on Linux to save CI time
         shell: bash
         run: |
-          # Download example files from the repository
-          curl -O https://raw.githubusercontent.com/hballington12/goad/main/goad-py/simple_example.py || true
+          # Run example scripts from goad-py directory
+          cd goad-py
           if [ -f simple_example.py ]; then
             python simple_example.py || echo "Example script failed (might need geometry files)"
           fi
@@ -222,6 +227,7 @@ jobs:
         with:
           command: upload
           args: --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*
+          working-directory: goad-py
 
   release:
     name: Release to PyPI
@@ -253,3 +259,4 @@ jobs:
         with:
           command: upload
           args: --skip-existing dist/*
+          working-directory: goad-py
