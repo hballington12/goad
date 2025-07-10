@@ -195,10 +195,13 @@ jobs:
           find . -name "*.whl" -type f
           echo "All files in current directory:"
           ls -la
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install numpy
       - name: Install wheel
         shell: bash
         run: |
-          pip install --upgrade pip
           pip install goad-py --find-links . --force-reinstall
       - name: Run import test
         run: |
