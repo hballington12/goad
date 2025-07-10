@@ -1,4 +1,4 @@
-use std::time::Instant;
+// use std::time::Instant;
 
 use crate::{
     bins::{generate_bins, Scheme},
@@ -17,24 +17,24 @@ use pyo3::prelude::*;
 use rayon::prelude::*;
 
 /// Multi-orientation light scattering simulation for a single geometry.
-/// 
+///
 /// Computes orientation-averaged scattering properties by running multiple
 /// single-orientation simulations and averaging the results. Supports both
 /// random and systematic orientation sampling schemes. Results include
 /// Mueller matrices, cross-sections, and derived optical parameters.
-/// 
+///
 /// # Examples
 /// ```python
 /// import goad_py as goad
-/// 
+///
 /// # Create orientation scheme and settings
 /// orientations = goad.create_uniform_orientation(100)
 /// settings = goad.Settings("particle.obj", orientation=orientations)
-/// 
+///
 /// # Run multi-orientation simulation
 /// mp = goad.MultiProblem(settings)
 /// mp.py_solve()
-/// 
+///
 /// # Access averaged results
 /// results = mp.results
 /// print(f"Scattering cross-section: {results.scat_cross}")
@@ -88,7 +88,7 @@ impl MultiProblem {
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
-        let start = Instant::now();
+        // let start = Instant::now();
         // println!("Solving problem...");
 
         // init a base problem that can be reset
@@ -128,9 +128,9 @@ impl MultiProblem {
         // Normalize results by the number of orientations
         self.normalize_results(self.orientations.num_orientations as f32);
 
-        let end = Instant::now();
-        let duration = end.duration_since(start);
-        let time_per_orientation = duration / self.orientations.num_orientations as u32;
+        // let end = Instant::now();
+        // let duration = end.duration_since(start);
+        // let time_per_orientation = duration / self.orientations.num_orientations as u32;
 
         // println!(
         //     "Time taken: {:.2?}, Time per orientation: {:.2?}",
@@ -321,14 +321,12 @@ impl MultiProblem {
         // Load geometry from file if not provided
         let mut geom = match geom {
             Some(g) => g,
-            None => {
-                Geom::from_file(&settings.geom_name).map_err(|e| {
-                    pyo3::exceptions::PyFileNotFoundError::new_err(format!(
-                        "Failed to load geometry file '{}': {}",
-                        settings.geom_name, e
-                    ))
-                })?
-            }
+            None => Geom::from_file(&settings.geom_name).map_err(|e| {
+                pyo3::exceptions::PyFileNotFoundError::new_err(format!(
+                    "Failed to load geometry file '{}': {}",
+                    settings.geom_name, e
+                ))
+            })?,
         };
 
         problem::init_geom(&settings, &mut geom);
@@ -346,11 +344,11 @@ impl MultiProblem {
     }
 
     /// Solve the multi-orientation scattering problem.
-    /// 
+    ///
     /// Computes scattering properties averaged over all orientations using
     /// parallel processing. The Global Interpreter Lock (GIL) is released
     /// during computation to allow concurrent Python operations.
-    /// 
+    ///
     /// # Returns
     /// PyResult<()> - Success or error if computation fails
     pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
@@ -361,11 +359,11 @@ impl MultiProblem {
     }
 
     /// Access the orientation-averaged simulation results.
-    /// 
+    ///
     /// Returns the complete Results object containing Mueller matrices,
     /// amplitude matrices, power distributions, and derived parameters
     /// averaged over all orientations.
-    /// 
+    ///
     /// # Returns
     /// Results - Complete scattering simulation results
     #[getter]
