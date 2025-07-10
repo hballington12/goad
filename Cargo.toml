@@ -1,6 +1,6 @@
 [package]
     name = "goad"
-    version = "0.4.0"
+    version = "0.4.1"
     edition = "2021"
     license = "GPL-3.0"
     description = "Compute the single scattering properties of particles much larger than the wavelength of light with geometric optics and aperture diffraction theory."

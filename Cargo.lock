@@ -582,7 +582,7 @@ checksum = "9e05e7e6723e3455f4818c7b26e855439f7546cf617ef669d1adedb8669e5cb9"
 
 [[package]]
 name = "goad"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "goad-py"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "goad",
  "pyo3",
