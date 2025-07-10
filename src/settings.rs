@@ -22,8 +22,6 @@ pub const COLINEAR_THRESHOLD: f32 = 0.001;
 pub const VEC_LENGTH_THRESHOLD: f32 = 0.01;
 /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
 pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
-/// Distance to far-field in multiples of wavelength. 1e3 - 1e5 is a good range for single precision arithmetic.
-pub const RADIUS: f32 = 1e4;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
 pub const DIFF_EPSILON: f32 = 1e-3;
 /// Minimum dx or dy in diffraction computation.

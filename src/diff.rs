@@ -108,7 +108,7 @@ pub fn diffraction(
     let kinc = prop2 * wavenumber;
 
     // Pre-calculate constants dependent only on wavenumber
-    let radius = settings::RADIUS * 2.0 * PI / wavenumber;
+    // let radius = settings::RADIUS * 2.0 * PI / wavenumber;
     let inv_denom = Complex::new(wavenumber / (2.0 * PI), 0.0); // Pre-calculate 1.0 / (2*PI/wavenumber)
 
     // Iterate over the flattened combinations
@@ -117,26 +117,24 @@ pub fn diffraction(
         let (sin_theta, cos_theta) = theta.to_radians().sin_cos();
         let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
 
-        // Calculate pos (xfar, yfar, zfar) for the current (theta, phi)
-        // Use pre-calculated radius
-        let r_sin_theta = radius * sin_theta;
-        let rotated_pos = rot3
-            * (Vector3::new(
-                r_sin_theta * cos_phi,
-                r_sin_theta * sin_phi,
-                -radius * cos_theta,
-            ) - center_of_mass.coords);
+        // Calculate observation direction in original frame
+        let k_obs = Vector3::new(sin_theta * cos_phi, sin_theta * sin_phi, -cos_theta);
 
-        // Calculate distance to bins and bin unit vectors
-        let bvs = rotated_pos.norm();
-        let k = rotated_pos / bvs;
+        // Rotate observation direction to aperture frame
+        let k = rot3 * k_obs;
+
+        // Phase calculation: relative to far-field reference distance
+        // The phase reference is at the aperture center, so we compute
+        // the additional phase due to the center of mass displacement
+        let r_offset = -center_of_mass.coords;
+        let path_difference = k_obs.dot(&r_offset);
+        let bvsk = path_difference * wavenumber;
 
         // Apply filtering based on field of view if specified
         if fov_factor.is_some() && k.dot(&prop2) < cos_fov {
             continue;
         }
 
-        let bvsk = bvs * wavenumber;
         let ampl_far_field = &mut ampl_cs[index];
 
         let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
@@ -158,8 +156,7 @@ pub fn diffraction(
                 .as_slice()
                 .try_into()
                 .unwrap(),
-            &rotated_pos,
-            bvsk,
+            &k,
             wavenumber,
         );
 
@@ -395,19 +392,9 @@ pub fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
 }
 
 #[inline]
-pub fn calculate_bvsk(rotated_pos: &Vector3<f32>, wavenumber: f32) -> f32 {
-    wavenumber * (rotated_pos.x.powi(2) + rotated_pos.y.powi(2) + rotated_pos.z.powi(2)).sqrt()
-}
-
-#[inline]
-pub fn calculate_kxx_kyy(
-    kinc: &[f32; 2],
-    rotated_pos: &Vector3<f32>,
-    bvsk: f32,
-    wavenumber: f32,
-) -> (f32, f32) {
-    let kxx = kinc[0] - wavenumber.powi(2) * rotated_pos.x / bvsk;
-    let kyy = kinc[1] - wavenumber.powi(2) * rotated_pos.y / bvsk;
+pub fn calculate_kxx_kyy(kinc: &[f32; 2], k: &Vector3<f32>, wavenumber: f32) -> (f32, f32) {
+    let kxx = kinc[0] - wavenumber * k.x;
+    let kyy = kinc[1] - wavenumber * k.y;
 
     let kxx = if kxx.abs() < settings::KXY_EPSILON {
         settings::KXY_EPSILON
