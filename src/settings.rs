@@ -23,7 +23,7 @@ pub const VEC_LENGTH_THRESHOLD: f32 = 0.01;
 /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
 pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
-pub const DIFF_EPSILON: f32 = 1e-3;
+pub const DIFF_EPSILON: f32 = 1e-2;
 /// Minimum dx or dy in diffraction computation.
 pub const DIFF_DMIN: f32 = 1e-5;
 /// Tolerance for kxx or kyy in diffraction computation.
