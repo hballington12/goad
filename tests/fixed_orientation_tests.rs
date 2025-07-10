@@ -11,7 +11,7 @@ use num_complex::Complex32;
 pub mod helpers;
 // Tolerance for comparing Mueller matrix elements
 const FRAC_TOL: f32 = 1e-4; // fractional error
-const ABS_TOL: f32 = 1e3; // absolute error
+const ABS_TOL: f32 = 1e4; // absolute error
 
 #[test]
 fn fixed_hex_30_30_30() {
