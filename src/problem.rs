@@ -211,7 +211,10 @@ impl Problem {
 
         // TODO move this outside the function
         for (i, ampl) in ampl_far_field.iter().enumerate() {
-            total_ampl_far_field[i] += ampl;
+            // Check if any component of the amplitude matrix contains NaN
+            if ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+                total_ampl_far_field[i] += ampl;
+            }
         }
     }
 
