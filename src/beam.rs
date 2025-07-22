@@ -360,7 +360,7 @@ fn get_ampl(
     let arg = dist * wavenumber * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
 
-    let dist_sqrt = dist.signum() * dist.abs().sqrt(); // TODO: improve this
+    let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
 
     let absorbed_intensity = Field::ampl_intensity(&ampl)
         * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
