@@ -721,6 +721,14 @@ impl Face {
     ) -> Result<Self> {
         Ok(Face::Simple(FaceData::new(exterior, parent_id, indices)?))
     }
+    
+    /// Get a reference to the exterior vertices of the face
+    pub fn exterior_ref(&self) -> &[Point3<f32>] {
+        match self {
+            Face::Simple(data) => &data.exterior,
+            Face::Complex { data, .. } => &data.exterior,
+        }
+    }
 
     pub fn new_complex(
         exterior: Vec<Point3<f32>>,
@@ -1156,11 +1164,16 @@ impl Geom {
             }
         }
 
-        Ok(Self {
+        let geom = Self {
             num_shapes: shapes.len(),
             shapes,
             containment_graph,
-        })
+        };
+        
+        // Validate the loaded geometry
+        geom.validate()?;
+        
+        Ok(geom)
     }
 
     fn shapes_from_models(models: Vec<Model>) -> Result<Vec<Shape>> {
@@ -1220,12 +1233,49 @@ impl Geom {
         (Point3::from(min), Point3::from(max))
     }
 
+    /// Computes the scale factor that would be used to rescale the geometry
+    /// so that the largest dimension is 1.0
+    pub fn compute_scale_factor(&self) -> f32 {
+        let bounds = self.bounds();
+        let max_dim = bounds.1.iter().fold(0.0, |acc: f32, &x| acc.max(x));
+        1.0 / max_dim
+    }
+
+    /// Validates the geometry to ensure all faces will work correctly after scaling
+    fn validate(&self) -> Result<()> {
+        // Compute the scale factor that will be applied
+        let scale_factor = self.compute_scale_factor();
+        
+        // Validate each shape and face
+        for (shape_idx, shape) in self.shapes.iter().enumerate() {
+            for (face_idx, face) in shape.faces.iter().enumerate() {
+                let vertices = face.exterior_ref();
+                
+                // Check that we have at least one valid vertex pair after scaling
+                validate_vertex_pair_exists(vertices, scale_factor)
+                    .map_err(|e| anyhow::anyhow!(
+                        "Shape {} Face {}: {}", 
+                        shape_idx, face_idx, e
+                    ))?;
+                
+                // Check planarity for faces with >3 vertices
+                if vertices.len() > 3 {
+                    validate_planarity(vertices)
+                        .map_err(|e| anyhow::anyhow!(
+                            "Shape {} Face {}: {}", 
+                            shape_idx, face_idx, e
+                        ))?;
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
     /// Rescales the geometry so that the largest dimension is 1. Returns the
     /// scaling factor.
     pub fn rescale(&mut self) -> f32 {
-        let bounds = self.bounds();
-        let max_dim = bounds.1.iter().fold(0.0, |acc: f32, &x| acc.max(x));
-        let scale = 1.0 / max_dim;
+        let scale = self.compute_scale_factor();
 
         for shape in self.shapes.iter_mut() {
             shape.rescale(scale);
@@ -1521,4 +1571,65 @@ pub fn translate(verts: &[Point3<f32>], center_of_mass: &Point3<f32>) -> Vec<Vec
         .iter()
         .map(|point| point.coords - center_of_mass.coords)
         .collect()
+}
+
+/// Validates that a face has at least one pair of vertices with sufficient separation after scaling
+fn validate_vertex_pair_exists(vertices: &[Point3<f32>], scale_factor: f32) -> Result<()> {
+    let min_original_distance = settings::VEC_LENGTH_THRESHOLD / scale_factor;
+    
+    for i in 0..vertices.len() {
+        for j in (i + 1)..vertices.len() {
+            if (vertices[j] - vertices[i]).magnitude() > min_original_distance {
+                return Ok(());
+            }
+        }
+    }
+    
+    Err(anyhow::anyhow!(
+        "No vertex pair will have distance > {} after scaling by {} (minimum required: {})",
+        settings::VEC_LENGTH_THRESHOLD, scale_factor, min_original_distance
+    ))
+}
+
+/// Validates that all vertices of a face lie on the same plane (within tolerance)
+fn validate_planarity(vertices: &[Point3<f32>]) -> Result<()> {
+    let midpoint = vertices.iter().fold(Point3::origin(), |acc, v| acc + v.coords) / vertices.len() as f32;
+    
+    // Find first valid vertex pair (we know one exists from previous validation)
+    let mut v1 = None;
+    let mut v2 = None;
+    for i in 0..vertices.len() {
+        for j in (i + 1)..vertices.len() {
+            // Using a very small threshold just to avoid degenerate cases
+            if (vertices[j] - vertices[i]).magnitude() > 1e-6 {
+                v1 = Some(vertices[i]);
+                v2 = Some(vertices[j]);
+                break;
+            }
+        }
+        if v1.is_some() {
+            break;
+        }
+    }
+    
+    let v1 = v1.unwrap();
+    let v2 = v2.unwrap();
+    
+    let u = v2 - v1;
+    let v = midpoint - v1;
+    let normal = u.cross(&v).normalize();
+    
+    // Check all vertices are on the same plane
+    for (i, &vertex) in vertices.iter().enumerate() {
+        let distance = (vertex - v1).dot(&normal).abs();
+        
+        if distance > settings::COLINEAR_THRESHOLD {
+            return Err(anyhow::anyhow!(
+                "Non-planar face: vertex {} deviates {} from plane (threshold: {})",
+                i, distance, settings::COLINEAR_THRESHOLD
+            ));
+        }
+    }
+    
+    Ok(())
 }

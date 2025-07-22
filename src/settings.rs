@@ -19,7 +19,7 @@ pub const CLIP_TOLERANCE: f32 = 1e6;
 /// Minimum absolute value of the dot product of two vectors to be considered colinear.
 pub const COLINEAR_THRESHOLD: f32 = 0.001;
 /// Minimum vector length (in geometry units) to be considered non-degenerate.
-pub const VEC_LENGTH_THRESHOLD: f32 = 0.01;
+pub const VEC_LENGTH_THRESHOLD: f32 = 0.001;
 /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
 pub const RAYCAST_MINIMUM_DISTANCE: f32 = 0.01;
 /// Tolerance for diffraction computations, used to avoid divide by zero errors.
