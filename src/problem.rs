@@ -1,10 +1,11 @@
+use std::f32::consts::PI;
+
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins::{generate_bins, Scheme},
+    bins::{generate_bins, BinningScheme, Scheme},
     field::Field,
     geom::{Face, Geom},
-    helpers,
-    orientation, output,
+    helpers, orientation, output,
     result::{self, Results},
     settings::{load_config, Settings},
 };
@@ -37,7 +38,8 @@ mod tests {
         );
 
         // Use default config to avoid loading local.toml which may have test-breaking settings
-        let default_settings = crate::settings::load_default_config().expect("Failed to load default config");
+        let default_settings =
+            crate::settings::load_default_config().expect("Failed to load default config");
         let mut problem = Problem::new(Some(geom), Some(default_settings));
 
         problem.propagate_next();
@@ -117,7 +119,9 @@ impl Problem {
     /// If geom not provided, loads from file using settings.geom_name.
     pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
         let settings = settings.unwrap_or_else(|| load_config().expect("Failed to load config"));
-        let mut geom = geom.unwrap_or_else(|| Geom::from_file(&settings.geom_name).expect("Failed to load geometry"));
+        let mut geom = geom.unwrap_or_else(|| {
+            Geom::from_file(&settings.geom_name).expect("Failed to load geometry")
+        });
         init_geom(&settings, &mut geom);
 
         let bins = generate_bins(&settings.binning.scheme);
@@ -190,6 +194,104 @@ impl Problem {
         }
     }
 
+    fn go_outbeams(
+        queue: &mut Vec<Beam>,
+        binning: &BinningScheme,
+        // bins: &[(f32, f32)],
+        total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
+        scale: f32,
+    ) {
+        // println!("doing somethinge with outbeams");
+        // for each beam
+        // pop it
+        // then have a different method for each binning routine to determine the bin
+        // for uniform binning, can just use analytical form
+        // for interval binning, do something a bit more clever
+        // for custom binning, do manual checking (but aim to try to convert custom to uniform or interval on startup)
+        match &binning.scheme {
+            Scheme::Simple { num_theta, num_phi } => {
+                // println!("scheme is simple");
+                // for a simple scheme, we can just use the fact that the bins are on a square grid to bin the outgoing beams
+                // bins are just a linspace from 0 to 180 in theta with ntheta steps
+                // and linspace from 0 to 360 in phi with nphi steps
+                // ok so if outgoing direction is k, then the z component of k is like the cosine of the angle
+                // ie. -k_z = cos(theta)
+                // so theta is arccos(-k_z) * 180 / pi
+                // bin spacing is basically 180 / (ntheta - 1)
+                // ie ntheta = 5 -> spacing is 45 -> 0, 45, 90, 135, 180
+                // we require a mapping theta -> n, where n 0,1,2,3,4 ^
+                // surely we can just do 180 / theta, then round to nearest integer
+                // if let Some(beam) = queue.pop() {
+                for beam in queue.iter() {
+                    // theta
+                    let kz = beam.prop[2]; // get the propagation z component
+                    let theta = ((-kz).acos() * 180.0 / PI).abs(); // compute outgoing theta
+                    let n_theta = (theta / 180.0 * (*num_theta as f32 - 1.0)).round(); // compute mapping to closest bin
+                    let _bin_spacing = 180.0 / (num_theta - 1) as f32;
+                    let _bin_angle = _bin_spacing * n_theta;
+
+                    if n_theta as i32 >= *num_theta as i32 {
+                        panic!("oh dear");
+                    }
+
+                    // println!("prop.z = {}", kz);
+                    // println!("theta.abs() = {}", theta);
+                    // println!("bin integer is {}", n_theta);
+                    // println!("we think this should be closest to bin: {} deg", _bin_angle);
+
+                    // phi
+                    // phi angle we can obtain from atan2 function
+                    let kx = beam.prop[0];
+                    let ky = beam.prop[1];
+                    let mut phi = ky.atan2(kx) * 180.0 / PI;
+                    // have to be slightly careful here, since all negative values should map: phi -> phi += 360
+                    if phi < 0.0 {
+                        phi += 360.0
+                    };
+                    let n_phi = (phi / 360.0 * (*num_phi as f32 - 1.0)).round();
+                    let _bin_spacing = 360.0 / (num_phi - 1) as f32;
+                    let _bin_angle = _bin_spacing * n_phi;
+
+                    if n_phi as i32 >= *num_phi as i32 {
+                        panic!("oh dear");
+                    }
+
+                    // println!("kx: {}, ky: {}", kx, ky);
+                    // println!("we think this is phi (range -180 to 180): {}", phi);
+                    // println!("we think this is phi (range 0 to 360): {}", phi);
+                    // println!("bin integer is {}", n_phi);
+                    // println!("we think this should be closest to bin: {} deg", _bin_angle);
+
+                    // so now we have the theta and phi values, need to map them onto the 1d array positions
+                    let n = (n_theta as i32 * *num_phi as i32 + n_phi as i32) as usize;
+
+                    // println!("we think this is the {}th bin", n);
+                    // println!("ampl far field norm: {}", beam.field.ampl.norm());
+                    println!("scale is {}", scale);
+                    println!("beam csa is {}", beam.csa());
+                    println!(
+                        "ampl far field norm: {}",
+                        beam.field.ampl.norm() * Complex::new(beam.csa() * scale.powi(-2), 0.0)
+                    );
+
+                    // add the amplitude matrix to the correct far field bin
+                    total_ampl_far_field[n] += beam.field.ampl * Complex::new(scale.powi(-2), 0.0);
+                }
+            }
+            Scheme::Interval {
+                thetas,
+                theta_spacings,
+                phis,
+                phi_spacings,
+            } => {
+                println!("scheme is interval")
+            }
+            Scheme::Custom { bins, .. } => {
+                println!("scheme is custom")
+            }
+        }
+    }
+
     fn diffract_outbeams(
         queue: &mut Vec<Beam>,
         bins: &[(f32, f32)],
@@ -228,6 +330,9 @@ impl Problem {
 
     pub fn solve_far_ext_diff(&mut self) {
         let fov_factor = None; // don't truncate by field of view for external diffraction
+        for outbeam in self.ext_diff_beam_queue.iter() {
+            println!("ampl of ext diff beam is: {}", outbeam.field.ampl.norm());
+        }
         Self::diffract_outbeams(
             &mut self.ext_diff_beam_queue,
             &self.result.bins,
@@ -238,12 +343,20 @@ impl Problem {
 
     pub fn solve_far_outbeams(&mut self) {
         let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
-        Self::diffract_outbeams(
+                                                   // Self::diffract_outbeams(
+                                                   //     &mut self.out_beam_queue,
+                                                   //     &self.result.bins,
+                                                   //     &mut self.result.ampl_beam,
+                                                   //     fov_factor,
+                                                   // );
+
+        // Do some geometric optics here instead
+        Self::go_outbeams(
             &mut self.out_beam_queue,
-            &self.result.bins,
+            &self.settings.binning,
             &mut self.result.ampl_beam,
-            fov_factor,
-        );
+            self.settings.scale,
+        )
     }
     pub fn solve_far(&mut self) {
         self.solve_far_ext_diff();
@@ -391,6 +504,8 @@ impl Problem {
             return None;
         };
 
+        println!("the beam ampl is: {}", beam.field.ampl.norm());
+
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam.type_ {
             BeamType::Default => self.propagate_default(&mut beam),
@@ -420,6 +535,8 @@ impl Problem {
                 }
                 (BeamType::Initial, BeamType::ExternalDiff) => {
                     self.result.powers.ext_diff += output_power;
+                    println!("external diff beam");
+                    println!("the power is: {}", output.field.ampl.norm());
                     self.ext_diff_beam_queue.push(output.clone());
                 }
                 _ => {}
