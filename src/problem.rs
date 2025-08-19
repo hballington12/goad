@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, BinningScheme, Scheme},
+    diff::get_rotation_matrix2,
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
@@ -268,9 +269,34 @@ impl Problem {
                     // println!("we think this is the {}th bin", n);
                     // println!("ampl far field norm: {}", beam.field.ampl.norm());
 
+                    // we need to apply 2 rotations to the amplitude matrix
+                    // 1. rotate from the beam reference plane into the scattering plane
+                    // 2. prerotate the initial amplitude matrix to align with the scattering plane
+
+                    // step 1: get the vector perpendicular to the scattering plane
+                    let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
+                    let hc = Vector3::new(sin_phi, -cos_phi, 0.0); // perpendicular to scattering plane
+                                                                   // 2:
+                    let evo2 = beam.field.e_par; // vector parallel to scattering plane
+                    let m = beam.field.e_perp;
+                    let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m)); // compute the rotation matrix
+                    let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
+
+                    // compute the prerotation matrix
+                    let prerotation = Field::rotation_matrix(
+                        Vector3::x(),
+                        Vector3::new(-sin_phi, cos_phi, 0.0),
+                        -Vector3::z(),
+                    )
+                    .transpose();
+
+                    let ampl = rotation.map(Complex::from)
+                        * beam.field.ampl
+                        * prerotation.map(Complex::from);
+
                     // add the amplitude matrix to the correct far field bin
-                    total_ampl_far_field[n] += beam.field.ampl
-                        * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0);
+                    total_ampl_far_field[n] +=
+                        ampl * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0);
                 }
             }
             Scheme::Interval {

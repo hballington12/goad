@@ -198,11 +198,11 @@ fn get_rotations(
     cos_phi: f32,
     k: Vector3<f32>,
 ) -> (Matrix2<f32>, Matrix2<f32>, Matrix2<f32>) {
-    let (karczewski, m) = karczewski(&prop2, &k);
+    let (karczewski, m) = karczewski(&prop2, &k); // compute karczweski polarisation matrix
 
-    let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
-    let evo2 = k.cross(&m);
-    let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
+    let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0); // rotate the vector perpendicular to the scattering plane into the aperture system
+    let evo2 = k.cross(&m); // compute the perpendicular component from the product of scattering direction and the parallel vector
+    let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m)); // compute the rotation matrix
 
     let prerotation = Field::rotation_matrix(
         Vector3::x(),
