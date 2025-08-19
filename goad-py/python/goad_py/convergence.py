@@ -35,6 +35,8 @@ class ConvergenceResults:
     mueller_2d: Optional[np.ndarray] = None
     convergence_history: List[Tuple[int, str, float]] = None  # (n_orientations, variable, sem)
     warning: Optional[str] = None
+    bins_1d: Optional[List[float]] = None  # 1D angular bins
+    bins: Optional[List[Tuple[float, float]]] = None  # 2D angular bins
 
 
 class Convergence:
@@ -94,6 +96,10 @@ class Convergence:
         self.mueller_1d_sum = None
         self.mueller_2d_sum = None
 
+        # Bin tracking
+        self.bins_1d = None
+        self.bins = None
+
     def _update_statistics(self, results: goad.Results, batch_size: int):
         """Update statistics with new batch results.
 
@@ -151,6 +157,12 @@ class Convergence:
 
         # Update total orientation count
         self.n_orientations += batch_size
+
+        # Capture bins from first batch (they're identical across all batches)
+        if self.bins_1d is None and results.bins_1d is not None:
+            self.bins_1d = list(results.bins_1d)  # Copy the bins
+        if self.bins is None and results.bins is not None:
+            self.bins = list(results.bins)  # Copy the bins
 
     def _calculate_mean_and_sem(self, variable: str) -> Tuple[float, float]:
         """Calculate mean and standard error of the mean for a variable using batch data.
@@ -378,5 +390,7 @@ class Convergence:
             mueller_1d=mueller_1d,
             mueller_2d=mueller_2d,
             convergence_history=self.convergence_history,
-            warning=warning
+            warning=warning,
+            bins_1d=self.bins_1d,
+            bins=self.bins
         )
