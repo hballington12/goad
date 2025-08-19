@@ -267,15 +267,10 @@ impl Problem {
 
                     // println!("we think this is the {}th bin", n);
                     // println!("ampl far field norm: {}", beam.field.ampl.norm());
-                    println!("scale is {}", scale);
-                    println!("beam csa is {}", beam.csa());
-                    println!(
-                        "ampl far field norm: {}",
-                        beam.field.ampl.norm() * Complex::new(beam.csa() * scale.powi(-2), 0.0)
-                    );
 
                     // add the amplitude matrix to the correct far field bin
-                    total_ampl_far_field[n] += beam.field.ampl * Complex::new(scale.powi(-2), 0.0);
+                    total_ampl_far_field[n] += beam.field.ampl
+                        * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0);
                 }
             }
             Scheme::Interval {
@@ -330,9 +325,6 @@ impl Problem {
 
     pub fn solve_far_ext_diff(&mut self) {
         let fov_factor = None; // don't truncate by field of view for external diffraction
-        for outbeam in self.ext_diff_beam_queue.iter() {
-            println!("ampl of ext diff beam is: {}", outbeam.field.ampl.norm());
-        }
         Self::diffract_outbeams(
             &mut self.ext_diff_beam_queue,
             &self.result.bins,
@@ -504,8 +496,6 @@ impl Problem {
             return None;
         };
 
-        println!("the beam ampl is: {}", beam.field.ampl.norm());
-
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam.type_ {
             BeamType::Default => self.propagate_default(&mut beam),
@@ -535,8 +525,6 @@ impl Problem {
                 }
                 (BeamType::Initial, BeamType::ExternalDiff) => {
                     self.result.powers.ext_diff += output_power;
-                    println!("external diff beam");
-                    println!("the power is: {}", output.field.ampl.norm());
                     self.ext_diff_beam_queue.push(output.clone());
                 }
                 _ => {}
