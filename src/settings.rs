@@ -34,6 +34,8 @@ pub const PROP_PERTURBATION: f32 = 1e-5;
 pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
 /// Minimum Distortion factor for the geometry.
 pub const MIN_DISTORTION: f32 = 1e-5;
+/// Threshold for classification of direct forwards or backwards rays
+pub const DIRECT_THRESHOLD: f32 = 1e-4;
 
 // Default values for Python API (no config file dependencies)
 /// Default wavelength in geometry units (532nm green laser)

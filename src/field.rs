@@ -108,6 +108,23 @@ impl Field {
             }
         }
 
+        // let e_par = e_perp.cross(&prop).normalize();
+        // // check that e_par is perpendicular to e_perp and prop
+        // if e_par.dot(&e_perp).abs() >= settings::COLINEAR_THRESHOLD {
+        //     return Err(anyhow::anyhow!(
+        //         "e-par is not perpendicular to e-perp, e_perp is: {:?}, e_par is: {:?}",
+        //         e_perp,
+        //         e_par
+        //     ));
+        // }
+        // if e_par.dot(&prop).abs() >= settings::COLINEAR_THRESHOLD {
+        //     return Err(anyhow::anyhow!(
+        //         "e-par is not perpendicular to prop, prop is: {:?}, e_par is: {:?}",
+        //         prop,
+        //         e_par
+        //     ));
+        // }
+
         let field = Self {
             ampl,
             e_perp,
@@ -132,6 +149,8 @@ impl Field {
 
         let result = Matrix2::new(dot1, -dot2, dot2.clone(), dot1.clone());
         let det = result.determinant();
+
+        let result = Matrix2::identity();
 
         result / det.abs().sqrt()
     }

@@ -3,13 +3,13 @@ use std::f32::consts::PI;
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, BinningScheme, Scheme},
-    diff::get_rotation_matrix2,
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
     result::{self, Results},
-    settings::{load_config, Settings},
+    settings::{load_config, Settings, DIRECT_THRESHOLD},
 };
+use ::rand::Rng;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -228,10 +228,10 @@ impl Problem {
                     let kz = beam.prop[2]; // get the propagation z component
                     let theta = ((-kz).acos() * 180.0 / PI).abs(); // compute outgoing theta
                     let n_theta = (theta / 180.0 * (*num_theta as f32 - 1.0)).round(); // compute mapping to closest bin
-                    let _bin_spacing = 180.0 / (num_theta - 1) as f32;
-                    let _bin_angle = _bin_spacing * n_theta;
+                    let _bin_spacing = 180.0 / (*num_theta as f32 - 1.0);
+                    let bin_angle_theta = _bin_spacing * n_theta;
 
-                    if n_theta as i32 >= *num_theta as i32 {
+                    if n_theta as i32 > *num_theta as i32 {
                         panic!("oh dear");
                     }
 
@@ -251,7 +251,7 @@ impl Problem {
                     };
                     let n_phi = (phi / 360.0 * (*num_phi as f32 - 1.0)).round();
                     let _bin_spacing = 360.0 / (num_phi - 1) as f32;
-                    let _bin_angle = _bin_spacing * n_phi;
+                    let _bin_angle_phi = _bin_spacing * n_phi;
 
                     if n_phi as i32 >= *num_phi as i32 {
                         panic!("oh dear");
@@ -274,12 +274,26 @@ impl Problem {
                     // 2. prerotate the initial amplitude matrix to align with the scattering plane
 
                     // step 1: get the vector perpendicular to the scattering plane
+
+                    // numerical: set random phi if direct forwards/backwards
+
+                    // Handle special cases where theta is very close to 0 or 180 degrees
+                    let tol = DIRECT_THRESHOLD;
+                    let phi =
+                        if bin_angle_theta.abs() < tol || (bin_angle_theta - 180.0).abs() < tol {
+                            // Use a random phi value for forward/backward scattering
+                            let mut rng = ::rand::rng();
+                            rng.random_range(0.0..360.0)
+                        } else {
+                            phi
+                        };
+
+                    //
+                    //
+                    //
                     let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
-                    let hc = Vector3::new(sin_phi, -cos_phi, 0.0); // perpendicular to scattering plane
+                    let hc = Vector3::new(-sin_phi, cos_phi, 0.0); // perpendicular to scattering plane
                                                                    // 2:
-                    let evo2 = beam.field.e_par; // vector parallel to scattering plane
-                    let m = beam.field.e_perp;
-                    let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m)); // compute the rotation matrix
                     let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
 
                     // compute the prerotation matrix
@@ -294,9 +308,44 @@ impl Problem {
                         * beam.field.ampl
                         * prerotation.map(Complex::from);
 
+                    // // print some stuff for debugging if the out angle is 37
+                    // // if (bin_angle_theta - 37.0).abs() < 1e-2 && beam.rec_count == 2 {
+                    // if beam.rec_count <= 10 {
+                    //     if (bin_angle_theta - 175.0).abs() < 1e-2 {
+                    //         println!("######");
+                    //         println!(
+                    //             "beam out at 175, theta = {}, bin phi = {}",
+                    //             theta, _bin_angle_phi
+                    //         );
+                    //         // println!("beam debug: {:#?}", beam);
+                    //         println!("beam prop is: {:?}", beam.prop);
+                    //         println!("beam e-par is: {:?}", beam.field.e_par);
+                    //         println!("beam e-perp is: {:?}", beam.field.e_perp);
+                    //         println!("beam rec: {:?}, tir: {:?}", beam.rec_count, beam.tir_count);
+                    //         println!("the beam has a normal: {:?}", beam.face.data().normal);
+                    //         println!(
+                    //             "the beam type | variant is: {:?} | {:?}",
+                    //             beam.type_, beam.variant
+                    //         );
+                    //     }
+                    // } else {
+                    //     continue;
+                    // }
+
+                    // phase calculation: account for distance to bin
+                    let r_offset = -beam.face.data().midpoint.coords;
+                    let path_difference = beam.prop.dot(&r_offset);
+                    let bvsk = path_difference * beam.wavenumber();
+                    let exp_factor = Complex::cis(-bvsk); // Use cis for complex exponential
+
+                    // Or just do random phase
+                    // let mut rng = ::rand::rng();
+                    // let exp_factor = Complex::cis(rng.random::<f32>() * 2.0 * PI);
+
                     // add the amplitude matrix to the correct far field bin
-                    total_ampl_far_field[n] +=
-                        ampl * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0);
+                    total_ampl_far_field[n] += ampl
+                        * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0)
+                        * exp_factor;
                 }
             }
             Scheme::Interval {
@@ -305,10 +354,10 @@ impl Problem {
                 phis,
                 phi_spacings,
             } => {
-                println!("scheme is interval")
+                println!("scheme is interval!")
             }
             Scheme::Custom { bins, .. } => {
-                println!("scheme is custom")
+                println!("scheme is custom!")
             }
         }
     }
@@ -588,7 +637,7 @@ impl Problem {
 
         // total internal reflection considerations
         if beam.variant == Some(BeamVariant::Tir) {
-            if beam.tir_count > self.settings.max_tir {
+            if beam.tir_count >= self.settings.max_tir {
                 self.result.powers.trnc_ref += beam.power() / self.settings.scale.powi(2);
                 return Vec::new();
             } else {
@@ -597,7 +646,7 @@ impl Problem {
         }
 
         // beam recursion over the maximum
-        if beam.rec_count > self.settings.max_rec {
+        if beam.rec_count >= self.settings.max_rec {
             self.result.powers.trnc_rec += beam.power() / self.settings.scale.powi(2);
             return Vec::new();
         }

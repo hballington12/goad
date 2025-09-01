@@ -4,7 +4,7 @@ use std::f32::consts::PI;
 use geo::Coord;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
-use nalgebra::{Complex, Matrix2, Point3, Vector3};
+use nalgebra::{Complex, ComplexField, Matrix2, Point3, Vector3};
 
 use crate::{
     clip::Clipping,
@@ -12,8 +12,7 @@ use crate::{
     field::Field,
     fresnel,
     geom::{Face, Geom},
-    helpers,
-    settings,
+    helpers, settings,
     snell::get_theta_t,
 };
 
@@ -224,7 +223,11 @@ impl Beam {
             let normal = face.data().normal;
             let theta_i = normal.dot(&self.prop).abs().acos();
             let n2 = get_n2(geom, self, face, normal, medium_refr_index);
-            let e_perp = get_e_perp(normal, &self);
+            let mut e_perp = get_e_perp(normal, &self);
+            if normal.dot(&self.prop) > 0.0 {
+                // ensure e_perp is pointing in the correct direction
+                e_perp = -e_perp;
+            }
             let rot = get_rotation_matrix(&self, e_perp);
             let (ampl, absorbed_intensity) = get_ampl(&self, rot, face, n1);
 
@@ -379,7 +382,7 @@ fn get_rotation_matrix(beam: &Beam, e_perp: Vector3<f32>) -> Matrix2<Complex<f32
         .map(|x| nalgebra::Complex::new(x, 0.0))
 }
 
-/// Determines the new `e_perp` vector for an intersection at a `face``.
+/// Determines the new `e_perp` vector for an intersection at a `face`.
 fn get_e_perp(normal: Vector3<f32>, beam: &Beam) -> Vector3<f32> {
     if normal.dot(&beam.prop).abs() > 1.0 - settings::COLINEAR_THRESHOLD {
         -beam.field.e_perp
@@ -431,7 +434,7 @@ fn create_reflected(
             face.clone(),
             prop,
             n1,
-            beam.rec_count + 1,
+            beam.rec_count, // same recursion count, aligns with Macke 1996
             beam.tir_count + 1,
             Field::new(e_perp, prop, refl_ampl)?,
             Some(BeamVariant::Tir),

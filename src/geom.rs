@@ -354,7 +354,7 @@ impl FaceData {
     }
 
     /// Compute the normal vector for the face.
-    fn set_normal(&mut self) -> Result<()> {
+    pub fn set_normal(&mut self) -> Result<()> {
         let vertices = &self.exterior;
 
         if vertices.len() < 2 {
@@ -721,7 +721,7 @@ impl Face {
     ) -> Result<Self> {
         Ok(Face::Simple(FaceData::new(exterior, parent_id, indices)?))
     }
-    
+
     /// Get a reference to the exterior vertices of the face
     pub fn exterior_ref(&self) -> &[Point3<f32>] {
         match self {
@@ -1169,10 +1169,10 @@ impl Geom {
             shapes,
             containment_graph,
         };
-        
+
         // Validate the loaded geometry
         geom.validate()?;
-        
+
         Ok(geom)
     }
 
@@ -1245,30 +1245,25 @@ impl Geom {
     fn validate(&self) -> Result<()> {
         // Compute the scale factor that will be applied
         let scale_factor = self.compute_scale_factor();
-        
+
         // Validate each shape and face
         for (shape_idx, shape) in self.shapes.iter().enumerate() {
             for (face_idx, face) in shape.faces.iter().enumerate() {
                 let vertices = face.exterior_ref();
-                
+
                 // Check that we have at least one valid vertex pair after scaling
                 validate_vertex_pair_exists(vertices, scale_factor)
-                    .map_err(|e| anyhow::anyhow!(
-                        "Shape {} Face {}: {}", 
-                        shape_idx, face_idx, e
-                    ))?;
-                
+                    .map_err(|e| anyhow::anyhow!("Shape {} Face {}: {}", shape_idx, face_idx, e))?;
+
                 // Check planarity for faces with >3 vertices
                 if vertices.len() > 3 {
-                    validate_planarity(vertices)
-                        .map_err(|e| anyhow::anyhow!(
-                            "Shape {} Face {}: {}", 
-                            shape_idx, face_idx, e
-                        ))?;
+                    validate_planarity(vertices).map_err(|e| {
+                        anyhow::anyhow!("Shape {} Face {}: {}", shape_idx, face_idx, e)
+                    })?;
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -1576,7 +1571,7 @@ pub fn translate(verts: &[Point3<f32>], center_of_mass: &Point3<f32>) -> Vec<Vec
 /// Validates that a face has at least one pair of vertices with sufficient separation after scaling
 fn validate_vertex_pair_exists(vertices: &[Point3<f32>], scale_factor: f32) -> Result<()> {
     let min_original_distance = settings::VEC_LENGTH_THRESHOLD / scale_factor;
-    
+
     for i in 0..vertices.len() {
         for j in (i + 1)..vertices.len() {
             if (vertices[j] - vertices[i]).magnitude() > min_original_distance {
@@ -1584,17 +1579,22 @@ fn validate_vertex_pair_exists(vertices: &[Point3<f32>], scale_factor: f32) -> R
             }
         }
     }
-    
+
     Err(anyhow::anyhow!(
         "No vertex pair will have distance > {} after scaling by {} (minimum required: {})",
-        settings::VEC_LENGTH_THRESHOLD, scale_factor, min_original_distance
+        settings::VEC_LENGTH_THRESHOLD,
+        scale_factor,
+        min_original_distance
     ))
 }
 
 /// Validates that all vertices of a face lie on the same plane (within tolerance)
 fn validate_planarity(vertices: &[Point3<f32>]) -> Result<()> {
-    let midpoint = vertices.iter().fold(Point3::origin(), |acc, v| acc + v.coords) / vertices.len() as f32;
-    
+    let midpoint = vertices
+        .iter()
+        .fold(Point3::origin(), |acc, v| acc + v.coords)
+        / vertices.len() as f32;
+
     // Find first valid vertex pair (we know one exists from previous validation)
     let mut v1 = None;
     let mut v2 = None;
@@ -1611,25 +1611,27 @@ fn validate_planarity(vertices: &[Point3<f32>]) -> Result<()> {
             break;
         }
     }
-    
+
     let v1 = v1.unwrap();
     let v2 = v2.unwrap();
-    
+
     let u = v2 - v1;
     let v = midpoint - v1;
     let normal = u.cross(&v).normalize();
-    
+
     // Check all vertices are on the same plane
     for (i, &vertex) in vertices.iter().enumerate() {
         let distance = (vertex - v1).dot(&normal).abs();
-        
+
         if distance > settings::COLINEAR_THRESHOLD {
             return Err(anyhow::anyhow!(
                 "Non-planar face: vertex {} deviates {} from plane (threshold: {})",
-                i, distance, settings::COLINEAR_THRESHOLD
+                i,
+                distance,
+                settings::COLINEAR_THRESHOLD
             ));
         }
     }
-    
+
     Ok(())
 }
