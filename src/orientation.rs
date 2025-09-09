@@ -228,7 +228,10 @@ impl Euler {
     }
 
     fn __repr__(&self) -> String {
-        format!("Euler(alpha={}, beta={}, gamma={})", self.alpha, self.beta, self.gamma)
+        format!(
+            "Euler(alpha={}, beta={}, gamma={})",
+            self.alpha, self.beta, self.gamma
+        )
     }
 }
 
@@ -252,7 +255,10 @@ impl Orientation {
     }
 
     fn __repr__(&self) -> String {
-        format!("Orientation(scheme={:?}, euler_convention={:?})", self.scheme, self.euler_convention)
+        format!(
+            "Orientation(scheme={:?}, euler_convention={:?})",
+            self.scheme, self.euler_convention
+        )
     }
 }
 

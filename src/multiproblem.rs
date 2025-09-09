@@ -186,18 +186,18 @@ impl MultiProblem {
         // Add powers
         acc.powers += item.powers;
 
-        // Add amplitude matrices if they exist
-        for (a, i) in acc.ampl.iter_mut().zip(item.ampl.iter()) {
-            *a += i;
-        }
+        // // Add amplitude matrices if they exist
+        // for (a, i) in acc.ampl.iter_mut().zip(item.ampl.iter()) {
+        //     *a += i;
+        // }
 
-        for (a, i) in acc.ampl_beam.iter_mut().zip(item.ampl_beam.iter()) {
-            *a += i;
-        }
+        // for (a, i) in acc.ampl_beam.iter_mut().zip(item.ampl_beam.iter()) {
+        //     *a += i;
+        // }
 
-        for (a, i) in acc.ampl_ext.iter_mut().zip(item.ampl_ext.iter()) {
-            *a += i;
-        }
+        // for (a, i) in acc.ampl_ext.iter_mut().zip(item.ampl_ext.iter()) {
+        //     *a += i;
+        // }
 
         for (a, i) in acc.mueller_beam.iter_mut().zip(item.mueller_beam.iter()) {
             *a += i;

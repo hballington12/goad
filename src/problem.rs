@@ -223,6 +223,7 @@ impl Problem {
                 // we require a mapping theta -> n, where n 0,1,2,3,4 ^
                 // surely we can just do 180 / theta, then round to nearest integer
                 // if let Some(beam) = queue.pop() {
+                let mut bs_power = 0.0;
                 for beam in queue.iter() {
                     // theta
                     let kz = beam.prop[2]; // get the propagation z component
@@ -249,6 +250,19 @@ impl Problem {
                     if phi < 0.0 {
                         phi += 360.0
                     };
+
+                    // Handle special cases where theta is very close to 0 or 180 degrees
+                    let tol = DIRECT_THRESHOLD;
+                    // let tol = 1e-2;
+                    let phi =
+                        if bin_angle_theta.abs() < tol || (bin_angle_theta - 180.0).abs() < tol {
+                            // Use a random phi value for forward/backward scattering
+                            let mut rng = ::rand::rng();
+                            rng.random_range(0.0..360.0)
+                        } else {
+                            phi
+                        };
+
                     let n_phi = (phi / 360.0 * (*num_phi as f32 - 1.0)).round();
                     let _bin_spacing = 360.0 / (num_phi - 1) as f32;
                     let _bin_angle_phi = _bin_spacing * n_phi;
@@ -277,24 +291,19 @@ impl Problem {
 
                     // numerical: set random phi if direct forwards/backwards
 
-                    // Handle special cases where theta is very close to 0 or 180 degrees
-                    let tol = DIRECT_THRESHOLD;
-                    let phi =
-                        if bin_angle_theta.abs() < tol || (bin_angle_theta - 180.0).abs() < tol {
-                            // Use a random phi value for forward/backward scattering
-                            let mut rng = ::rand::rng();
-                            rng.random_range(0.0..360.0)
-                        } else {
-                            phi
-                        };
-
                     //
                     //
                     //
                     let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
-                    let hc = Vector3::new(-sin_phi, cos_phi, 0.0); // perpendicular to scattering plane
+                    let hc = Vector3::new(sin_phi, -cos_phi, 0.0); // perpendicular to scattering plane
                                                                    // 2:
                     let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
+
+                    // let k = beam.prop;
+                    // let m = beam.field.e_perp;
+                    // let evo2 = k.cross(&m); // compute the perpendicular component from the product of scattering direction and the parallel vector
+                    // let rotation =
+                    //     Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m)); // compute the rotation matrix
 
                     // compute the prerotation matrix
                     let prerotation = Field::rotation_matrix(
@@ -308,45 +317,69 @@ impl Problem {
                         * beam.field.ampl
                         * prerotation.map(Complex::from);
 
-                    // // print some stuff for debugging if the out angle is 37
-                    // // if (bin_angle_theta - 37.0).abs() < 1e-2 && beam.rec_count == 2 {
-                    // if beam.rec_count <= 10 {
-                    //     if (bin_angle_theta - 175.0).abs() < 1e-2 {
-                    //         println!("######");
-                    //         println!(
-                    //             "beam out at 175, theta = {}, bin phi = {}",
-                    //             theta, _bin_angle_phi
-                    //         );
-                    //         // println!("beam debug: {:#?}", beam);
-                    //         println!("beam prop is: {:?}", beam.prop);
-                    //         println!("beam e-par is: {:?}", beam.field.e_par);
-                    //         println!("beam e-perp is: {:?}", beam.field.e_perp);
-                    //         println!("beam rec: {:?}, tir: {:?}", beam.rec_count, beam.tir_count);
-                    //         println!("the beam has a normal: {:?}", beam.face.data().normal);
-                    //         println!(
-                    //             "the beam type | variant is: {:?} | {:?}",
-                    //             beam.type_, beam.variant
-                    //         );
-                    //     }
-                    // } else {
-                    //     continue;
-                    // }
-
                     // phase calculation: account for distance to bin
                     let r_offset = -beam.face.data().midpoint.coords;
                     let path_difference = beam.prop.dot(&r_offset);
                     let bvsk = path_difference * beam.wavenumber();
-                    let exp_factor = Complex::cis(-bvsk); // Use cis for complex exponential
+                    let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
 
-                    // Or just do random phase
+                    // // // Or just do random phase
                     // let mut rng = ::rand::rng();
                     // let exp_factor = Complex::cis(rng.random::<f32>() * 2.0 * PI);
 
+                    // let mut fac = 1.0;
+                    // if bin_angle_theta > 179.0 {
+                    //     fac = 2.0;
+                    // }
+
+                    // print some stuff for debugging if the out angle is 37
+                    // if (bin_angle_theta - 180.0).abs() < 1e-2 && beam.rec_count == 2 {
+                    // if (bin_angle_theta - 180.0).abs() < 1e-2 {
+                    //     // if beam.rec_count <= 10 {
+                    //     // if (bin_angle_theta - 175.0).abs() < 1e-2 {
+                    //     println!("######");
+                    //     println!(
+                    //         "beam out at 180, theta = {}, bin phi = {}",
+                    //         theta, _bin_angle_phi
+                    //     );
+                    //     // println!("beam debug: {:#?}", beam);
+                    //     println!("beam prop is: {:?}", beam.prop);
+                    //     println!("beam e-par is: {:?}", beam.field.e_par);
+                    //     println!("beam e-perp is: {:?}", beam.field.e_perp);
+                    //     println!("beam rec: {:?}, tir: {:?}", beam.rec_count, beam.tir_count);
+                    //     println!("the beam has a normal: {:?}", beam.face.data().normal);
+                    //     println!(
+                    //         "the beam type | variant is: {:?} | {:?}",
+                    //         beam.type_, beam.variant
+                    //     );
+                    //     println!("beam midpoint is {:?}", beam.face.data().midpoint);
+                    //     println!("intensity is {:?}", beam.field.intensity());
+                    //     bs_power += beam.field.intensity() * beam.csa();
+                    //     println!("the beam area is {:?}", beam.csa());
+                    //     println!("the ampl is {:?}", beam.field.ampl * exp_factor);
+                    //     println!(
+                    //         "the sq lens are: 1,1: {:?}, 2.2: {:?}",
+                    //         (beam.field.ampl[(0, 0)] * exp_factor).norm_sqr(),
+                    //         (beam.field.ampl[(1, 1)] * exp_factor).norm_sqr()
+                    //     );
+                    //     println!(
+                    //         "the args are: 1,1: {:?}, 2.2: {:?}",
+                    //         (beam.field.ampl[(0, 0)] * exp_factor).arg().to_degrees(),
+                    //         (beam.field.ampl[(1, 1)] * exp_factor).arg().to_degrees()
+                    //     );
+                    //     // }
+                    // } else {
+                    //     continue;
+                    // }
+
                     // add the amplitude matrix to the correct far field bin
-                    total_ampl_far_field[n] += ampl
-                        * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0)
-                        * exp_factor;
+                    total_ampl_far_field[n] +=
+                        ampl * Complex::new(beam.csa().sqrt(), 0.0) * exp_factor;
+                    // * Complex::new(fac, 0.0)
+                    // * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0)
+                    // * Complex::new(1.0 / scale.powi(2), 0.0)
                 }
+                // println!("bs power is: {:?}", bs_power);
             }
             Scheme::Interval {
                 thetas,
@@ -646,7 +679,7 @@ impl Problem {
         }
 
         // beam recursion over the maximum
-        if beam.rec_count >= self.settings.max_rec {
+        if beam.rec_count > self.settings.max_rec {
             self.result.powers.trnc_rec += beam.power() / self.settings.scale.powi(2);
             return Vec::new();
         }
