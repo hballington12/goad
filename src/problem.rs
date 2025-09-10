@@ -224,23 +224,27 @@ impl Problem {
                 // we require a mapping theta -> n, where n 0,1,2,3,4 ^
                 // surely we can just do 180 / theta, then round to nearest integer
                 // if let Some(beam) = queue.pop() {
-                let mut bs_power = 0.0;
                 for beam in queue.iter() {
                     // theta
                     let kz = beam.prop[2]; // get the propagation z component
                     let theta = ((-kz).acos() * 180.0 / PI).abs(); // compute outgoing theta
-                    let n_theta = (theta / 180.0 * (*num_theta as f32 - 1.0)).round(); // compute mapping to closest bin
-                    let _bin_theta_spacing = 180.0 / (*num_theta as f32 - 1.0);
-                    let bin_angle_theta = _bin_theta_spacing * n_theta;
 
-                    if n_theta as i32 > *num_theta as i32 {
-                        panic!("oh dear");
+                    // Map to centered bins: bins are at spacing/2, 3*spacing/2, 5*spacing/2, etc.
+                    let theta_spacing = 180.0 / (*num_theta as f32);
+                    let n_theta = (theta / theta_spacing).floor().min((*num_theta - 1) as f32);
+                    let bin_angle_theta = theta_spacing * (n_theta + 0.5);
+
+                    if n_theta as i32 >= *num_theta as i32 {
+                        panic!(
+                            "theta bin index {} exceeds num_theta {}",
+                            n_theta, num_theta
+                        );
                     }
 
                     // println!("prop.z = {}", kz);
                     // println!("theta.abs() = {}", theta);
                     // println!("bin integer is {}", n_theta);
-                    // println!("we think this should be closest to bin: {} deg", _bin_angle);
+                    // println!("we think this should be closest to bin: {} deg", bin_angle_theta);
 
                     // phi
                     // phi angle we can obtain from atan2 function
@@ -252,61 +256,46 @@ impl Problem {
                         phi += 360.0
                     };
 
-                    // Handle special cases where theta is very close to 0 or 180 degrees
-                    let tol = DIRECT_THRESHOLD;
-                    // let tol = 1e-2;
-                    let phi =
-                        if bin_angle_theta.abs() < tol || (bin_angle_theta - 180.0).abs() < tol {
-                            // Use a random phi value for forward/backward scattering
-                            let mut rng = ::rand::rng();
-                            rng.random_range(0.0..360.0)
-                        } else {
-                            phi
-                        };
+                    // // Handle special cases where theta is very close to 0 or 180 degrees
+                    // let tol = DIRECT_THRESHOLD;
+                    // // let tol = 1e-2;
+                    // let phi = if bin_angle_theta < theta_spacing / 2.0 + tol
+                    //     || bin_angle_theta > 180.0 - theta_spacing / 2.0 - tol
+                    // {
+                    //     // Use a random phi value for forward/backward scattering (near poles)
+                    //     let mut rng = ::rand::rng();
+                    //     rng.random_range(0.0..360.0)
+                    // } else {
+                    //     phi
+                    // };
 
-                    let n_phi = (phi / 360.0 * (*num_phi as f32 - 1.0)).round();
-                    let _bin_phi_spacing = 360.0 / (num_phi - 1) as f32;
-                    let _bin_angle_phi = _bin_phi_spacing * n_phi;
+                    // Map to centered bins
+                    let phi_spacing = 360.0 / (*num_phi as f32);
+                    let n_phi = (phi / phi_spacing).floor().min((*num_phi - 1) as f32);
+                    let _bin_angle_phi = phi_spacing * (n_phi + 0.5);
 
                     if n_phi as i32 >= *num_phi as i32 {
-                        panic!("oh dear");
+                        panic!("phi bin index {} exceeds num_phi {}", n_phi, num_phi);
                     }
 
                     // println!("kx: {}, ky: {}", kx, ky);
                     // println!("we think this is phi (range -180 to 180): {}", phi);
                     // println!("we think this is phi (range 0 to 360): {}", phi);
                     // println!("bin integer is {}", n_phi);
-                    // println!("we think this should be closest to bin: {} deg", _bin_angle);
+                    // println!("we think this should be closest to bin: {} deg", _bin_angle_phi);
 
                     // so now we have the theta and phi values, need to map them onto the 1d array positions
                     let n = (n_theta as i32 * *num_phi as i32 + n_phi as i32) as usize;
 
-                    // println!("we think this is the {}th bin", n);
-                    // println!("ampl far field norm: {}", beam.field.ampl.norm());
-
                     // we need to apply 2 rotations to the amplitude matrix
                     // 1. rotate from the beam reference plane into the scattering plane
-                    // 2. prerotate the initial amplitude matrix to align with the scattering plane
 
                     // step 1: get the vector perpendicular to the scattering plane
-
-                    // numerical: set random phi if direct forwards/backwards
-
-                    //
-                    //
-                    //
                     let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
                     let hc = Vector3::new(sin_phi, -cos_phi, 0.0); // perpendicular to scattering plane
-                                                                   // 2:
                     let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
 
-                    // let k = beam.prop;
-                    // let m = beam.field.e_perp;
-                    // let evo2 = k.cross(&m); // compute the perpendicular component from the product of scattering direction and the parallel vector
-                    // let rotation =
-                    //     Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m)); // compute the rotation matrix
-
-                    // compute the prerotation matrix
+                    // 2. prerotate the initial amplitude matrix to align with the scattering plane
                     let prerotation = Field::rotation_matrix(
                         Vector3::x(),
                         Vector3::new(-sin_phi, cos_phi, 0.0),
@@ -324,88 +313,28 @@ impl Problem {
                     let bvsk = path_difference * beam.wavenumber();
                     let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
 
-                    // // // Or just do random phase
+                    // Or just do random phase
                     // let mut rng = ::rand::rng();
                     // let exp_factor = Complex::cis(rng.random::<f32>() * 2.0 * PI);
 
-                    // let mut fac = 1.0;
-                    // if bin_angle_theta > 179.0 {
-                    //     fac = 2.0;
-                    // }
-
-                    // print some stuff for debugging if the out angle is 37
-                    // if (bin_angle_theta - 180.0).abs() < 1e-2 && beam.rec_count == 2 {
-                    // if (bin_angle_theta - 180.0).abs() < 1e-2 {
-                    //     // if beam.rec_count <= 10 {
-                    //     // if (bin_angle_theta - 175.0).abs() < 1e-2 {
-                    //     println!("######");
-                    //     println!(
-                    //         "beam out at 180, theta = {}, bin phi = {}",
-                    //         theta, _bin_angle_phi
-                    //     );
-                    //     // println!("beam debug: {:#?}", beam);
-                    //     println!("beam prop is: {:?}", beam.prop);
-                    //     println!("beam e-par is: {:?}", beam.field.e_par);
-                    //     println!("beam e-perp is: {:?}", beam.field.e_perp);
-                    //     println!("beam rec: {:?}, tir: {:?}", beam.rec_count, beam.tir_count);
-                    //     println!("the beam has a normal: {:?}", beam.face.data().normal);
-                    //     println!(
-                    //         "the beam type | variant is: {:?} | {:?}",
-                    //         beam.type_, beam.variant
-                    //     );
-                    //     println!("beam midpoint is {:?}", beam.face.data().midpoint);
-                    //     println!("intensity is {:?}", beam.field.intensity());
-                    //     bs_power += beam.field.intensity() * beam.csa();
-                    //     println!("the beam area is {:?}", beam.csa());
-                    //     println!("the ampl is {:?}", beam.field.ampl * exp_factor);
-                    //     println!(
-                    //         "the sq lens are: 1,1: {:?}, 2.2: {:?}",
-                    //         (beam.field.ampl[(0, 0)] * exp_factor).norm_sqr(),
-                    //         (beam.field.ampl[(1, 1)] * exp_factor).norm_sqr()
-                    //     );
-                    //     println!(
-                    //         "the args are: 1,1: {:?}, 2.2: {:?}",
-                    //         (beam.field.ampl[(0, 0)] * exp_factor).arg().to_degrees(),
-                    //         (beam.field.ampl[(1, 1)] * exp_factor).arg().to_degrees()
-                    //     );
-                    //     // }
-                    // } else {
-                    //     continue;
-                    // }
-
                     // compute the solid angle of the outbin
-                    let solid_angle = if (bin_angle_theta - 0.0).abs() < 0.1 {
-                        let a: f32 = 0.25;
-                        2.0 * a.to_radians().sin().abs() * a.to_radians().sin()
-                    } else if (bin_angle_theta - 180.0).abs() < 0.1 {
-                        let a: f32 = 179.75;
-                        2.0 * a.to_radians().sin().abs() * a.to_radians().sin()
-                    } else {
-                        2.0 * (bin_angle_theta).to_radians().sin().abs()
-                            * (0.5 * _bin_theta_spacing).to_radians().sin()
-                    };
+                    let solid_angle = 2.0
+                        * (bin_angle_theta).to_radians().sin().abs()
+                        * (0.5 * theta_spacing).to_radians().sin()
+                        * phi_spacing.to_radians();
 
-                    // * (0.5 * _bin_theta_spacing.to_radians()).sin();
+                    let ampl2 = ampl
+                        * Complex::new(beam.csa().sqrt() / scale / solid_angle.sqrt(), 0.0)
+                        * exp_factor;
 
-                    // add the amplitude matrix to the correct far field bin
-                    // total_ampl_far_field[n] +=
-                    // ampl * Complex::new(beam.csa().sqrt(), 0.0) * exp_factor;
-                    // * Complex::new(fac, 0.0)
-                    // * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0)
-                    // * Complex::new(1.0 / scale.powi(2), 0.0)
-
-                    // for testing, just to do the mueller on beam by beam basis
-                    // let ampl2 = ampl * Complex::new(beam.csa().sqrt() / solid_angle.sqrt(), 0.0);
-                    let ampl2 = ampl * Complex::new(beam.csa().sqrt(), 0.0);
-                    // * exp_factor;
-
-                    let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
-                    // actually just add all mueller elements
-                    for i in 0..16 {
-                        mueller_out[(n, i)] += mueller[(0, i)] / solid_angle;
-                    }
+                    // either sum the far-field amplitude matrix and reduce to mueller later
+                    total_ampl_far_field[n] += ampl2;
+                    // or, just add mueller linearly
+                    // let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
+                    // for i in 0..16 {
+                    //     mueller_out[(n, i)] += mueller[(0, i)];
+                    // }
                 }
-                // println!("bs power is: {:?}", bs_power);
             }
             Scheme::Interval {
                 thetas,
@@ -495,9 +424,8 @@ impl Problem {
         self.solve_near();
         self.solve_far();
         self.result.mueller = output::ampl_to_mueller(&self.result.bins, &self.result.ampl);
-        println!("Note mueller beam claculated elsewhere!!!");
-        // self.result.mueller_beam =
-        // output::ampl_to_mueller(&self.result.bins, &self.result.ampl_beam);
+        self.result.mueller_beam =
+            output::ampl_to_mueller(&self.result.bins, &self.result.ampl_beam);
         self.result.mueller_ext = output::ampl_to_mueller(&self.result.bins, &self.result.ampl_ext);
 
         // try compute 1d mueller

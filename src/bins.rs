@@ -1,4 +1,4 @@
-use ndarray::Array1;
+use ndarray::{s, Array1};
 use pyo3::prelude::*;
 use serde::Deserialize;
 
@@ -29,15 +29,15 @@ mod tests {
         let num_phi = 3;
         let result = simple_bins(num_theta, num_phi);
         let expected = vec![
-            (0.0, 0.0),
-            (0.0, 180.0),
-            (0.0, 360.0),
-            (90.0, 0.0),
+            (30.0, 60.0),
+            (30.0, 180.0),
+            (30.0, 300.0),
+            (90.0, 60.0),
             (90.0, 180.0),
-            (90.0, 360.0),
-            (180.0, 0.0),
-            (180.0, 180.0),
-            (180.0, 360.0),
+            (90.0, 300.0),
+            (150.0, 60.0),
+            (150.0, 180.0),
+            (150.0, 300.0),
         ];
         assert_eq!(result, expected);
     }
@@ -186,8 +186,15 @@ pub fn interval_bins(
 
 /// Generate theta and phi combinations
 pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
-    let thetas = Array1::linspace(0.0, 180.0, num_theta).insert_axis(ndarray::Axis(1)); // Reshape to (50, 1)
-    let phis = Array1::linspace(0.0, 360.0, num_phi).insert_axis(ndarray::Axis(0)); // Reshape to (1, 60)
+    // Create linspace with num_theta + 1 points, then remove last and offset
+    let dtheta = 180.0 / (num_theta as f32);
+    let thetas_temp = Array1::linspace(0.0, 180.0, num_theta + 1);
+    let thetas = thetas_temp.slice(s![0..-1]).mapv(|v| v + dtheta / 2.0);
+
+    // Create linspace with num_phi + 1 points, then remove last and offset
+    let dphi = 360.0 / (num_phi as f32);
+    let phis_temp = Array1::linspace(0.0, 360.0, num_phi + 1);
+    let phis = phis_temp.slice(s![0..-1]).mapv(|v| v + dphi / 2.0);
 
     // Flatten the combinations of theta and phi into a 1D array of tuples
     thetas
