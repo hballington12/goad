@@ -7,6 +7,7 @@ use anyhow::Result;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2};
 
+use crate::bins::Bin;
 use crate::result::Results;
 
 #[cfg(test)]
@@ -44,18 +45,6 @@ mod tests {
         assert_eq!(arr, expected);
     }
 
-    #[test]
-    fn test_unique_grid() {
-        let input = vec![(1.0, 2.0), (1.0, 2.0), (1.0, 3.0), (2.0, 3.0), (2.0, 3.0)];
-        let expected = vec![(1.0, 2.0), (1.0, 3.0), (2.0, 2.0), (2.0, 3.0)];
-        let result = unique_grid(&input);
-        assert_eq!(result, expected);
-
-        let input = vec![(1.0, 1.0), (1.0, 1.0), (2.0, 2.0), (2.0, 2.0)];
-        let expected = vec![(1.0, 1.0), (1.0, 2.0), (2.0, 1.0), (2.0, 2.0)];
-        let result = unique_grid(&input);
-        assert_eq!(result, expected);
-    }
 }
 
 pub fn integrate_trapezoidal<F>(x: &Array1<f32>, y: &Array1<f32>, transform: F) -> f32
@@ -78,26 +67,6 @@ where
     sum
 }
 
-#[allow(dead_code)]
-/// Given a slice of 2-element tuples, return a Vec of unique tuples.
-fn unique_grid(tuple_slice: &[(f32, f32)]) -> Vec<(f32, f32)> {
-    // separate the grid into two arrays
-    let (mut thetas, mut phis): (Vec<f32>, Vec<f32>) = tuple_slice.iter().cloned().unzip();
-    // sort each array
-    thetas.sort_by(|a, b| a.partial_cmp(b).expect("NaN encountered"));
-    phis.sort_by(|a, b| a.partial_cmp(b).expect("NaN encountered"));
-    // deduplicate each array
-    thetas.dedup();
-    phis.dedup();
-    // create a new Vec of tuples
-    let mut unique_grid = Vec::new();
-    for theta in thetas.iter() {
-        for phi in phis.iter() {
-            unique_grid.push((*theta, *phi));
-        }
-    }
-    unique_grid
-}
 
 /// Write the 1d Mueller matrix to a file against the theta and phi bins
 pub fn write_mueller_1d(
@@ -127,7 +96,7 @@ pub fn write_mueller_1d(
 
 /// Write the Mueller matrix to a file against the theta and phi bins
 pub fn write_mueller(
-    bins: &[(f32, f32)],
+    bins: &[(Bin, Bin)],
     mueller: &Array2<f32>,
     suffix: &str,
     output_dir: &Path,
@@ -140,8 +109,8 @@ pub fn write_mueller(
 
     // Iterate over the array and write data to the file
     for (index, row) in mueller.outer_iter().enumerate() {
-        let (theta, phi) = bins[index];
-        write!(writer, "{} {} ", theta, phi)?;
+        let (theta_bin, phi_bin) = bins[index];
+        write!(writer, "{} {} ", theta_bin.center, phi_bin.center)?;
         for value in row.iter() {
             write!(writer, "{} ", value)?;
         }
@@ -264,7 +233,7 @@ fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
 }
 
 pub fn ampl_to_mueller(
-    theta_phi_combinations: &[(f32, f32)],
+    theta_phi_combinations: &[(Bin, Bin)],
     ampl_cs: &[Matrix2<Complex<f32>>],
 ) -> Array2<f32> {
     let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));

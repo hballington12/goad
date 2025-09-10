@@ -39,6 +39,32 @@ pub const DIRECT_THRESHOLD: f32 = 1e-4;
 /// Tolerance for value matching in interval binning
 pub const INTERVAL_IGNORE_TOLERANCE: f32 = 0.0001;
 
+/// Helper function to adjust theta splits away from poles (0.0, 180.0)
+fn adjust_theta_splits_from_poles(positions: &mut Vec<f32>, spacings: &[f32]) {
+    // Check and adjust first position if it's near 0.0
+    if !positions.is_empty() && (positions[0] - 0.0).abs() < INTERVAL_IGNORE_TOLERANCE {
+        if !spacings.is_empty() {
+            positions[0] += spacings[0];
+            println!(
+                "Note: trimmed theta split from 0.0° to {:.5}° to avoid pole singularity",
+                positions[0]
+            );
+        }
+    }
+
+    // Check and adjust last position if it's near 180.0
+    let last_idx = positions.len() - 1;
+    if !positions.is_empty() && (positions[last_idx] - 180.0).abs() < INTERVAL_IGNORE_TOLERANCE {
+        if spacings.len() >= positions.len() - 1 {
+            positions[last_idx] -= spacings[spacings.len() - 1];
+            println!(
+                "Note: trimmed theta split from 180.0° to {:.5}° to avoid pole singularity",
+                positions[last_idx]
+            );
+        }
+    }
+}
+
 // Default values for Python API (no config file dependencies)
 /// Default wavelength in geometry units (532nm green laser)
 pub const DEFAULT_WAVELENGTH: f32 = 0.532;
@@ -220,7 +246,7 @@ impl Settings {
             },
         });
 
-        Ok(Settings {
+        let mut settings = Settings {
             wavelength,
             beam_power_threshold,
             beam_area_threshold_fac,
@@ -238,7 +264,11 @@ impl Settings {
             geom_scale: None,
             directory: PathBuf::from(directory),
             fov_factor: None,
-        })
+        };
+
+        validate_config(&mut settings);
+
+        Ok(settings)
     }
 
     /// Set the euler angles
@@ -292,12 +322,12 @@ pub fn load_default_config() -> Result<Settings> {
             std::process::exit(1);
         });
 
-    let config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
+    let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
         eprintln!("Error deserializing configuration: {}", err);
         std::process::exit(1);
     });
 
-    validate_config(&config);
+    validate_config(&mut config);
 
     Ok(config)
 }
@@ -329,7 +359,7 @@ pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
         update_settings_from_cli(&mut config);
     }
 
-    validate_config(&config);
+    validate_config(&mut config);
 
     // println!("{:#?}", config);
 
@@ -549,12 +579,23 @@ fn retrieve_project_root() -> Result<std::path::PathBuf> {
     }
 }
 
-fn validate_config(config: &Settings) {
+fn validate_config(config: &mut Settings) {
     assert!(
         config.beam_area_threshold_fac > 1e-5,
         "Beam area threshold factor must be greater than 1e-5"
     );
     assert!(config.wavelength > 0.0, "Wavelength must be greater than 0");
+
+    // the following is currently not required because interval binnings are now based on edges
+    // // Adjust theta splits for interval binning schemes to avoid poles
+    // if let bins::Scheme::Interval {
+    //     ref mut thetas,
+    //     ref theta_spacings,
+    //     ..
+    // } = &mut config.binning.scheme
+    // {
+    //     adjust_theta_splits_from_poles(thetas, theta_spacings);
+    // }
 }
 
 #[derive(Parser, Debug)]

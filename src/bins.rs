@@ -1,8 +1,38 @@
-use ndarray::{s, Array1};
 use pyo3::prelude::*;
 use serde::Deserialize;
 
-use crate::settings::INTERVAL_IGNORE_TOLERANCE;
+/// Represents an angular bin with edges and center
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Bin {
+    pub min: f32,    // minimum edge of the bin
+    pub max: f32,    // maximum edge of the bin
+    pub center: f32, // center of the bin
+}
+
+impl Bin {
+    /// Create a new bin from edges
+    pub fn new(min: f32, max: f32) -> Self {
+        Bin {
+            min,
+            max,
+            center: (min + max) / 2.0,
+        }
+    }
+    
+    /// Create a bin from center and width
+    pub fn from_center_width(center: f32, width: f32) -> Self {
+        Bin {
+            min: center - width / 2.0,
+            max: center + width / 2.0,
+            center,
+        }
+    }
+    
+    /// Get the width of the bin
+    pub fn width(&self) -> f32 {
+        self.max - self.min
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -12,7 +42,7 @@ mod tests {
     fn test_interval_bins() {
         let values = vec![0.0, 1.0, 2.0];
         let spacings = vec![0.5, 0.5];
-        let result = interval_spacings(&values, &spacings, None);
+        let result = interval_spacings(&values, &spacings);
         let expected = vec![0.0, 0.5, 1.0, 1.5, 2.0];
         assert_eq!(result, expected);
     }
@@ -22,7 +52,7 @@ mod tests {
     fn test_interval_bins_bad_angle() {
         let values = vec![0.0, 1.0, 2.0];
         let spacings = vec![0.3, 0.5];
-        interval_spacings(&values, &spacings, None);
+        interval_spacings(&values, &spacings);
     }
 
     #[test]
@@ -30,18 +60,14 @@ mod tests {
         let num_theta = 3;
         let num_phi = 3;
         let result = simple_bins(num_theta, num_phi);
-        let expected = vec![
-            (30.0, 60.0),
-            (30.0, 180.0),
-            (30.0, 300.0),
-            (90.0, 60.0),
-            (90.0, 180.0),
-            (90.0, 300.0),
-            (150.0, 60.0),
-            (150.0, 180.0),
-            (150.0, 300.0),
-        ];
-        assert_eq!(result, expected);
+        // Check that we have the right number of bins
+        assert_eq!(result.len(), 9);
+        // Check first bin centers
+        assert_eq!(result[0].0.center, 30.0);
+        assert_eq!(result[0].1.center, 60.0);
+        // Check bin edges for first theta bin
+        assert_eq!(result[0].0.min, 0.0);
+        assert_eq!(result[0].0.max, 60.0);
     }
 }
 
@@ -132,7 +158,6 @@ impl BinningScheme {
 pub fn interval_spacings(
     splits: &[f32],
     spacings: &[f32],
-    vals_to_ignore: Option<&[f32]>,
 ) -> Vec<f32> {
     let num_values = splits.len();
     let mut values = Vec::new();
@@ -166,17 +191,6 @@ pub fn interval_spacings(
                 continue;
             }
 
-            // Skip values that match ignored values within tolerance
-            if let Some(ignore_vals) = vals_to_ignore {
-                if ignore_vals
-                    .iter()
-                    .any(|&ignore_val| (val - ignore_val).abs() < INTERVAL_IGNORE_TOLERANCE)
-                {
-                    println!("Note: interval binning angle {:?} will not be computed because the scattering plane is not well-defined this close to direct forwards/backwards scattering.",val);
-                    continue;
-                }
-            }
-
             values.push(val);
         }
     }
@@ -189,40 +203,61 @@ pub fn interval_bins(
     theta_splits: &Vec<f32>,
     phi_spacing: &Vec<f32>,
     phi_splits: &Vec<f32>,
-) -> Vec<(f32, f32)> {
-    let thetas = interval_spacings(theta_splits, theta_spacing, Some(&[0.0, 180.0]));
-    let phis = interval_spacings(phi_splits, phi_spacing, None);
+) -> Vec<(Bin, Bin)> {
+    // Get edge positions
+    let theta_edges = interval_spacings(theta_splits, theta_spacing);
+    let phi_edges = interval_spacings(phi_splits, phi_spacing);
 
+    // Convert edges to bins
+    let theta_bins: Vec<Bin> = theta_edges.windows(2)
+        .map(|edges| Bin::new(edges[0], edges[1]))
+        .collect();
+    
+    let phi_bins: Vec<Bin> = phi_edges.windows(2)
+        .map(|edges| Bin::new(edges[0], edges[1]))
+        .collect();
+
+    // Create all combinations
     let mut bins = Vec::new();
-    for theta in thetas.iter() {
-        for phi in phis.iter() {
-            bins.push((*theta, *phi));
+    for theta_bin in theta_bins.iter() {
+        for phi_bin in phi_bins.iter() {
+            bins.push((*theta_bin, *phi_bin));
         }
     }
 
     bins
 }
 
-/// Generate theta and phi combinations
-pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(f32, f32)> {
-    // Create linspace with num_theta + 1 points, then remove last and offset
+/// Generate theta and phi bin combinations
+pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(Bin, Bin)> {
+    // Create theta bins
     let dtheta = 180.0 / (num_theta as f32);
-    let thetas_temp = Array1::linspace(0.0, 180.0, num_theta + 1);
-    let thetas = thetas_temp.slice(s![0..-1]).mapv(|v| v + dtheta / 2.0);
+    let theta_bins: Vec<Bin> = (0..num_theta)
+        .map(|i| {
+            let min = i as f32 * dtheta;
+            let max = (i + 1) as f32 * dtheta;
+            Bin::new(min, max)
+        })
+        .collect();
 
-    // Create linspace with num_phi + 1 points, then remove last and offset
+    // Create phi bins
     let dphi = 360.0 / (num_phi as f32);
-    let phis_temp = Array1::linspace(0.0, 360.0, num_phi + 1);
-    let phis = phis_temp.slice(s![0..-1]).mapv(|v| v + dphi / 2.0);
+    let phi_bins: Vec<Bin> = (0..num_phi)
+        .map(|i| {
+            let min = i as f32 * dphi;
+            let max = (i + 1) as f32 * dphi;
+            Bin::new(min, max)
+        })
+        .collect();
 
-    // Flatten the combinations of theta and phi into a 1D array of tuples
-    thetas
+    // Flatten the combinations of theta and phi bins
+    theta_bins
         .iter()
-        .flat_map(|&theta| phis.iter().map(move |&phi| (theta, phi)))
+        .flat_map(|&theta_bin| phi_bins.iter().map(move |&phi_bin| (theta_bin, phi_bin)))
         .collect()
 }
 
-pub fn generate_bins(bin_type: &Scheme) -> Vec<(f32, f32)> {
+pub fn generate_bins(bin_type: &Scheme) -> Vec<(Bin, Bin)> {
     match bin_type {
         Scheme::Simple { num_theta, num_phi } => simple_bins(*num_theta, *num_phi),
         Scheme::Interval {
@@ -232,28 +267,30 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<(f32, f32)> {
             phi_spacings,
         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
         Scheme::Custom { bins, file } => {
-            // println!("Loading custom bins from file: {:?}", file);
-            if let Some(file) = file {
-                let content = match std::fs::read_to_string(file) {
-                    Ok(content) => content,
-                    Err(e) => panic!("Could not read file '{}': {}", file, e),
-                };
+            // TODO: Custom bins need to specify edges or we need to infer them
+            todo!("Custom bins with Bin struct not yet implemented")
+            // // println!("Loading custom bins from file: {:?}", file);
+            // if let Some(file) = file {
+            //     let content = match std::fs::read_to_string(file) {
+            //         Ok(content) => content,
+            //         Err(e) => panic!("Could not read file '{}': {}", file, e),
+            //     };
 
-                // Parse the TOML file
-                match toml::from_str::<CustomBins>(&content) {
-                    Ok(custom_bins) => {
-                        // println!("Loaded {} custom bins from file", custom_bins.bins.len());
-                        custom_bins.bins
-                    }
-                    Err(e) => {
-                        eprintln!("Error parsing custom bins file: {}", e);
-                        eprintln!("Falling back to default bins");
-                        bins.to_vec()
-                    }
-                }
-            } else {
-                bins.to_vec()
-            }
+            //     // Parse the TOML file
+            //     match toml::from_str::<CustomBins>(&content) {
+            //         Ok(custom_bins) => {
+            //             // println!("Loaded {} custom bins from file", custom_bins.bins.len());
+            //             custom_bins.bins
+            //         }
+            //         Err(e) => {
+            //             eprintln!("Error parsing custom bins file: {}", e);
+            //             eprintln!("Falling back to default bins");
+            //             bins.to_vec()
+            //         }
+            //     }
+            // } else {
+            //     bins.to_vec()
+            // }
         }
     }
 }

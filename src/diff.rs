@@ -2,6 +2,7 @@ use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
 use ndarray::Array2;
 use std::f32::consts::PI;
 
+use crate::bins::Bin;
 use crate::field::Field;
 use crate::{geom, settings};
 
@@ -11,7 +12,7 @@ pub fn diffraction(
     mut ampl: Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
-    theta_phi_combinations: &[(f32, f32)],
+    theta_phi_combinations: &[(Bin, Bin)],
     wavenumber: f32,
     fov_factor: Option<f32>,
 ) -> Vec<Matrix2<Complex<f32>>> {
@@ -112,10 +113,10 @@ pub fn diffraction(
     let inv_denom = Complex::new(wavenumber / (2.0 * PI), 0.0); // Pre-calculate 1.0 / (2*PI/wavenumber)
 
     // Iterate over the flattened combinations
-    for (index, (theta, phi)) in theta_phi_combinations.iter().enumerate() {
-        // Compute sin and cos values for current theta and phi
-        let (sin_theta, cos_theta) = theta.to_radians().sin_cos();
-        let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
+    for (index, (theta_bin, phi_bin)) in theta_phi_combinations.iter().enumerate() {
+        // Compute sin and cos values for current theta and phi bin centers
+        let (sin_theta, cos_theta) = theta_bin.center.to_radians().sin_cos();
+        let (sin_phi, cos_phi) = phi_bin.center.to_radians().sin_cos();
 
         // Calculate observation direction in original frame
         let k_obs = Vector3::new(sin_theta * cos_phi, sin_theta * sin_phi, -cos_theta);

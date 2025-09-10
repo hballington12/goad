@@ -1,5 +1,6 @@
 use std::f32::consts::PI;
 
+use crate::bins::Bin;
 use crate::output;
 use crate::params::Params;
 use crate::powers::Powers;
@@ -21,7 +22,7 @@ use pyo3::prelude::*;
 #[derive(Debug, Clone)]
 pub struct Results {
     pub powers: Powers,
-    pub bins: Vec<(f32, f32)>,
+    pub bins: Vec<(Bin, Bin)>,
     pub mueller: Array2<f32>,
     pub mueller_beam: Array2<f32>,
     pub mueller_ext: Array2<f32>,
@@ -37,7 +38,7 @@ pub struct Results {
 
 impl Results {
     /// Creates a new `Result` with empty mueller and amplitude matrix
-    pub fn new_empty(bins: &[(f32, f32)]) -> Self {
+    pub fn new_empty(bins: &[(Bin, Bin)]) -> Self {
         let mueller = Array2::<f32>::zeros((bins.len(), 16));
         let mueller_beam = mueller.clone();
         let mueller_ext = mueller.clone();
@@ -134,10 +135,13 @@ impl Results {
 
 #[pymethods]
 impl Results {
-    /// Get the bins as a list of tuples
+    /// Get the bins as a list of tuples (returns bin centers for backwards compatibility)
     #[getter]
     pub fn get_bins(&self) -> Vec<(f32, f32)> {
-        self.bins.clone()
+        self.bins
+            .iter()
+            .map(|(theta_bin, phi_bin)| (theta_bin.center, phi_bin.center))
+            .collect()
     }
 
     /// Get the 1D bins (theta values)
@@ -258,7 +262,7 @@ impl Results {
 /// Returns a tuple of the theta bins and the 1D Mueller matrix
 /// NOTE: Assumes phi is ordered
 pub fn try_mueller_to_1d(
-    bins: &[(f32, f32)],
+    bins: &[(Bin, Bin)],
     mueller: &Array2<f32>,
 ) -> Result<(Vec<f32>, Array2<f32>)> {
     // Check that the mueller matrix and bins are the same length
@@ -274,7 +278,7 @@ pub fn try_mueller_to_1d(
     let mueller = mueller.to_owned();
     let mut bins = bins.to_owned();
     let mut indices: Vec<usize> = (0..bins.len()).collect();
-    indices.sort_by(|&i, &j| bins[i].0.partial_cmp(&bins[j].0).unwrap());
+    indices.sort_by(|&i, &j| bins[i].0.center.partial_cmp(&bins[j].0.center).unwrap());
 
     // Sort bins according to the sorted indices
     bins = indices.iter().map(|&i| bins[i]).collect();
@@ -294,10 +298,10 @@ pub fn try_mueller_to_1d(
         .map(|(bin, row)| (*bin, row.to_owned()))
         .collect();
 
-    // group the combined Vec by theta
+    // group the combined Vec by theta center
     let grouped: Vec<Vec<_>> = combined
         .into_iter()
-        .chunk_by(|((key, _), _)| *key)
+        .chunk_by(|((theta_bin, _), _)| theta_bin.center)
         .into_iter()
         .map(|(_, group)| group.map(|x| x).collect())
         .collect();
@@ -310,7 +314,7 @@ pub fn try_mueller_to_1d(
         // Unzip the theta, phi, and mueller values
         let thetas_phi: Vec<_> = muellers
             .iter()
-            .map(|((theta, phi), _)| (*theta, *phi))
+            .map(|((theta_bin, phi_bin), _)| (theta_bin.center, phi_bin.center))
             .collect();
         let mueller_phi: Vec<_> = muellers.iter().map(|(_, mueller)| mueller).collect();
         let mut mueller_1d_row = Array1::<f32>::zeros(16);

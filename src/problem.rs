@@ -1,15 +1,14 @@
-use std::f32::consts::{PI, SQRT_2};
+use std::f32::consts::PI;
 
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins::{generate_bins, BinningScheme, Scheme},
+    bins::{generate_bins, Bin, BinningScheme, Scheme},
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
     result::{self, Results},
-    settings::{load_config, Settings, DIRECT_THRESHOLD},
+    settings::{load_config, Settings},
 };
-use ::rand::Rng;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -406,7 +405,7 @@ impl Problem {
 
     fn diffract_outbeams(
         queue: &mut Vec<Beam>,
-        bins: &[(f32, f32)],
+        bins: &[(Bin, Bin)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         fov_factor: Option<f32>,
     ) {
