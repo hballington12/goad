@@ -195,6 +195,12 @@ impl Problem {
         }
     }
 
+    /// Helper function to compute theta angle from beam propagation vector
+    fn compute_theta_from_beam(beam: &Beam) -> f32 {
+        let kz = beam.prop[2]; // get the propagation z component
+        ((-kz).acos() * 180.0 / PI).abs() // compute outgoing theta
+    }
+
     fn go_outbeams(
         queue: &mut Vec<Beam>,
         binning: &BinningScheme,
@@ -226,8 +232,7 @@ impl Problem {
                 // if let Some(beam) = queue.pop() {
                 for beam in queue.iter() {
                     // theta
-                    let kz = beam.prop[2]; // get the propagation z component
-                    let theta = ((-kz).acos() * 180.0 / PI).abs(); // compute outgoing theta
+                    let theta = Self::compute_theta_from_beam(beam);
 
                     // Map to centered bins: bins are at spacing/2, 3*spacing/2, 5*spacing/2, etc.
                     let theta_spacing = 180.0 / (*num_theta as f32);
@@ -342,10 +347,59 @@ impl Problem {
                 phis,
                 phi_spacings,
             } => {
-                println!("scheme is interval!")
+                println!("scheme is interval!");
+
+                // Precompute theta bin edges for bounds checking
+                let theta_min = thetas[0] - theta_spacings[0] / 2.0;
+                let theta_max =
+                    thetas[thetas.len() - 1] + theta_spacings[theta_spacings.len() - 1] / 2.0;
+
+                println!("theta min: {:}, theta max: {:}", theta_min, theta_max);
+
+                for beam in queue.iter() {
+                    let theta = Self::compute_theta_from_beam(beam);
+
+                    // Check if theta is within valid range
+                    if theta < theta_min || theta > theta_max {
+                        println!("Beam theta out of bounds: {}", theta);
+                        continue; // Skip beams outside the binning range
+                    }
+
+                    // Find which interval contains this theta
+                    let mut theta_interval_idx = None;
+                    for i in 0..thetas.len() - 1 {
+                        if theta >= thetas[i] && theta < thetas[i + 1] {
+                            theta_interval_idx = Some(i);
+                            break;
+                        }
+                    }
+
+                    let theta_interval_idx = match theta_interval_idx {
+                        Some(idx) => idx,
+                        None => continue, // Couldn't find interval, skip
+                    };
+
+                    // Find position within that interval
+                    let local_theta_offset = theta - thetas[theta_interval_idx];
+                    let local_theta_bin =
+                        (local_theta_offset / theta_spacings[theta_interval_idx]).floor() as usize;
+
+                    // Calculate actual bin center for this theta
+                    let bin_center_theta = thetas[theta_interval_idx]
+                        + local_theta_bin as f32 * theta_spacings[theta_interval_idx]
+                        + theta_spacings[theta_interval_idx] / 2.0;
+
+                    println!(
+                        "Theta: {:.2}°, Interval: {}, Local bin: {}, Bin center: {:.2}°",
+                        theta, theta_interval_idx, local_theta_bin, bin_center_theta
+                    );
+                }
+
+                todo!()
             }
             Scheme::Custom { bins, .. } => {
-                println!("scheme is custom!")
+                println!("scheme is custom!");
+                todo!()
             }
         }
     }

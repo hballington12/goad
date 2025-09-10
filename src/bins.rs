@@ -2,6 +2,8 @@ use ndarray::{s, Array1};
 use pyo3::prelude::*;
 use serde::Deserialize;
 
+use crate::settings::INTERVAL_IGNORE_TOLERANCE;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -10,7 +12,7 @@ mod tests {
     fn test_interval_bins() {
         let values = vec![0.0, 1.0, 2.0];
         let spacings = vec![0.5, 0.5];
-        let result = interval_spacings(&values, &spacings);
+        let result = interval_spacings(&values, &spacings, None);
         let expected = vec![0.0, 0.5, 1.0, 1.5, 2.0];
         assert_eq!(result, expected);
     }
@@ -20,7 +22,7 @@ mod tests {
     fn test_interval_bins_bad_angle() {
         let values = vec![0.0, 1.0, 2.0];
         let spacings = vec![0.3, 0.5];
-        interval_spacings(&values, &spacings);
+        interval_spacings(&values, &spacings, None);
     }
 
     #[test]
@@ -127,7 +129,11 @@ impl BinningScheme {
     }
 }
 
-pub fn interval_spacings(splits: &Vec<f32>, spacings: &Vec<f32>) -> Vec<f32> {
+pub fn interval_spacings(
+    splits: &[f32],
+    spacings: &[f32],
+    vals_to_ignore: Option<&[f32]>,
+) -> Vec<f32> {
     let num_values = splits.len();
     let mut values = Vec::new();
 
@@ -152,13 +158,26 @@ pub fn interval_spacings(splits: &Vec<f32>, spacings: &Vec<f32>) -> Vec<f32> {
         }
 
         for j in 0..=jmax {
+            let val = splits[i] + j as f32 * spacings[i];
+
             // Iterate over the number of values between the splits
             if i != num_values - 2 && j == jmax {
                 // skip the last value unless it is the last split
                 continue;
-            } else {
-                values.push(splits[i] + j as f32 * spacings[i]);
             }
+
+            // Skip values that match ignored values within tolerance
+            if let Some(ignore_vals) = vals_to_ignore {
+                if ignore_vals
+                    .iter()
+                    .any(|&ignore_val| (val - ignore_val).abs() < INTERVAL_IGNORE_TOLERANCE)
+                {
+                    println!("Note: interval binning angle {:?} will not be computed because the scattering plane is not well-defined this close to direct forwards/backwards scattering.",val);
+                    continue;
+                }
+            }
+
+            values.push(val);
         }
     }
 
@@ -171,8 +190,8 @@ pub fn interval_bins(
     phi_spacing: &Vec<f32>,
     phi_splits: &Vec<f32>,
 ) -> Vec<(f32, f32)> {
-    let thetas = interval_spacings(theta_splits, theta_spacing);
-    let phis = interval_spacings(phi_splits, phi_spacing);
+    let thetas = interval_spacings(theta_splits, theta_spacing, Some(&[0.0, 180.0]));
+    let phis = interval_spacings(phi_splits, phi_spacing, None);
 
     let mut bins = Vec::new();
     for theta in thetas.iter() {

@@ -36,6 +36,8 @@ pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
 pub const MIN_DISTORTION: f32 = 1e-5;
 /// Threshold for classification of direct forwards or backwards rays
 pub const DIRECT_THRESHOLD: f32 = 1e-4;
+/// Tolerance for value matching in interval binning
+pub const INTERVAL_IGNORE_TOLERANCE: f32 = 0.0001;
 
 // Default values for Python API (no config file dependencies)
 /// Default wavelength in geometry units (532nm green laser)
