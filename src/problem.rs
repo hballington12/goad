@@ -201,6 +201,59 @@ impl Problem {
         ((-kz).acos() * 180.0 / PI).abs() // compute outgoing theta
     }
 
+    /// Helper function to compute phi angle from beam propagation vector
+    fn compute_phi_from_beam(beam: &Beam) -> f32 {
+        let kx = beam.prop[0];
+        let ky = beam.prop[1];
+        let mut phi = ky.atan2(kx) * 180.0 / PI;
+        if phi < 0.0 {
+            phi += 360.0
+        }
+        phi
+    }
+
+    /// Helper function to apply amplitude matrix rotations
+    fn apply_amplitude_rotations(beam: &Beam, phi: f32) -> Matrix2<Complex<f32>> {
+        let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
+        let hc = Vector3::new(sin_phi, -cos_phi, 0.0);
+        let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
+
+        let prerotation = Field::rotation_matrix(
+            Vector3::x(),
+            Vector3::new(-sin_phi, cos_phi, 0.0),
+            -Vector3::z(),
+        )
+        .transpose();
+
+        rotation.map(Complex::from) * beam.field.ampl * prerotation.map(Complex::from)
+    }
+
+    /// Helper function to compute phase factor
+    fn compute_phase_factor(beam: &Beam) -> Complex<f32> {
+        let r_offset = -beam.face.data().midpoint.coords;
+        let path_difference = beam.prop.dot(&r_offset);
+        let bvsk = path_difference * beam.wavenumber();
+        Complex::cis(bvsk)
+    }
+
+    /// Helper function to compute solid angle
+    fn compute_solid_angle(theta_bin: &Bin, phi_bin: &Bin) -> f32 {
+        2.0 * (theta_bin.center).to_radians().sin().abs()
+            * (0.5 * theta_bin.width()).to_radians().sin()
+            * phi_bin.width().to_radians()
+    }
+
+    /// Helper function to compute final amplitude
+    fn compute_final_amplitude(
+        ampl: Matrix2<Complex<f32>>,
+        beam: &Beam,
+        solid_angle: f32,
+        scale: f32,
+        phase_factor: Complex<f32>,
+    ) -> Matrix2<Complex<f32>> {
+        ampl * Complex::new(beam.csa().sqrt() / scale / solid_angle.sqrt(), 0.0) * phase_factor
+    }
+
     fn go_outbeams(
         queue: &mut Vec<Beam>,
         binning: &BinningScheme,
@@ -237,7 +290,6 @@ impl Problem {
                     // Map to centered bins: bins are at spacing/2, 3*spacing/2, 5*spacing/2, etc.
                     let theta_spacing = 180.0 / (*num_theta as f32);
                     let n_theta = (theta / theta_spacing).floor().min((*num_theta - 1) as f32);
-                    let bin_angle_theta = theta_spacing * (n_theta + 0.5);
 
                     if n_theta as i32 >= *num_theta as i32 {
                         panic!(
@@ -246,91 +298,33 @@ impl Problem {
                         );
                     }
 
-                    // println!("prop.z = {}", kz);
-                    // println!("theta.abs() = {}", theta);
-                    // println!("bin integer is {}", n_theta);
-                    // println!("we think this should be closest to bin: {} deg", bin_angle_theta);
-
                     // phi
-                    // phi angle we can obtain from atan2 function
-                    let kx = beam.prop[0];
-                    let ky = beam.prop[1];
-                    let mut phi = ky.atan2(kx) * 180.0 / PI;
-                    // have to be slightly careful here, since all negative values should map: phi -> phi += 360
-                    if phi < 0.0 {
-                        phi += 360.0
-                    };
-
-                    // // Handle special cases where theta is very close to 0 or 180 degrees
-                    // let tol = DIRECT_THRESHOLD;
-                    // // let tol = 1e-2;
-                    // let phi = if bin_angle_theta < theta_spacing / 2.0 + tol
-                    //     || bin_angle_theta > 180.0 - theta_spacing / 2.0 - tol
-                    // {
-                    //     // Use a random phi value for forward/backward scattering (near poles)
-                    //     let mut rng = ::rand::rng();
-                    //     rng.random_range(0.0..360.0)
-                    // } else {
-                    //     phi
-                    // };
+                    let phi = Self::compute_phi_from_beam(beam);
 
                     // Map to centered bins
                     let phi_spacing = 360.0 / (*num_phi as f32);
                     let n_phi = (phi / phi_spacing).floor().min((*num_phi - 1) as f32);
-                    let _bin_angle_phi = phi_spacing * (n_phi + 0.5);
 
                     if n_phi as i32 >= *num_phi as i32 {
                         panic!("phi bin index {} exceeds num_phi {}", n_phi, num_phi);
                     }
 
-                    // println!("kx: {}, ky: {}", kx, ky);
-                    // println!("we think this is phi (range -180 to 180): {}", phi);
-                    // println!("we think this is phi (range 0 to 360): {}", phi);
-                    // println!("bin integer is {}", n_phi);
-                    // println!("we think this should be closest to bin: {} deg", _bin_angle_phi);
-
                     // so now we have the theta and phi values, need to map them onto the 1d array positions
                     let n = (n_theta as i32 * *num_phi as i32 + n_phi as i32) as usize;
 
-                    // we need to apply 2 rotations to the amplitude matrix
-                    // 1. rotate from the beam reference plane into the scattering plane
+                    // Apply amplitude rotations
+                    let ampl = Self::apply_amplitude_rotations(beam, phi);
 
-                    // step 1: get the vector perpendicular to the scattering plane
-                    let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
-                    let hc = Vector3::new(sin_phi, -cos_phi, 0.0); // perpendicular to scattering plane
-                    let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
+                    // Calculate phase factor
+                    let exp_factor = Self::compute_phase_factor(beam);
 
-                    // 2. prerotate the initial amplitude matrix to align with the scattering plane
-                    let prerotation = Field::rotation_matrix(
-                        Vector3::x(),
-                        Vector3::new(-sin_phi, cos_phi, 0.0),
-                        -Vector3::z(),
-                    )
-                    .transpose();
+                    // Get the actual bin and compute solid angle
+                    let (theta_bin, phi_bin) = &bins[n];
+                    let solid_angle = Self::compute_solid_angle(theta_bin, phi_bin);
 
-                    let ampl = rotation.map(Complex::from)
-                        * beam.field.ampl
-                        * prerotation.map(Complex::from);
-
-                    // phase calculation: account for distance to bin
-                    let r_offset = -beam.face.data().midpoint.coords;
-                    let path_difference = beam.prop.dot(&r_offset);
-                    let bvsk = path_difference * beam.wavenumber();
-                    let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
-
-                    // Or just do random phase
-                    // let mut rng = ::rand::rng();
-                    // let exp_factor = Complex::cis(rng.random::<f32>() * 2.0 * PI);
-
-                    // compute the solid angle of the outbin
-                    let solid_angle = 2.0
-                        * (bin_angle_theta).to_radians().sin().abs()
-                        * (0.5 * theta_spacing).to_radians().sin()
-                        * phi_spacing.to_radians();
-
-                    let ampl2 = ampl
-                        * Complex::new(beam.csa().sqrt() / scale / solid_angle.sqrt(), 0.0)
-                        * exp_factor;
+                    // Compute final amplitude
+                    let ampl2 =
+                        Self::compute_final_amplitude(ampl, beam, solid_angle, scale, exp_factor);
 
                     // either sum the far-field amplitude matrix and reduce to mueller later
                     total_ampl_far_field[n] += ampl2;
@@ -346,14 +340,7 @@ impl Problem {
 
                 for beam in queue.iter() {
                     let theta = Self::compute_theta_from_beam(beam);
-
-                    // Calculate phi angle
-                    let kx = beam.prop[0];
-                    let ky = beam.prop[1];
-                    let mut phi = ky.atan2(kx) * 180.0 / PI;
-                    if phi < 0.0 {
-                        phi += 360.0
-                    };
+                    let phi = Self::compute_phi_from_beam(beam);
 
                     // Find the corresponding bin in the bins array
                     let mut bin_idx = None;
@@ -373,42 +360,19 @@ impl Problem {
                         None => continue, // Couldn't find matching bin, skip
                     };
 
-                    // Apply rotations to the amplitude matrix (same as Simple case)
-                    let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
-                    let hc = Vector3::new(sin_phi, -cos_phi, 0.0);
-                    let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
+                    // Apply amplitude rotations
+                    let ampl = Self::apply_amplitude_rotations(beam, phi);
 
-                    let prerotation = Field::rotation_matrix(
-                        Vector3::x(),
-                        Vector3::new(-sin_phi, cos_phi, 0.0),
-                        -Vector3::z(),
-                    )
-                    .transpose();
+                    // Calculate phase factor
+                    let exp_factor = Self::compute_phase_factor(beam);
 
-                    let ampl = rotation.map(Complex::from)
-                        * beam.field.ampl
-                        * prerotation.map(Complex::from);
-
-                    // Phase calculation
-                    let r_offset = -beam.face.data().midpoint.coords;
-                    let path_difference = beam.prop.dot(&r_offset);
-                    let bvsk = path_difference * beam.wavenumber();
-                    let exp_factor = Complex::cis(bvsk);
-
-                    // // Or just do random phase
-                    // let mut rng = ::rand::rng();
-                    // let exp_factor = Complex::cis(rng.random::<f32>() * 2.0 * PI);
-
-                    // Compute solid angle using the bin's actual width
+                    // Get the actual bin and compute solid angle
                     let (theta_b, phi_b) = &bins[n];
-                    let solid_angle = 2.0
-                        * (theta_b.center).to_radians().sin().abs()
-                        * (0.5 * theta_b.width()).to_radians().sin()
-                        * phi_b.width().to_radians();
+                    let solid_angle = Self::compute_solid_angle(theta_b, phi_b);
 
-                    let ampl2 = ampl
-                        * Complex::new(beam.csa().sqrt() / scale / solid_angle.sqrt(), 0.0)
-                        * exp_factor;
+                    // Compute final amplitude
+                    let ampl2 =
+                        Self::compute_final_amplitude(ampl, beam, solid_angle, scale, exp_factor);
 
                     total_ampl_far_field[n] += ampl2;
                 }
