@@ -62,7 +62,7 @@ pub enum Scheme {
 }
 
 /// Angular binning scheme for scattering calculations.
-/// 
+///
 /// Defines how to discretize the scattering sphere into angular bins
 /// for Mueller matrix and amplitude computations. Supports simple
 /// regular grids, custom intervals, and arbitrary bin arrangements.
@@ -86,15 +86,15 @@ impl BinningScheme {
     fn simple(num_theta: usize, num_phi: usize) -> PyResult<Self> {
         if num_theta == 0 {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "num_theta must be greater than 0"
+                "num_theta must be greater than 0",
             ));
         }
         if num_phi == 0 {
             return Err(pyo3::exceptions::PyValueError::new_err(
-                "num_phi must be greater than 0"
+                "num_phi must be greater than 0",
             ));
         }
-        
+
         Ok(BinningScheme {
             scheme: Scheme::Simple { num_theta, num_phi },
         })

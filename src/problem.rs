@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::consts::{PI, SQRT_2};
 
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
@@ -201,6 +201,7 @@ impl Problem {
         // bins: &[(f32, f32)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         scale: f32,
+        mueller_out: &mut Array2<f32>,
     ) {
         // println!("doing somethinge with outbeams");
         // for each beam
@@ -229,8 +230,8 @@ impl Problem {
                     let kz = beam.prop[2]; // get the propagation z component
                     let theta = ((-kz).acos() * 180.0 / PI).abs(); // compute outgoing theta
                     let n_theta = (theta / 180.0 * (*num_theta as f32 - 1.0)).round(); // compute mapping to closest bin
-                    let _bin_spacing = 180.0 / (*num_theta as f32 - 1.0);
-                    let bin_angle_theta = _bin_spacing * n_theta;
+                    let _bin_theta_spacing = 180.0 / (*num_theta as f32 - 1.0);
+                    let bin_angle_theta = _bin_theta_spacing * n_theta;
 
                     if n_theta as i32 > *num_theta as i32 {
                         panic!("oh dear");
@@ -264,8 +265,8 @@ impl Problem {
                         };
 
                     let n_phi = (phi / 360.0 * (*num_phi as f32 - 1.0)).round();
-                    let _bin_spacing = 360.0 / (num_phi - 1) as f32;
-                    let _bin_angle_phi = _bin_spacing * n_phi;
+                    let _bin_phi_spacing = 360.0 / (num_phi - 1) as f32;
+                    let _bin_angle_phi = _bin_phi_spacing * n_phi;
 
                     if n_phi as i32 >= *num_phi as i32 {
                         panic!("oh dear");
@@ -372,12 +373,37 @@ impl Problem {
                     //     continue;
                     // }
 
+                    // compute the solid angle of the outbin
+                    let solid_angle = if (bin_angle_theta - 0.0).abs() < 0.1 {
+                        let a: f32 = 0.25;
+                        2.0 * a.to_radians().sin().abs() * a.to_radians().sin()
+                    } else if (bin_angle_theta - 180.0).abs() < 0.1 {
+                        let a: f32 = 179.75;
+                        2.0 * a.to_radians().sin().abs() * a.to_radians().sin()
+                    } else {
+                        2.0 * (bin_angle_theta).to_radians().sin().abs()
+                            * (0.5 * _bin_theta_spacing).to_radians().sin()
+                    };
+
+                    // * (0.5 * _bin_theta_spacing.to_radians()).sin();
+
                     // add the amplitude matrix to the correct far field bin
-                    total_ampl_far_field[n] +=
-                        ampl * Complex::new(beam.csa().sqrt(), 0.0) * exp_factor;
+                    // total_ampl_far_field[n] +=
+                    // ampl * Complex::new(beam.csa().sqrt(), 0.0) * exp_factor;
                     // * Complex::new(fac, 0.0)
                     // * Complex::new(beam.wavenumber() * beam.csa() / scale.powi(2), 0.0)
                     // * Complex::new(1.0 / scale.powi(2), 0.0)
+
+                    // for testing, just to do the mueller on beam by beam basis
+                    // let ampl2 = ampl * Complex::new(beam.csa().sqrt() / solid_angle.sqrt(), 0.0);
+                    let ampl2 = ampl * Complex::new(beam.csa().sqrt(), 0.0);
+                    // * exp_factor;
+
+                    let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
+                    // actually just add all mueller elements
+                    for i in 0..16 {
+                        mueller_out[(n, i)] += mueller[(0, i)] / solid_angle;
+                    }
                 }
                 // println!("bs power is: {:?}", bs_power);
             }
@@ -456,6 +482,7 @@ impl Problem {
             &self.settings.binning,
             &mut self.result.ampl_beam,
             self.settings.scale,
+            &mut self.result.mueller_beam,
         )
     }
     pub fn solve_far(&mut self) {
@@ -468,8 +495,9 @@ impl Problem {
         self.solve_near();
         self.solve_far();
         self.result.mueller = output::ampl_to_mueller(&self.result.bins, &self.result.ampl);
-        self.result.mueller_beam =
-            output::ampl_to_mueller(&self.result.bins, &self.result.ampl_beam);
+        println!("Note mueller beam claculated elsewhere!!!");
+        // self.result.mueller_beam =
+        // output::ampl_to_mueller(&self.result.bins, &self.result.ampl_beam);
         self.result.mueller_ext = output::ampl_to_mueller(&self.result.bins, &self.result.ampl_ext);
 
         // try compute 1d mueller
