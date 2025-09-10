@@ -9,6 +9,7 @@ use crate::{
     result::{self, Results},
     settings::{load_config, Settings},
 };
+use ::rand::Rng;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -203,7 +204,7 @@ impl Problem {
     fn go_outbeams(
         queue: &mut Vec<Beam>,
         binning: &BinningScheme,
-        // bins: &[(f32, f32)],
+        bins: &[(Bin, Bin)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         scale: f32,
         mueller_out: &mut Array2<f32>,
@@ -340,61 +341,77 @@ impl Problem {
                     // }
                 }
             }
-            Scheme::Interval {
-                thetas,
-                theta_spacings,
-                phis,
-                phi_spacings,
-            } => {
-                println!("scheme is interval!");
-
-                // Precompute theta bin edges for bounds checking
-                let theta_min = thetas[0] - theta_spacings[0] / 2.0;
-                let theta_max =
-                    thetas[thetas.len() - 1] + theta_spacings[theta_spacings.len() - 1] / 2.0;
-
-                println!("theta min: {:}, theta max: {:}", theta_min, theta_max);
+            Scheme::Interval { .. } => {
+                // println!("scheme is interval!");
 
                 for beam in queue.iter() {
                     let theta = Self::compute_theta_from_beam(beam);
 
-                    // Check if theta is within valid range
-                    if theta < theta_min || theta > theta_max {
-                        println!("Beam theta out of bounds: {}", theta);
-                        continue; // Skip beams outside the binning range
-                    }
+                    // Calculate phi angle
+                    let kx = beam.prop[0];
+                    let ky = beam.prop[1];
+                    let mut phi = ky.atan2(kx) * 180.0 / PI;
+                    if phi < 0.0 {
+                        phi += 360.0
+                    };
 
-                    // Find which interval contains this theta
-                    let mut theta_interval_idx = None;
-                    for i in 0..thetas.len() - 1 {
-                        if theta >= thetas[i] && theta < thetas[i + 1] {
-                            theta_interval_idx = Some(i);
+                    // Find the corresponding bin in the bins array
+                    let mut bin_idx = None;
+                    for (i, (theta_b, phi_b)) in bins.iter().enumerate() {
+                        if theta >= theta_b.min
+                            && theta < theta_b.max
+                            && phi >= phi_b.min
+                            && phi < phi_b.max
+                        {
+                            bin_idx = Some(i);
                             break;
                         }
                     }
 
-                    let theta_interval_idx = match theta_interval_idx {
+                    let n = match bin_idx {
                         Some(idx) => idx,
-                        None => continue, // Couldn't find interval, skip
+                        None => continue, // Couldn't find matching bin, skip
                     };
 
-                    // Find position within that interval
-                    let local_theta_offset = theta - thetas[theta_interval_idx];
-                    let local_theta_bin =
-                        (local_theta_offset / theta_spacings[theta_interval_idx]).floor() as usize;
+                    // Apply rotations to the amplitude matrix (same as Simple case)
+                    let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
+                    let hc = Vector3::new(sin_phi, -cos_phi, 0.0);
+                    let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
 
-                    // Calculate actual bin center for this theta
-                    let bin_center_theta = thetas[theta_interval_idx]
-                        + local_theta_bin as f32 * theta_spacings[theta_interval_idx]
-                        + theta_spacings[theta_interval_idx] / 2.0;
+                    let prerotation = Field::rotation_matrix(
+                        Vector3::x(),
+                        Vector3::new(-sin_phi, cos_phi, 0.0),
+                        -Vector3::z(),
+                    )
+                    .transpose();
 
-                    println!(
-                        "Theta: {:.2}°, Interval: {}, Local bin: {}, Bin center: {:.2}°",
-                        theta, theta_interval_idx, local_theta_bin, bin_center_theta
-                    );
+                    let ampl = rotation.map(Complex::from)
+                        * beam.field.ampl
+                        * prerotation.map(Complex::from);
+
+                    // Phase calculation
+                    let r_offset = -beam.face.data().midpoint.coords;
+                    let path_difference = beam.prop.dot(&r_offset);
+                    let bvsk = path_difference * beam.wavenumber();
+                    let exp_factor = Complex::cis(bvsk);
+
+                    // // Or just do random phase
+                    // let mut rng = ::rand::rng();
+                    // let exp_factor = Complex::cis(rng.random::<f32>() * 2.0 * PI);
+
+                    // Compute solid angle using the bin's actual width
+                    let (theta_b, phi_b) = &bins[n];
+                    let solid_angle = 2.0
+                        * (theta_b.center).to_radians().sin().abs()
+                        * (0.5 * theta_b.width()).to_radians().sin()
+                        * phi_b.width().to_radians();
+
+                    let ampl2 = ampl
+                        * Complex::new(beam.csa().sqrt() / scale / solid_angle.sqrt(), 0.0)
+                        * exp_factor;
+
+                    total_ampl_far_field[n] += ampl2;
                 }
-
-                todo!()
             }
             Scheme::Custom { bins, .. } => {
                 println!("scheme is custom!");
@@ -462,6 +479,7 @@ impl Problem {
         Self::go_outbeams(
             &mut self.out_beam_queue,
             &self.settings.binning,
+            &self.result.bins,
             &mut self.result.ampl_beam,
             self.settings.scale,
             &mut self.result.mueller_beam,
