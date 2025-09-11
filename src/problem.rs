@@ -195,23 +195,6 @@ impl Problem {
         }
     }
 
-    /// Helper function to compute theta angle from beam propagation vector
-    fn compute_theta_from_beam(beam: &Beam) -> f32 {
-        let kz = beam.prop[2]; // get the propagation z component
-        ((-kz).acos() * 180.0 / PI).abs() // compute outgoing theta
-    }
-
-    /// Helper function to compute phi angle from beam propagation vector
-    fn compute_phi_from_beam(beam: &Beam) -> f32 {
-        let kx = beam.prop[0];
-        let ky = beam.prop[1];
-        let mut phi = ky.atan2(kx) * 180.0 / PI;
-        if phi < 0.0 {
-            phi += 360.0
-        }
-        phi
-    }
-
     /// Helper function to apply amplitude matrix rotations
     fn apply_amplitude_rotations(beam: &Beam, phi: f32) -> Matrix2<Complex<f32>> {
         let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
@@ -237,10 +220,11 @@ impl Problem {
     }
 
     /// Helper function to compute solid angle
-    fn compute_solid_angle(theta_bin: &Bin, phi_bin: &Bin) -> f32 {
-        2.0 * (theta_bin.center).to_radians().sin().abs()
-            * (0.5 * theta_bin.width()).to_radians().sin()
-            * phi_bin.width().to_radians()
+    // fn compute_solid_angle(theta_bin: &Bin, phi_bin: &Bin) -> f32 {
+    fn compute_solid_angle(bin: &(Bin, Bin)) -> f32 {
+        2.0 * (bin.0.center).to_radians().sin().abs()
+            * (0.5 * bin.0.width()).to_radians().sin()
+            * bin.1.width().to_radians()
     }
 
     /// Helper function to compute final amplitude
@@ -262,55 +246,20 @@ impl Problem {
         scale: f32,
         mueller_out: &mut Array2<f32>,
     ) {
-        // println!("doing somethinge with outbeams");
-        // for each beam
-        // pop it
-        // then have a different method for each binning routine to determine the bin
-        // for uniform binning, can just use analytical form
-        // for interval binning, do something a bit more clever
-        // for custom binning, do manual checking (but aim to try to convert custom to uniform or interval on startup)
         match &binning.scheme {
             Scheme::Simple { num_theta, num_phi } => {
-                // println!("scheme is simple");
-                // for a simple scheme, we can just use the fact that the bins are on a square grid to bin the outgoing beams
-                // bins are just a linspace from 0 to 180 in theta with ntheta steps
-                // and linspace from 0 to 360 in phi with nphi steps
-                // ok so if outgoing direction is k, then the z component of k is like the cosine of the angle
-                // ie. -k_z = cos(theta)
-                // so theta is arccos(-k_z) * 180 / pi
-                // bin spacing is basically 180 / (ntheta - 1)
-                // ie ntheta = 5 -> spacing is 45 -> 0, 45, 90, 135, 180
-                // we require a mapping theta -> n, where n 0,1,2,3,4 ^
-                // surely we can just do 180 / theta, then round to nearest integer
-                // if let Some(beam) = queue.pop() {
+                let delta_theta = 180.0 / (*num_theta as f32);
+                let delta_phi = 360.0 / (*num_phi as f32);
                 for beam in queue.iter() {
-                    // theta
-                    let theta = Self::compute_theta_from_beam(beam);
+                    // compute beam scattering angles
+                    let (theta, phi) = beam.get_scattering_angles();
 
-                    // Map to centered bins: bins are at spacing/2, 3*spacing/2, 5*spacing/2, etc.
-                    let theta_spacing = 180.0 / (*num_theta as f32);
-                    let n_theta = (theta / theta_spacing).floor().min((*num_theta - 1) as f32);
-
-                    if n_theta as i32 >= *num_theta as i32 {
-                        panic!(
-                            "theta bin index {} exceeds num_theta {}",
-                            n_theta, num_theta
-                        );
-                    }
-
-                    // phi
-                    let phi = Self::compute_phi_from_beam(beam);
-
-                    // Map to centered bins
-                    let phi_spacing = 360.0 / (*num_phi as f32);
-                    let n_phi = (phi / phi_spacing).floor().min((*num_phi - 1) as f32);
-
-                    if n_phi as i32 >= *num_phi as i32 {
-                        panic!("phi bin index {} exceeds num_phi {}", n_phi, num_phi);
-                    }
-
-                    // so now we have the theta and phi values, need to map them onto the 1d array positions
-                    let n = (n_theta as i32 * *num_phi as i32 + n_phi as i32) as usize;
+                    // map scattering angles to the corresponding bin
+                    let n = get_n_simple(*num_theta, *num_phi, delta_theta, delta_phi, theta, phi);
+                    let n = match n {
+                        Some(index) => index,
+                        None => continue,
+                    };
 
                     // Apply amplitude rotations
                     let ampl = Self::apply_amplitude_rotations(beam, phi);
@@ -319,8 +268,7 @@ impl Problem {
                     let exp_factor = Self::compute_phase_factor(beam);
 
                     // Get the actual bin and compute solid angle
-                    let (theta_bin, phi_bin) = &bins[n];
-                    let solid_angle = Self::compute_solid_angle(theta_bin, phi_bin);
+                    let solid_angle = Self::compute_solid_angle(&bins[n]);
 
                     // Compute final amplitude
                     let ampl2 =
@@ -337,23 +285,10 @@ impl Problem {
             }
             Scheme::Interval { .. } => {
                 for beam in queue.iter() {
-                    let theta = Self::compute_theta_from_beam(beam);
-                    let phi = Self::compute_phi_from_beam(beam);
+                    let (theta, phi) = beam.get_scattering_angles();
 
-                    // Find the corresponding bin in the bins array
-                    let mut bin_idx = None;
-                    for (i, (theta_b, phi_b)) in bins.iter().enumerate() {
-                        if theta >= theta_b.min
-                            && theta < theta_b.max
-                            && phi >= phi_b.min
-                            && phi < phi_b.max
-                        {
-                            bin_idx = Some(i);
-                            break;
-                        }
-                    }
-
-                    let n = match bin_idx {
+                    let n = get_n_interval(bins, theta, phi);
+                    let n = match n {
                         Some(idx) => idx,
                         None => continue, // Couldn't find matching bin, skip
                     };
@@ -365,8 +300,7 @@ impl Problem {
                     let exp_factor = Self::compute_phase_factor(beam);
 
                     // Get the actual bin and compute solid angle
-                    let (theta_b, phi_b) = &bins[n];
-                    let solid_angle = Self::compute_solid_angle(theta_b, phi_b);
+                    let solid_angle = Self::compute_solid_angle(&bins[n]);
 
                     // Compute final amplitude
                     let ampl2 =
@@ -376,8 +310,7 @@ impl Problem {
                 }
             }
             Scheme::Custom { bins, .. } => {
-                println!("scheme is custom!");
-                todo!()
+                todo!("GO outbeam is not yet supported for custom binning.")
             }
         }
     }
@@ -731,6 +664,32 @@ impl Problem {
             panic!("Error rotating geometry: {}", error);
         }
     }
+}
+
+fn get_n_interval(bins: &[(Bin, Bin)], theta: f32, phi: f32) -> Option<usize> {
+    // Find the corresponding bin in the bins array
+    let mut bin_idx = None;
+    for (i, (theta_b, phi_b)) in bins.iter().enumerate() {
+        if theta >= theta_b.min && theta < theta_b.max && phi >= phi_b.min && phi < phi_b.max {
+            bin_idx = Some(i);
+            break;
+        }
+    }
+    bin_idx
+}
+
+// TODO: Move to bins.rs
+fn get_n_simple(
+    num_theta: usize,
+    num_phi: usize,
+    delta_theta: f32,
+    delta_phi: f32,
+    theta: f32,
+    phi: f32,
+) -> Option<usize> {
+    let n_theta = ((theta / delta_theta).floor() as usize).min(num_theta - 1);
+    let n_phi = ((phi / delta_phi).floor() as usize).min(num_phi - 1);
+    Some(n_theta * num_phi + n_phi)
 }
 
 /// Collects a 2d array as a list of lists.

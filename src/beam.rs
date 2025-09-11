@@ -300,6 +300,29 @@ impl Beam {
         }
         outputs
     }
+
+    /// Computes the polar scattering angle of a beam in degrees
+    fn get_polar_angle(&self) -> f32 {
+        ((-self.prop[2]).acos().to_degrees()).abs() // compute outgoing theta
+    }
+
+    /// Computes the azimuthal scattering angle of a beam in degrees. Returns a value in the range [0, 360)
+    fn get_azimuthal_angle(&self) -> f32 {
+        let kx = self.prop[0];
+        let ky = self.prop[1];
+        let mut phi = ky.atan2(kx).to_degrees();
+        if phi < 0.0 {
+            phi += 360.0
+        }
+        phi
+    }
+
+    /// Returns the polar and azimuthal scattering angles of a beam in degrees.
+    pub fn get_scattering_angles(&self) -> (f32, f32) {
+        let theta = self.get_polar_angle();
+        let phi = self.get_azimuthal_angle();
+        (theta, phi)
+    }
 }
 
 /// Returns a transmitted propagation vector, where `stt` is the sine of the angle of transmission.
