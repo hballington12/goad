@@ -246,72 +246,47 @@ impl Problem {
         scale: f32,
         mueller_out: &mut Array2<f32>,
     ) {
-        match &binning.scheme {
-            Scheme::Simple { num_theta, num_phi } => {
-                let delta_theta = 180.0 / (*num_theta as f32);
-                let delta_phi = 360.0 / (*num_phi as f32);
-                for beam in queue.iter() {
-                    // compute beam scattering angles
-                    let (theta, phi) = beam.get_scattering_angles();
+        for beam in queue.iter() {
+            // compute beam scattering angles
+            let (theta, phi) = beam.get_scattering_angles();
 
-                    // map scattering angles to the corresponding bin
-                    let n = get_n_simple(*num_theta, *num_phi, delta_theta, delta_phi, theta, phi);
-                    let n = match n {
-                        Some(index) => index,
-                        None => continue,
-                    };
-
-                    // Apply amplitude rotations
-                    let ampl = Self::apply_amplitude_rotations(beam, phi);
-
-                    // Calculate phase factor
-                    let exp_factor = Self::compute_phase_factor(beam);
-
-                    // Get the actual bin and compute solid angle
-                    let solid_angle = Self::compute_solid_angle(&bins[n]);
-
-                    // Compute final amplitude
-                    let ampl2 =
-                        Self::compute_final_amplitude(ampl, beam, solid_angle, scale, exp_factor);
-
-                    // either sum the far-field amplitude matrix and reduce to mueller later
-                    total_ampl_far_field[n] += ampl2;
-                    // or, just add mueller linearly
-                    // let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
-                    // for i in 0..16 {
-                    //     mueller_out[(n, i)] += mueller[(0, i)];
-                    // }
+            // map scattering angles to the corresponding bin
+            let n = match &binning.scheme {
+                Scheme::Simple { num_theta, num_phi } => {
+                    let delta_theta = 180.0 / (*num_theta as f32);
+                    let delta_phi = 360.0 / (*num_phi as f32);
+                    get_n_simple(*num_theta, *num_phi, delta_theta, delta_phi, theta, phi)
                 }
-            }
-            Scheme::Interval { .. } => {
-                for beam in queue.iter() {
-                    let (theta, phi) = beam.get_scattering_angles();
-
-                    let n = get_n_interval(bins, theta, phi);
-                    let n = match n {
-                        Some(idx) => idx,
-                        None => continue, // Couldn't find matching bin, skip
-                    };
-
-                    // Apply amplitude rotations
-                    let ampl = Self::apply_amplitude_rotations(beam, phi);
-
-                    // Calculate phase factor
-                    let exp_factor = Self::compute_phase_factor(beam);
-
-                    // Get the actual bin and compute solid angle
-                    let solid_angle = Self::compute_solid_angle(&bins[n]);
-
-                    // Compute final amplitude
-                    let ampl2 =
-                        Self::compute_final_amplitude(ampl, beam, solid_angle, scale, exp_factor);
-
-                    total_ampl_far_field[n] += ampl2;
+                Scheme::Interval { .. } => get_n_linear_search(bins, theta, phi),
+                Scheme::Custom { .. } => {
+                    todo!("GO outbeam is not yet supported for custom binning.")
                 }
-            }
-            Scheme::Custom { bins, .. } => {
-                todo!("GO outbeam is not yet supported for custom binning.")
-            }
+            };
+
+            let n = match n {
+                Some(index) => index,
+                None => continue,
+            };
+
+            // Apply amplitude rotations
+            let ampl = Self::apply_amplitude_rotations(beam, phi);
+
+            // Calculate phase factor
+            let exp_factor = Self::compute_phase_factor(beam);
+
+            // Get the actual bin and compute solid angle
+            let solid_angle = Self::compute_solid_angle(&bins[n]);
+
+            // Compute final amplitude
+            let ampl2 = Self::compute_final_amplitude(ampl, beam, solid_angle, scale, exp_factor);
+
+            // either sum the far-field amplitude matrix and reduce to mueller later
+            total_ampl_far_field[n] += ampl2;
+            // or, just add mueller linearly
+            // let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
+            // for i in 0..16 {
+            //     mueller_out[(n, i)] += mueller[(0, i)];
+            // }
         }
     }
 
@@ -666,7 +641,7 @@ impl Problem {
     }
 }
 
-fn get_n_interval(bins: &[(Bin, Bin)], theta: f32, phi: f32) -> Option<usize> {
+fn get_n_linear_search(bins: &[(Bin, Bin)], theta: f32, phi: f32) -> Option<usize> {
     // Find the corresponding bin in the bins array
     let mut bin_idx = None;
     for (i, (theta_b, phi_b)) in bins.iter().enumerate() {
