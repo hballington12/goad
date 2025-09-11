@@ -1,15 +1,13 @@
-use std::f32::consts::PI;
-
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, Bin, BinningScheme, Scheme},
+    diff::Mapping,
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
     result::{self, Results},
     settings::{load_config, Settings},
 };
-use ::rand::Rng;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
@@ -196,55 +194,13 @@ impl Problem {
     }
 
     /// Helper function to apply amplitude matrix rotations
-    fn apply_amplitude_rotations(beam: &Beam, phi: f32) -> Matrix2<Complex<f32>> {
-        let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
-        let hc = Vector3::new(sin_phi, -cos_phi, 0.0);
-        let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
-
-        let prerotation = Field::rotation_matrix(
-            Vector3::x(),
-            Vector3::new(-sin_phi, cos_phi, 0.0),
-            -Vector3::z(),
-        )
-        .transpose();
-
-        rotation.map(Complex::from) * beam.field.ampl * prerotation.map(Complex::from)
-    }
-
-    /// Helper function to compute phase factor
-    fn compute_phase_factor(beam: &Beam) -> Complex<f32> {
-        let r_offset = -beam.face.data().midpoint.coords;
-        let path_difference = beam.prop.dot(&r_offset);
-        let bvsk = path_difference * beam.wavenumber();
-        Complex::cis(bvsk)
-    }
-
-    /// Helper function to compute solid angle
-    // fn compute_solid_angle(theta_bin: &Bin, phi_bin: &Bin) -> f32 {
-    fn compute_solid_angle(bin: &(Bin, Bin)) -> f32 {
-        2.0 * (bin.0.center).to_radians().sin().abs()
-            * (0.5 * bin.0.width()).to_radians().sin()
-            * bin.1.width().to_radians()
-    }
-
-    /// Helper function to compute final amplitude
-    fn compute_final_amplitude(
-        ampl: Matrix2<Complex<f32>>,
-        beam: &Beam,
-        solid_angle: f32,
-        scale: f32,
-        phase_factor: Complex<f32>,
-    ) -> Matrix2<Complex<f32>> {
-        ampl * Complex::new(beam.csa().sqrt() / scale / solid_angle.sqrt(), 0.0) * phase_factor
-    }
-
     fn go_outbeams(
         beams: &mut Vec<Beam>,
         binning: &BinningScheme,
         bins: &[(Bin, Bin)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         scale: f32,
-        mueller_out: &mut Array2<f32>,
+        _mueller_out: &mut Array2<f32>,
     ) {
         // Precompute theta and phi spacings if using Simple binning
         let (delta_theta, delta_phi) = match binning.scheme {
@@ -361,23 +317,25 @@ impl Problem {
     }
 
     pub fn solve_far_outbeams(&mut self) {
-        let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
-                                                   // Self::diffract_outbeams(
-                                                   //     &mut self.out_beam_queue,
-                                                   //     &self.result.bins,
-                                                   //     &mut self.result.ampl_beam,
-                                                   //     fov_factor,
-                                                   // );
-
-        // Do some geometric optics here instead
-        Self::go_outbeams(
-            &mut self.out_beam_queue,
-            &self.settings.binning,
-            &self.result.bins,
-            &mut self.result.ampl_beam,
-            self.settings.scale,
-            &mut self.result.mueller_beam,
-        )
+        match self.settings.mapping {
+            Mapping::GeometricOptics => Self::go_outbeams(
+                &mut self.out_beam_queue,
+                &self.settings.binning,
+                &self.result.bins,
+                &mut self.result.ampl_beam,
+                self.settings.scale,
+                &mut self.result.mueller_beam,
+            ),
+            Mapping::ApertureDiffraction => {
+                let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
+                Self::diffract_outbeams(
+                    &mut self.out_beam_queue,
+                    &self.result.bins,
+                    &mut self.result.ampl_beam,
+                    fov_factor,
+                );
+            }
+        }
     }
     pub fn solve_far(&mut self) {
         self.solve_far_ext_diff();

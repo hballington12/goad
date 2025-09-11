@@ -4,7 +4,7 @@ use std::f32::consts::PI;
 use geo::Coord;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
-use nalgebra::{Complex, ComplexField, Matrix2, Point3, Vector3};
+use nalgebra::{Complex, Matrix2, Point3, Vector3};
 
 use crate::{
     bins::Bin,

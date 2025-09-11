@@ -1,9 +1,9 @@
 # Configuration file for the GOAD simulation.
 # This file contains the default values for all config options.
-# The user should not modify this config, but may make a local copy of it 
+# The user should not modify this config, but may make a local copy of it
 #   in this directory called `local.toml`.
 # If `local.toml` exists, GOAD will use the values specified in that file.
-# Environment variables can be set to override values in this file. 
+# Environment variables can be set to override values in this file.
 #   eg. `export GOAD_WAVELENGTH=632.8`
 # Configuration options specified on the command line will override values given
 #   in this file, as well as those set by environment variables.
@@ -33,6 +33,7 @@ directory = "goad_run"                # Directory for output files
 # seed = 6                              # Seed (comment out for no seed)
 # geom_scale = [1.0, 1.0, 1.0] # Scale factor for the geometry
 # fov_factor = 1.0                      # Field of view factor for diffraction (comment out for no truncation)
+mapping = "ApertureDiffraction" # ApertureDiffraction / GeometricOptics
 
 [binning] # Binning configuration
 
@@ -50,12 +51,12 @@ directory = "goad_run"                # Directory for output files
 
             # [binning.scheme.Custom] # Custom binning with specified [theta,phi] angular bins
             #     bins = [[0, 0], [0, 40], [20, 180]] # custom bins, unless a file is specified below
-            #     # file = "custom_bins.toml"           # File containing custom bins, relative to working directory 
+            #     # file = "custom_bins.toml"           # File containing custom bins, relative to working directory
             #     # see the template directory for an example custom_bins.toml file
 
 
 [orientation] # Orientation configuration
-    euler_convention = "ZYZ" # Euler angle convention 
+    euler_convention = "ZYZ" # Euler angle convention
 
     [orientation.scheme] # Uncomment the desired orientation scheme below
 

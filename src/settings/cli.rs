@@ -3,6 +3,7 @@ use nalgebra::Complex;
 use std::path::PathBuf;
 
 use crate::bins::{self, BinningScheme};
+use crate::diff::Mapping;
 use crate::orientation::{Euler, EulerConvention, Orientation, Scheme};
 use crate::settings::{Settings, DEFAULT_EULER_ORDER};
 
@@ -33,6 +34,10 @@ pub struct CliArgs {
     /// Set the field of view truncation factor for diffraction of beams.
     #[arg(long)]
     pub fov_factor: Option<f32>,
+
+    /// Set the near to far field mapping method.
+    #[arg(long, value_enum)]
+    pub mapping: Option<Mapping>,
 }
 
 /// Beam propagation parameters
@@ -334,6 +339,9 @@ pub fn update_settings_from_cli(config: &mut Settings) {
 
     if let Some(fov_factor) = args.fov_factor {
         config.fov_factor = Some(fov_factor);
+    }
+    if let Some(mapping) = args.mapping {
+        config.mapping = mapping;
     }
 
     if let Some(geom_scale) = args.material.geom_scale {

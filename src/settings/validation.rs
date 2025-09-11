@@ -1,4 +1,4 @@
-use super::{Settings, constants};
+use super::Settings;
 
 pub fn validate_config(config: &mut Settings) {
     assert!(

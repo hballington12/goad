@@ -9,6 +9,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 
 use crate::bins;
+use crate::diff::Mapping;
 use crate::orientation::Euler;
 use crate::{bins::BinningScheme, orientation::*};
 
@@ -41,6 +42,7 @@ pub struct Settings {
     pub directory: PathBuf,
     #[serde(default = "constants::default_fov_factor")]
     pub fov_factor: Option<f32>,
+    pub mapping: Mapping,
 }
 
 #[pymethods]
@@ -61,7 +63,8 @@ impl Settings {
         max_rec = DEFAULT_MAX_REC,
         max_tir = DEFAULT_MAX_TIR,
         scale = 1.0,
-        directory = "goad_run"
+        directory = "goad_run",
+        mapping = DEFAULT_MAPPING,
     ))]
     fn py_new(
         geom_path: String,
@@ -79,6 +82,7 @@ impl Settings {
         max_tir: i32,
         scale: f32,
         directory: &str,
+        mapping: Mapping,
     ) -> PyResult<Self> {
         // Input validation
         if wavelength <= 0.0 {
@@ -149,6 +153,7 @@ impl Settings {
             geom_scale: None,
             directory: PathBuf::from(directory),
             fov_factor: None,
+            mapping,
         };
 
         validation::validate_config(&mut settings);

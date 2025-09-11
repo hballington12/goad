@@ -18,7 +18,7 @@ impl Bin {
             center: (min + max) / 2.0,
         }
     }
-    
+
     /// Create a bin from center and width
     pub fn from_center_width(center: f32, width: f32) -> Self {
         Bin {
@@ -27,7 +27,7 @@ impl Bin {
             center,
         }
     }
-    
+
     /// Get the width of the bin
     pub fn width(&self) -> f32 {
         self.max - self.min
@@ -155,10 +155,7 @@ impl BinningScheme {
     }
 }
 
-pub fn interval_spacings(
-    splits: &[f32],
-    spacings: &[f32],
-) -> Vec<f32> {
+pub fn interval_spacings(splits: &[f32], spacings: &[f32]) -> Vec<f32> {
     let num_values = splits.len();
     let mut values = Vec::new();
 
@@ -209,11 +206,13 @@ pub fn interval_bins(
     let phi_edges = interval_spacings(phi_splits, phi_spacing);
 
     // Convert edges to bins
-    let theta_bins: Vec<Bin> = theta_edges.windows(2)
+    let theta_bins: Vec<Bin> = theta_edges
+        .windows(2)
         .map(|edges| Bin::new(edges[0], edges[1]))
         .collect();
-    
-    let phi_bins: Vec<Bin> = phi_edges.windows(2)
+
+    let phi_bins: Vec<Bin> = phi_edges
+        .windows(2)
         .map(|edges| Bin::new(edges[0], edges[1]))
         .collect();
 
@@ -266,7 +265,7 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<(Bin, Bin)> {
             phis,
             phi_spacings,
         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
-        Scheme::Custom { bins, file } => {
+        Scheme::Custom { .. } => {
             // TODO: Custom bins need to specify edges or we need to infer them
             todo!("Custom bins with Bin struct not yet implemented")
             // // println!("Loading custom bins from file: {:?}", file);
@@ -298,5 +297,5 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<(Bin, Bin)> {
 // Define a struct to match the TOML structure
 #[derive(Debug, Deserialize)]
 struct CustomBins {
-    bins: Vec<(f32, f32)>,
+    _bins: Vec<(f32, f32)>,
 }

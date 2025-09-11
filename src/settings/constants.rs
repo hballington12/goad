@@ -1,5 +1,5 @@
+use crate::{diff::Mapping, orientation::EulerConvention};
 use std::path::PathBuf;
-use crate::orientation::EulerConvention;
 
 // ================================
 // Computational/Physical Constants
@@ -58,6 +58,8 @@ pub const DEFAULT_THETA_BINS: usize = 181;
 pub const DEFAULT_PHI_BINS: usize = 181;
 /// Default Euler angle order for the discrete orientation scheme.
 pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
+/// Default mapping from near to far-field
+pub const DEFAULT_MAPPING: Mapping = Mapping::ApertureDiffraction;
 
 // =================
 // Default Functions

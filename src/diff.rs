@@ -1,10 +1,21 @@
+use clap::ValueEnum;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
 use ndarray::Array2;
+use pyo3::prelude::*;
+use serde::Deserialize;
 use std::f32::consts::PI;
 
 use crate::bins::Bin;
 use crate::field::Field;
 use crate::{geom, settings};
+
+/// Enum representing different mapping methods from near to far field.
+#[pyclass]
+#[derive(Debug, Clone, Deserialize, PartialEq, ValueEnum)]
+pub enum Mapping {
+    GeometricOptics,
+    ApertureDiffraction,
+}
 
 // Diffraction. Face must be convex.
 pub fn diffraction(
