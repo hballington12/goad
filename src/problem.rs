@@ -336,8 +336,6 @@ impl Problem {
                 }
             }
             Scheme::Interval { .. } => {
-                // println!("scheme is interval!");
-
                 for beam in queue.iter() {
                     let theta = Self::compute_theta_from_beam(beam);
                     let phi = Self::compute_phi_from_beam(beam);
