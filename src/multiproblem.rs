@@ -179,31 +179,20 @@ impl MultiProblem {
     /// Combines two Results objects by adding their fields
     fn reduce_results(&self, mut acc: Results, item: Results) -> Results {
         // Add Mueller matrix elements
-        for (a, i) in acc.mueller.iter_mut().zip(item.mueller.iter()) {
+        for (a, i) in acc.mueller.iter_mut().zip(item.mueller.into_iter()) {
             *a += i;
         }
 
-        // Add powers
-        acc.powers += item.powers;
-
-        // // Add amplitude matrices if they exist
-        // for (a, i) in acc.ampl.iter_mut().zip(item.ampl.iter()) {
-        //     *a += i;
-        // }
-
-        // for (a, i) in acc.ampl_beam.iter_mut().zip(item.ampl_beam.iter()) {
-        //     *a += i;
-        // }
-
-        // for (a, i) in acc.ampl_ext.iter_mut().zip(item.ampl_ext.iter()) {
-        //     *a += i;
-        // }
-
-        for (a, i) in acc.mueller_beam.iter_mut().zip(item.mueller_beam.iter()) {
+        // Add Mueller matrix elements for beam
+        for (a, i) in acc
+            .mueller_beam
+            .iter_mut()
+            .zip(item.mueller_beam.into_iter())
+        {
             *a += i;
         }
 
-        for (a, i) in acc.mueller_ext.iter_mut().zip(item.mueller_ext.iter()) {
+        for (a, i) in acc.mueller_ext.iter_mut().zip(item.mueller_ext.into_iter()) {
             *a += i;
         }
 

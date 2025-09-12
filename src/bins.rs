@@ -1,18 +1,25 @@
 use pyo3::prelude::*;
 use serde::Deserialize;
 
-/// Represents an angular bin with edges and center
+/// Represents a solid angle bin with theta and phi bins
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Bin {
-    pub min: f32,    // minimum edge of the bin
-    pub max: f32,    // maximum edge of the bin
-    pub center: f32, // center of the bin
+pub struct SolidAngleBin {
+    pub theta: AngleBin,
+    pub phi: AngleBin,
 }
 
-impl Bin {
+/// Represents an angular bin with edges and center. Fields: `min`, `max`, `center`
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AngleBin {
+    pub min: f32,    // min edge
+    pub max: f32,    // max edge
+    pub center: f32, // center
+}
+
+impl AngleBin {
     /// Create a new bin from edges
     pub fn new(min: f32, max: f32) -> Self {
-        Bin {
+        AngleBin {
             min,
             max,
             center: (min + max) / 2.0,
@@ -21,7 +28,7 @@ impl Bin {
 
     /// Create a bin from center and width
     pub fn from_center_width(center: f32, width: f32) -> Self {
-        Bin {
+        AngleBin {
             min: center - width / 2.0,
             max: center + width / 2.0,
             center,
@@ -200,20 +207,20 @@ pub fn interval_bins(
     theta_splits: &Vec<f32>,
     phi_spacing: &Vec<f32>,
     phi_splits: &Vec<f32>,
-) -> Vec<(Bin, Bin)> {
+) -> Vec<(AngleBin, AngleBin)> {
     // Get edge positions
     let theta_edges = interval_spacings(theta_splits, theta_spacing);
     let phi_edges = interval_spacings(phi_splits, phi_spacing);
 
     // Convert edges to bins
-    let theta_bins: Vec<Bin> = theta_edges
+    let theta_bins: Vec<AngleBin> = theta_edges
         .windows(2)
-        .map(|edges| Bin::new(edges[0], edges[1]))
+        .map(|edges| AngleBin::new(edges[0], edges[1]))
         .collect();
 
-    let phi_bins: Vec<Bin> = phi_edges
+    let phi_bins: Vec<AngleBin> = phi_edges
         .windows(2)
-        .map(|edges| Bin::new(edges[0], edges[1]))
+        .map(|edges| AngleBin::new(edges[0], edges[1]))
         .collect();
 
     // Create all combinations
@@ -228,24 +235,24 @@ pub fn interval_bins(
 }
 
 /// Generate theta and phi bin combinations
-pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(Bin, Bin)> {
+pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(AngleBin, AngleBin)> {
     // Create theta bins
     let dtheta = 180.0 / (num_theta as f32);
-    let theta_bins: Vec<Bin> = (0..num_theta)
+    let theta_bins: Vec<AngleBin> = (0..num_theta)
         .map(|i| {
             let min = i as f32 * dtheta;
             let max = (i + 1) as f32 * dtheta;
-            Bin::new(min, max)
+            AngleBin::new(min, max)
         })
         .collect();
 
     // Create phi bins
     let dphi = 360.0 / (num_phi as f32);
-    let phi_bins: Vec<Bin> = (0..num_phi)
+    let phi_bins: Vec<AngleBin> = (0..num_phi)
         .map(|i| {
             let min = i as f32 * dphi;
             let max = (i + 1) as f32 * dphi;
-            Bin::new(min, max)
+            AngleBin::new(min, max)
         })
         .collect();
 
@@ -256,7 +263,7 @@ pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<(Bin, Bin)> {
         .collect()
 }
 
-pub fn generate_bins(bin_type: &Scheme) -> Vec<(Bin, Bin)> {
+pub fn generate_bins(bin_type: &Scheme) -> Vec<(AngleBin, AngleBin)> {
     match bin_type {
         Scheme::Simple { num_theta, num_phi } => simple_bins(*num_theta, *num_phi),
         Scheme::Interval {

@@ -7,8 +7,8 @@ use anyhow::Result;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2};
 
-use crate::bins::Bin;
-use crate::result::Results;
+use crate::bins::AngleBin;
+use crate::result::{Mueller, Results};
 
 #[cfg(test)]
 mod tests {
@@ -44,7 +44,6 @@ mod tests {
         let expected = vec![1.0, 1.2, 2.0, 2.01, 3.0];
         assert_eq!(arr, expected);
     }
-
 }
 
 pub fn integrate_trapezoidal<F>(x: &Array1<f32>, y: &Array1<f32>, transform: F) -> f32
@@ -66,7 +65,6 @@ where
 
     sum
 }
-
 
 /// Write the 1d Mueller matrix to a file against the theta and phi bins
 pub fn write_mueller_1d(
@@ -96,8 +94,8 @@ pub fn write_mueller_1d(
 
 /// Write the Mueller matrix to a file against the theta and phi bins
 pub fn write_mueller(
-    bins: &[(Bin, Bin)],
-    mueller: &Array2<f32>,
+    bins: &[(AngleBin, AngleBin)],
+    muellers: &[Mueller],
     suffix: &str,
     output_dir: &Path,
 ) -> Result<()> {
@@ -108,11 +106,11 @@ pub fn write_mueller(
     let mut writer = BufWriter::new(file);
 
     // Iterate over the array and write data to the file
-    for (index, row) in mueller.outer_iter().enumerate() {
+    for (index, mueller) in muellers.iter().enumerate() {
         let (theta_bin, phi_bin) = bins[index];
         write!(writer, "{} {} ", theta_bin.center, phi_bin.center)?;
-        for value in row.iter() {
-            write!(writer, "{} ", value)?;
+        for element in mueller.to_vec().into_iter() {
+            write!(writer, "{} ", element)?;
         }
         writeln!(writer)?;
     }
@@ -233,7 +231,7 @@ fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
 }
 
 pub fn ampl_to_mueller(
-    theta_phi_combinations: &[(Bin, Bin)],
+    theta_phi_combinations: &[(AngleBin, AngleBin)],
     ampl_cs: &[Matrix2<Complex<f32>>],
 ) -> Array2<f32> {
     let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));

@@ -1,6 +1,9 @@
 use std::f32::consts::PI;
+use std::ops::Add;
+use std::ops::AddAssign;
 
-use crate::bins::Bin;
+use crate::bins::AngleBin;
+use crate::bins::SolidAngleBin;
 use crate::output;
 use crate::params::Params;
 use crate::powers::Powers;
@@ -13,8 +16,96 @@ use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2, Axis};
 use pyo3::prelude::*;
 
+/// A 2D far-field scattering result.
+#[derive(Debug, Clone)]
+pub struct ScattResult {
+    bin: SolidAngleBin,
+    ampl: Matrix2<Complex<f32>>,
+    ampl_beam: Matrix2<Complex<f32>>,
+    ampl_ext: Matrix2<Complex<f32>>,
+}
+
+/// A mueller matrix
+#[derive(Debug, Clone, Default)]
+pub struct Mueller {
+    pub s11: f32,
+    pub s12: f32,
+    pub s13: f32,
+    pub s14: f32,
+    pub s21: f32,
+    pub s22: f32,
+    pub s23: f32,
+    pub s24: f32,
+    pub s31: f32,
+    pub s32: f32,
+    pub s33: f32,
+    pub s34: f32,
+    pub s41: f32,
+    pub s42: f32,
+    pub s43: f32,
+    pub s44: f32,
+}
+
+impl Mueller {
+    /// Returns the Mueller matrix as a vector of its elements.
+    pub fn to_vec(&self) -> Vec<f32> {
+        vec![
+            self.s11, self.s12, self.s13, self.s14, self.s21, self.s22, self.s23, self.s24,
+            self.s31, self.s32, self.s33, self.s34, self.s41, self.s42, self.s43, self.s44,
+        ]
+    }
+}
+
+impl Add for Mueller {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            s11: self.s11 + other.s11,
+            s12: self.s12 + other.s12,
+            s13: self.s13 + other.s13,
+            s14: self.s14 + other.s14,
+            s21: self.s21 + other.s21,
+            s22: self.s22 + other.s22,
+            s23: self.s23 + other.s23,
+            s24: self.s24 + other.s24,
+            s31: self.s31 + other.s31,
+            s32: self.s32 + other.s32,
+            s33: self.s33 + other.s33,
+            s34: self.s34 + other.s34,
+            s41: self.s41 + other.s41,
+            s42: self.s42 + other.s42,
+            s43: self.s43 + other.s43,
+            s44: self.s44 + other.s44,
+        }
+    }
+}
+
+impl AddAssign for Mueller {
+    fn add_assign(&mut self, other: Self) {
+        *self = Self {
+            s11: self.s11 + other.s11,
+            s12: self.s12 + other.s12,
+            s13: self.s13 + other.s13,
+            s14: self.s14 + other.s14,
+            s21: self.s21 + other.s21,
+            s22: self.s22 + other.s22,
+            s23: self.s23 + other.s23,
+            s24: self.s24 + other.s24,
+            s31: self.s31 + other.s31,
+            s32: self.s32 + other.s32,
+            s33: self.s33 + other.s33,
+            s34: self.s34 + other.s34,
+            s41: self.s41 + other.s41,
+            s42: self.s42 + other.s42,
+            s43: self.s43 + other.s43,
+            s44: self.s44 + other.s44,
+        };
+    }
+}
+
 /// Complete results from a GOAD light scattering simulation.
-/// 
+///
 /// Contains all computed scattering data including Mueller matrices,
 /// amplitude matrices, power distributions, and derived parameters.
 /// Supports both 2D angular distributions and 1D integrated results.
@@ -22,26 +113,26 @@ use pyo3::prelude::*;
 #[derive(Debug, Clone)]
 pub struct Results {
     pub powers: Powers,
-    pub bins: Vec<(Bin, Bin)>,
-    pub mueller: Array2<f32>,
-    pub mueller_beam: Array2<f32>,
-    pub mueller_ext: Array2<f32>,
+    pub bins: Vec<(AngleBin, AngleBin)>,
+    pub mueller: Vec<Mueller>,
+    pub mueller_beam: Vec<Mueller>,
+    pub mueller_ext: Vec<Mueller>,
     pub ampl: Vec<Matrix2<Complex<f32>>>,
     pub ampl_beam: Vec<Matrix2<Complex<f32>>>,
     pub ampl_ext: Vec<Matrix2<Complex<f32>>>,
     pub bins_1d: Option<Vec<f32>>,
-    pub mueller_1d: Option<Array2<f32>>,
-    pub mueller_1d_beam: Option<Array2<f32>>,
-    pub mueller_1d_ext: Option<Array2<f32>>,
+    pub mueller_1d: Option<Vec<Mueller>>,
+    pub mueller_1d_beam: Option<Vec<Mueller>>,
+    pub mueller_1d_ext: Option<Vec<Mueller>>,
     pub params: Params,
 }
 
 impl Results {
     /// Creates a new `Result` with empty mueller and amplitude matrix
-    pub fn new_empty(bins: &[(Bin, Bin)]) -> Self {
-        let mueller = Array2::<f32>::zeros((bins.len(), 16));
-        let mueller_beam = mueller.clone();
-        let mueller_ext = mueller.clone();
+    pub fn new_empty(bins: &[(AngleBin, AngleBin)]) -> Self {
+        let mueller = Vec::with_capacity(bins.len());
+        let mueller_beam = Vec::with_capacity(bins.len());
+        let mueller_ext = Vec::with_capacity(bins.len());
         let ampl = vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
         let ampl_beam = ampl.clone();
         let ampl_ext = ampl.clone();
@@ -262,14 +353,14 @@ impl Results {
 /// Returns a tuple of the theta bins and the 1D Mueller matrix
 /// NOTE: Assumes phi is ordered
 pub fn try_mueller_to_1d(
-    bins: &[(Bin, Bin)],
-    mueller: &Array2<f32>,
-) -> Result<(Vec<f32>, Array2<f32>)> {
+    bins: &[(AngleBin, AngleBin)],
+    mueller: &[Mueller],
+) -> Result<(Vec<f32>, Vec<Mueller>)> {
     // Check that the mueller matrix and bins are the same length
-    if mueller.len_of(Axis(0)) != bins.len() {
+    if mueller.len() != bins.len() {
         return Err(anyhow!(
             "Mueller matrix and bins must have the same length. Got {} and {}",
-            mueller.len_of(Axis(0)),
+            mueller.len(),
             bins.len()
         ));
     }

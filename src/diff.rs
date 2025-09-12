@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use serde::Deserialize;
 use std::f32::consts::PI;
 
-use crate::bins::Bin;
+use crate::bins::AngleBin;
 use crate::field::Field;
 use crate::{geom, settings};
 
@@ -23,7 +23,7 @@ pub fn diffraction(
     mut ampl: Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
-    theta_phi_combinations: &[(Bin, Bin)],
+    theta_phi_combinations: &[(AngleBin, AngleBin)],
     wavenumber: f32,
     fov_factor: Option<f32>,
 ) -> Vec<Matrix2<Complex<f32>>> {

@@ -7,7 +7,7 @@ use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 
 use crate::{
-    bins::Bin,
+    bins::AngleBin,
     clip::Clipping,
     diff,
     field::Field,
@@ -630,7 +630,7 @@ impl Beam {
 
     pub fn diffract(
         &self,
-        theta_phi_combinations: &[(Bin, Bin)],
+        theta_phi_combinations: &[(AngleBin, AngleBin)],
         fov_factor: Option<f32>,
     ) -> Vec<Matrix2<Complex<f32>>> {
         match &self.face {

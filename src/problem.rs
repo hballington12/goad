@@ -1,11 +1,11 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins::{generate_bins, Bin, BinningScheme, Scheme},
+    bins::{generate_bins, AngleBin, BinningScheme, Scheme},
     diff::Mapping,
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
-    result::{self, Results},
+    result::{self, Mueller, Results},
     settings::{load_config, Settings},
 };
 #[cfg(feature = "macroquad")]
@@ -197,7 +197,7 @@ impl Problem {
     fn go_outbeams(
         beams: &mut Vec<Beam>,
         binning: &BinningScheme,
-        bins: &[(Bin, Bin)],
+        bins: &[(AngleBin, AngleBin)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         scale: f32,
         _mueller_out: &mut Array2<f32>,
@@ -272,7 +272,7 @@ impl Problem {
 
     fn diffract_outbeams(
         queue: &mut Vec<Beam>,
-        bins: &[(Bin, Bin)],
+        bins: &[(AngleBin, AngleBin)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         fov_factor: Option<f32>,
     ) {
@@ -624,7 +624,7 @@ impl Problem {
 }
 
 // TODO: move to bins.rs
-fn get_solid_angle(bin: &(Bin, Bin)) -> f32 {
+fn get_solid_angle(bin: &(AngleBin, AngleBin)) -> f32 {
     2.0 * (bin.0.center).to_radians().sin().abs()
         * (0.5 * bin.0.width()).to_radians().sin()
         * bin.1.width().to_radians()
@@ -654,7 +654,7 @@ fn get_mapping_rotations(beam: &Beam, phi: f32) -> (Matrix2<Complex<f32>>, Matri
     (rotation.map(Complex::from), prerotation.map(Complex::from))
 }
 
-fn get_n_linear_search(bins: &[(Bin, Bin)], theta: f32, phi: f32) -> Option<usize> {
+fn get_n_linear_search(bins: &[(AngleBin, AngleBin)], theta: f32, phi: f32) -> Option<usize> {
     // Find the corresponding bin in the bins array
     let mut bin_idx = None;
     for (i, (theta_b, phi_b)) in bins.iter().enumerate() {
@@ -682,14 +682,10 @@ fn get_n_simple(
 
 /// Collects a 2d array as a list of lists.
 /// There is probably already a function for this in ndarray.
-pub fn collect_mueller(array2: &Array2<f32>) -> Vec<Vec<f32>> {
+pub fn collect_mueller(muellers: &[Mueller]) -> Vec<Vec<f32>> {
     let mut mueller_list = Vec::new();
-    for row in array2.outer_iter() {
-        let mut row_list = Vec::new();
-        for val in row.iter() {
-            row_list.push(*val);
-        }
-        mueller_list.push(row_list);
+    for mueller in muellers.iter() {
+        mueller_list.push(mueller.to_vec());
     }
     mueller_list
 }
