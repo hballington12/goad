@@ -200,7 +200,6 @@ impl Problem {
         bins: &[(AngleBin, AngleBin)],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         scale: f32,
-        _mueller_out: &mut Array2<f32>,
     ) {
         // Precompute theta and phi spacings if using Simple binning
         let (delta_theta, delta_phi) = match binning.scheme {
@@ -324,7 +323,6 @@ impl Problem {
                 &self.result.bins,
                 &mut self.result.ampl_beam,
                 self.settings.scale,
-                &mut self.result.mueller_beam,
             ),
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
@@ -346,10 +344,9 @@ impl Problem {
     pub fn solve(&mut self) {
         self.solve_near();
         self.solve_far();
-        self.result.mueller = output::ampl_to_mueller(&self.result.bins, &self.result.ampl);
-        self.result.mueller_beam =
-            output::ampl_to_mueller(&self.result.bins, &self.result.ampl_beam);
-        self.result.mueller_ext = output::ampl_to_mueller(&self.result.bins, &self.result.ampl_ext);
+        self.result.mueller = output::ampl_to_mueller(&self.result.ampl);
+        self.result.mueller_beam = output::ampl_to_mueller(&self.result.ampl_beam);
+        self.result.mueller_ext = output::ampl_to_mueller(&self.result.ampl_ext);
 
         // try compute 1d mueller
         match self.settings.binning.scheme {

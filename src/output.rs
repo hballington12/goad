@@ -69,7 +69,7 @@ where
 /// Write the 1d Mueller matrix to a file against the theta and phi bins
 pub fn write_mueller_1d(
     bins: &[f32],
-    mueller_1d: &Array2<f32>,
+    mueller_1d: &[Mueller],
     suffix: &str,
     output_dir: &Path,
 ) -> Result<()> {
@@ -80,11 +80,11 @@ pub fn write_mueller_1d(
     let mut writer = BufWriter::new(file);
 
     // Iterate over the array and write data to the file
-    for (index, row) in mueller_1d.outer_iter().enumerate() {
+    for (index, mueller) in mueller_1d.iter().enumerate() {
         let theta = bins[index];
         write!(writer, "{} ", theta)?;
-        for value in row.iter() {
-            write!(writer, "{} ", value)?;
+        for element in mueller.to_vec().into_iter() {
+            write!(writer, "{} ", element)?;
         }
         writeln!(writer)?;
     }
@@ -230,60 +230,63 @@ fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
     }
 }
 
-pub fn ampl_to_mueller(
-    theta_phi_combinations: &[(AngleBin, AngleBin)],
-    ampl_cs: &[Matrix2<Complex<f32>>],
-) -> Array2<f32> {
-    let mut mueller = Array2::<f32>::zeros((theta_phi_combinations.len(), 16));
+pub fn ampl_to_mueller(ampl_cs: &[Matrix2<Complex<f32>>]) -> Vec<Mueller> {
+    let mut muellers = Vec::new();
 
-    for (index, amplc) in ampl_cs.iter().enumerate() {
-        mueller[[index, 0]] = (Complex::new(0.5, 0.0)
-            * (amplc[(0, 0)] * amplc[(0, 0)].conj()
-                + amplc[(0, 1)] * amplc[(0, 1)].conj()
-                + amplc[(1, 0)] * amplc[(1, 0)].conj()
-                + amplc[(1, 1)] * amplc[(1, 1)].conj()))
-        .re;
-
-        mueller[[index, 1]] = (Complex::new(0.5, 0.0)
-            * (amplc[(0, 0)] * amplc[(0, 0)].conj() - amplc[(0, 1)] * amplc[(0, 1)].conj()
-                + amplc[(1, 0)] * amplc[(1, 0)].conj()
-                - amplc[(1, 1)] * amplc[(1, 1)].conj()))
-        .re;
-        mueller[[index, 2]] =
-            (amplc[(0, 0)] * amplc[(0, 1)].conj() + amplc[(1, 1)] * amplc[(1, 0)].conj()).re;
-        mueller[[index, 3]] =
-            (amplc[(0, 0)] * amplc[(0, 1)].conj() - amplc[(1, 1)] * amplc[(1, 0)].conj()).im;
-        mueller[[index, 4]] = 0.5
-            * (amplc[(0, 0)] * amplc[(0, 0)].conj() + amplc[(0, 1)] * amplc[(0, 1)].conj()
-                - amplc[(1, 0)] * amplc[(1, 0)].conj()
-                - amplc[(1, 1)] * amplc[(1, 1)].conj())
+    for ampl in ampl_cs.into_iter() {
+        let s11 = 0.5
+            * (ampl[(0, 0)] * ampl[(0, 0)].conj()
+                + ampl[(0, 1)] * ampl[(0, 1)].conj()
+                + ampl[(1, 0)] * ampl[(1, 0)].conj()
+                + ampl[(1, 1)] * ampl[(1, 1)].conj())
             .re;
-        mueller[[index, 5]] = 0.5
-            * (amplc[(0, 0)] * amplc[(0, 0)].conj()
-                - amplc[(0, 1)] * amplc[(0, 1)].conj()
-                - amplc[(1, 0)] * amplc[(1, 0)].conj()
-                + amplc[(1, 1)] * amplc[(1, 1)].conj())
+        let s12 = 0.5
+            * (ampl[(0, 0)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(0, 1)].conj()
+                + ampl[(1, 0)] * ampl[(1, 0)].conj()
+                - ampl[(1, 1)] * ampl[(1, 1)].conj())
             .re;
-        mueller[[index, 6]] =
-            (amplc[(0, 0)] * amplc[(0, 1)].conj() - amplc[(1, 1)] * amplc[(1, 0)].conj()).re;
-        mueller[[index, 7]] =
-            (amplc[(0, 0)] * amplc[(0, 1)].conj() + amplc[(1, 1)] * amplc[(1, 0)].conj()).im;
-        mueller[[index, 8]] =
-            (amplc[(0, 0)] * amplc[(1, 0)].conj() + amplc[(1, 1)] * amplc[(0, 1)].conj()).re;
-        mueller[[index, 9]] =
-            (amplc[(0, 0)] * amplc[(1, 0)].conj() - amplc[(1, 1)] * amplc[(0, 1)].conj()).re;
-        mueller[[index, 10]] =
-            (amplc[(0, 0)] * amplc[(1, 1)].conj() + amplc[(0, 1)] * amplc[(1, 0)].conj()).re;
-        mueller[[index, 11]] =
-            (amplc[(0, 0)] * amplc[(1, 1)].conj() + amplc[(0, 1)] * amplc[(1, 0)].conj()).im;
-        mueller[[index, 12]] =
-            (amplc[(1, 0)] * amplc[(0, 0)].conj() + amplc[(1, 1)] * amplc[(0, 1)].conj()).im;
-        mueller[[index, 13]] =
-            (amplc[(1, 0)] * amplc[(0, 0)].conj() - amplc[(1, 1)] * amplc[(0, 1)].conj()).im;
-        mueller[[index, 14]] =
-            (amplc[(1, 1)] * amplc[(0, 0)].conj() - amplc[(0, 1)] * amplc[(1, 0)].conj()).im;
-        mueller[[index, 15]] =
-            (amplc[(1, 1)] * amplc[(0, 0)].conj() - amplc[(0, 1)] * amplc[(1, 0)].conj()).re;
+        let s13 = (ampl[(0, 0)] * ampl[(0, 1)].conj() + ampl[(1, 1)] * ampl[(1, 0)].conj()).re;
+        let s14 = (ampl[(0, 0)] * ampl[(0, 1)].conj() - ampl[(1, 1)] * ampl[(1, 0)].conj()).im;
+        let s21 = 0.5
+            * (ampl[(0, 0)] * ampl[(0, 0)].conj() + ampl[(0, 1)] * ampl[(0, 1)].conj()
+                - ampl[(1, 0)] * ampl[(1, 0)].conj()
+                - ampl[(1, 1)] * ampl[(1, 1)].conj())
+            .re;
+        let s22 = 0.5
+            * (ampl[(0, 0)] * ampl[(0, 0)].conj()
+                - ampl[(0, 1)] * ampl[(0, 1)].conj()
+                - ampl[(1, 0)] * ampl[(1, 0)].conj()
+                + ampl[(1, 1)] * ampl[(1, 1)].conj())
+            .re;
+        let s23 = (ampl[(0, 0)] * ampl[(0, 1)].conj() - ampl[(1, 1)] * ampl[(1, 0)].conj()).re;
+        let s24 = (ampl[(0, 0)] * ampl[(0, 1)].conj() + ampl[(1, 1)] * ampl[(1, 0)].conj()).im;
+        let s31 = (ampl[(0, 0)] * ampl[(1, 0)].conj() + ampl[(1, 1)] * ampl[(0, 1)].conj()).re;
+        let s32 = (ampl[(0, 0)] * ampl[(1, 0)].conj() - ampl[(1, 1)] * ampl[(0, 1)].conj()).re;
+        let s33 = (ampl[(0, 0)] * ampl[(1, 1)].conj() + ampl[(0, 1)] * ampl[(1, 0)].conj()).re;
+        let s34 = (ampl[(0, 0)] * ampl[(1, 1)].conj() + ampl[(0, 1)] * ampl[(1, 0)].conj()).im;
+        let s41 = (ampl[(1, 0)] * ampl[(0, 0)].conj() + ampl[(1, 1)] * ampl[(0, 1)].conj()).im;
+        let s42 = (ampl[(1, 0)] * ampl[(0, 0)].conj() - ampl[(1, 1)] * ampl[(0, 1)].conj()).im;
+        let s43 = (ampl[(1, 1)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(1, 0)].conj()).im;
+        let s44 = (ampl[(1, 1)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(1, 0)].conj()).re;
+        let mueller = Mueller {
+            s11,
+            s12,
+            s13,
+            s14,
+            s21,
+            s22,
+            s23,
+            s24,
+            s31,
+            s32,
+            s33,
+            s34,
+            s41,
+            s42,
+            s43,
+            s44,
+        };
+        muellers.push(mueller);
     }
-    mueller
+    muellers
 }

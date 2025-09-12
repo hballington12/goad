@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 use std::ops::Add;
 use std::ops::AddAssign;
+use std::ops::DivAssign;
 
 use crate::bins::AngleBin;
 use crate::bins::SolidAngleBin;
@@ -47,6 +48,28 @@ pub struct Mueller {
 }
 
 impl Mueller {
+    /// Creates a blank Mueller matrix.
+    pub fn new_empty() -> Self {
+        Self {
+            s11: 0.0,
+            s12: 0.0,
+            s13: 0.0,
+            s14: 0.0,
+            s21: 0.0,
+            s22: 0.0,
+            s23: 0.0,
+            s24: 0.0,
+            s31: 0.0,
+            s32: 0.0,
+            s33: 0.0,
+            s34: 0.0,
+            s41: 0.0,
+            s42: 0.0,
+            s43: 0.0,
+            s44: 0.0,
+        }
+    }
+
     /// Returns the Mueller matrix as a vector of its elements.
     pub fn to_vec(&self) -> Vec<f32> {
         vec![
@@ -101,6 +124,27 @@ impl AddAssign for Mueller {
             s43: self.s43 + other.s43,
             s44: self.s44 + other.s44,
         };
+    }
+}
+
+impl DivAssign<f32> for Mueller {
+    fn div_assign(&mut self, fac: f32) {
+        self.s11 /= fac;
+        self.s12 /= fac;
+        self.s13 /= fac;
+        self.s14 /= fac;
+        self.s21 /= fac;
+        self.s22 /= fac;
+        self.s23 /= fac;
+        self.s24 /= fac;
+        self.s31 /= fac;
+        self.s32 /= fac;
+        self.s33 /= fac;
+        self.s34 /= fac;
+        self.s41 /= fac;
+        self.s42 /= fac;
+        self.s43 /= fac;
+        self.s44 /= fac;
     }
 }
 
@@ -365,106 +409,109 @@ pub fn try_mueller_to_1d(
         ));
     }
 
-    // Create indices and sort them by corresponding theta values
-    let mueller = mueller.to_owned();
-    let mut bins = bins.to_owned();
-    let mut indices: Vec<usize> = (0..bins.len()).collect();
-    indices.sort_by(|&i, &j| bins[i].0.center.partial_cmp(&bins[j].0.center).unwrap());
+    // // Create indices and sort them by corresponding theta values
+    // let mueller = mueller.to_owned();
+    // let mut bins = bins.to_owned();
+    // let mut indices: Vec<usize> = (0..bins.len()).collect();
+    // indices.sort_by(|&i, &j| bins[i].0.center.partial_cmp(&bins[j].0.center).unwrap());
 
-    // Sort bins according to the sorted indices
-    bins = indices.iter().map(|&i| bins[i]).collect();
+    // // Sort bins according to the sorted indices
+    // bins = indices.iter().map(|&i| bins[i]).collect();
 
-    // Create a new sorted mueller matrix using the same indices
-    let mut sorted_mueller = Array2::<f32>::zeros(mueller.dim());
-    for (new_idx, &old_idx) in indices.iter().enumerate() {
-        sorted_mueller
-            .slice_mut(s![new_idx, ..])
-            .assign(&mueller.slice(s![old_idx, ..]));
-    }
+    // // Create a new sorted mueller matrix using the same indices
+    // let mut sorted_mueller = Array2::<f32>::zeros(mueller.dim());
+    // for (new_idx, &old_idx) in indices.iter().enumerate() {
+    //     sorted_mueller
+    //         .slice_mut(s![new_idx, ..])
+    //         .assign(&mueller.slice(s![old_idx, ..]));
+    // }
 
-    // zip the bins and mueller matrix
-    let combined: Vec<_> = bins
-        .iter()
-        .zip(mueller.outer_iter())
-        .map(|(bin, row)| (*bin, row.to_owned()))
-        .collect();
+    // // zip the bins and mueller matrix
+    // let combined: Vec<_> = bins
+    //     .iter()
+    //     .zip(mueller.outer_iter())
+    //     .map(|(bin, row)| (*bin, row.to_owned()))
+    //     .collect();
 
-    // group the combined Vec by theta center
-    let grouped: Vec<Vec<_>> = combined
-        .into_iter()
-        .chunk_by(|((theta_bin, _), _)| theta_bin.center)
-        .into_iter()
-        .map(|(_, group)| group.map(|x| x).collect())
-        .collect();
+    // // group the combined Vec by theta center
+    // let grouped: Vec<Vec<_>> = combined
+    //     .into_iter()
+    //     .chunk_by(|((theta_bin, _), _)| theta_bin.center)
+    //     .into_iter()
+    //     .map(|(_, group)| group.map(|x| x).collect())
+    //     .collect();
 
-    let mut thetas = Vec::new();
-    let mut mueller_1d = Array2::<f32>::zeros((grouped.len(), 16));
+    // let mut thetas = Vec::new();
+    // let mut mueller_1d = Array2::<f32>::zeros((grouped.len(), 16));
 
-    // loop over vectors at each theta
-    for (i, muellers) in grouped.iter().enumerate() {
-        // Unzip the theta, phi, and mueller values
-        let thetas_phi: Vec<_> = muellers
-            .iter()
-            .map(|((theta_bin, phi_bin), _)| (theta_bin.center, phi_bin.center))
-            .collect();
-        let mueller_phi: Vec<_> = muellers.iter().map(|(_, mueller)| mueller).collect();
-        let mut mueller_1d_row = Array1::<f32>::zeros(16);
+    // // loop over vectors at each theta
+    // for (i, muellers) in grouped.iter().enumerate() {
+    //     // Unzip the theta, phi, and mueller values
+    //     let thetas_phi: Vec<_> = muellers
+    //         .iter()
+    //         .map(|((theta_bin, phi_bin), _)| (theta_bin.center, phi_bin.center))
+    //         .collect();
+    //     let mueller_phi: Vec<_> = muellers.iter().map(|(_, mueller)| mueller).collect();
+    //     let mut mueller_1d_row = Array1::<f32>::zeros(16);
 
-        // loop over the mueller values at each phi
-        for j in 0..16 {
-            // Create 1D arrays for x and y, where x is phi and y is 1 of the 16 mueller values
-            let y = Array1::from(mueller_phi.iter().map(|row| row[j]).collect::<Vec<_>>());
-            let phi_values: Vec<_> = thetas_phi.iter().map(|(_, phi)| phi.to_radians()).collect();
+    //     // loop over the mueller values at each phi
+    //     for j in 0..16 {
+    //         // Create 1D arrays for x and y, where x is phi and y is 1 of the 16 mueller values
+    //         let y = Array1::from(mueller_phi.iter().map(|row| row[j]).collect::<Vec<_>>());
+    //         let phi_values: Vec<_> = thetas_phi.iter().map(|(_, phi)| phi.to_radians()).collect();
 
-            // Check if phi values are sorted in ascending order (probably dont need this)
-            for i in 1..phi_values.len() {
-                if phi_values[i] < phi_values[i - 1] {
-                    return Err(anyhow!(
-                        "Phi values must be sorted in ascending order for integration"
-                    ));
-                }
-            }
+    //         // Check if phi values are sorted in ascending order (probably dont need this)
+    //         for i in 1..phi_values.len() {
+    //             if phi_values[i] < phi_values[i - 1] {
+    //                 return Err(anyhow!(
+    //                     "Phi values must be sorted in ascending order for integration"
+    //                 ));
+    //             }
+    //         }
 
-            let x = Array1::from(phi_values);
-            mueller_1d_row[j] = output::integrate_trapezoidal(&x, &y, |_, y| y);
-            // integrate over phi
-        }
+    //         let x = Array1::from(phi_values);
+    //         mueller_1d_row[j] = output::integrate_trapezoidal(&x, &y, |_, y| y);
+    //         // integrate over phi
+    //     }
 
-        // Assign the theta and mueller values to the final arrays
-        thetas.push(thetas_phi[0].0);
-        mueller_1d
-            .slice_mut(s![i, ..])
-            .assign(&mueller_1d_row.slice(s![..]));
-    }
+    //     // Assign the theta and mueller values to the final arrays
+    //     thetas.push(thetas_phi[0].0);
+    //     mueller_1d
+    //         .slice_mut(s![i, ..])
+    //         .assign(&mueller_1d_row.slice(s![..]));
+    // }
+    !todo!();
 
-    Ok((thetas, mueller_1d))
+    // Ok((thetas, mueller_1d))
 }
 
 /// Integrate the first mueller element over theta to get the asymmetry parameter
-pub fn compute_asymmetry(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32, scatt: f32) -> f32 {
+pub fn compute_asymmetry(theta: &[f32], mueller_1d: &[Mueller], waveno: f32, scatt: f32) -> f32 {
     // get first column of mueller matrix
-    let y = mueller_1d.slice(s![.., 0]).to_owned();
+    let y = mueller_1d.into_iter().map(|m| m.s11).collect::<Vec<f32>>();
 
     let x = Array1::from(theta.iter().map(|&t| t.to_radians()).collect::<Vec<f32>>());
 
     // integrate p11 sin(theta) cos(theta) / scatt cross / k^2
-    let asymmetry = output::integrate_trapezoidal(&x, &y, |x, y| {
-        x.sin() * x.cos() * y / scatt / waveno.powi(2)
-    });
+    // let asymmetry = output::integrate_trapezoidal(&x, &y, |x, y| {
+    //     x.sin() * x.cos() * y / scatt / waveno.powi(2)
+    // });
+    !todo!();
 
-    asymmetry
+    // asymmetry
 }
 
 /// Integrate the first mueller element over theta to get the scattering cross section
-pub fn compute_scat_cross(theta: &[f32], mueller_1d: &Array2<f32>, waveno: f32) -> f32 {
+pub fn compute_scat_cross(theta: &[f32], mueller_1d: &[Mueller], waveno: f32) -> f32 {
     // get first column of mueller matrix
-    let y = mueller_1d.slice(s![.., 0]).to_owned();
+    let y = mueller_1d.into_iter().map(|m| m.s11).collect::<Vec<f32>>();
 
     // convert theta values from degrees to radians for integration
     let x = Array1::from(theta.iter().map(|&t| t.to_radians()).collect::<Vec<f32>>());
 
     // integrate p11 sin(theta) / k^2
-    let scat_cross = output::integrate_trapezoidal(&x, &y, |x, y| x.sin() * y / waveno.powi(2));
+    // let scat_cross = output::integrate_trapezoidal(&x, &y, |x, y| x.sin() * y / waveno.powi(2));
+    !todo!();
 
-    scat_cross
+    // scat_cross
 }

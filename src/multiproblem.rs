@@ -216,22 +216,16 @@ impl MultiProblem {
             *ampl /= Complex::new(num_orientations, 0.0);
         }
 
-        for mut row in self.result.mueller.outer_iter_mut() {
-            for val in row.iter_mut() {
-                *val /= num_orientations;
-            }
+        for mueller in self.result.mueller.iter_mut() {
+            *mueller /= num_orientations;
         }
 
-        for mut row in self.result.mueller_beam.outer_iter_mut() {
-            for val in row.iter_mut() {
-                *val /= num_orientations;
-            }
+        for mueller in self.result.mueller_beam.iter_mut() {
+            *mueller /= num_orientations;
         }
 
-        for mut row in self.result.mueller_ext.outer_iter_mut() {
-            for val in row.iter_mut() {
-                *val /= num_orientations;
-            }
+        for mueller in self.result.mueller_ext.iter_mut() {
+            *mueller /= num_orientations;
         }
     }
 
