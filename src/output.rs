@@ -7,7 +7,7 @@ use anyhow::Result;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2};
 
-use crate::bins::AngleBin;
+use crate::bins::{AngleBin, SolidAngleBin};
 use crate::result::{Mueller, Results};
 
 #[cfg(test)]
@@ -94,8 +94,8 @@ pub fn write_mueller_1d(
 
 /// Write the Mueller matrix to a file against the theta and phi bins
 pub fn write_mueller(
-    bins: &[(AngleBin, AngleBin)],
-    muellers: &[Mueller],
+    bins: &[SolidAngleBin],
+    muellers: &[&Mueller],
     suffix: &str,
     output_dir: &Path,
 ) -> Result<()> {
@@ -107,8 +107,8 @@ pub fn write_mueller(
 
     // Iterate over the array and write data to the file
     for (index, mueller) in muellers.iter().enumerate() {
-        let (theta_bin, phi_bin) = bins[index];
-        write!(writer, "{} {} ", theta_bin.center, phi_bin.center)?;
+        let bin = bins[index];
+        write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
         for element in mueller.to_vec().into_iter() {
             write!(writer, "{} ", element)?;
         }
@@ -210,7 +210,7 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     // Write binning information
     writeln!(writer, "\n# Simulation Information")?;
     writeln!(writer, "# ---------------------")?;
-    writeln!(writer, "Number of bins: {}", result.bins.len())?;
+    writeln!(writer, "Number of bins: {}", result.bins().len())?;
     if let Some(bins_1d) = &result.bins_1d {
         writeln!(writer, "Number of 1D bins: {}", bins_1d.len())?;
     }
@@ -228,65 +228,4 @@ fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
         }
         None => Ok(PathBuf::from(file_name)),
     }
-}
-
-pub fn ampl_to_mueller(ampl_cs: &[Matrix2<Complex<f32>>]) -> Vec<Mueller> {
-    let mut muellers = Vec::new();
-
-    for ampl in ampl_cs.into_iter() {
-        let s11 = 0.5
-            * (ampl[(0, 0)] * ampl[(0, 0)].conj()
-                + ampl[(0, 1)] * ampl[(0, 1)].conj()
-                + ampl[(1, 0)] * ampl[(1, 0)].conj()
-                + ampl[(1, 1)] * ampl[(1, 1)].conj())
-            .re;
-        let s12 = 0.5
-            * (ampl[(0, 0)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(0, 1)].conj()
-                + ampl[(1, 0)] * ampl[(1, 0)].conj()
-                - ampl[(1, 1)] * ampl[(1, 1)].conj())
-            .re;
-        let s13 = (ampl[(0, 0)] * ampl[(0, 1)].conj() + ampl[(1, 1)] * ampl[(1, 0)].conj()).re;
-        let s14 = (ampl[(0, 0)] * ampl[(0, 1)].conj() - ampl[(1, 1)] * ampl[(1, 0)].conj()).im;
-        let s21 = 0.5
-            * (ampl[(0, 0)] * ampl[(0, 0)].conj() + ampl[(0, 1)] * ampl[(0, 1)].conj()
-                - ampl[(1, 0)] * ampl[(1, 0)].conj()
-                - ampl[(1, 1)] * ampl[(1, 1)].conj())
-            .re;
-        let s22 = 0.5
-            * (ampl[(0, 0)] * ampl[(0, 0)].conj()
-                - ampl[(0, 1)] * ampl[(0, 1)].conj()
-                - ampl[(1, 0)] * ampl[(1, 0)].conj()
-                + ampl[(1, 1)] * ampl[(1, 1)].conj())
-            .re;
-        let s23 = (ampl[(0, 0)] * ampl[(0, 1)].conj() - ampl[(1, 1)] * ampl[(1, 0)].conj()).re;
-        let s24 = (ampl[(0, 0)] * ampl[(0, 1)].conj() + ampl[(1, 1)] * ampl[(1, 0)].conj()).im;
-        let s31 = (ampl[(0, 0)] * ampl[(1, 0)].conj() + ampl[(1, 1)] * ampl[(0, 1)].conj()).re;
-        let s32 = (ampl[(0, 0)] * ampl[(1, 0)].conj() - ampl[(1, 1)] * ampl[(0, 1)].conj()).re;
-        let s33 = (ampl[(0, 0)] * ampl[(1, 1)].conj() + ampl[(0, 1)] * ampl[(1, 0)].conj()).re;
-        let s34 = (ampl[(0, 0)] * ampl[(1, 1)].conj() + ampl[(0, 1)] * ampl[(1, 0)].conj()).im;
-        let s41 = (ampl[(1, 0)] * ampl[(0, 0)].conj() + ampl[(1, 1)] * ampl[(0, 1)].conj()).im;
-        let s42 = (ampl[(1, 0)] * ampl[(0, 0)].conj() - ampl[(1, 1)] * ampl[(0, 1)].conj()).im;
-        let s43 = (ampl[(1, 1)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(1, 0)].conj()).im;
-        let s44 = (ampl[(1, 1)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(1, 0)].conj()).re;
-        let mueller = Mueller {
-            s11,
-            s12,
-            s13,
-            s14,
-            s21,
-            s22,
-            s23,
-            s24,
-            s31,
-            s32,
-            s33,
-            s34,
-            s41,
-            s42,
-            s43,
-            s44,
-        };
-        muellers.push(mueller);
-    }
-    muellers
 }

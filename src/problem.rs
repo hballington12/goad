@@ -144,7 +144,7 @@ impl Problem {
         self.beam_queue.clear();
         self.out_beam_queue.clear();
         self.ext_diff_beam_queue.clear();
-        self.result = Results::new_empty(&self.result.bins);
+        self.result = Results::new_empty(&self.result.bins());
         self.geom.clone_from(&self.base_geom);
     }
 

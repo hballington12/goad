@@ -1,12 +1,14 @@
 // use std::time::Instant;
 
+use std::collections::HashMap;
+
 use crate::{
     bins::{generate_bins, Scheme},
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
     problem::{self, Problem},
-    result::{self, Results},
+    result::{self, Ampl, Results},
     settings::Settings,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -82,7 +84,14 @@ impl MultiProblem {
 
     /// Resets a `MultiOrientProblem` to its initial state.
     pub fn reset(&mut self) {
-        self.result = Results::new_empty(&self.result.bins);
+        self.result = Results::new_empty(
+            &self
+                .result
+                .scatt_result
+                .iter()
+                .map(|f| f.bin)
+                .collect::<Vec<_>>(),
+        );
         self.regenerate_orientations();
     }
 
@@ -121,7 +130,15 @@ impl MultiProblem {
                 problem.result
             })
             .reduce(
-                || Results::new_empty(&self.result.bins),
+                || {
+                    let bins = &self
+                        .result
+                        .scatt_result
+                        .iter()
+                        .map(|a| a.bin)
+                        .collect::<Vec<_>>();
+                    Results::new_empty(bins)
+                },
                 |accum, item| self.reduce_results(accum, item),
             );
 
@@ -179,21 +196,19 @@ impl MultiProblem {
     /// Combines two Results objects by adding their fields
     fn reduce_results(&self, mut acc: Results, item: Results) -> Results {
         // Add Mueller matrix elements
-        for (a, i) in acc.mueller.iter_mut().zip(item.mueller.into_iter()) {
-            *a += i;
-        }
-
-        // Add Mueller matrix elements for beam
         for (a, i) in acc
-            .mueller_beam
+            .scatt_result
             .iter_mut()
-            .zip(item.mueller_beam.into_iter())
+            .zip(item.scatt_result.into_iter())
         {
-            *a += i;
-        }
-
-        for (a, i) in acc.mueller_ext.iter_mut().zip(item.mueller_ext.into_iter()) {
-            *a += i;
+            for mueller_acc in a.muellers.iter_mut() {
+                for mueller_inc in i.muellers.iter() {
+                    // Filter by class (GO, Ext Diff, Total)
+                    if mueller_acc.meta.class == mueller_inc.meta.class {
+                        mueller_acc.matrix += mueller_inc.matrix;
+                    }
+                }
+            }
         }
 
         acc
@@ -201,54 +216,61 @@ impl MultiProblem {
 
     /// Normalizes the results by dividing by the number of orientations
     fn normalize_results(&mut self, num_orientations: f32) {
-        // Normalize powers
+        // Powers
         self.result.powers /= num_orientations;
-
-        for ampl in self.result.ampl.iter_mut() {
-            *ampl /= Complex::new(num_orientations, 0.0);
-        }
-
-        for ampl in self.result.ampl_beam.iter_mut() {
-            *ampl /= Complex::new(num_orientations, 0.0);
-        }
-
-        for ampl in self.result.ampl_ext.iter_mut() {
-            *ampl /= Complex::new(num_orientations, 0.0);
-        }
-
-        for mueller in self.result.mueller.iter_mut() {
-            *mueller /= num_orientations;
-        }
-
-        for mueller in self.result.mueller_beam.iter_mut() {
-            *mueller /= num_orientations;
-        }
-
-        for mueller in self.result.mueller_ext.iter_mut() {
-            *mueller /= num_orientations;
+        for field in self.result.scatt_result.iter_mut() {
+            let div_r = num_orientations;
+            let div_c = Complex::new(num_orientations, 0.0);
+            // Amplitude Matrices
+            for ampl in field.ampls.iter_mut() {
+                ampl.matrix /= div_c;
+            }
+            // Mueller Matrices
+            for mueller in field.muellers.iter_mut() {
+                mueller.matrix /= div_r;
+            }
         }
     }
 
     pub fn writeup(&self) {
-        // Write 2D mueller matrices
-        let _ = output::write_mueller(
-            &self.result.bins,
-            &self.result.mueller,
-            "",
-            &self.settings.directory,
-        );
-        let _ = output::write_mueller(
-            &self.result.bins,
-            &self.result.mueller_beam,
-            "_beam",
-            &self.settings.directory,
-        );
-        let _ = output::write_mueller(
-            &self.result.bins,
-            &self.result.mueller_ext,
-            "_ext",
-            &self.settings.directory,
-        );
+        // collect vectors of bins, muellers, ampls
+        let bins = self.result.bins();
+
+        // Group into hash set by meta class
+        let mut mueller_map = HashMap::new();
+        for result in self.result.scatt_result.iter() {
+            for mueller in result.muellers.iter() {
+                mueller_map
+                    .entry(mueller.meta.class.clone())
+                    .or_insert(Vec::new())
+                    .push(mueller);
+            }
+        }
+
+        // Loop over meta classes
+        for muellers_by_class in mueller_map.values() {
+            let _ = output::write_mueller(&bins, muellers_by_class, "", &self.settings.directory);
+        }
+
+        // // Write 2D mueller matrices
+        // let _ = output::write_mueller(
+        //     &self.result.bins,
+        //     &self.result.mueller,
+        //     "",
+        //     &self.settings.directory,
+        // );
+        // let _ = output::write_mueller(
+        //     &self.result.bins,
+        //     &self.result.mueller_beam,
+        //     "_beam",
+        //     &self.settings.directory,
+        // );
+        // let _ = output::write_mueller(
+        //     &self.result.bins,
+        //     &self.result.mueller_ext,
+        //     "_ext",
+        //     &self.settings.directory,
+        // );
 
         // Write generic results
         let _ = output::write_result(&self.result, &self.settings.directory);

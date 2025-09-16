@@ -13,140 +13,374 @@ use anyhow::Result;
 use itertools::Itertools;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
+use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
 use ndarray::{s, Array1, Array2, Axis};
 use pyo3::prelude::*;
 
+// type Mueller = Matrix4<f32>;
+// type Ampl = Matrix2<Complex<f32>>;
+
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+pub enum GOComponent {
+    Total,
+    Beam,
+    ExtDiff,
+}
+
+impl GOComponent {
+    /// Returns the file extension for the given GOComponent.
+    pub fn file_extension(&self) -> &'static str {
+        match self {
+            GOComponent::Total => "",
+            GOComponent::Beam => "beam",
+            GOComponent::ExtDiff => "ext",
+        }
+    }
+}
+
+/// A Mueller matrix
+#[derive(Debug, Clone)]
+pub struct Mueller {
+    pub meta: ScattResultMeta,
+    pub matrix: Matrix4<f32>,
+}
+
+/// An amplitude matrix
+#[derive(Debug, Clone)]
+pub struct Ampl {
+    pub meta: ScattResultMeta,
+    pub matrix: Matrix2<Complex<f32>>,
+}
+
+impl Ampl {
+    pub fn s11(&self) -> f32 {
+        let ampl = &self.matrix;
+        0.5 * (ampl[(0, 0)] * ampl[(0, 0)].conj()
+            + ampl[(0, 1)] * ampl[(0, 1)].conj()
+            + ampl[(1, 0)] * ampl[(1, 0)].conj()
+            + ampl[(1, 1)] * ampl[(1, 1)].conj())
+        .re
+    }
+    pub fn s12(&self) -> f32 {
+        let ampl = &self.matrix;
+        0.5 * (ampl[(0, 0)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(0, 1)].conj()
+            + ampl[(1, 0)] * ampl[(1, 0)].conj()
+            - ampl[(1, 1)] * ampl[(1, 1)].conj())
+        .re
+    }
+    pub fn s13(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(0, 1)].conj() + ampl[(1, 1)] * ampl[(1, 0)].conj()).re
+    }
+    pub fn s14(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(0, 1)].conj() - ampl[(1, 1)] * ampl[(1, 0)].conj()).im
+    }
+    pub fn s21(&self) -> f32 {
+        let ampl = &self.matrix;
+        0.5 * (ampl[(0, 0)] * ampl[(0, 0)].conj() + ampl[(0, 1)] * ampl[(0, 1)].conj()
+            - ampl[(1, 0)] * ampl[(1, 0)].conj()
+            - ampl[(1, 1)] * ampl[(1, 1)].conj())
+        .re
+    }
+    pub fn s22(&self) -> f32 {
+        let ampl = &self.matrix;
+        0.5 * (ampl[(0, 0)] * ampl[(0, 0)].conj()
+            - ampl[(0, 1)] * ampl[(0, 1)].conj()
+            - ampl[(1, 0)] * ampl[(1, 0)].conj()
+            + ampl[(1, 1)] * ampl[(1, 1)].conj())
+        .re
+    }
+    pub fn s23(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(0, 1)].conj() - ampl[(1, 1)] * ampl[(1, 0)].conj()).re
+    }
+    pub fn s24(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(0, 1)].conj() + ampl[(1, 1)] * ampl[(1, 0)].conj()).im
+    }
+    pub fn s31(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(1, 0)].conj() + ampl[(1, 1)] * ampl[(0, 1)].conj()).re
+    }
+    pub fn s32(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(1, 0)].conj() - ampl[(1, 1)] * ampl[(0, 1)].conj()).re
+    }
+    pub fn s33(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(1, 1)].conj() + ampl[(0, 1)] * ampl[(1, 0)].conj()).re
+    }
+    pub fn s34(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(0, 0)] * ampl[(1, 1)].conj() + ampl[(0, 1)] * ampl[(1, 0)].conj()).im
+    }
+    pub fn s41(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(1, 0)] * ampl[(0, 0)].conj() + ampl[(1, 1)] * ampl[(0, 1)].conj()).im
+    }
+    pub fn s42(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(1, 0)] * ampl[(0, 0)].conj() - ampl[(1, 1)] * ampl[(0, 1)].conj()).im
+    }
+    pub fn s43(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(1, 1)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(1, 0)].conj()).im
+    }
+    pub fn s44(&self) -> f32 {
+        let ampl = &self.matrix;
+        (ampl[(1, 1)] * ampl[(0, 0)].conj() - ampl[(0, 1)] * ampl[(1, 0)].conj()).re
+    }
+    pub fn to_mueller(&self) -> Mueller {
+        Mueller {
+            meta: self.meta.clone(),
+            matrix: Matrix4::new(
+                self.s11(),
+                self.s12(),
+                self.s13(),
+                self.s14(),
+                self.s21(),
+                self.s22(),
+                self.s23(),
+                self.s24(),
+                self.s31(),
+                self.s32(),
+                self.s33(),
+                self.s34(),
+                self.s41(),
+                self.s42(),
+                self.s43(),
+                self.s44(),
+            ),
+        }
+    }
+}
+
+/// Scattering result metadata
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScattResultMeta {
+    pub class: GOComponent,
+}
+
 /// A 2D far-field scattering result.
 #[derive(Debug, Clone)]
 pub struct ScattResult {
-    bin: SolidAngleBin,
-    ampl: Matrix2<Complex<f32>>,
-    ampl_beam: Matrix2<Complex<f32>>,
-    ampl_ext: Matrix2<Complex<f32>>,
+    pub bin: SolidAngleBin,
+    pub ampls: Vec<Ampl>,
+    pub muellers: Vec<Mueller>,
 }
 
-/// A mueller matrix
-#[derive(Debug, Clone, Default)]
-pub struct Mueller {
-    pub s11: f32,
-    pub s12: f32,
-    pub s13: f32,
-    pub s14: f32,
-    pub s21: f32,
-    pub s22: f32,
-    pub s23: f32,
-    pub s24: f32,
-    pub s31: f32,
-    pub s32: f32,
-    pub s33: f32,
-    pub s34: f32,
-    pub s41: f32,
-    pub s42: f32,
-    pub s43: f32,
-    pub s44: f32,
+impl ScattResult {
+    /// Creates a new empty ScattResult.
+    pub fn new_empty(bin: SolidAngleBin) -> Self {
+        Self {
+            bin,
+            ampls: Vec::new(),
+            muellers: Vec::new(),
+        }
+    }
 }
+
+// /// A mueller matrix
+// #[derive(Debug, Clone, Default)]
+// pub struct Mueller {
+//     pub s11: f32,
+//     pub s12: f32,
+//     pub s13: f32,
+//     pub s14: f32,
+//     pub s21: f32,
+//     pub s22: f32,
+//     pub s23: f32,
+//     pub s24: f32,
+//     pub s31: f32,
+//     pub s32: f32,
+//     pub s33: f32,
+//     pub s34: f32,
+//     pub s41: f32,
+//     pub s42: f32,
+//     pub s43: f32,
+//     pub s44: f32,
+// }
 
 impl Mueller {
-    /// Creates a blank Mueller matrix.
-    pub fn new_empty() -> Self {
-        Self {
-            s11: 0.0,
-            s12: 0.0,
-            s13: 0.0,
-            s14: 0.0,
-            s21: 0.0,
-            s22: 0.0,
-            s23: 0.0,
-            s24: 0.0,
-            s31: 0.0,
-            s32: 0.0,
-            s33: 0.0,
-            s34: 0.0,
-            s41: 0.0,
-            s42: 0.0,
-            s43: 0.0,
-            s44: 0.0,
-        }
+    // /// Creates a blank Mueller matrix.
+    // pub fn new_empty() -> Self {
+    //     Self {
+    //         s11: 0.0,
+    //         s12: 0.0,
+    //         s13: 0.0,
+    //         s14: 0.0,
+    //         s21: 0.0,
+    //         s22: 0.0,
+    //         s23: 0.0,
+    //         s24: 0.0,
+    //         s31: 0.0,
+    //         s32: 0.0,
+    //         s33: 0.0,
+    //         s34: 0.0,
+    //         s41: 0.0,
+    //         s42: 0.0,
+    //         s43: 0.0,
+    //         s44: 0.0,
+    //     }
+    // }
+
+    pub fn s11(&self) -> f32 {
+        self.matrix[(0, 0)]
+    }
+
+    pub fn s12(&self) -> f32 {
+        self.matrix[(0, 1)]
+    }
+
+    pub fn s13(&self) -> f32 {
+        self.matrix[(0, 2)]
+    }
+
+    pub fn s14(&self) -> f32 {
+        self.matrix[(0, 3)]
+    }
+
+    pub fn s21(&self) -> f32 {
+        self.matrix[(1, 0)]
+    }
+
+    pub fn s22(&self) -> f32 {
+        self.matrix[(1, 1)]
+    }
+
+    pub fn s23(&self) -> f32 {
+        self.matrix[(1, 2)]
+    }
+
+    pub fn s24(&self) -> f32 {
+        self.matrix[(1, 3)]
+    }
+
+    pub fn s31(&self) -> f32 {
+        self.matrix[(2, 0)]
+    }
+
+    pub fn s32(&self) -> f32 {
+        self.matrix[(2, 1)]
+    }
+
+    pub fn s33(&self) -> f32 {
+        self.matrix[(2, 2)]
+    }
+
+    pub fn s34(&self) -> f32 {
+        self.matrix[(2, 3)]
+    }
+
+    pub fn s41(&self) -> f32 {
+        self.matrix[(3, 0)]
+    }
+
+    pub fn s42(&self) -> f32 {
+        self.matrix[(3, 1)]
+    }
+
+    pub fn s43(&self) -> f32 {
+        self.matrix[(3, 2)]
+    }
+
+    pub fn s44(&self) -> f32 {
+        self.matrix[(3, 3)]
     }
 
     /// Returns the Mueller matrix as a vector of its elements.
     pub fn to_vec(&self) -> Vec<f32> {
         vec![
-            self.s11, self.s12, self.s13, self.s14, self.s21, self.s22, self.s23, self.s24,
-            self.s31, self.s32, self.s33, self.s34, self.s41, self.s42, self.s43, self.s44,
+            self.s11(),
+            self.s12(),
+            self.s13(),
+            self.s14(),
+            self.s21(),
+            self.s22(),
+            self.s23(),
+            self.s24(),
+            self.s31(),
+            self.s32(),
+            self.s33(),
+            self.s34(),
+            self.s41(),
+            self.s42(),
+            self.s43(),
+            self.s44(),
         ]
     }
 }
 
-impl Add for Mueller {
-    type Output = Self;
+// impl Add for Mueller {
+//     type Output = Self;
 
-    fn add(self, other: Self) -> Self {
-        Self {
-            s11: self.s11 + other.s11,
-            s12: self.s12 + other.s12,
-            s13: self.s13 + other.s13,
-            s14: self.s14 + other.s14,
-            s21: self.s21 + other.s21,
-            s22: self.s22 + other.s22,
-            s23: self.s23 + other.s23,
-            s24: self.s24 + other.s24,
-            s31: self.s31 + other.s31,
-            s32: self.s32 + other.s32,
-            s33: self.s33 + other.s33,
-            s34: self.s34 + other.s34,
-            s41: self.s41 + other.s41,
-            s42: self.s42 + other.s42,
-            s43: self.s43 + other.s43,
-            s44: self.s44 + other.s44,
-        }
-    }
-}
+//     fn add(self, other: Self) -> Self {
+//         Self {
+//             s11: self.s11 + other.s11,
+//             s12: self.s12 + other.s12,
+//             s13: self.s13 + other.s13,
+//             s14: self.s14 + other.s14,
+//             s21: self.s21 + other.s21,
+//             s22: self.s22 + other.s22,
+//             s23: self.s23 + other.s23,
+//             s24: self.s24 + other.s24,
+//             s31: self.s31 + other.s31,
+//             s32: self.s32 + other.s32,
+//             s33: self.s33 + other.s33,
+//             s34: self.s34 + other.s34,
+//             s41: self.s41 + other.s41,
+//             s42: self.s42 + other.s42,
+//             s43: self.s43 + other.s43,
+//             s44: self.s44 + other.s44,
+//         }
+//     }
+// }
 
-impl AddAssign for Mueller {
-    fn add_assign(&mut self, other: Self) {
-        *self = Self {
-            s11: self.s11 + other.s11,
-            s12: self.s12 + other.s12,
-            s13: self.s13 + other.s13,
-            s14: self.s14 + other.s14,
-            s21: self.s21 + other.s21,
-            s22: self.s22 + other.s22,
-            s23: self.s23 + other.s23,
-            s24: self.s24 + other.s24,
-            s31: self.s31 + other.s31,
-            s32: self.s32 + other.s32,
-            s33: self.s33 + other.s33,
-            s34: self.s34 + other.s34,
-            s41: self.s41 + other.s41,
-            s42: self.s42 + other.s42,
-            s43: self.s43 + other.s43,
-            s44: self.s44 + other.s44,
-        };
-    }
-}
+// impl AddAssign for Mueller {
+//     fn add_assign(&mut self, other: Self) {
+//         *self = Self {
+//             s11: self.s11 + other.s11,
+//             s12: self.s12 + other.s12,
+//             s13: self.s13 + other.s13,
+//             s14: self.s14 + other.s14,
+//             s21: self.s21 + other.s21,
+//             s22: self.s22 + other.s22,
+//             s23: self.s23 + other.s23,
+//             s24: self.s24 + other.s24,
+//             s31: self.s31 + other.s31,
+//             s32: self.s32 + other.s32,
+//             s33: self.s33 + other.s33,
+//             s34: self.s34 + other.s34,
+//             s41: self.s41 + other.s41,
+//             s42: self.s42 + other.s42,
+//             s43: self.s43 + other.s43,
+//             s44: self.s44 + other.s44,
+//         };
+//     }
+// }
 
-impl DivAssign<f32> for Mueller {
-    fn div_assign(&mut self, fac: f32) {
-        self.s11 /= fac;
-        self.s12 /= fac;
-        self.s13 /= fac;
-        self.s14 /= fac;
-        self.s21 /= fac;
-        self.s22 /= fac;
-        self.s23 /= fac;
-        self.s24 /= fac;
-        self.s31 /= fac;
-        self.s32 /= fac;
-        self.s33 /= fac;
-        self.s34 /= fac;
-        self.s41 /= fac;
-        self.s42 /= fac;
-        self.s43 /= fac;
-        self.s44 /= fac;
-    }
-}
+// impl DivAssign<f32> for Mueller {
+//     fn div_assign(&mut self, fac: f32) {
+//         self.s11 /= fac;
+//         self.s12 /= fac;
+//         self.s13 /= fac;
+//         self.s14 /= fac;
+//         self.s21 /= fac;
+//         self.s22 /= fac;
+//         self.s23 /= fac;
+//         self.s24 /= fac;
+//         self.s31 /= fac;
+//         self.s32 /= fac;
+//         self.s33 /= fac;
+//         self.s34 /= fac;
+//         self.s41 /= fac;
+//         self.s42 /= fac;
+//         self.s43 /= fac;
+//         self.s44 /= fac;
+//     }
+// }
 
 /// Complete results from a GOAD light scattering simulation.
 ///
@@ -156,14 +390,15 @@ impl DivAssign<f32> for Mueller {
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Results {
+    pub scatt_result: Vec<ScattResult>,
     pub powers: Powers,
-    pub bins: Vec<(AngleBin, AngleBin)>,
-    pub mueller: Vec<Mueller>,
-    pub mueller_beam: Vec<Mueller>,
-    pub mueller_ext: Vec<Mueller>,
-    pub ampl: Vec<Matrix2<Complex<f32>>>,
-    pub ampl_beam: Vec<Matrix2<Complex<f32>>>,
-    pub ampl_ext: Vec<Matrix2<Complex<f32>>>,
+    // pub bins: Vec<(AngleBin, AngleBin)>,
+    // pub mueller: Vec<Mueller>,
+    // pub mueller_beam: Vec<Mueller>,
+    // pub mueller_ext: Vec<Mueller>,
+    // pub ampl: Vec<Matrix2<Complex<f32>>>,
+    // pub ampl_beam: Vec<Matrix2<Complex<f32>>>,
+    // pub ampl_ext: Vec<Matrix2<Complex<f32>>>,
     pub bins_1d: Option<Vec<f32>>,
     pub mueller_1d: Option<Vec<Mueller>>,
     pub mueller_1d_beam: Option<Vec<Mueller>>,
@@ -172,8 +407,19 @@ pub struct Results {
 }
 
 impl Results {
+    /// Returns an owned vector of solid angle bins
+    pub fn bins(&self) -> Vec<SolidAngleBin> {
+        self.scatt_result.iter().map(|a| a.bin.clone()).collect()
+    }
+
+    /// Writes some stuff to a file
+
     /// Creates a new `Result` with empty mueller and amplitude matrix
-    pub fn new_empty(bins: &[(AngleBin, AngleBin)]) -> Self {
+    pub fn new_empty(bins: &[SolidAngleBin]) -> Self {
+        let field = bins
+            .iter()
+            .map(|&bin| ScattResult::new_empty(bin))
+            .collect();
         let mueller = Vec::with_capacity(bins.len());
         let mueller_beam = Vec::with_capacity(bins.len());
         let mueller_ext = Vec::with_capacity(bins.len());
@@ -181,6 +427,7 @@ impl Results {
         let ampl_beam = ampl.clone();
         let ampl_ext = ampl.clone();
         Self {
+            scatt_result: field,
             powers: Powers::new(),
             bins: bins.to_vec(),
             mueller,
