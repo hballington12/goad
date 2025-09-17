@@ -130,7 +130,6 @@ impl MultiProblem {
                 problem.run(Some(&euler)); // run the problem with an euler rotation
 
                 pb.inc(1);
-                println!("powers are: {:?}", problem.result.powers);
                 problem.result
             })
             .reduce(
