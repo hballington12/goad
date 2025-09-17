@@ -5,7 +5,7 @@ use crate::{
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
-    result::{self, Ampl, GOComponent, Mueller, Results, ScattResultMeta},
+    result::{self, Ampl, AmplMatrix, GOComponent, Mueller, Results, ScattResultMeta},
     settings::{load_config, Settings},
 };
 #[cfg(feature = "macroquad")]
@@ -197,9 +197,11 @@ impl Problem {
         beams: &mut Vec<Beam>,
         binning: &BinningScheme,
         bins: &[SolidAngleBin],
-        total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         scale: f32,
-    ) {
+    ) -> Vec<Ampl> {
+        // Create a vector to store the amplitudes
+        let mut amplitudes = Vec::with_capacity(bins.len());
+
         // Precompute theta and phi spacings if using Simple binning
         let (delta_theta, delta_phi) = match binning.scheme {
             Scheme::Simple { num_theta, num_phi } => {
@@ -259,98 +261,119 @@ impl Problem {
                 * phase_correction; // reference phase correction
 
             // sum the far-field amplitude matrix, reduce to mueller later
-            total_ampl_far_field[n] += ampl;
+            amplitudes[n] += ampl;
             // or, add mueller directly now (no interference between beams)
             // let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
             // for i in 0..16 {
             //     mueller_out[(n, i)] += mueller[(0, i)];
             // }
         }
+
+        amplitudes
     }
 
     fn diffract_outbeams(
-        queue: &mut Vec<Beam>,
-        results: &mut Results,
-        meta: ScattResultMeta,
-        // total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
+        queue: &[Beam],
+        bins: &[SolidAngleBin],
         fov_factor: Option<f32>,
-    ) {
-        let bins = results.bins();
-        let ampl_far_field = queue
+    ) -> Vec<Ampl> {
+        // Calculate far-field amplitudes by diffracting all outbeams in parallel
+        queue
             .par_iter()
             .map(|outbeam| outbeam.diffract(&bins, fov_factor))
             .reduce(
                 || vec![Matrix2::<Complex<f32>>::zeros(); bins.len()],
                 |mut acc, local| {
-                    for (a, l) in acc.iter_mut().zip(local) {
-                        *a += l;
-                    }
+                    acc.iter_mut().zip(local).for_each(|(a, l)| *a += l);
                     acc
                 },
-            );
+            )
 
-        // TODO move this outside the function
-        for (i, ampl) in ampl_far_field.iter().enumerate() {
-            // Check if any component of the amplitude matrix contains NaN
-            if ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
-                total_ampl_far_field[i] += ampl;
-            }
-        }
+        // // Update the appropriate amplitude matrices based on component type
+        // for (result, ampl) in results.scatt_result.iter_mut().zip(ampl_far_field) {
+        //     // Skip invalid amplitudes (NaN or infinite values)
+        //     if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+        //         continue;
+        //     }
+
+        //     // Select and update the target amplitude matrix
+        //     let target_ampl = match component {
+        //         GOComponent::Total => &mut result.ampl_total,
+        //         GOComponent::Beam => &mut result.ampl_beam,
+        //         GOComponent::ExtDiff => &mut result.ampl_ext,
+        //     };
+
+        //     if let Some(ampl_matrix) = target_ampl.as_mut() {
+        //         *ampl_matrix += ampl;
+        //     }
+        // }
     }
 
     /// Combines the external diffraction and outbeams to get the far-field solution.
     fn combine_far(&mut self) {
-        for result in self.result.scatt_result.iter() {
-            let meta = ScattResultMeta {
-                class: GOComponent::Total,
+        for result in self.result.scatt_result.iter_mut() {
+            // Combine beam and external diffraction amplitudes
+            let ampl_total = match (result.ampl_beam, result.ampl_ext) {
+                (Some(beam), Some(ext)) => beam + ext,
+                (Some(beam), None) => beam,
+                (None, Some(ext)) => ext,
+                (None, None) => continue, // Skip if both are None
             };
-            let mut ampl_total = Ampl::new_with_meta(meta);
-            for ampl in result.ampls.iter() {
-                match ampl.meta.class {
-                    GOComponent::Beam => {
-                        ampl_total.matrix += ampl.matrix;
-                    }
-                    GOComponent::ExtDiff => {
-                        ampl_total.matrix += ampl.matrix;
-                    }
-                    GOComponent::Total => {}
-                }
+
+            // Store the combined amplitude
+            result.ampl_total = Some(ampl_total);
+        }
+    }
+
+    /// Helper to add amplitudes to results, handling None cases
+    fn add_amplitudes_to_results(
+        results: &mut [result::ScattResult],
+        amplitudes: Vec<Ampl>,
+        component: GOComponent,
+    ) {
+        for (result, ampl) in results.iter_mut().zip(amplitudes) {
+            // Skip invalid amplitudes
+            if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+                continue;
+            }
+
+            let target_ampl = match component {
+                GOComponent::Total => &mut result.ampl_total,
+                GOComponent::Beam => &mut result.ampl_beam,
+                GOComponent::ExtDiff => &mut result.ampl_ext,
+            };
+
+            match target_ampl.as_mut() {
+                Some(existing) => *existing += ampl,
+                None => *target_ampl = Some(ampl),
             }
         }
     }
 
     pub fn solve_far_ext_diff(&mut self) {
         let fov_factor = None; // don't truncate by field of view for external diffraction
-        let meta = ScattResultMeta {
-            class: GOComponent::ExtDiff,
-        };
-        Self::diffract_outbeams(
-            &mut self.ext_diff_beam_queue,
-            &self.result,
-            meta,
-            fov_factor,
-        );
+        let bins = self.result.bins();
+        let ampls = Self::diffract_outbeams(&self.ext_diff_beam_queue, &bins, fov_factor);
+
+        Self::add_amplitudes_to_results(&mut self.result.scatt_result, ampls, GOComponent::ExtDiff);
     }
 
     pub fn solve_far_outbeams(&mut self) {
-        match self.settings.mapping {
+        let ampls = match self.settings.mapping {
             Mapping::GeometricOptics => Self::go_outbeams(
                 &mut self.out_beam_queue,
                 &self.settings.binning,
-                &self.result.bins,
-                &mut self.result.ampl_beam,
+                &self.result.bins(),
                 self.settings.scale,
             ),
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
-                Self::diffract_outbeams(
-                    &mut self.out_beam_queue,
-                    &self.result.bins,
-                    &mut self.result.ampl_beam,
-                    fov_factor,
-                );
+                let bins = self.result.bins();
+                Self::diffract_outbeams(&self.out_beam_queue, &bins, fov_factor)
             }
-        }
+        };
+
+        Self::add_amplitudes_to_results(&mut self.result.scatt_result, ampls, GOComponent::Beam);
     }
     pub fn solve_far(&mut self) {
         self.solve_far_ext_diff();
@@ -358,12 +381,19 @@ impl Problem {
         self.combine_far();
     }
 
+    fn compute_mueller(&mut self) {
+        for result in self.result.scatt_result.iter_mut() {
+            // Convert amplitude matrices to Mueller matrices
+            result.mueller_total = result.ampl_total.map(|a| a.to_mueller());
+            result.mueller_beam = result.ampl_beam.map(|a| a.to_mueller());
+            result.mueller_ext = result.ampl_ext.map(|a| a.to_mueller());
+        }
+    }
+
     pub fn solve(&mut self) {
         self.solve_near();
         self.solve_far();
-        self.result.mueller = output::ampl_to_mueller(&self.result.ampl);
-        self.result.mueller_beam = output::ampl_to_mueller(&self.result.ampl_beam);
-        self.result.mueller_ext = output::ampl_to_mueller(&self.result.ampl_ext);
+        self.compute_mueller();
 
         // try compute 1d mueller
         match self.settings.binning.scheme {

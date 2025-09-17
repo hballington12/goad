@@ -519,22 +519,9 @@ impl Results {
             .iter()
             .map(|&bin| ScattResult::new_empty(bin))
             .collect();
-        let mueller = Vec::with_capacity(bins.len());
-        let mueller_beam = Vec::with_capacity(bins.len());
-        let mueller_ext = Vec::with_capacity(bins.len());
-        let ampl = vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
-        let ampl_beam = ampl.clone();
-        let ampl_ext = ampl.clone();
         Self {
             scatt_result: field,
             powers: Powers::new(),
-            bins: bins.to_vec(),
-            mueller,
-            mueller_beam,
-            mueller_ext,
-            ampl,
-            ampl_beam,
-            ampl_ext,
             bins_1d: None,
             mueller_1d: None,
             mueller_1d_beam: None,
