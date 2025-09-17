@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use std::fmt::Debug;
 
 use crate::bins::AngleBin;
 use crate::bins::SolidAngleBin;
@@ -12,6 +13,35 @@ use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
 use ndarray::Array1;
 use pyo3::prelude::*;
+
+/// Trait for different types of scattering bins (1D or 2D)
+pub trait ScatteringBin: Clone + Debug {
+    /// Get the theta center value
+    fn theta_center(&self) -> f32;
+
+    /// Get the theta bin
+    fn theta_bin(&self) -> &AngleBin;
+}
+
+impl ScatteringBin for SolidAngleBin {
+    fn theta_center(&self) -> f32 {
+        self.theta_bin.center
+    }
+
+    fn theta_bin(&self) -> &AngleBin {
+        &self.theta_bin
+    }
+}
+
+impl ScatteringBin for AngleBin {
+    fn theta_center(&self) -> f32 {
+        self.center
+    }
+
+    fn theta_bin(&self) -> &AngleBin {
+        self
+    }
+}
 
 // type Mueller = Matrix4<f32>;
 // type Ampl = Matrix2<Complex<f32>>;
@@ -254,10 +284,10 @@ pub struct ScattResultMeta {
     pub class: GOComponent,
 }
 
-/// A 2D far-field scattering result.
+/// A generic far-field scattering result that can be 1D or 2D.
 #[derive(Debug, Clone)]
-pub struct ScattResult {
-    pub bin: SolidAngleBin,
+pub struct ScattResult<B: ScatteringBin> {
+    pub bin: B,
     pub ampl_total: Option<Ampl>,
     pub ampl_beam: Option<Ampl>,
     pub ampl_ext: Option<Ampl>,
@@ -266,9 +296,9 @@ pub struct ScattResult {
     pub mueller_ext: Option<Mueller>,
 }
 
-impl ScattResult {
+impl<B: ScatteringBin> ScattResult<B> {
     /// Creates a new empty ScattResult.
-    pub fn new_empty(bin: SolidAngleBin) -> Self {
+    pub fn new_empty(bin: B) -> Self {
         Self {
             bin,
             ampl_total: None,
@@ -280,6 +310,12 @@ impl ScattResult {
         }
     }
 }
+
+/// Type alias for 2D scattering results (full solid angle)
+pub type ScattResult2D = ScattResult<SolidAngleBin>;
+
+/// Type alias for 1D scattering results (theta only)
+pub type ScattResult1D = ScattResult<AngleBin>;
 
 // /// A mueller matrix
 // #[derive(Debug, Clone, Default)]
@@ -489,7 +525,7 @@ impl ScattResult {
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Results {
-    pub scatt_result: Vec<ScattResult>,
+    pub scatt_result: Vec<ScattResult2D>,
     pub powers: Powers,
     // pub bins: Vec<(AngleBin, AngleBin)>,
     // pub mueller: Vec<Mueller>,
@@ -517,7 +553,7 @@ impl Results {
     pub fn new_empty(bins: &[SolidAngleBin]) -> Self {
         let field = bins
             .iter()
-            .map(|&bin| ScattResult::new_empty(bin))
+            .map(|&bin| ScattResult2D::new_empty(bin))
             .collect();
         Self {
             scatt_result: field,
@@ -606,9 +642,9 @@ impl Results {
     /// Get the bins as a list of tuples (returns bin centers for backwards compatibility)
     #[getter]
     pub fn get_bins(&self) -> Vec<(f32, f32)> {
-        self.bins
+        self.bins()
             .iter()
-            .map(|(theta_bin, phi_bin)| (theta_bin.center, phi_bin.center))
+            .map(|bin| (bin.theta_bin.center, bin.phi_bin.center))
             .collect()
     }
 

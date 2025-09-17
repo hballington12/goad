@@ -5,7 +5,10 @@ use crate::{
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
-    result::{self, Ampl, AmplMatrix, GOComponent, Mueller, Results, ScattResultMeta},
+    result::{
+        self, Ampl, AmplMatrix, GOComponent, Mueller, Results, ScattResult, ScattResultMeta,
+        ScatteringBin,
+    },
     settings::{load_config, Settings},
 };
 #[cfg(feature = "macroquad")]
@@ -326,8 +329,8 @@ impl Problem {
     }
 
     /// Helper to add amplitudes to results, handling None cases
-    fn add_amplitudes_to_results(
-        results: &mut [result::ScattResult],
+    fn add_amplitudes_to_results<B: ScatteringBin>(
+        results: &mut [ScattResult<B>],
         amplitudes: Vec<Ampl>,
         component: GOComponent,
     ) {

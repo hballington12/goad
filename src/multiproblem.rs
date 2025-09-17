@@ -254,7 +254,7 @@ impl MultiProblem {
         // Helper closure to write Mueller matrices to files
         let write_mueller_grid =
             |file_suffix: &str,
-             mueller_getter: &dyn Fn(&result::ScattResult) -> Option<Mueller>|
+             mueller_getter: &dyn Fn(&result::ScattResult2D) -> Option<Mueller>|
              -> Result<()> {
                 let file_name = format!("mueller_scatgrid_{}", file_suffix);
                 let path = output::output_path(Some(&self.settings.directory), &file_name)?;
