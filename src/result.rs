@@ -590,13 +590,12 @@ impl Results {
     }
 
     /// Integrates Mueller matrices over phi using rectangular rule
-    /// Weighted by phi bin width
+    /// Weighted by phi bin width in radians
     fn integrate_over_phi(phi_group: Vec<&ScattResult2D>) -> ScattResult1D {
         // All results in group have same theta bin
         let theta_bin = phi_group[0].bin.theta_bin;
 
-        // Calculate total phi width and weighted sums
-        let mut total_phi_width = 0.0;
+        // Calculate weighted sums (no normalization - preserve 2π factor for cross-section)
         let mut mueller_total_sum = Mueller::zeros();
         let mut mueller_beam_sum = Mueller::zeros();
         let mut mueller_ext_sum = Mueller::zeros();
@@ -605,42 +604,42 @@ impl Results {
         let mut has_ext = false;
 
         for result in phi_group {
-            let phi_width = result.bin.phi_bin.width();
-            total_phi_width += phi_width;
+            // Convert phi width to radians to match theta integration units
+            let phi_width_rad = result.bin.phi_bin.width().to_radians();
 
-            // Integrate Mueller matrices (weighted by phi bin width)
+            // Integrate Mueller matrices (weighted by phi bin width in radians)
             if let Some(mueller) = result.mueller_total {
-                mueller_total_sum += mueller * phi_width;
+                mueller_total_sum += mueller * phi_width_rad;
                 has_total = true;
             }
             if let Some(mueller) = result.mueller_beam {
-                mueller_beam_sum += mueller * phi_width;
+                mueller_beam_sum += mueller * phi_width_rad;
                 has_beam = true;
             }
             if let Some(mueller) = result.mueller_ext {
-                mueller_ext_sum += mueller * phi_width;
+                mueller_ext_sum += mueller * phi_width_rad;
                 has_ext = true;
             }
         }
 
-        // Normalize by total phi width (complete the integration)
+        // Return integrated values without normalization to preserve 2π factor
         ScattResult1D {
             bin: theta_bin,
             ampl_total: None, // Amplitudes not integrated
             ampl_beam: None,
             ampl_ext: None,
             mueller_total: if has_total {
-                Some(mueller_total_sum / total_phi_width)
+                Some(mueller_total_sum)
             } else {
                 None
             },
             mueller_beam: if has_beam {
-                Some(mueller_beam_sum / total_phi_width)
+                Some(mueller_beam_sum)
             } else {
                 None
             },
             mueller_ext: if has_ext {
-                Some(mueller_ext_sum / total_phi_width)
+                Some(mueller_ext_sum)
             } else {
                 None
             },
