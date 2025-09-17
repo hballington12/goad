@@ -150,8 +150,6 @@ impl Field {
         let result = Matrix2::new(dot1, -dot2, dot2.clone(), dot1.clone());
         let det = result.determinant();
 
-        let result = Matrix2::identity();
-
         result / det.abs().sqrt()
     }
 
