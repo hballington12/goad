@@ -1,13 +1,13 @@
+use crate::result::MuellerMatrix;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs::File, io::BufWriter};
 
 use anyhow::Result;
-use nalgebra::{Complex, Matrix2};
-use ndarray::{s, Array1, Array2};
+use ndarray::{s, Array1};
 
-use crate::bins::{AngleBin, SolidAngleBin};
+use crate::bins::SolidAngleBin;
 use crate::result::{Mueller, Results};
 
 #[cfg(test)]
@@ -66,57 +66,56 @@ where
     sum
 }
 
-/// Write the 1d Mueller matrix to a file against the theta and phi bins
-pub fn write_mueller_1d(
-    bins: &[f32],
-    mueller_1d: &[Mueller],
-    suffix: &str,
-    output_dir: &Path,
-) -> Result<()> {
-    let file_name = format!("mueller_scatgrid_1d{}", suffix);
-    let path = output_path(Some(output_dir), &file_name)?;
+// /// Write the 1d Mueller matrix to a file against the theta and phi bins
+// pub fn write_mueller_1d(
+//     bins: &[f32],
+//     mueller_1d: &[Mueller],
+//     suffix: &str,
+//     output_dir: &Path,
+// ) -> Result<()> {
+//     let file_name = format!("mueller_scatgrid_1d{}", suffix);
+//     let path = output_path(Some(output_dir), &file_name)?;
 
-    let file = File::create(&path)?;
-    let mut writer = BufWriter::new(file);
+//     let file = File::create(&path)?;
+//     let mut writer = BufWriter::new(file);
 
-    // Iterate over the array and write data to the file
-    for (index, mueller) in mueller_1d.iter().enumerate() {
-        let theta = bins[index];
-        write!(writer, "{} ", theta)?;
-        for element in mueller.to_vec().into_iter() {
-            write!(writer, "{} ", element)?;
-        }
-        writeln!(writer)?;
-    }
+//     // Iterate over the array and write data to the file
+//     for (index, mueller) in mueller_1d.iter().enumerate() {
+//         let theta = bins[index];
+//         write!(writer, "{} ", theta)?;
+//         for element in mueller.to_vec().into_iter() {
+//             write!(writer, "{} ", element)?;
+//         }
+//         writeln!(writer)?;
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }
 
-/// Write the Mueller matrix to a file against the theta and phi bins
-pub fn write_mueller(
-    bins: &[SolidAngleBin],
-    muellers: &[&Mueller],
-    suffix: &str,
-    output_dir: &Path,
-) -> Result<()> {
-    let file_name = format!("mueller_scatgrid{}", suffix);
-    let path = output_path(Some(output_dir), &file_name)?;
+// /// Write the Mueller matrix to a file against the theta and phi bins
+// pub fn write_mueller(
+//     bins: &[SolidAngleBin],
+//     muellers: &[&Mueller],
+//     suffix: &str,
+//     output_dir: &Path,
+// ) -> Result<()> {
+//     let file_name_total = "mueller_scatgrid";
+//     let path_total = output_path(Some(output_dir), &file_name_total)?;
+//     let file_total = File::create(&path_total)?;
+//     let mut writer_total = BufWriter::new(file_total);
 
-    let file = File::create(&path)?;
-    let mut writer = BufWriter::new(file);
+//     // Iterate over the array and write data to the file
+//     for (index, mueller) in muellers.iter().enumerate() {
+//         let bin = bins[index];
+//         write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
+//         for element in mueller.to_vec().into_iter() {
+//             write!(writer, "{} ", element)?;
+//         }
+//         writeln!(writer)?;
+//     }
 
-    // Iterate over the array and write data to the file
-    for (index, mueller) in muellers.iter().enumerate() {
-        let bin = bins[index];
-        write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
-        for element in mueller.to_vec().into_iter() {
-            write!(writer, "{} ", element)?;
-        }
-        writeln!(writer)?;
-    }
-
-    Ok(())
-}
+//     Ok(())
+// }
 
 /// Write the Mueller matrix to a file against the theta and phi bins
 pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
@@ -220,7 +219,7 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
 }
 
 // Helper function to construct the output path and ensure the directory exists
-fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
+pub fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
     match output_dir {
         Some(dir) => {
             fs::create_dir_all(dir)?;

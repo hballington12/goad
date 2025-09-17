@@ -1,17 +1,16 @@
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins::{generate_bins, AngleBin, BinningScheme, Scheme},
+    bins::{generate_bins, BinningScheme, Scheme, SolidAngleBin},
     diff::Mapping,
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
-    result::{self, Mueller, Results},
+    result::{self, Ampl, GOComponent, Mueller, Results, ScattResultMeta},
     settings::{load_config, Settings},
 };
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
-use ndarray::Array2;
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
@@ -197,7 +196,7 @@ impl Problem {
     fn go_outbeams(
         beams: &mut Vec<Beam>,
         binning: &BinningScheme,
-        bins: &[(AngleBin, AngleBin)],
+        bins: &[SolidAngleBin],
         total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         scale: f32,
     ) {
@@ -271,13 +270,15 @@ impl Problem {
 
     fn diffract_outbeams(
         queue: &mut Vec<Beam>,
-        bins: &[(AngleBin, AngleBin)],
-        total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
+        results: &mut Results,
+        meta: ScattResultMeta,
+        // total_ampl_far_field: &mut [Matrix2<Complex<f32>>],
         fov_factor: Option<f32>,
     ) {
+        let bins = results.bins();
         let ampl_far_field = queue
             .par_iter()
-            .map(|outbeam| outbeam.diffract(bins, fov_factor))
+            .map(|outbeam| outbeam.diffract(&bins, fov_factor))
             .reduce(
                 || vec![Matrix2::<Complex<f32>>::zeros(); bins.len()],
                 |mut acc, local| {
@@ -299,18 +300,34 @@ impl Problem {
 
     /// Combines the external diffraction and outbeams to get the far-field solution.
     fn combine_far(&mut self) {
-        self.result.ampl = self.result.ampl_ext.clone();
-        for (i, ampl) in self.result.ampl.iter_mut().enumerate() {
-            *ampl += self.result.ampl_beam[i];
+        for result in self.result.scatt_result.iter() {
+            let meta = ScattResultMeta {
+                class: GOComponent::Total,
+            };
+            let mut ampl_total = Ampl::new_with_meta(meta);
+            for ampl in result.ampls.iter() {
+                match ampl.meta.class {
+                    GOComponent::Beam => {
+                        ampl_total.matrix += ampl.matrix;
+                    }
+                    GOComponent::ExtDiff => {
+                        ampl_total.matrix += ampl.matrix;
+                    }
+                    GOComponent::Total => {}
+                }
+            }
         }
     }
 
     pub fn solve_far_ext_diff(&mut self) {
         let fov_factor = None; // don't truncate by field of view for external diffraction
+        let meta = ScattResultMeta {
+            class: GOComponent::ExtDiff,
+        };
         Self::diffract_outbeams(
             &mut self.ext_diff_beam_queue,
-            &self.result.bins,
-            &mut self.result.ampl_ext,
+            &self.result,
+            meta,
             fov_factor,
         );
     }
@@ -451,21 +468,35 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
+        // group mueller by GOComponent
+        let mut muellers_beam = Vec::new();
+        let mut muellers_ext_diff = Vec::new();
+        let mut muellers_total = Vec::new();
+        for result in self.result.scatt_result.iter() {
+            for mueller in result.muellers.iter() {
+                match mueller.meta.class {
+                    GOComponent::Beam => muellers_beam.push(mueller),
+                    GOComponent::ExtDiff => muellers_ext_diff.push(mueller),
+                    GOComponent::Total => muellers_total.push(mueller),
+                }
+            }
+        }
+
         let _ = output::write_mueller(
-            &self.result.bins,
-            &self.result.mueller,
+            &self.result.bins(),
+            &muellers_total,
             "",
             &self.settings.directory,
         );
         let _ = output::write_mueller(
-            &self.result.bins,
-            &self.result.mueller_beam,
+            &self.result.bins(),
+            &muellers_beam,
             "_beam",
             &self.settings.directory,
         );
         let _ = output::write_mueller(
-            &self.result.bins,
-            &self.result.mueller_ext,
+            &self.result.bins(),
+            &muellers_ext_diff,
             "_ext",
             &self.settings.directory,
         );
@@ -621,10 +652,10 @@ impl Problem {
 }
 
 // TODO: move to bins.rs
-fn get_solid_angle(bin: &(AngleBin, AngleBin)) -> f32 {
-    2.0 * (bin.0.center).to_radians().sin().abs()
-        * (0.5 * bin.0.width()).to_radians().sin()
-        * bin.1.width().to_radians()
+fn get_solid_angle(bin: &SolidAngleBin) -> f32 {
+    2.0 * (bin.theta_bin.center).to_radians().sin().abs()
+        * (0.5 * bin.theta_bin.width()).to_radians().sin()
+        * bin.phi_bin.width().to_radians()
 }
 
 /// Returns the reference phase correction for accounting for how far the beam must travel to reach a point on the scattering sphere in the far-field.
@@ -651,11 +682,15 @@ fn get_mapping_rotations(beam: &Beam, phi: f32) -> (Matrix2<Complex<f32>>, Matri
     (rotation.map(Complex::from), prerotation.map(Complex::from))
 }
 
-fn get_n_linear_search(bins: &[(AngleBin, AngleBin)], theta: f32, phi: f32) -> Option<usize> {
+fn get_n_linear_search(bins: &[SolidAngleBin], theta: f32, phi: f32) -> Option<usize> {
     // Find the corresponding bin in the bins array
     let mut bin_idx = None;
-    for (i, (theta_b, phi_b)) in bins.iter().enumerate() {
-        if theta >= theta_b.min && theta < theta_b.max && phi >= phi_b.min && phi < phi_b.max {
+    for (i, bin) in bins.iter().enumerate() {
+        if theta >= bin.theta_bin.min
+            && theta < bin.theta_bin.max
+            && phi >= bin.phi_bin.min
+            && phi < bin.phi_bin.max
+        {
             bin_idx = Some(i);
             break;
         }

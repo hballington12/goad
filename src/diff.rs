@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use serde::Deserialize;
 use std::f32::consts::PI;
 
-use crate::bins::AngleBin;
+use crate::bins::SolidAngleBin;
 use crate::field::Field;
 use crate::{geom, settings};
 
@@ -23,7 +23,7 @@ pub fn diffraction(
     mut ampl: Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
-    theta_phi_combinations: &[(AngleBin, AngleBin)],
+    bins: &[SolidAngleBin],
     wavenumber: f32,
     fov_factor: Option<f32>,
 ) -> Vec<Matrix2<Complex<f32>>> {
@@ -116,7 +116,7 @@ pub fn diffraction(
     // --- Optimizations End ---
 
     // Define the output variables.
-    let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); theta_phi_combinations.len()];
+    let mut ampl_cs = vec![Matrix2::<Complex<f32>>::default(); bins.len()];
     let kinc = prop2 * wavenumber;
 
     // Pre-calculate constants dependent only on wavenumber
@@ -124,10 +124,10 @@ pub fn diffraction(
     let inv_denom = Complex::new(wavenumber / (2.0 * PI), 0.0); // Pre-calculate 1.0 / (2*PI/wavenumber)
 
     // Iterate over the flattened combinations
-    for (index, (theta_bin, phi_bin)) in theta_phi_combinations.iter().enumerate() {
+    for (index, bin) in bins.iter().enumerate() {
         // Compute sin and cos values for current theta and phi bin centers
-        let (sin_theta, cos_theta) = theta_bin.center.to_radians().sin_cos();
-        let (sin_phi, cos_phi) = phi_bin.center.to_radians().sin_cos();
+        let (sin_theta, cos_theta) = bin.theta_bin.center.to_radians().sin_cos();
+        let (sin_phi, cos_phi) = bin.phi_bin.center.to_radians().sin_cos();
 
         // Calculate observation direction in original frame
         let k_obs = Vector3::new(sin_theta * cos_phi, sin_theta * sin_phi, -cos_theta);

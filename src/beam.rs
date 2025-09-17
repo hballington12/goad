@@ -7,7 +7,7 @@ use macroquad::prelude::*;
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 
 use crate::{
-    bins::AngleBin,
+    bins::SolidAngleBin,
     clip::Clipping,
     diff,
     field::Field,
@@ -630,7 +630,7 @@ impl Beam {
 
     pub fn diffract(
         &self,
-        theta_phi_combinations: &[(AngleBin, AngleBin)],
+        bins: &[SolidAngleBin],
         fov_factor: Option<f32>,
     ) -> Vec<Matrix2<Complex<f32>>> {
         match &self.face {
@@ -639,19 +639,11 @@ impl Beam {
                 let ampl = self.field.ampl;
                 let prop = self.prop;
                 let vk7 = self.field.e_perp;
-                diff::diffraction(
-                    verts,
-                    ampl,
-                    prop,
-                    vk7,
-                    &theta_phi_combinations,
-                    self.wavenumber(),
-                    fov_factor,
-                )
+                diff::diffraction(verts, ampl, prop, vk7, bins, self.wavenumber(), fov_factor)
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");
-                vec![Matrix2::zeros(); theta_phi_combinations.len()]
+                vec![Matrix2::zeros(); bins.len()]
             }
         }
     }

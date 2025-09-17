@@ -1,16 +1,19 @@
 // use std::time::Instant;
 
-use std::collections::HashMap;
+use std::io::Write;
+use std::{fs::File, io::BufWriter};
 
+use crate::result::{Mueller, MuellerMatrix};
 use crate::{
     bins::{generate_bins, Scheme},
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
     problem::{self, Problem},
-    result::{self, Ampl, Results},
+    result::{self, Results},
     settings::Settings,
 };
+use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
@@ -201,13 +204,15 @@ impl MultiProblem {
             .iter_mut()
             .zip(item.scatt_result.into_iter())
         {
-            for mueller_acc in a.muellers.iter_mut() {
-                for mueller_inc in i.muellers.iter() {
-                    // Filter by class (GO, Ext Diff, Total)
-                    if mueller_acc.meta.class == mueller_inc.meta.class {
-                        mueller_acc.matrix += mueller_inc.matrix;
-                    }
-                }
+            if let (Some(a_mueller), Some(i_mueller)) = (a.mueller_total.as_mut(), i.mueller_total)
+            {
+                *a_mueller += i_mueller;
+            }
+            if let (Some(a_mueller), Some(i_mueller)) = (a.mueller_beam.as_mut(), i.mueller_beam) {
+                *a_mueller += i_mueller;
+            }
+            if let (Some(a_mueller), Some(i_mueller)) = (a.mueller_ext.as_mut(), i.mueller_ext) {
+                *a_mueller += i_mueller;
             }
         }
 
@@ -218,103 +223,68 @@ impl MultiProblem {
     fn normalize_results(&mut self, num_orientations: f32) {
         // Powers
         self.result.powers /= num_orientations;
+
         for field in self.result.scatt_result.iter_mut() {
-            let div_r = num_orientations;
-            let div_c = Complex::new(num_orientations, 0.0);
-            // Amplitude Matrices
-            for ampl in field.ampls.iter_mut() {
-                ampl.matrix /= div_c;
+            // Amplitude Matrices - divide by complex representation
+            let div_c = Complex::from(num_orientations);
+            if let Some(ampl) = field.ampl_total.as_mut() {
+                *ampl /= div_c;
             }
-            // Mueller Matrices
-            for mueller in field.muellers.iter_mut() {
-                mueller.matrix /= div_r;
+            if let Some(ampl) = field.ampl_beam.as_mut() {
+                *ampl /= div_c;
+            }
+            if let Some(ampl) = field.ampl_ext.as_mut() {
+                *ampl /= div_c;
+            }
+
+            // Mueller Matrices - divide by real value
+            if let Some(mueller) = field.mueller_total.as_mut() {
+                *mueller /= num_orientations;
+            }
+            if let Some(mueller) = field.mueller_beam.as_mut() {
+                *mueller /= num_orientations;
+            }
+            if let Some(mueller) = field.mueller_ext.as_mut() {
+                *mueller /= num_orientations;
             }
         }
     }
 
-    pub fn writeup(&self) {
-        // collect vectors of bins, muellers, ampls
-        let bins = self.result.bins();
+    pub fn writeup(&self) -> Result<()> {
+        // Helper closure to write Mueller matrices to files
+        let write_mueller_grid =
+            |file_suffix: &str,
+             mueller_getter: &dyn Fn(&result::ScattResult) -> Option<Mueller>|
+             -> Result<()> {
+                let file_name = format!("mueller_scatgrid_{}", file_suffix);
+                let path = output::output_path(Some(&self.settings.directory), &file_name)?;
+                let file = File::create(&path)?;
+                let mut writer = BufWriter::new(file);
 
-        // Group into hash set by meta class
-        let mut mueller_map = HashMap::new();
-        for result in self.result.scatt_result.iter() {
-            for mueller in result.muellers.iter() {
-                mueller_map
-                    .entry(mueller.meta.class.clone())
-                    .or_insert(Vec::new())
-                    .push(mueller);
-            }
-        }
+                for result in &self.result.scatt_result {
+                    let bin = result.bin;
+                    write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
 
-        // Loop over meta classes
-        for muellers_by_class in mueller_map.values() {
-            let _ = output::write_mueller(&bins, muellers_by_class, "", &self.settings.directory);
-        }
+                    if let Some(mueller) = mueller_getter(result) {
+                        for element in mueller.to_vec() {
+                            write!(writer, "{} ", element)?;
+                        }
+                    }
+                    writeln!(writer)?;
+                }
+                Ok(())
+            };
 
-        // // Write 2D mueller matrices
-        // let _ = output::write_mueller(
-        //     &self.result.bins,
-        //     &self.result.mueller,
-        //     "",
-        //     &self.settings.directory,
-        // );
-        // let _ = output::write_mueller(
-        //     &self.result.bins,
-        //     &self.result.mueller_beam,
-        //     "_beam",
-        //     &self.settings.directory,
-        // );
-        // let _ = output::write_mueller(
-        //     &self.result.bins,
-        //     &self.result.mueller_ext,
-        //     "_ext",
-        //     &self.settings.directory,
-        // );
+        // Write all three Mueller matrix types
+        write_mueller_grid("", &|r| r.mueller_total)?;
+        write_mueller_grid("beam", &|r| r.mueller_beam)?;
+        write_mueller_grid("ext", &|r| r.mueller_ext)?;
 
         // Write generic results
         let _ = output::write_result(&self.result, &self.settings.directory);
 
-        // (Try to) write 1D mueller matrices
-        match self.result.mueller_1d {
-            Some(ref mueller_1d) => {
-                let _ = output::write_mueller_1d(
-                    &self.result.bins_1d.as_ref().unwrap(),
-                    mueller_1d,
-                    "",
-                    &self.settings.directory,
-                );
-            }
-            None => {
-                println!("Failed to write 1D mueller matrix");
-            }
-        }
-        match self.result.mueller_1d_beam {
-            Some(ref mueller_1d) => {
-                let _ = output::write_mueller_1d(
-                    &self.result.bins_1d.as_ref().unwrap(),
-                    mueller_1d,
-                    "_beam",
-                    &self.settings.directory,
-                );
-            }
-            None => {
-                println!("Failed to write 1D mueller matrix (beam)");
-            }
-        }
-        match self.result.mueller_1d_ext {
-            Some(ref mueller_1d) => {
-                let _ = output::write_mueller_1d(
-                    &self.result.bins_1d.as_ref().unwrap(),
-                    mueller_1d,
-                    "_ext",
-                    &self.settings.directory,
-                );
-            }
-            None => {
-                println!("Failed to write 1D mueller matrix (ext)");
-            }
-        }
+        // Write 1d results (todo)
+        todo!("Implement 1d results writing")
     }
 }
 
