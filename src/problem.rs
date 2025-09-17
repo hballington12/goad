@@ -201,7 +201,7 @@ impl Problem {
         scale: f32,
     ) -> Vec<Ampl> {
         // Create a vector to store the amplitudes
-        let mut amplitudes = Vec::with_capacity(bins.len());
+        let mut amplitudes = vec![Ampl::zeros(); bins.len()];
 
         // Precompute theta and phi spacings if using Simple binning
         let (delta_theta, delta_phi) = match binning.scheme {
