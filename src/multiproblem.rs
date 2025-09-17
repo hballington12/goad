@@ -130,16 +130,12 @@ impl MultiProblem {
                 problem.run(Some(&euler)); // run the problem with an euler rotation
 
                 pb.inc(1);
+                println!("powers are: {:?}", problem.result.powers);
                 problem.result
             })
             .reduce(
                 || {
-                    let bins = &self
-                        .result
-                        .field_2d
-                        .iter()
-                        .map(|a| a.bin)
-                        .collect::<Vec<_>>();
+                    let bins = &self.result.bins();
                     Results::new_empty(bins)
                 },
                 |accum, item| self.reduce_results(accum, item),
@@ -147,7 +143,8 @@ impl MultiProblem {
 
         // Normalize results by the number of orientations
         self.normalize_results(self.orientations.num_orientations as f32);
-        self.try_mueller_to_1d();
+        self.result.try_mueller_to_1d(&self.settings.binning.scheme);
+        let _ = self.result.compute_params(self.settings.wavelength);
 
         // let end = Instant::now();
         // let duration = end.duration_since(start);
@@ -193,24 +190,38 @@ impl MultiProblem {
         //     }
         // }
 
-        // println!("Results:");
-        // self.result.print();
+        println!("Results:");
+        self.result.print();
     }
 
     /// Combines two Results objects by adding their fields
     fn reduce_results(&self, mut acc: Results, item: Results) -> Results {
+        // Add powers
+        acc.powers += item.powers;
+
         // Add Mueller matrix elements
         for (a, i) in acc.field_2d.iter_mut().zip(item.field_2d.into_iter()) {
-            if let (Some(a_mueller), Some(i_mueller)) = (a.mueller_total.as_mut(), i.mueller_total)
-            {
-                *a_mueller += i_mueller;
-            }
-            if let (Some(a_mueller), Some(i_mueller)) = (a.mueller_beam.as_mut(), i.mueller_beam) {
-                *a_mueller += i_mueller;
-            }
-            if let (Some(a_mueller), Some(i_mueller)) = (a.mueller_ext.as_mut(), i.mueller_ext) {
-                *a_mueller += i_mueller;
-            }
+            // Handle Mueller matrices
+            a.mueller_total = match (a.mueller_total, i.mueller_total) {
+                (Some(a_val), Some(i_val)) => Some(a_val + i_val),
+                (Some(a_val), None) => Some(a_val),
+                (None, Some(i_val)) => Some(i_val),
+                (None, None) => None,
+            };
+
+            a.mueller_beam = match (a.mueller_beam, i.mueller_beam) {
+                (Some(a_val), Some(i_val)) => Some(a_val + i_val),
+                (Some(a_val), None) => Some(a_val),
+                (None, Some(i_val)) => Some(i_val),
+                (None, None) => None,
+            };
+
+            a.mueller_ext = match (a.mueller_ext, i.mueller_ext) {
+                (Some(a_val), Some(i_val)) => Some(a_val + i_val),
+                (Some(a_val), None) => Some(a_val),
+                (None, Some(i_val)) => Some(i_val),
+                (None, None) => None,
+            };
         }
 
         acc
@@ -220,6 +231,7 @@ impl MultiProblem {
     fn normalize_results(&mut self, num_orientations: f32) {
         // Powers
         self.result.powers /= num_orientations;
+        println!("powers: {:?}", self.result.powers);
 
         for field in self.result.field_2d.iter_mut() {
             // Amplitude Matrices - divide by complex representation
@@ -247,7 +259,7 @@ impl MultiProblem {
         }
     }
 
-    pub fn writeup(&self) -> Result<()> {
+    pub fn writeup(&self) {
         // Helper closure to write Mueller matrices to files
         let write_mueller_grid =
             |file_suffix: &str,
@@ -273,15 +285,15 @@ impl MultiProblem {
             };
 
         // Write all three Mueller matrix types
-        write_mueller_grid("", &|r| r.mueller_total)?;
-        write_mueller_grid("beam", &|r| r.mueller_beam)?;
-        write_mueller_grid("ext", &|r| r.mueller_ext)?;
+        let _ = write_mueller_grid("", &|r| r.mueller_total);
+        let _ = write_mueller_grid("beam", &|r| r.mueller_beam);
+        let _ = write_mueller_grid("ext", &|r| r.mueller_ext);
 
         // Write generic results
         let _ = output::write_result(&self.result, &self.settings.directory);
 
         // Write 1d results (todo)
-        todo!("Implement 1d results writing")
+        // todo!("Implement 1d results writing")
     }
 }
 
@@ -345,7 +357,7 @@ impl MultiProblem {
 
     /// Python wrapper for writeup method
     pub fn py_writeup(&self) -> PyResult<()> {
-        self.writeup();
+        let _ = self.writeup();
         Ok(())
     }
 

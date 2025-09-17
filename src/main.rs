@@ -9,5 +9,5 @@ fn main() {
     let mut multiproblem = MultiProblem::new(None, Some(settings));
 
     multiproblem.solve();
-    multiproblem.writeup();
+    let _ = multiproblem.writeup();
 }

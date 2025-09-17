@@ -5,13 +5,10 @@ use crate::bins::AngleBin;
 use crate::bins::SolidAngleBin;
 use crate::params::Params;
 use crate::powers::Powers;
-use anyhow::anyhow;
-use anyhow::Result;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
-use ndarray::Array1;
 use pyo3::prelude::*;
 
 /// Trait for different types of scattering bins (1D or 2D)
@@ -21,6 +18,11 @@ pub trait ScatteringBin: Clone + Debug {
 
     /// Get the theta bin
     fn theta_bin(&self) -> &AngleBin;
+
+    /// Check if this bin has the same theta as another
+    fn same_theta(&self, other: &Self) -> bool {
+        self.theta_bin() == other.theta_bin()
+    }
 }
 
 impl ScatteringBin for SolidAngleBin {
@@ -558,15 +560,90 @@ impl Results {
         }
     }
 
-    pub fn try_mueller_to_1d(&mut self) -> std::result::Result<(), anyhow::Error> {
-        match try_mueller_to_1d(&self.bins, &self.mueller) {
-            Ok((theta, mueller_1d)) => {
-                self.bins_1d = Some(theta);
-                self.mueller_1d = Some(mueller_1d);
+    pub fn try_mueller_to_1d(&mut self, binning_scheme: &crate::bins::Scheme) {
+        use crate::bins::Scheme;
+        use itertools::Itertools;
 
-                Ok(())
+        // Step 1: Check scheme compatibility
+        match binning_scheme {
+            Scheme::Custom { .. } => return, // Skip custom binning
+            Scheme::Simple { .. } | Scheme::Interval { .. } => {}
+        }
+
+        // Step 2: Group by theta using chunk_by (leveraging sorted property)
+        let theta_groups: Vec<Vec<&ScattResult2D>> = self
+            .field_2d
+            .iter()
+            .chunk_by(|result| result.bin.theta_bin)
+            .into_iter()
+            .map(|(_, group)| group.collect())
+            .collect();
+
+        // Step 3: Rectangular integration over phi for each theta
+        let field_1d: Vec<ScattResult1D> = theta_groups
+            .into_iter()
+            .map(|group| Self::integrate_over_phi(group))
+            .collect();
+
+        // Step 4: Update struct
+        self.field_1d = Some(field_1d);
+    }
+
+    /// Integrates Mueller matrices over phi using rectangular rule
+    /// Weighted by phi bin width
+    fn integrate_over_phi(phi_group: Vec<&ScattResult2D>) -> ScattResult1D {
+        // All results in group have same theta bin
+        let theta_bin = phi_group[0].bin.theta_bin;
+
+        // Calculate total phi width and weighted sums
+        let mut total_phi_width = 0.0;
+        let mut mueller_total_sum = Mueller::zeros();
+        let mut mueller_beam_sum = Mueller::zeros();
+        let mut mueller_ext_sum = Mueller::zeros();
+        let mut has_total = false;
+        let mut has_beam = false;
+        let mut has_ext = false;
+
+        for result in phi_group {
+            let phi_width = result.bin.phi_bin.width();
+            total_phi_width += phi_width;
+
+            // Integrate Mueller matrices (weighted by phi bin width)
+            if let Some(mueller) = result.mueller_total {
+                mueller_total_sum += mueller * phi_width;
+                has_total = true;
             }
-            Err(e) => Err(e),
+            if let Some(mueller) = result.mueller_beam {
+                mueller_beam_sum += mueller * phi_width;
+                has_beam = true;
+            }
+            if let Some(mueller) = result.mueller_ext {
+                mueller_ext_sum += mueller * phi_width;
+                has_ext = true;
+            }
+        }
+
+        // Normalize by total phi width (complete the integration)
+        ScattResult1D {
+            bin: theta_bin,
+            ampl_total: None, // Amplitudes not integrated
+            ampl_beam: None,
+            ampl_ext: None,
+            mueller_total: if has_total {
+                Some(mueller_total_sum / total_phi_width)
+            } else {
+                None
+            },
+            mueller_beam: if has_beam {
+                Some(mueller_beam_sum / total_phi_width)
+            } else {
+                None
+            },
+            mueller_ext: if has_ext {
+                Some(mueller_ext_sum / total_phi_width)
+            } else {
+                None
+            },
         }
     }
 
@@ -581,23 +658,21 @@ impl Results {
     }
 
     pub fn compute_asymmetry(&mut self, wavelength: f32) {
-        if let (Some(theta), Some(mueller_1d), Some(scatt)) =
-            (&self.bins_1d, &self.mueller_1d, self.params.scat_cross)
-        {
-            self.params.asymettry = Some(compute_asymmetry(
-                theta,
-                mueller_1d,
-                2.0 * PI / wavelength,
-                scatt,
-            ));
+        if let (Some(field_1d), Some(scatt)) = (&self.field_1d, self.params.scat_cross) {
+            let k = 2.0 * PI / wavelength;
+            self.params.asymettry = Some(integrate_theta_weighted(field_1d, |theta, s11| {
+                theta.sin() * theta.cos() * s11 / (scatt * k.powi(2))
+            }));
         }
     }
 
     /// Computes the scattering cross section from the 1D Mueller matrix
     pub fn compute_scat_cross(&mut self, wavelength: f32) {
-        if let (Some(theta), Some(mueller_1d)) = (&self.bins_1d, &self.mueller_1d) {
-            self.params.scat_cross =
-                Some(compute_scat_cross(theta, mueller_1d, 2.0 * PI / wavelength));
+        if let Some(field_1d) = &self.field_1d {
+            let k = 2.0 * PI / wavelength;
+            self.params.scat_cross = Some(integrate_theta_weighted(field_1d, |theta, s11| {
+                theta.sin() * s11 / k.powi(2)
+            }));
         }
     }
 
@@ -643,32 +718,46 @@ impl Results {
     /// Get the 1D bins (theta values)
     #[getter]
     pub fn get_bins_1d(&self) -> Option<Vec<f32>> {
-        self.bins_1d.clone()
+        self.field_1d
+            .as_ref()
+            .map(|field_1d| field_1d.iter().map(|result| result.bin.center).collect())
     }
 
     /// Get the Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller(&self) -> Vec<Vec<f32>> {
-        crate::problem::collect_mueller(&self.mueller)
+        let muellers: Vec<Mueller> = self
+            .field_2d
+            .iter()
+            .filter_map(|r| r.mueller_total)
+            .collect();
+        crate::problem::collect_mueller(&muellers)
     }
 
     /// Get the beam Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller_beam(&self) -> Vec<Vec<f32>> {
-        crate::problem::collect_mueller(&self.mueller_beam)
+        let muellers: Vec<Mueller> = self
+            .field_2d
+            .iter()
+            .filter_map(|r| r.mueller_beam)
+            .collect();
+        crate::problem::collect_mueller(&muellers)
     }
 
     /// Get the external diffraction Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller_ext(&self) -> Vec<Vec<f32>> {
-        crate::problem::collect_mueller(&self.mueller_ext)
+        let muellers: Vec<Mueller> = self.field_2d.iter().filter_map(|r| r.mueller_ext).collect();
+        crate::problem::collect_mueller(&muellers)
     }
 
     /// Get the 1D Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
-        if let Some(ref mueller_1d) = self.mueller_1d {
-            crate::problem::collect_mueller(mueller_1d)
+        if let Some(ref field_1d) = self.field_1d {
+            let muellers: Vec<Mueller> = field_1d.iter().filter_map(|r| r.mueller_total).collect();
+            crate::problem::collect_mueller(&muellers)
         } else {
             Vec::new()
         }
@@ -677,8 +766,9 @@ impl Results {
     /// Get the 1D beam Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller_1d_beam(&self) -> Vec<Vec<f32>> {
-        if let Some(ref mueller_1d_beam) = self.mueller_1d_beam {
-            crate::problem::collect_mueller(mueller_1d_beam)
+        if let Some(ref field_1d) = self.field_1d {
+            let muellers: Vec<Mueller> = field_1d.iter().filter_map(|r| r.mueller_beam).collect();
+            crate::problem::collect_mueller(&muellers)
         } else {
             Vec::new()
         }
@@ -687,8 +777,9 @@ impl Results {
     /// Get the 1D external diffraction Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller_1d_ext(&self) -> Vec<Vec<f32>> {
-        if let Some(ref mueller_1d_ext) = self.mueller_1d_ext {
-            crate::problem::collect_mueller(mueller_1d_ext)
+        if let Some(ref field_1d) = self.field_1d {
+            let muellers: Vec<Mueller> = field_1d.iter().filter_map(|r| r.mueller_ext).collect();
+            crate::problem::collect_mueller(&muellers)
         } else {
             Vec::new()
         }
@@ -753,126 +844,21 @@ impl Results {
     }
 }
 
-/// Integrate over phi (second bin of the tuple) to get the 1D Mueller matrix
-/// Uses the trapezoidal rule
-/// Returns a tuple of the theta bins and the 1D Mueller matrix
-/// NOTE: Assumes phi is ordered
-pub fn try_mueller_to_1d(
-    bins: &[(AngleBin, AngleBin)],
-    mueller: &[Mueller],
-) -> Result<(Vec<f32>, Vec<Mueller>)> {
-    // Check that the mueller matrix and bins are the same length
-    if mueller.len() != bins.len() {
-        return Err(anyhow!(
-            "Mueller matrix and bins must have the same length. Got {} and {}",
-            mueller.len(),
-            bins.len()
-        ));
-    }
-
-    // // Create indices and sort them by corresponding theta values
-    // let mueller = mueller.to_owned();
-    // let mut bins = bins.to_owned();
-    // let mut indices: Vec<usize> = (0..bins.len()).collect();
-    // indices.sort_by(|&i, &j| bins[i].0.center.partial_cmp(&bins[j].0.center).unwrap());
-
-    // // Sort bins according to the sorted indices
-    // bins = indices.iter().map(|&i| bins[i]).collect();
-
-    // // Create a new sorted mueller matrix using the same indices
-    // let mut sorted_mueller = Array2::<f32>::zeros(mueller.dim());
-    // for (new_idx, &old_idx) in indices.iter().enumerate() {
-    //     sorted_mueller
-    //         .slice_mut(s![new_idx, ..])
-    //         .assign(&mueller.slice(s![old_idx, ..]));
-    // }
-
-    // // zip the bins and mueller matrix
-    // let combined: Vec<_> = bins
-    //     .iter()
-    //     .zip(mueller.outer_iter())
-    //     .map(|(bin, row)| (*bin, row.to_owned()))
-    //     .collect();
-
-    // // group the combined Vec by theta center
-    // let grouped: Vec<Vec<_>> = combined
-    //     .into_iter()
-    //     .chunk_by(|((theta_bin, _), _)| theta_bin.center)
-    //     .into_iter()
-    //     .map(|(_, group)| group.map(|x| x).collect())
-    //     .collect();
-
-    // let mut thetas = Vec::new();
-    // let mut mueller_1d = Array2::<f32>::zeros((grouped.len(), 16));
-
-    // // loop over vectors at each theta
-    // for (i, muellers) in grouped.iter().enumerate() {
-    //     // Unzip the theta, phi, and mueller values
-    //     let thetas_phi: Vec<_> = muellers
-    //         .iter()
-    //         .map(|((theta_bin, phi_bin), _)| (theta_bin.center, phi_bin.center))
-    //         .collect();
-    //     let mueller_phi: Vec<_> = muellers.iter().map(|(_, mueller)| mueller).collect();
-    //     let mut mueller_1d_row = Array1::<f32>::zeros(16);
-
-    //     // loop over the mueller values at each phi
-    //     for j in 0..16 {
-    //         // Create 1D arrays for x and y, where x is phi and y is 1 of the 16 mueller values
-    //         let y = Array1::from(mueller_phi.iter().map(|row| row[j]).collect::<Vec<_>>());
-    //         let phi_values: Vec<_> = thetas_phi.iter().map(|(_, phi)| phi.to_radians()).collect();
-
-    //         // Check if phi values are sorted in ascending order (probably dont need this)
-    //         for i in 1..phi_values.len() {
-    //             if phi_values[i] < phi_values[i - 1] {
-    //                 return Err(anyhow!(
-    //                     "Phi values must be sorted in ascending order for integration"
-    //                 ));
-    //             }
-    //         }
-
-    //         let x = Array1::from(phi_values);
-    //         mueller_1d_row[j] = output::integrate_trapezoidal(&x, &y, |_, y| y);
-    //         // integrate over phi
-    //     }
-
-    //     // Assign the theta and mueller values to the final arrays
-    //     thetas.push(thetas_phi[0].0);
-    //     mueller_1d
-    //         .slice_mut(s![i, ..])
-    //         .assign(&mueller_1d_row.slice(s![..]));
-    // }
-    !todo!();
-
-    // Ok((thetas, mueller_1d))
-}
-
-/// Integrate the first mueller element over theta to get the asymmetry parameter
-pub fn compute_asymmetry(theta: &[f32], mueller_1d: &[Mueller], waveno: f32, scatt: f32) -> f32 {
-    // get first column of mueller matrix
-    let y = mueller_1d.into_iter().map(|m| m.s11).collect::<Vec<f32>>();
-
-    let x = Array1::from(theta.iter().map(|&t| t.to_radians()).collect::<Vec<f32>>());
-
-    // integrate p11 sin(theta) cos(theta) / scatt cross / k^2
-    // let asymmetry = output::integrate_trapezoidal(&x, &y, |x, y| {
-    //     x.sin() * x.cos() * y / scatt / waveno.powi(2)
-    // });
-    !todo!();
-
-    // asymmetry
-}
-
-/// Integrate the first mueller element over theta to get the scattering cross section
-pub fn compute_scat_cross(theta: &[f32], mueller_1d: &[Mueller], waveno: f32) -> f32 {
-    // get first column of mueller matrix
-    let y = mueller_1d.into_iter().map(|m| m.s11).collect::<Vec<f32>>();
-
-    // convert theta values from degrees to radians for integration
-    let x = Array1::from(theta.iter().map(|&t| t.to_radians()).collect::<Vec<f32>>());
-
-    // integrate p11 sin(theta) / k^2
-    // let scat_cross = output::integrate_trapezoidal(&x, &y, |x, y| x.sin() * y / waveno.powi(2));
-    !todo!();
-
-    // scat_cross
+/// Helper function to integrate over theta with custom weighting
+/// Takes field_1d results and applies a weight function to (theta_radians, s11_value)
+fn integrate_theta_weighted<F>(field_1d: &[ScattResult1D], weight_fn: F) -> f32
+where
+    F: Fn(f32, f32) -> f32, // (theta_radians, s11_value) -> weighted_value
+{
+    field_1d
+        .iter()
+        .filter_map(|result| {
+            result.mueller_total.map(|mueller| {
+                let theta_rad = result.bin.center.to_radians();
+                let s11 = mueller.s11();
+                let bin_width = result.bin.width().to_radians();
+                weight_fn(theta_rad, s11) * bin_width
+            })
+        })
+        .sum()
 }

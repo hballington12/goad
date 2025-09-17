@@ -436,14 +436,7 @@ impl Problem {
     }
 
     pub fn try_mueller_to_1d(&mut self) {
-        match self.result.try_mueller_to_1d() {
-            Ok(()) => {
-                // println!("1d mueller computed successfully");
-            }
-            Err(e) => {
-                println!("Failed to compute 1d mueller: {}", e);
-            }
-        }
+        self.result.try_mueller_to_1d(&self.settings.binning.scheme);
     }
 
     pub fn try_params(&mut self) {

@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use serde::Deserialize;
 
 /// Represents a solid angle bin with theta and phi bins
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct SolidAngleBin {
     pub theta_bin: AngleBin,
     pub phi_bin: AngleBin,
@@ -16,7 +16,7 @@ impl SolidAngleBin {
 }
 
 /// Represents an angular bin with edges and center. Fields: `min`, `max`, `center`
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct AngleBin {
     pub min: f32,    // min edge
     pub max: f32,    // max edge
