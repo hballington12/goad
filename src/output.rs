@@ -92,30 +92,30 @@ where
 //     Ok(())
 // }
 
-// /// Write the Mueller matrix to a file against the theta and phi bins
-// pub fn write_mueller(
-//     bins: &[SolidAngleBin],
-//     muellers: &[&Mueller],
-//     suffix: &str,
-//     output_dir: &Path,
-// ) -> Result<()> {
-//     let file_name_total = "mueller_scatgrid";
-//     let path_total = output_path(Some(output_dir), &file_name_total)?;
-//     let file_total = File::create(&path_total)?;
-//     let mut writer_total = BufWriter::new(file_total);
+/// Write the Mueller matrix to a file against the theta and phi bins
+pub fn write_mueller(
+    bins: &[SolidAngleBin],
+    muellers: &[Mueller],
+    suffix: &str,
+    output_dir: &Path,
+) -> Result<()> {
+    let file_name_total = format!("mueller_scatgrid{}", suffix);
+    let path_total = output_path(Some(output_dir), &file_name_total)?;
+    let file_total = File::create(&path_total)?;
+    let mut writer = BufWriter::new(file_total);
 
-//     // Iterate over the array and write data to the file
-//     for (index, mueller) in muellers.iter().enumerate() {
-//         let bin = bins[index];
-//         write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
-//         for element in mueller.to_vec().into_iter() {
-//             write!(writer, "{} ", element)?;
-//         }
-//         writeln!(writer)?;
-//     }
+    // Iterate over the array and write data to the file
+    for (index, mueller) in muellers.iter().enumerate() {
+        let bin = bins[index];
+        write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
+        for element in mueller.to_vec().into_iter() {
+            write!(writer, "{} ", element)?;
+        }
+        writeln!(writer)?;
+    }
 
-//     Ok(())
-// }
+    Ok(())
+}
 
 /// Write the Mueller matrix to a file against the theta and phi bins
 pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
@@ -210,9 +210,9 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     writeln!(writer, "\n# Simulation Information")?;
     writeln!(writer, "# ---------------------")?;
     writeln!(writer, "Number of bins: {}", result.bins().len())?;
-    if let Some(bins_1d) = &result.bins_1d {
-        writeln!(writer, "Number of 1D bins: {}", bins_1d.len())?;
-    }
+    // if let Some(bins_1d) = &result.bins_1d {
+    //     writeln!(writer, "Number of 1D bins: {}", bins_1d.len())?;
+    // }
 
     println!("Results written to: {}", path.display());
     Ok(())

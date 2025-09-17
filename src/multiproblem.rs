@@ -5,7 +5,7 @@ use std::{fs::File, io::BufWriter};
 
 use crate::result::{Mueller, MuellerMatrix};
 use crate::{
-    bins::{generate_bins, Scheme},
+    bins::generate_bins,
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
@@ -90,7 +90,7 @@ impl MultiProblem {
         self.result = Results::new_empty(
             &self
                 .result
-                .scatt_result
+                .field_2d
                 .iter()
                 .map(|f| f.bin)
                 .collect::<Vec<_>>(),
@@ -136,7 +136,7 @@ impl MultiProblem {
                 || {
                     let bins = &self
                         .result
-                        .scatt_result
+                        .field_2d
                         .iter()
                         .map(|a| a.bin)
                         .collect::<Vec<_>>();
@@ -147,6 +147,7 @@ impl MultiProblem {
 
         // Normalize results by the number of orientations
         self.normalize_results(self.orientations.num_orientations as f32);
+        self.try_mueller_to_1d();
 
         // let end = Instant::now();
         // let duration = end.duration_since(start);
@@ -157,40 +158,40 @@ impl MultiProblem {
         //     duration, time_per_orientation
         // );
 
-        // try compute 1d mueller
-        match self.settings.binning.scheme {
-            Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-            _ => {
-                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-                    Ok((theta, mueller_1d)) => {
-                        self.result.bins_1d = Some(theta);
-                        self.result.mueller_1d = Some(mueller_1d);
+        // // try compute 1d mueller
+        // match self.settings.binning.scheme {
+        //     Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
+        //     _ => {
+        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+        //             Ok((theta, mueller_1d)) => {
+        //                 self.result.bins_1d = Some(theta);
+        //                 self.result.mueller_1d = Some(mueller_1d);
 
-                        // compute params
-                        let _ = self.result.compute_params(self.settings.wavelength);
-                    }
-                    Err(..) => {}
-                };
-                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
-                    Ok((theta, mueller_1d_beam)) => {
-                        self.result.bins_1d = Some(theta);
-                        self.result.mueller_1d_beam = Some(mueller_1d_beam);
-                    }
-                    Err(e) => {
-                        println!("Failed to compute 1d mueller (beam): {}", e);
-                    }
-                };
-                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
-                    Ok((theta, mueller_1d_ext)) => {
-                        self.result.bins_1d = Some(theta);
-                        self.result.mueller_1d_ext = Some(mueller_1d_ext);
-                    }
-                    Err(e) => {
-                        println!("Failed to compute 1d mueller (ext): {}", e);
-                    }
-                };
-            }
-        }
+        //                 // compute params
+        //                 let _ = self.result.compute_params(self.settings.wavelength);
+        //             }
+        //             Err(..) => {}
+        //         };
+        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
+        //             Ok((theta, mueller_1d_beam)) => {
+        //                 self.result.bins_1d = Some(theta);
+        //                 self.result.mueller_1d_beam = Some(mueller_1d_beam);
+        //             }
+        //             Err(e) => {
+        //                 println!("Failed to compute 1d mueller (beam): {}", e);
+        //             }
+        //         };
+        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
+        //             Ok((theta, mueller_1d_ext)) => {
+        //                 self.result.bins_1d = Some(theta);
+        //                 self.result.mueller_1d_ext = Some(mueller_1d_ext);
+        //             }
+        //             Err(e) => {
+        //                 println!("Failed to compute 1d mueller (ext): {}", e);
+        //             }
+        //         };
+        //     }
+        // }
 
         // println!("Results:");
         // self.result.print();
@@ -199,11 +200,7 @@ impl MultiProblem {
     /// Combines two Results objects by adding their fields
     fn reduce_results(&self, mut acc: Results, item: Results) -> Results {
         // Add Mueller matrix elements
-        for (a, i) in acc
-            .scatt_result
-            .iter_mut()
-            .zip(item.scatt_result.into_iter())
-        {
+        for (a, i) in acc.field_2d.iter_mut().zip(item.field_2d.into_iter()) {
             if let (Some(a_mueller), Some(i_mueller)) = (a.mueller_total.as_mut(), i.mueller_total)
             {
                 *a_mueller += i_mueller;
@@ -224,7 +221,7 @@ impl MultiProblem {
         // Powers
         self.result.powers /= num_orientations;
 
-        for field in self.result.scatt_result.iter_mut() {
+        for field in self.result.field_2d.iter_mut() {
             // Amplitude Matrices - divide by complex representation
             let div_c = Complex::from(num_orientations);
             if let Some(ampl) = field.ampl_total.as_mut() {
@@ -261,7 +258,7 @@ impl MultiProblem {
                 let file = File::create(&path)?;
                 let mut writer = BufWriter::new(file);
 
-                for result in &self.result.scatt_result {
+                for result in &self.result.field_2d {
                     let bin = result.bin;
                     write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
 

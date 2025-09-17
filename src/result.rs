@@ -278,12 +278,6 @@ impl AmplMatrix for Ampl {
     }
 }
 
-/// Scattering result metadata
-#[derive(Debug, Clone, PartialEq)]
-pub struct ScattResultMeta {
-    pub class: GOComponent,
-}
-
 /// A generic far-field scattering result that can be 1D or 2D.
 #[derive(Debug, Clone)]
 pub struct ScattResult<B: ScatteringBin> {
@@ -525,7 +519,8 @@ pub type ScattResult1D = ScattResult<AngleBin>;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Results {
-    pub scatt_result: Vec<ScattResult2D>,
+    pub field_2d: Vec<ScattResult2D>,
+    pub field_1d: Option<Vec<ScattResult1D>>,
     pub powers: Powers,
     // pub bins: Vec<(AngleBin, AngleBin)>,
     // pub mueller: Vec<Mueller>,
@@ -534,17 +529,17 @@ pub struct Results {
     // pub ampl: Vec<Matrix2<Complex<f32>>>,
     // pub ampl_beam: Vec<Matrix2<Complex<f32>>>,
     // pub ampl_ext: Vec<Matrix2<Complex<f32>>>,
-    pub bins_1d: Option<Vec<f32>>,
-    pub mueller_1d: Option<Vec<Mueller>>,
-    pub mueller_1d_beam: Option<Vec<Mueller>>,
-    pub mueller_1d_ext: Option<Vec<Mueller>>,
+    // pub bins_1d: Option<Vec<f32>>,
+    // pub mueller_1d: Option<Vec<Mueller>>,
+    // pub mueller_1d_beam: Option<Vec<Mueller>>,
+    // pub mueller_1d_ext: Option<Vec<Mueller>>,
     pub params: Params,
 }
 
 impl Results {
     /// Returns an owned vector of solid angle bins
     pub fn bins(&self) -> Vec<SolidAngleBin> {
-        self.scatt_result.iter().map(|a| a.bin.clone()).collect()
+        self.field_2d.iter().map(|a| a.bin.clone()).collect()
     }
 
     /// Writes some stuff to a file
@@ -556,12 +551,9 @@ impl Results {
             .map(|&bin| ScattResult2D::new_empty(bin))
             .collect();
         Self {
-            scatt_result: field,
+            field_2d: field,
             powers: Powers::new(),
-            bins_1d: None,
-            mueller_1d: None,
-            mueller_1d_beam: None,
-            mueller_1d_ext: None,
+            field_1d: None,
             params: Params::new(),
         }
     }

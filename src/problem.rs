@@ -1,3 +1,4 @@
+use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
     bins::{generate_bins, BinningScheme, Scheme, SolidAngleBin},
@@ -5,10 +6,7 @@ use crate::{
     field::Field,
     geom::{Face, Geom},
     helpers, orientation, output,
-    result::{
-        self, Ampl, AmplMatrix, GOComponent, Mueller, Results, ScattResult, ScattResultMeta,
-        ScatteringBin,
-    },
+    result::{Ampl, AmplMatrix, GOComponent, Mueller, Results, ScattResult, ScatteringBin},
     settings::{load_config, Settings},
 };
 #[cfg(feature = "macroquad")]
@@ -314,7 +312,7 @@ impl Problem {
 
     /// Combines the external diffraction and outbeams to get the far-field solution.
     fn combine_far(&mut self) {
-        for result in self.result.scatt_result.iter_mut() {
+        for result in self.result.field_2d.iter_mut() {
             // Combine beam and external diffraction amplitudes
             let ampl_total = match (result.ampl_beam, result.ampl_ext) {
                 (Some(beam), Some(ext)) => beam + ext,
@@ -358,7 +356,7 @@ impl Problem {
         let bins = self.result.bins();
         let ampls = Self::diffract_outbeams(&self.ext_diff_beam_queue, &bins, fov_factor);
 
-        Self::add_amplitudes_to_results(&mut self.result.scatt_result, ampls, GOComponent::ExtDiff);
+        Self::add_amplitudes_to_results(&mut self.result.field_2d, ampls, GOComponent::ExtDiff);
     }
 
     pub fn solve_far_outbeams(&mut self) {
@@ -376,7 +374,7 @@ impl Problem {
             }
         };
 
-        Self::add_amplitudes_to_results(&mut self.result.scatt_result, ampls, GOComponent::Beam);
+        Self::add_amplitudes_to_results(&mut self.result.field_2d, ampls, GOComponent::Beam);
     }
     pub fn solve_far(&mut self) {
         self.solve_far_ext_diff();
@@ -385,7 +383,7 @@ impl Problem {
     }
 
     fn compute_mueller(&mut self) {
-        for result in self.result.scatt_result.iter_mut() {
+        for result in self.result.field_2d.iter_mut() {
             // Convert amplitude matrices to Mueller matrices
             result.mueller_total = result.ampl_total.map(|a| a.to_mueller());
             result.mueller_beam = result.ampl_beam.map(|a| a.to_mueller());
@@ -397,43 +395,44 @@ impl Problem {
         self.solve_near();
         self.solve_far();
         self.compute_mueller();
+        self.try_mueller_to_1d();
 
-        // try compute 1d mueller
-        match self.settings.binning.scheme {
-            Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-            _ => {
-                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-                    Ok((theta, mueller_1d)) => {
-                        // let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
-                        self.result.bins_1d = Some(theta);
-                        self.result.mueller_1d = Some(mueller_1d);
-                    }
-                    Err(e) => {
-                        println!("Failed to compute 1d mueller: {}", e);
-                    }
-                };
-                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
-                    Ok((theta, mueller_1d_beam)) => {
-                        // let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
-                        self.result.bins_1d = Some(theta);
-                        self.result.mueller_1d_beam = Some(mueller_1d_beam);
-                    }
-                    Err(e) => {
-                        println!("Failed to compute 1d mueller (beam): {}", e);
-                    }
-                };
-                match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
-                    Ok((theta, mueller_1d_ext)) => {
-                        // let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
-                        self.result.bins_1d = Some(theta);
-                        self.result.mueller_1d_ext = Some(mueller_1d_ext);
-                    }
-                    Err(e) => {
-                        println!("Failed to compute 1d mueller (ext): {}", e);
-                    }
-                };
-            }
-        }
+        // // try compute 1d mueller
+        // match self.settings.binning.scheme {
+        //     Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
+        //     _ => {
+        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
+        //             Ok((theta, mueller_1d)) => {
+        //                 // let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
+        //                 self.result.bins_1d = Some(theta);
+        //                 self.result.mueller_1d = Some(mueller_1d);
+        //             }
+        //             Err(e) => {
+        //                 println!("Failed to compute 1d mueller: {}", e);
+        //             }
+        //         };
+        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
+        //             Ok((theta, mueller_1d_beam)) => {
+        //                 // let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
+        //                 self.result.bins_1d = Some(theta);
+        //                 self.result.mueller_1d_beam = Some(mueller_1d_beam);
+        //             }
+        //             Err(e) => {
+        //                 println!("Failed to compute 1d mueller (beam): {}", e);
+        //             }
+        //         };
+        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
+        //             Ok((theta, mueller_1d_ext)) => {
+        //                 // let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
+        //                 self.result.bins_1d = Some(theta);
+        //                 self.result.mueller_1d_ext = Some(mueller_1d_ext);
+        //             }
+        //             Err(e) => {
+        //                 println!("Failed to compute 1d mueller (ext): {}", e);
+        //             }
+        //         };
+        //     }
+        // }
     }
 
     pub fn try_mueller_to_1d(&mut self) {
@@ -501,35 +500,43 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        // group mueller by GOComponent
-        let mut muellers_beam = Vec::new();
-        let mut muellers_ext_diff = Vec::new();
-        let mut muellers_total = Vec::new();
-        for result in self.result.scatt_result.iter() {
-            for mueller in result.muellers.iter() {
-                match mueller.meta.class {
-                    GOComponent::Beam => muellers_beam.push(mueller),
-                    GOComponent::ExtDiff => muellers_ext_diff.push(mueller),
-                    GOComponent::Total => muellers_total.push(mueller),
-                }
-            }
-        }
+        // Collect Mueller matrices by component type
+        let mueller_total: Vec<Mueller> = self
+            .result
+            .field_2d
+            .iter()
+            .map(|field| field.mueller_total.unwrap_or_else(Mueller::zeros))
+            .collect();
+
+        let mueller_beam: Vec<Mueller> = self
+            .result
+            .field_2d
+            .iter()
+            .map(|field| field.mueller_beam.unwrap_or_else(Mueller::zeros))
+            .collect();
+
+        let mueller_ext: Vec<Mueller> = self
+            .result
+            .field_2d
+            .iter()
+            .map(|field| field.mueller_ext.unwrap_or_else(Mueller::zeros))
+            .collect();
 
         let _ = output::write_mueller(
             &self.result.bins(),
-            &muellers_total,
+            &mueller_total,
             "",
             &self.settings.directory,
         );
         let _ = output::write_mueller(
             &self.result.bins(),
-            &muellers_beam,
+            &mueller_beam,
             "_beam",
             &self.settings.directory,
         );
         let _ = output::write_mueller(
             &self.result.bins(),
-            &muellers_ext_diff,
+            &mueller_ext,
             "_ext",
             &self.settings.directory,
         );
