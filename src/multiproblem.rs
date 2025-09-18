@@ -260,11 +260,11 @@ impl MultiProblem {
 
     pub fn writeup(&self) {
         // Helper closure to write Mueller matrices to files
-        let write_mueller_grid =
+        let write_mueller_2d =
             |file_suffix: &str,
              mueller_getter: &dyn Fn(&result::ScattResult2D) -> Option<Mueller>|
              -> Result<()> {
-                let file_name = format!("mueller_scatgrid_{}", file_suffix);
+                let file_name = format!("mueller_scatgrid{}", file_suffix);
                 let path = output::output_path(Some(&self.settings.directory), &file_name)?;
                 let file = File::create(&path)?;
                 let mut writer = BufWriter::new(file);
@@ -283,16 +283,41 @@ impl MultiProblem {
                 Ok(())
             };
 
+        let write_mueller_1d =
+            |file_suffix: &str,
+             mueller_getter: &dyn Fn(&result::ScattResult1D) -> Option<Mueller>|
+             -> Result<()> {
+                let file_name = format!("mueller_scatgrid_1d{}", file_suffix);
+                let path = output::output_path(Some(&self.settings.directory), &file_name)?;
+                let file = File::create(&path)?;
+                let mut writer = BufWriter::new(file);
+
+                if let Some(field) = &self.result.field_1d {
+                    for result in field {
+                        let bin = result.bin;
+                        write!(writer, "{} ", bin.center)?;
+
+                        if let Some(mueller) = mueller_getter(result) {
+                            for element in mueller.to_vec() {
+                                write!(writer, "{} ", element)?;
+                            }
+                        }
+                        writeln!(writer)?;
+                    }
+                }
+                Ok(())
+            };
+
         // Write all three Mueller matrix types
-        let _ = write_mueller_grid("", &|r| r.mueller_total);
-        let _ = write_mueller_grid("beam", &|r| r.mueller_beam);
-        let _ = write_mueller_grid("ext", &|r| r.mueller_ext);
+        let _ = write_mueller_2d("", &|r| r.mueller_total);
+        let _ = write_mueller_2d("_beam", &|r| r.mueller_beam);
+        let _ = write_mueller_2d("_ext", &|r| r.mueller_ext);
+        let _ = write_mueller_1d("", &|r| r.mueller_total);
+        let _ = write_mueller_1d("_beam", &|r| r.mueller_beam);
+        let _ = write_mueller_1d("_ext", &|r| r.mueller_ext);
 
         // Write generic results
         let _ = output::write_result(&self.result, &self.settings.directory);
-
-        // Write 1d results (todo)
-        // todo!("Implement 1d results writing")
     }
 }
 
