@@ -48,7 +48,7 @@ impl ScatteringBin for AngleBin {
 // type Mueller = Matrix4<f32>;
 // type Ampl = Matrix2<Complex<f32>>;
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum GOComponent {
     Total,
     Beam,
@@ -648,58 +648,100 @@ impl Results {
 
     /// Computes the parameters of the result
     pub fn compute_params(&mut self, wavelength: f32) -> std::result::Result<(), anyhow::Error> {
-        self.compute_scat_cross(wavelength);
-        self.compute_asymmetry(wavelength);
-        self.compute_ext_cross();
-        self.compute_albedo();
+        // Compute all 4 parameters for Total
+        self.compute_scat_cross(wavelength, GOComponent::Total);
+        self.compute_asymmetry(wavelength, GOComponent::Total);
+        self.compute_ext_cross(GOComponent::Total);
+        self.compute_albedo(GOComponent::Total);
+        
+        // Compute scat_cross and asymmetry for Beam
+        self.compute_scat_cross(wavelength, GOComponent::Beam);
+        self.compute_asymmetry(wavelength, GOComponent::Beam);
+        
+        // Compute scat_cross and asymmetry for ExtDiff
+        self.compute_scat_cross(wavelength, GOComponent::ExtDiff);
+        self.compute_asymmetry(wavelength, GOComponent::ExtDiff);
 
         Ok(())
     }
 
-    pub fn compute_asymmetry(&mut self, wavelength: f32) {
-        if let (Some(field_1d), Some(scatt)) = (&self.field_1d, self.params.scat_cross) {
-            let k = 2.0 * PI / wavelength;
-            self.params.asymettry = Some(integrate_theta_weighted(field_1d, |theta, s11| {
-                theta.sin() * theta.cos() * s11 / (scatt * k.powi(2))
-            }));
+    pub fn compute_asymmetry(&mut self, wavelength: f32, component: GOComponent) {
+        if let Some(field_1d) = &self.field_1d {
+            if let Some(scatt) = self.params.scat_cross.get(&component) {
+                let k = 2.0 * PI / wavelength;
+                let asymmetry = integrate_theta_weighted_component(field_1d, component, |theta, s11| {
+                    theta.sin() * theta.cos() * s11 / (scatt * k.powi(2))
+                });
+                
+                if let Some(val) = asymmetry {
+                    self.params.asymmetry.insert(component, val);
+                }
+            }
         }
     }
 
     /// Computes the scattering cross section from the 1D Mueller matrix
-    pub fn compute_scat_cross(&mut self, wavelength: f32) {
+    pub fn compute_scat_cross(&mut self, wavelength: f32, component: GOComponent) {
         if let Some(field_1d) = &self.field_1d {
             let k = 2.0 * PI / wavelength;
-            self.params.scat_cross = Some(integrate_theta_weighted(field_1d, |theta, s11| {
+            let scat_cross = integrate_theta_weighted_component(field_1d, component, |theta, s11| {
                 theta.sin() * s11 / k.powi(2)
-            }));
+            });
+            
+            if let Some(val) = scat_cross {
+                self.params.scat_cross.insert(component, val);
+            }
         }
     }
 
     /// Computes the extinction cross section from the scattering cross section and absorbed power
-    pub fn compute_ext_cross(&mut self) {
-        match self.params.scat_cross {
-            Some(scat) => {
-                self.params.ext_cross = Some(scat + self.powers.absorbed);
-            }
-            None => {
-                self.params.ext_cross = None;
-            }
+    pub fn compute_ext_cross(&mut self, component: GOComponent) {
+        if let Some(scat) = self.params.scat_cross.get(&component) {
+            // For Total component, add absorbed power; for others, ext = scat (no absorption in partial components)
+            let ext = match component {
+                GOComponent::Total => scat + self.powers.absorbed,
+                GOComponent::Beam | GOComponent::ExtDiff => *scat,
+            };
+            self.params.ext_cross.insert(component, ext);
         }
     }
 
     /// Computes the albedo from the scattering and extinction cross sections
-    pub fn compute_albedo(&mut self) {
-        if let (Some(scat), Some(ext)) = (self.params.scat_cross, self.params.ext_cross) {
-            self.params.albedo = Some(scat / ext);
+    pub fn compute_albedo(&mut self, component: GOComponent) {
+        if let (Some(scat), Some(ext)) = (
+            self.params.scat_cross.get(&component),
+            self.params.ext_cross.get(&component)
+        ) {
+            if *ext > 0.0 {
+                self.params.albedo.insert(component, scat / ext);
+            }
         }
     }
 
     pub fn print(&self) {
         println!("Powers: {:?}", self.powers);
-        println!("Asymmetry: {:?}", self.params.asymettry);
-        println!("Scat Cross: {:?}", self.params.scat_cross);
-        println!("Ext Cross: {:?}", self.params.ext_cross);
-        println!("Albedo: {:?}", self.params.albedo);
+        
+        // Print parameters for each component
+        for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
+            let comp_str = match component {
+                GOComponent::Total => "Total",
+                GOComponent::Beam => "Beam",
+                GOComponent::ExtDiff => "ExtDiff",
+            };
+            
+            if let Some(val) = self.params.asymmetry.get(&component) {
+                println!("{} Asymmetry: {}", comp_str, val);
+            }
+            if let Some(val) = self.params.scat_cross.get(&component) {
+                println!("{} Scat Cross: {}", comp_str, val);
+            }
+            if let Some(val) = self.params.ext_cross.get(&component) {
+                println!("{} Ext Cross: {}", comp_str, val);
+            }
+            if let Some(val) = self.params.albedo.get(&component) {
+                println!("{} Albedo: {}", comp_str, val);
+            }
+        }
     }
 }
 
@@ -787,25 +829,25 @@ impl Results {
     /// Get the asymmetry parameter
     #[getter]
     pub fn get_asymmetry(&self) -> Option<f32> {
-        self.params.asymettry
+        self.params.asymmetry()
     }
 
     /// Get the scattering cross section
     #[getter]
     pub fn get_scat_cross(&self) -> Option<f32> {
-        self.params.scat_cross
+        self.params.scat_cross()
     }
 
     /// Get the extinction cross section
     #[getter]
     pub fn get_ext_cross(&self) -> Option<f32> {
-        self.params.ext_cross
+        self.params.ext_cross()
     }
 
     /// Get the albedo
     #[getter]
     pub fn get_albedo(&self) -> Option<f32> {
-        self.params.albedo
+        self.params.albedo()
     }
 
     /// Get all parameters as a dictionary
@@ -813,10 +855,37 @@ impl Results {
     pub fn get_params(&self) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let dict = pyo3::types::PyDict::new(py);
-            dict.set_item("asymmetry", self.params.asymettry)?;
-            dict.set_item("scat_cross", self.params.scat_cross)?;
-            dict.set_item("ext_cross", self.params.ext_cross)?;
-            dict.set_item("albedo", self.params.albedo)?;
+            
+            // Add backwards-compatible top-level keys for Total component
+            dict.set_item("asymmetry", self.params.asymmetry())?;
+            dict.set_item("scat_cross", self.params.scat_cross())?;
+            dict.set_item("ext_cross", self.params.ext_cross())?;
+            dict.set_item("albedo", self.params.albedo())?;
+            
+            // Add component-specific dictionaries
+            for (comp_name, component) in [
+                ("total", GOComponent::Total),
+                ("beam", GOComponent::Beam),
+                ("ext_diff", GOComponent::ExtDiff),
+            ] {
+                let comp_dict = pyo3::types::PyDict::new(py);
+                
+                if let Some(val) = self.params.asymmetry.get(&component) {
+                    comp_dict.set_item("asymmetry", val)?;
+                }
+                if let Some(val) = self.params.scat_cross.get(&component) {
+                    comp_dict.set_item("scat_cross", val)?;
+                }
+                if let Some(val) = self.params.ext_cross.get(&component) {
+                    comp_dict.set_item("ext_cross", val)?;
+                }
+                if let Some(val) = self.params.albedo.get(&component) {
+                    comp_dict.set_item("albedo", val)?;
+                }
+                
+                dict.set_item(comp_name, comp_dict)?;
+            }
+            
             Ok(dict.into())
         })
     }
@@ -860,4 +929,39 @@ where
             })
         })
         .sum()
+}
+
+/// Helper function to integrate over theta for a specific component with custom weighting
+fn integrate_theta_weighted_component<F>(
+    field_1d: &[ScattResult1D], 
+    component: GOComponent,
+    weight_fn: F
+) -> Option<f32>
+where
+    F: Fn(f32, f32) -> f32, // (theta_radians, s11_value) -> weighted_value
+{
+    let sum: f32 = field_1d
+        .iter()
+        .filter_map(|result| {
+            let mueller = match component {
+                GOComponent::Total => result.mueller_total,
+                GOComponent::Beam => result.mueller_beam,
+                GOComponent::ExtDiff => result.mueller_ext,
+            };
+            
+            mueller.map(|m| {
+                let theta_rad = result.bin.center.to_radians();
+                let s11 = m.s11();
+                let bin_width = result.bin.width().to_radians();
+                weight_fn(theta_rad, s11) * bin_width
+            })
+        })
+        .sum();
+    
+    // Return None if sum is 0 (no data for this component)
+    if sum == 0.0 {
+        None
+    } else {
+        Some(sum)
+    }
 }

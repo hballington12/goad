@@ -132,17 +132,41 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     // Write parameters section
     writeln!(writer, "\n# Parameters")?;
     writeln!(writer, "# ----------")?;
-    if let Some(scat) = result.params.scat_cross {
+    
+    // Write parameters for Total component (backwards compatible)
+    if let Some(scat) = result.params.scat_cross() {
         writeln!(writer, "Scattering Cross Section: {:.6}", scat)?;
     }
-    if let Some(ext) = result.params.ext_cross {
+    if let Some(ext) = result.params.ext_cross() {
         writeln!(writer, "Extinction Cross Section: {:.6}", ext)?;
     }
-    if let Some(albedo) = result.params.albedo {
+    if let Some(albedo) = result.params.albedo() {
         writeln!(writer, "Single Scattering Albedo: {:.6}", albedo)?;
     }
-    if let Some(asym) = result.params.asymettry {
+    if let Some(asym) = result.params.asymmetry() {
         writeln!(writer, "Asymmetry Parameter: {:.6}", asym)?;
+    }
+    
+    // Write component-specific parameters
+    writeln!(writer, "\n# Component-Specific Parameters")?;
+    writeln!(writer, "# ------------------------------")?;
+    
+    for component in [
+        crate::result::GOComponent::Beam,
+        crate::result::GOComponent::ExtDiff
+    ] {
+        let comp_str = match component {
+            crate::result::GOComponent::Beam => "Beam",
+            crate::result::GOComponent::ExtDiff => "ExtDiff",
+            _ => continue,
+        };
+        
+        if let Some(scat) = result.params.scat_cross.get(&component) {
+            writeln!(writer, "{} Scattering Cross Section: {:.6}", comp_str, scat)?;
+        }
+        if let Some(asym) = result.params.asymmetry.get(&component) {
+            writeln!(writer, "{} Asymmetry Parameter: {:.6}", comp_str, asym)?;
+        }
     }
 
     // Write powers section

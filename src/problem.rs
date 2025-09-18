@@ -250,9 +250,11 @@ impl Problem {
 
             // Compute scaling factor (sqrt <- amplitude, not intensity)
             let scale_factor = beam.csa().sqrt() // account for beam cross-sectional area
-                / scale.sqrt() // account for geometry is scaled down to unit size
+                / scale.sqrt() // account for geometry is scaled down to unit size (only depends on geometry)
                 / solid_angle.sqrt() // account for Jacobian: Cartesian to spherical
-                * beam.wavenumber();
+                * 4.0 * std::f32::consts::PI // account for 4pi factor in solid angle
+                ;
+            // *beam.wavenumber();
 
             // Compute far-field amplitude matrix
             let ampl = rotation // rotation from beam plane to scattering plane
