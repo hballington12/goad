@@ -9,7 +9,7 @@ use std::path::PathBuf;
 /// Minimum distance for vertices to be considered the same.
 pub const VERTEX_MERGE_DISTANCE: f32 = 0.001;
 /// Scaling factor for integer coordinates during clipping.
-pub const CLIP_TOLERANCE: f32 = 1e10;
+pub const CLIP_TOLERANCE: f32 = 1e16;
 /// Minimum absolute value of the dot product of two vectors to be considered colinear.
 pub const COLINEAR_THRESHOLD: f32 = 0.001;
 /// Minimum vector length (in geometry units) to be considered non-degenerate.
