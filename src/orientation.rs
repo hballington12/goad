@@ -3,7 +3,6 @@ use nalgebra::Matrix3;
 use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
-use log::{debug, info, trace};
 use pyo3::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
@@ -273,21 +272,11 @@ pub struct Orientations {
 
 impl Orientations {
     pub fn generate(scheme: &Scheme, seed: Option<u64>) -> Orientations {
-        info!("Generating orientations");
         match &scheme {
             Scheme::Uniform {
                 num_orients: num_orientations,
-            } => {
-                info!("Using uniform orientation scheme with {} orientations", num_orientations);
-                if let Some(seed_val) = seed {
-                    debug!("Using random seed: {}", seed_val);
-                } else {
-                    debug!("Using random seed from system entropy");
-                }
-                Orientations::random_uniform(*num_orientations, seed)
-            }
+            } => Orientations::random_uniform(*num_orientations, seed),
             Scheme::Discrete { eulers } => {
-                info!("Using discrete orientation scheme with {} orientations", eulers.len());
                 let alphas: Vec<f32> = eulers.iter().map(|e| e.alpha).collect();
                 let betas: Vec<f32> = eulers.iter().map(|e| e.beta).collect();
                 let gammas: Vec<f32> = eulers.iter().map(|e| e.gamma).collect();
@@ -298,7 +287,6 @@ impl Orientations {
 
     /// Creates a new orientation scheme with the given discrete angles.
     pub fn new_discrete(alphas: Vec<f32>, betas: Vec<f32>, gammas: Vec<f32>) -> Result<Self> {
-        debug!("Creating discrete orientation set with {} angles", alphas.len());
         if alphas.is_empty() || betas.is_empty() || gammas.is_empty() {
             return Err(anyhow::anyhow!("Empty angle list"));
         }
@@ -317,7 +305,6 @@ impl Orientations {
     }
 
     pub fn random_uniform(num_orient: usize, seed: Option<u64>) -> Orientations {
-        debug!("Generating uniform random orientations");
         let mut rng = if let Some(seed) = seed {
             rand::rngs::StdRng::seed_from_u64(seed)
         } else {
@@ -335,7 +322,6 @@ impl Orientations {
             .collect();
 
         let orientations = Orientations::new_discrete(alphas, betas, gammas).unwrap();
-        debug!("Generated {} orientation angles", num_orient);
         orientations
     }
 }

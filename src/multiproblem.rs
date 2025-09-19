@@ -10,7 +10,6 @@ use crate::{
     settings::Settings,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use log::{info, trace};
 use nalgebra::Complex;
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -95,9 +94,7 @@ impl MultiProblem {
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
-        info!("Solving multi-problem");
         // Initialize multi-progress display
-        trace!("Initialising progress bar");
         let m = MultiProgress::new();
         let n = self.orientations.num_orientations;
 
@@ -121,7 +118,6 @@ impl MultiProblem {
         let info_pb = m.add(ProgressBar::new_spinner());
         info_pb.set_style(ProgressStyle::with_template("ℹ️  {msg}").unwrap());
         info_pb.enable_steady_tick(Duration::from_millis(500));
-        trace!("Initialised progress bar");
 
         // Phase 1: Initialization
         status_pb.set_message("Initializing geometry and solver...");
@@ -131,7 +127,6 @@ impl MultiProblem {
         ));
 
         // init a base problem that can be reset
-        trace!("Creating base problem");
         let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
 
         // Phase 2: Main computation

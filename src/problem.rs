@@ -11,8 +11,6 @@ use crate::{
     settings::{load_config, Settings},
 };
 
-use log::{debug, info, trace, warn};
-
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 use pyo3::prelude::*;
 use rayon::prelude::*;
@@ -119,13 +117,10 @@ impl Problem {
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
     pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
-        info!("Creating new problem");
-        debug!("Loading configuration");
         let settings = settings.unwrap_or_else(|| load_config().expect("Failed to load config"));
         let mut geom = geom.unwrap_or_else(|| {
             Geom::from_file(&settings.geom_name).expect("Failed to load geometry")
         });
-        debug!("Initializing geometry");
         init_geom(&settings, &mut geom);
 
         let bins = generate_bins(&settings.binning.scheme);
@@ -141,10 +136,6 @@ impl Problem {
             result: solution,
         };
 
-        info!(
-            "Problem initialized with {} shapes",
-            problem.geom.shapes.len()
-        );
         problem
     }
 
@@ -159,25 +150,20 @@ impl Problem {
 
     /// Initialises the geometry and scales it.
     pub fn init(&mut self) {
-        info!("Initializing problem geometry");
         // Apply geometry scaling if set
         if let Some(scale) = &self.settings.geom_scale {
             self.geom.vector_scale(scale);
-            debug!("Applied geometry scaling: {:?}", scale);
         }
         // Apply distortion if set
         if let Some(distortion) = self.settings.distortion {
             self.geom.distort(distortion, self.settings.seed);
-            debug!("Applied geometry distortion: {:?}", distortion);
         }
         self.geom.recentre();
         self.settings.scale = self.geom.rescale();
-        info!("Geometry recentered and rescaled");
     }
 
     /// Illuminates the problem with a basic initial beam.
     pub fn illuminate(&mut self) {
-        debug!("Creating initial illumination beam");
         let scaled_wavelength = self.settings.wavelength * self.settings.scale;
 
         let beam = basic_initial_beam(
@@ -267,10 +253,6 @@ impl Problem {
     }
 
     pub fn solve_far_ext_diff(&mut self) {
-        debug!(
-            "Processing {} external diffraction beams",
-            self.ext_diff_beam_queue.len()
-        );
         let fov_factor = None; // don't truncate by field of view for external diffraction
         let bins = self.result.bins();
         let ampls = Self::diffract_outbeams(&self.ext_diff_beam_queue, &bins, fov_factor);
@@ -279,7 +261,6 @@ impl Problem {
     }
 
     pub fn solve_far_outbeams(&mut self) {
-        debug!("Processing {} outgoing beams", self.out_beam_queue.len());
         let ampls = match self.settings.mapping {
             Mapping::GeometricOptics => n2f_mapping_go(
                 &mut self.out_beam_queue,
@@ -296,14 +277,12 @@ impl Problem {
         Self::add_amplitudes_to_results(&mut self.result.field_2d, ampls, GOComponent::Beam);
     }
     pub fn solve_far(&mut self) {
-        info!("Computing far-field diffraction");
         self.solve_far_ext_diff();
         self.solve_far_outbeams();
         self.combine_far();
     }
 
     fn compute_mueller(&mut self) {
-        info!("Converting amplitude matrices to Mueller matrices");
         for result in self.result.field_2d.iter_mut() {
             // Convert amplitude matrices to Mueller matrices
             result.mueller_total = result.ampl_total.map(|a| a.to_mueller());
@@ -335,12 +314,10 @@ impl Problem {
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>) {
-        info!("Running problem simulation");
         self.init();
         match euler {
             Some(euler) => {
                 self.orient(euler);
-                debug!("Applied Euler rotation: {:?}", euler);
             }
             None => {
                 // No rotation
@@ -350,17 +327,14 @@ impl Problem {
         self.solve();
         self.try_mueller_to_1d();
         self.try_params();
-        info!("Problem simulation complete");
     }
 
     /// Trace beams to solve the near-field problem.
     pub fn solve_near(&mut self) {
-        info!("Starting near-field beam propagation");
         loop {
             if self.beam_queue.len() == 0 {
                 break;
             }
-            trace!("Beam queue length: {}", self.beam_queue.len());
 
             let input_power = self.result.powers.input;
             let output_power = self.result.powers.output;
@@ -377,7 +351,6 @@ impl Problem {
 
             self.propagate_next();
         }
-        info!("Near-field propagation complete");
     }
 
     pub fn writeup(&self) {
@@ -428,11 +401,8 @@ impl Problem {
     pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
         // Try to pop the next beam from the queue
         let Some(mut beam) = self.beam_queue.pop() else {
-            warn!("No beams left to pop!");
             return None;
         };
-
-        trace!("Propagating beam with power: {:.2e}", beam.power());
 
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam.type_ {
