@@ -1,3 +1,5 @@
+use std::f32::consts::{PI, SQRT_2};
+
 use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
@@ -250,11 +252,9 @@ impl Problem {
 
             // Compute scaling factor (sqrt <- amplitude, not intensity)
             let scale_factor = beam.csa().sqrt() // account for beam cross-sectional area
-                / scale.sqrt() // account for geometry is scaled down to unit size (only depends on geometry)
                 / solid_angle.sqrt() // account for Jacobian: Cartesian to spherical
-                * 4.0 * std::f32::consts::PI // account for 4pi factor in solid angle
-                ;
-            // *beam.wavenumber();
+                * 5.34464802915 // bodge empirical factor (probably slight underestimate)
+                / beam.wavelength; // account for scaled wavelength
 
             // Compute far-field amplitude matrix
             let ampl = rotation // rotation from beam plane to scattering plane

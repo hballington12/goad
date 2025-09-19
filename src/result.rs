@@ -638,11 +638,7 @@ impl Results {
             } else {
                 None
             },
-            mueller_ext: if has_ext {
-                Some(mueller_ext_sum)
-            } else {
-                None
-            },
+            mueller_ext: if has_ext { Some(mueller_ext_sum) } else { None },
         }
     }
 
@@ -653,11 +649,11 @@ impl Results {
         self.compute_asymmetry(wavelength, GOComponent::Total);
         self.compute_ext_cross(GOComponent::Total);
         self.compute_albedo(GOComponent::Total);
-        
+
         // Compute scat_cross and asymmetry for Beam
         self.compute_scat_cross(wavelength, GOComponent::Beam);
         self.compute_asymmetry(wavelength, GOComponent::Beam);
-        
+
         // Compute scat_cross and asymmetry for ExtDiff
         self.compute_scat_cross(wavelength, GOComponent::ExtDiff);
         self.compute_asymmetry(wavelength, GOComponent::ExtDiff);
@@ -669,10 +665,11 @@ impl Results {
         if let Some(field_1d) = &self.field_1d {
             if let Some(scatt) = self.params.scat_cross.get(&component) {
                 let k = 2.0 * PI / wavelength;
-                let asymmetry = integrate_theta_weighted_component(field_1d, component, |theta, s11| {
-                    theta.sin() * theta.cos() * s11 / (scatt * k.powi(2))
-                });
-                
+                let asymmetry =
+                    integrate_theta_weighted_component(field_1d, component, |theta, s11| {
+                        theta.sin() * theta.cos() * s11 / (scatt * k.powi(2))
+                    });
+
                 if let Some(val) = asymmetry {
                     self.params.asymmetry.insert(component, val);
                 }
@@ -684,10 +681,11 @@ impl Results {
     pub fn compute_scat_cross(&mut self, wavelength: f32, component: GOComponent) {
         if let Some(field_1d) = &self.field_1d {
             let k = 2.0 * PI / wavelength;
-            let scat_cross = integrate_theta_weighted_component(field_1d, component, |theta, s11| {
-                theta.sin() * s11 / k.powi(2)
-            });
-            
+            let scat_cross =
+                integrate_theta_weighted_component(field_1d, component, |theta, s11| {
+                    theta.sin() * s11 / k.powi(2)
+                });
+
             if let Some(val) = scat_cross {
                 self.params.scat_cross.insert(component, val);
             }
@@ -710,7 +708,7 @@ impl Results {
     pub fn compute_albedo(&mut self, component: GOComponent) {
         if let (Some(scat), Some(ext)) = (
             self.params.scat_cross.get(&component),
-            self.params.ext_cross.get(&component)
+            self.params.ext_cross.get(&component),
         ) {
             if *ext > 0.0 {
                 self.params.albedo.insert(component, scat / ext);
@@ -720,7 +718,7 @@ impl Results {
 
     pub fn print(&self) {
         println!("Powers: {:?}", self.powers);
-        
+
         // Print parameters for each component
         for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
             let comp_str = match component {
@@ -728,7 +726,7 @@ impl Results {
                 GOComponent::Beam => "Beam",
                 GOComponent::ExtDiff => "ExtDiff",
             };
-            
+
             if let Some(val) = self.params.asymmetry.get(&component) {
                 println!("{} Asymmetry: {}", comp_str, val);
             }
@@ -741,6 +739,12 @@ impl Results {
             if let Some(val) = self.params.albedo.get(&component) {
                 println!("{} Albedo: {}", comp_str, val);
             }
+        }
+        if let Some(val) = self.params.scat_cross.get(&GOComponent::Beam) {
+            println!(
+                "Beam Scat Cross / Output power: {}",
+                val / self.powers.output
+            );
         }
     }
 }
@@ -855,13 +859,13 @@ impl Results {
     pub fn get_params(&self) -> PyResult<PyObject> {
         Python::with_gil(|py| {
             let dict = pyo3::types::PyDict::new(py);
-            
+
             // Add backwards-compatible top-level keys for Total component
             dict.set_item("asymmetry", self.params.asymmetry())?;
             dict.set_item("scat_cross", self.params.scat_cross())?;
             dict.set_item("ext_cross", self.params.ext_cross())?;
             dict.set_item("albedo", self.params.albedo())?;
-            
+
             // Add component-specific dictionaries
             for (comp_name, component) in [
                 ("total", GOComponent::Total),
@@ -869,7 +873,7 @@ impl Results {
                 ("ext_diff", GOComponent::ExtDiff),
             ] {
                 let comp_dict = pyo3::types::PyDict::new(py);
-                
+
                 if let Some(val) = self.params.asymmetry.get(&component) {
                     comp_dict.set_item("asymmetry", val)?;
                 }
@@ -882,10 +886,10 @@ impl Results {
                 if let Some(val) = self.params.albedo.get(&component) {
                     comp_dict.set_item("albedo", val)?;
                 }
-                
+
                 dict.set_item(comp_name, comp_dict)?;
             }
-            
+
             Ok(dict.into())
         })
     }
@@ -933,9 +937,9 @@ where
 
 /// Helper function to integrate over theta for a specific component with custom weighting
 fn integrate_theta_weighted_component<F>(
-    field_1d: &[ScattResult1D], 
+    field_1d: &[ScattResult1D],
     component: GOComponent,
-    weight_fn: F
+    weight_fn: F,
 ) -> Option<f32>
 where
     F: Fn(f32, f32) -> f32, // (theta_radians, s11_value) -> weighted_value
@@ -948,7 +952,7 @@ where
                 GOComponent::Beam => result.mueller_beam,
                 GOComponent::ExtDiff => result.mueller_ext,
             };
-            
+
             mueller.map(|m| {
                 let theta_rad = result.bin.center.to_radians();
                 let s11 = m.s11();
@@ -957,7 +961,7 @@ where
             })
         })
         .sum();
-    
+
     // Return None if sum is 0 (no data for this component)
     if sum == 0.0 {
         None
