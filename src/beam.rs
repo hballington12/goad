@@ -84,7 +84,6 @@ impl Beam {
             0,
             0,
             field,
-            None,
             BeamType::Initial,
             wavelength,
         ))
@@ -104,7 +103,6 @@ impl Beam {
             0,
             0,
             field,
-            None,
             BeamType::Initial,
             wavelength,
         )
@@ -175,7 +173,6 @@ impl Beam {
                     self.rec_count + 1,
                     self.tir_count,
                     Field::new(e_perp, self.prop, ampl).unwrap(),
-                    None,
                     BeamType::ExternalDiff,
                     self.wavelength,
                 );
@@ -221,7 +218,6 @@ impl Beam {
                         beam.rec_count,
                         beam.tir_count,
                         Field::new(beam.field.e_perp, beam.prop, ampl).unwrap(),
-                        beam.variant.clone(),
                         beam.type_.clone(),
                         beam.wavelength,
                     );
@@ -393,8 +389,7 @@ fn create_reflected(
             beam.rec_count, // same recursion count, aligns with Macke 1996
             beam.tir_count + 1,
             Field::new(e_perp, prop, refl_ampl)?,
-            Some(BeamVariant::Tir),
-            BeamType::Default,
+            BeamType::Default(BeamVariant::Tir),
             beam.wavelength,
         )))
     } else {
@@ -409,8 +404,7 @@ fn create_reflected(
             beam.rec_count + 1,
             beam.tir_count,
             Field::new(e_perp, prop, refl_ampl)?,
-            Some(BeamVariant::Refl),
-            BeamType::Default,
+            BeamType::Default(BeamVariant::Refl),
             beam.wavelength,
         )))
     }
@@ -448,8 +442,7 @@ fn create_refracted(
             beam.rec_count + 1,
             beam.tir_count,
             Field::new(e_perp, prop, refr_ampl)?,
-            Some(BeamVariant::Refr),
-            BeamType::Default,
+            BeamType::Default(BeamVariant::Refr),
             beam.wavelength,
         )))
     }
@@ -481,7 +474,6 @@ impl Beam {
                     self.rec_count,
                     self.tir_count,
                     Field::new(self.field.e_perp, self.prop, ampl).unwrap(),
-                    None,
                     BeamType::OutGoing,
                     self.wavelength,
                 ))
@@ -506,10 +498,9 @@ pub struct Beam {
     pub rec_count: i32,
     pub tir_count: i32,
     pub field: Field,
-    pub absorbed_power: f32,          // power absorbed by the medium
-    pub clipping_area: f32,           // total area accounted for by intersections and remainders
-    pub variant: Option<BeamVariant>, // variant of beam, e.g. reflection, refraction, total internal reflection
-    pub type_: BeamType, // type of beam, e.g. initial, default, outgoing, external diff
+    pub absorbed_power: f32, // power absorbed by the medium
+    pub clipping_area: f32,  // total area accounted for by intersections and remainders
+    pub type_: BeamType,     // type of beam, e.g. initial, default, outgoing, external diff
     pub wavelength: f32,
 }
 
@@ -522,7 +513,6 @@ impl Beam {
         rec_count: i32,
         tir_count: i32,
         field: Field,
-        variant: Option<BeamVariant>,
         type_: BeamType,
         wavelength: f32,
     ) -> Self {
@@ -536,7 +526,6 @@ impl Beam {
             field,
             absorbed_power: 0.0,
             clipping_area: 0.0,
-            variant,
             type_,
             wavelength,
         }
@@ -599,7 +588,7 @@ pub enum BeamVariant {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BeamType {
     Initial,
-    Default,
+    Default(BeamVariant),
     OutGoing,
     ExternalDiff,
 }

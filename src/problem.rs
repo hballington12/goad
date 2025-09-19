@@ -406,7 +406,7 @@ impl Problem {
 
         // Compute the outputs by propagating the beam
         let outputs = match &mut beam.type_ {
-            BeamType::Default => self.propagate_default(&mut beam),
+            BeamType::Default(..) => self.propagate_default(&mut beam),
             BeamType::Initial => self.propagate_initial(&mut beam),
             _ => {
                 println!("Unknown beam type, returning empty outputs.");
@@ -422,12 +422,12 @@ impl Problem {
         for output in outputs.iter() {
             let output_power = output.power() / self.settings.scale.powi(2);
             match (&beam.type_, &output.type_) {
-                (BeamType::Default, BeamType::Default) => self.insert_beam(output.clone()),
-                (BeamType::Default, BeamType::OutGoing) => {
+                (BeamType::Default(..), BeamType::Default(..)) => self.insert_beam(output.clone()),
+                (BeamType::Default(..), BeamType::OutGoing) => {
                     self.result.powers.output += output_power;
                     self.insert_outbeam(output.clone());
                 }
-                (BeamType::Initial, BeamType::Default) => {
+                (BeamType::Initial, BeamType::Default(..)) => {
                     self.result.powers.input += output_power;
                     self.insert_beam(output.clone());
                 }
@@ -469,7 +469,7 @@ impl Problem {
         }
 
         // total internal reflection considerations
-        if beam.variant == Some(BeamVariant::Tir) {
+        if let BeamType::Default(BeamVariant::Tir) = beam.type_ {
             if beam.tir_count >= self.settings.max_tir {
                 self.result.powers.trnc_ref += beam.power() / self.settings.scale.powi(2);
                 return Vec::new();
