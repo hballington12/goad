@@ -2,8 +2,7 @@ use anyhow::Result;
 use std::f32::consts::PI;
 
 use geo::Coord;
-#[cfg(feature = "macroquad")]
-use macroquad::prelude::*;
+
 use nalgebra::{Complex, Matrix2, Point3, Vector3};
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
     field::Field,
     fresnel,
     geom::{Face, Geom},
-    helpers, settings,
+    settings,
     snell::get_theta_t,
 };
 
@@ -34,74 +33,7 @@ impl BeamPropagation {
             outputs,
         }
     }
-
-    /// Draws a `Beam Propagation`
-    #[cfg(feature = "macroquad")]
-    pub fn draw(&self) {
-        // draw the input
-        #[cfg(feature = "macroquad")]
-        helpers::draw_face(&self.input.face, YELLOW, 4.0);
-        // draw the outputs
-        for beam in &self.outputs {
-            if beam.type_ == BeamType::Default {
-                #[cfg(feature = "macroquad")]
-                helpers::draw_face(&beam.face, BLUE, 4.0);
-            } else if beam.type_ == BeamType::OutGoing {
-                #[cfg(feature = "macroquad")]
-                helpers::draw_face(&beam.face, RED, 3.0);
-            }
-        }
-        let input_mid = self.input.face.data().midpoint;
-
-        // // draw lines from the outputs midpoints to the input
-        // let line_strings: Vec<_> = self
-        //     .outputs
-        //     .iter()
-        //     .map(|x| Self::get_line(&x.data().face.midpoint(), &self.input))
-        //     .collect();
-
-        // draw lines from all vertices of outputs to the input
-        let mut line_strings = Vec::new();
-        for output in &self.outputs {
-            for vertex in &output.face.data().exterior {
-                line_strings.push(Self::get_line(&vertex, &self.input));
-            }
-        }
-
-        // draw a small line in the direction of propagation
-        let length = 1.0;
-        let propagation_line = vec![vec![
-            Coord {
-                x: input_mid.coords.x,
-                y: input_mid.coords.y,
-            },
-            Coord {
-                x: input_mid.coords.x + self.input.prop.x * length,
-                y: input_mid.coords.y + self.input.prop.y * length,
-            },
-        ]];
-
-        // draw a small line in the direction of normal
-        let length = 1.5;
-        let normal_line = vec![vec![
-            Coord {
-                x: input_mid.coords.x,
-                y: input_mid.coords.y,
-            },
-            Coord {
-                x: input_mid.coords.x + self.input.face.data().normal.x * length,
-                y: input_mid.coords.y + self.input.face.data().normal.y * length,
-            },
-        ]];
-
-        #[cfg(feature = "macroquad")]
-        helpers::lines_to_screen(line_strings, RED, 2.0);
-        #[cfg(feature = "macroquad")]
-        helpers::lines_to_screen(propagation_line, MAGENTA, 5.0);
-        #[cfg(feature = "macroquad")]
-        helpers::lines_to_screen(normal_line, WHITE, 2.5);
-    }
-
+    #[allow(dead_code)]
     fn get_line(point: &Point3<f32>, input: &Beam) -> Vec<Coord<f32>> {
         let output_mid = point;
         let input_mid = input.face.data().midpoint;

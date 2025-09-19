@@ -7,8 +7,6 @@ use crate::bins::SolidAngleBin;
 use crate::params::Params;
 use crate::powers::Powers;
 use itertools::Itertools;
-#[cfg(feature = "macroquad")]
-use macroquad::prelude::*;
 use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
 use pyo3::prelude::*;
