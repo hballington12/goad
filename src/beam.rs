@@ -639,7 +639,15 @@ impl Beam {
                 let ampl = self.field.ampl;
                 let prop = self.prop;
                 let vk7 = self.field.e_perp;
-                diff::diffraction(verts, ampl, prop, vk7, bins, self.wavenumber(), fov_factor)
+                diff::n2f_aperture_diffraction(
+                    verts,
+                    ampl,
+                    prop,
+                    vk7,
+                    bins,
+                    self.wavenumber(),
+                    fov_factor,
+                )
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");

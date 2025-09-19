@@ -1,8 +1,8 @@
-use crate::bins::get_n_simple;
+use crate::diff::n2f_mapping_go;
 use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
-    bins::{generate_bins, BinningScheme, Scheme, SolidAngleBin},
+    bins::{generate_bins, SolidAngleBin},
     diff::Mapping,
     field::Field,
     geom::{Face, Geom},
@@ -194,85 +194,6 @@ impl Problem {
         }
     }
 
-    /// Helper function to apply amplitude matrix rotations
-    fn go_outbeams(
-        beams: &mut Vec<Beam>,
-        binning: &BinningScheme,
-        bins: &[SolidAngleBin],
-    ) -> Vec<Ampl> {
-        // Create a vector to store the amplitudes
-        let mut amplitudes = vec![Ampl::zeros(); bins.len()];
-
-        // Precompute theta and phi spacings if using Simple binning
-        let (delta_theta, delta_phi) = match binning.scheme {
-            Scheme::Simple { num_theta, num_phi } => {
-                let delta_theta = 180.0 / (num_theta as f32);
-                let delta_phi = 360.0 / (num_phi as f32);
-                (Some(delta_theta), Some(delta_phi))
-            }
-            Scheme::Interval { .. } => (None, None),
-            Scheme::Custom { .. } => (None, None),
-        };
-
-        for beam in beams.iter() {
-            // Get beam scattering angles
-            let (theta, phi) = beam.get_scattering_angles();
-
-            // Map scattering angles to corresponding bin
-            let Some(n) = (match &binning.scheme {
-                Scheme::Simple { num_theta, num_phi } => {
-                    // Safe to unwrap because we know the scheme is Simple
-                    get_n_simple(
-                        *num_theta,
-                        *num_phi,
-                        delta_theta.unwrap(),
-                        delta_phi.unwrap(),
-                        theta,
-                        phi,
-                    )
-                }
-                Scheme::Interval { .. } => get_n_linear_search(bins, theta, phi),
-                Scheme::Custom { .. } => {
-                    todo!("GO outbeam is not yet supported for custom binning.")
-                }
-            }) else {
-                continue;
-            };
-
-            // Get amplitude rotation matrices
-            let (rotation, prerotation) = get_mapping_rotations(beam, phi);
-
-            // Calculate the reference phase correction
-            let phase_correction = get_reference_phase(beam);
-
-            // Compute solid angle
-            let solid_angle = &bins[n].solid_angle();
-
-            // Compute scaling factor (sqrt <- amplitude, not intensity)
-            let scale_factor = beam.csa().sqrt() // account for beam cross-sectional area
-                / solid_angle.sqrt() // account for Jacobian: Cartesian to spherical
-                * 5.34464802915 // bodge empirical factor (probably slight underestimate)
-                / beam.wavelength; // account for scaled wavelength
-
-            // Compute far-field amplitude matrix
-            let ampl = rotation // rotation from beam plane to scattering plane
-                * beam.field.ampl // outgoing beam amplitude matrix
-                * prerotation // pre-rotation of the initial incidence
-                * Complex::new(scale_factor, 0.0) // amplitude scaling factor
-                * phase_correction; // reference phase correction
-
-            // sum the far-field amplitude matrix, reduce to mueller later
-            amplitudes[n] += ampl;
-            // or, add mueller directly now (no interference between beams)
-            // let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
-            // for i in 0..16 {
-            //     mueller_out[(n, i)] += mueller[(0, i)];
-            // }
-        }
-
-        amplitudes
-    }
-
     fn diffract_outbeams(
         queue: &[Beam],
         bins: &[SolidAngleBin],
@@ -289,25 +210,6 @@ impl Problem {
                     acc
                 },
             )
-
-        // // Update the appropriate amplitude matrices based on component type
-        // for (result, ampl) in results.scatt_result.iter_mut().zip(ampl_far_field) {
-        //     // Skip invalid amplitudes (NaN or infinite values)
-        //     if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
-        //         continue;
-        //     }
-
-        //     // Select and update the target amplitude matrix
-        //     let target_ampl = match component {
-        //         GOComponent::Total => &mut result.ampl_total,
-        //         GOComponent::Beam => &mut result.ampl_beam,
-        //         GOComponent::ExtDiff => &mut result.ampl_ext,
-        //     };
-
-        //     if let Some(ampl_matrix) = target_ampl.as_mut() {
-        //         *ampl_matrix += ampl;
-        //     }
-        // }
     }
 
     /// Combines the external diffraction and outbeams to get the far-field solution.
@@ -361,7 +263,7 @@ impl Problem {
 
     pub fn solve_far_outbeams(&mut self) {
         let ampls = match self.settings.mapping {
-            Mapping::GeometricOptics => Self::go_outbeams(
+            Mapping::GeometricOptics => n2f_mapping_go(
                 &mut self.out_beam_queue,
                 &self.settings.binning,
                 &self.result.bins(),
@@ -395,43 +297,6 @@ impl Problem {
         self.solve_far();
         self.compute_mueller();
         self.try_mueller_to_1d();
-
-        // // try compute 1d mueller
-        // match self.settings.binning.scheme {
-        //     Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-        //     _ => {
-        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-        //             Ok((theta, mueller_1d)) => {
-        //                 // let _ = output::write_mueller_1d(&theta, &mueller_1d, "");
-        //                 self.result.bins_1d = Some(theta);
-        //                 self.result.mueller_1d = Some(mueller_1d);
-        //             }
-        //             Err(e) => {
-        //                 println!("Failed to compute 1d mueller: {}", e);
-        //             }
-        //         };
-        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
-        //             Ok((theta, mueller_1d_beam)) => {
-        //                 // let _ = output::write_mueller_1d(&theta, &mueller_1d_beam, "_beam");
-        //                 self.result.bins_1d = Some(theta);
-        //                 self.result.mueller_1d_beam = Some(mueller_1d_beam);
-        //             }
-        //             Err(e) => {
-        //                 println!("Failed to compute 1d mueller (beam): {}", e);
-        //             }
-        //         };
-        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
-        //             Ok((theta, mueller_1d_ext)) => {
-        //                 // let _ = output::write_mueller_1d(&theta, &mueller_1d_ext, "_ext");
-        //                 self.result.bins_1d = Some(theta);
-        //                 self.result.mueller_1d_ext = Some(mueller_1d_ext);
-        //             }
-        //             Err(e) => {
-        //                 println!("Failed to compute 1d mueller (ext): {}", e);
-        //             }
-        //         };
-        //     }
-        // }
     }
 
     pub fn try_mueller_to_1d(&mut self) {
@@ -681,46 +546,6 @@ impl Problem {
             panic!("Error rotating geometry: {}", error);
         }
     }
-}
-
-/// Returns the reference phase correction for accounting for how far the beam must travel to reach a point on the scattering sphere in the far-field.
-fn get_reference_phase(beam: &Beam) -> Complex<f32> {
-    let exp_factor = {
-        let position = beam.face.data().midpoint.coords;
-        let correction = -beam.prop.dot(&position) * beam.wavenumber();
-        Complex::cis(correction)
-    };
-    exp_factor
-}
-
-fn get_mapping_rotations(beam: &Beam, phi: f32) -> (Matrix2<Complex<f32>>, Matrix2<Complex<f32>>) {
-    let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
-    let hc = Vector3::new(sin_phi, -cos_phi, 0.0);
-    let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
-
-    let prerotation = Field::rotation_matrix(
-        Vector3::x(),
-        Vector3::new(-sin_phi, cos_phi, 0.0),
-        -Vector3::z(),
-    )
-    .transpose();
-    (rotation.map(Complex::from), prerotation.map(Complex::from))
-}
-
-fn get_n_linear_search(bins: &[SolidAngleBin], theta: f32, phi: f32) -> Option<usize> {
-    // Find the corresponding bin in the bins array
-    let mut bin_idx = None;
-    for (i, bin) in bins.iter().enumerate() {
-        if theta >= bin.theta_bin.min
-            && theta < bin.theta_bin.max
-            && phi >= bin.phi_bin.min
-            && phi < bin.phi_bin.max
-        {
-            bin_idx = Some(i);
-            break;
-        }
-    }
-    bin_idx
 }
 
 /// Collects a 2d array as a list of lists.

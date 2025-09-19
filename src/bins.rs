@@ -334,3 +334,20 @@ pub fn get_n_simple(
     let n_phi = ((phi / delta_phi).floor() as usize).min(num_phi - 1);
     Some(n_theta * num_phi + n_phi)
 }
+
+/// Gets the index of a theta-phi bin by linearly searching through the bins until a match is found. Returns `None` if no match is found.
+pub fn get_n_linear_search(bins: &[SolidAngleBin], theta: f32, phi: f32) -> Option<usize> {
+    // Find the corresponding bin in the bins array
+    let mut bin_idx = None;
+    for (i, bin) in bins.iter().enumerate() {
+        if theta >= bin.theta_bin.min
+            && theta < bin.theta_bin.max
+            && phi >= bin.phi_bin.min
+            && phi < bin.phi_bin.max
+        {
+            bin_idx = Some(i);
+            break;
+        }
+    }
+    bin_idx
+}

@@ -2,9 +2,11 @@ use std::f32::consts::PI;
 use std::fmt::Debug;
 
 use crate::bins::AngleBin;
+use crate::bins::Scheme;
 use crate::bins::SolidAngleBin;
 use crate::params::Params;
 use crate::powers::Powers;
+use itertools::Itertools;
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
 use nalgebra::Matrix4;
@@ -332,9 +334,6 @@ impl Results {
     }
 
     pub fn try_mueller_to_1d(&mut self, binning_scheme: &crate::bins::Scheme) {
-        use crate::bins::Scheme;
-        use itertools::Itertools;
-
         // Step 1: Check scheme compatibility
         match binning_scheme {
             Scheme::Custom { .. } => return, // Skip custom binning
