@@ -50,7 +50,6 @@ impl<'a> OutputManager<'a> {
         // Write enabled outputs
         for writer in writers {
             if writer.is_enabled(&self.settings.output) {
-                println!("Writing {}", writer.filename());
                 writer.write(output_dir)?;
             }
         }
@@ -72,7 +71,6 @@ impl<'a> OutputManager<'a> {
         // Write 2D Mueller matrices
         if self.settings.output.mueller_2d {
             if config.total {
-                println!("Writing mueller_scatgrid");
                 let muellers: Vec<Mueller> = self
                     .results
                     .field_2d
@@ -82,7 +80,6 @@ impl<'a> OutputManager<'a> {
                 write_mueller(&self.results.bins(), &muellers, "", output_dir)?;
             }
             if config.beam {
-                println!("Writing mueller_scatgrid_beam");
                 let muellers: Vec<Mueller> = self
                     .results
                     .field_2d
@@ -92,7 +89,6 @@ impl<'a> OutputManager<'a> {
                 write_mueller(&self.results.bins(), &muellers, "_beam", output_dir)?;
             }
             if config.external {
-                println!("Writing mueller_scatgrid_ext");
                 let muellers: Vec<Mueller> = self
                     .results
                     .field_2d
@@ -105,10 +101,31 @@ impl<'a> OutputManager<'a> {
 
         // Write 1D Mueller matrices
         if self.settings.output.mueller_1d {
-            if let Some(_field_1d) = &self.results.field_1d {
-                // TODO: Implement 1D Mueller matrix writing
-                // This would require updating the existing commented out write_mueller_1d function
-                println!("1D Mueller matrix writing not yet implemented");
+            if let Some(field_1d) = &self.results.field_1d {
+                if config.total {
+                    write_mueller_1d(
+                        "",
+                        field_1d,
+                        &|r: &crate::result::ScattResult1D| r.mueller_total.clone(),
+                        output_dir,
+                    )?;
+                }
+                if config.beam {
+                    write_mueller_1d(
+                        "_beam",
+                        field_1d,
+                        &|r: &crate::result::ScattResult1D| r.mueller_beam.clone(),
+                        output_dir,
+                    )?;
+                }
+                if config.external {
+                    write_mueller_1d(
+                        "_ext",
+                        field_1d,
+                        &|r: &crate::result::ScattResult1D| r.mueller_ext.clone(),
+                        output_dir,
+                    )?;
+                }
             }
         }
 
@@ -216,6 +233,36 @@ pub fn write_mueller(
         write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
         for element in mueller.to_vec().into_iter() {
             write!(writer, "{} ", element)?;
+        }
+        writeln!(writer)?;
+    }
+
+    Ok(())
+}
+
+/// Write the 1D Mueller matrix to a file
+pub fn write_mueller_1d<F>(
+    suffix: &str,
+    field_1d: &[crate::result::ScattResult1D],
+    mueller_getter: F,
+    output_dir: &Path,
+) -> Result<()>
+where
+    F: Fn(&crate::result::ScattResult1D) -> Option<Mueller>,
+{
+    let file_name = format!("mueller_scatgrid_1d{}", suffix);
+    let path = output_path(Some(output_dir), &file_name)?;
+    let file = File::create(&path)?;
+    let mut writer = BufWriter::new(file);
+
+    for result in field_1d {
+        let bin = result.bin;
+        write!(writer, "{} ", bin.center)?;
+
+        if let Some(mueller) = mueller_getter(result) {
+            for element in mueller.to_vec() {
+                write!(writer, "{} ", element)?;
+            }
         }
         writeln!(writer)?;
     }
@@ -344,7 +391,6 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     //     writeln!(writer, "Number of 1D bins: {}", bins_1d.len())?;
     // }
 
-    println!("Results written to: {}", path.display());
     Ok(())
 }
 

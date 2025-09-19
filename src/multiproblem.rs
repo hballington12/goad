@@ -15,6 +15,7 @@ use macroquad::prelude::*;
 use nalgebra::Complex;
 use pyo3::prelude::*;
 use rayon::prelude::*;
+use std::time::Duration;
 
 /// Multi-orientation light scattering simulation for a single geometry.
 ///
@@ -95,23 +96,47 @@ impl MultiProblem {
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
-        // let start = Instant::now();
-        // println!("Solving problem...");
-
-        // init a base problem that can be reset
-        let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
-
+        // Initialize multi-progress display
         let m = MultiProgress::new();
         let n = self.orientations.num_orientations;
+        
+        // Status spinner (top) - shows current phase
+        let status_pb = m.add(ProgressBar::new_spinner());
+        status_pb.set_style(
+            ProgressStyle::with_template("{spinner:.cyan} Status: {msg}")
+                .unwrap()
+        );
+        status_pb.enable_steady_tick(Duration::from_millis(100));
+        
+        // Main progress bar for orientations
         let pb = m.add(ProgressBar::new(n as u64));
         pb.set_style(
             ProgressStyle::with_template(
-            "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg} ETA: {eta_precise}",
+            "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
             )
             .unwrap()
             .progress_chars("█▇▆▅▄▃▂▁")
         );
-        pb.set_message("orientation".to_string());
+        pb.set_message("Computing orientations");
+        
+        // Info display (bottom) - shows additional context
+        let info_pb = m.add(ProgressBar::new_spinner());
+        info_pb.set_style(
+            ProgressStyle::with_template("ℹ️  {msg}")
+                .unwrap()
+        );
+        info_pb.enable_steady_tick(Duration::from_millis(500));
+        
+        // Phase 1: Initialization
+        status_pb.set_message("Initializing geometry and solver...");
+        info_pb.set_message(format!("Geometry: {} | Orientations: {}", self.settings.geom_name, n));
+        
+        // init a base problem that can be reset
+        let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
+        
+        // Phase 2: Main computation
+        status_pb.set_message("Running orientation averaging...");
+        info_pb.set_message(format!("Processing {} orientations in parallel", n));
 
         // Solve for each orientation and reduce results on the fly
         self.result = self
@@ -134,11 +159,29 @@ impl MultiProblem {
                 },
                 |accum, item| self.reduce_results(accum, item),
             );
-
+        
+        // Phase 3: Post-processing
+        pb.finish_with_message("Orientations complete");
+        status_pb.set_message("Post-processing results...");
+        
         // Normalize results by the number of orientations
+        info_pb.set_message("Normalizing by orientation count...");
         self.normalize_results(self.orientations.num_orientations as f32);
+        
+        // Compute 1D integration
+        info_pb.set_message("Computing 1D integrated Mueller matrices...");
         self.result.try_mueller_to_1d(&self.settings.binning.scheme);
+        
+        // Compute derived parameters
+        info_pb.set_message("Computing scattering parameters...");
         let _ = self.result.compute_params(self.settings.wavelength);
+        
+        // Phase 4: Complete
+        status_pb.finish_with_message("✓ Computation complete");
+        info_pb.finish_with_message(format!(
+            "Power ratio: {:.3} | Results ready for output",
+            self.result.powers.output / self.result.powers.input.max(1e-10)
+        ));
     }
 
     /// Combines two Results objects by adding their fields
@@ -206,9 +249,22 @@ impl MultiProblem {
     }
 
     pub fn writeup(&self) {
+        // Create progress display for writing phase
+        let m = MultiProgress::new();
+        
+        let status_pb = m.add(ProgressBar::new_spinner());
+        status_pb.set_style(
+            ProgressStyle::with_template("{spinner:.cyan} Writing: {msg}")
+                .unwrap()
+        );
+        status_pb.enable_steady_tick(Duration::from_millis(100));
+        status_pb.set_message("Preparing output files...");
+        
         // Use the new unified output system
         let output_manager = output::OutputManager::new(&self.settings, &self.result);
         let _ = output_manager.write_all();
+        
+        status_pb.finish_with_message(format!("✓ Output written to {}", self.settings.directory.display()));
     }
 }
 
