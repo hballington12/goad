@@ -13,6 +13,11 @@ impl SolidAngleBin {
     pub fn new(theta_bin: AngleBin, phi_bin: AngleBin) -> Self {
         SolidAngleBin { theta_bin, phi_bin }
     }
+    pub fn solid_angle(&self) -> f32 {
+        2.0 * (self.theta_bin.center).to_radians().sin().abs()
+            * (0.5 * self.theta_bin.width()).to_radians().sin()
+            * self.phi_bin.width().to_radians()
+    }
 }
 
 /// Represents an angular bin with edges and center. Fields: `min`, `max`, `center`
@@ -314,4 +319,18 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<SolidAngleBin> {
 #[derive(Debug, Deserialize)]
 struct CustomBins {
     _bins: Vec<(f32, f32)>,
+}
+
+/// Gets the index of a theta-phi bin, assuming a `Simple` binning scheme, given an input theta and phi.
+pub fn get_n_simple(
+    num_theta: usize,
+    num_phi: usize,
+    delta_theta: f32,
+    delta_phi: f32,
+    theta: f32,
+    phi: f32,
+) -> Option<usize> {
+    let n_theta = ((theta / delta_theta).floor() as usize).min(num_theta - 1);
+    let n_phi = ((phi / delta_phi).floor() as usize).min(num_phi - 1);
+    Some(n_theta * num_phi + n_phi)
 }

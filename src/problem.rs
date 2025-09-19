@@ -1,3 +1,4 @@
+use crate::bins::get_n_simple;
 use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
@@ -245,7 +246,7 @@ impl Problem {
             let phase_correction = get_reference_phase(beam);
 
             // Compute solid angle
-            let solid_angle = get_solid_angle(&bins[n]);
+            let solid_angle = &bins[n].solid_angle();
 
             // Compute scaling factor (sqrt <- amplitude, not intensity)
             let scale_factor = beam.csa().sqrt() // account for beam cross-sectional area
@@ -682,13 +683,6 @@ impl Problem {
     }
 }
 
-// TODO: move to bins.rs
-fn get_solid_angle(bin: &SolidAngleBin) -> f32 {
-    2.0 * (bin.theta_bin.center).to_radians().sin().abs()
-        * (0.5 * bin.theta_bin.width()).to_radians().sin()
-        * bin.phi_bin.width().to_radians()
-}
-
 /// Returns the reference phase correction for accounting for how far the beam must travel to reach a point on the scattering sphere in the far-field.
 fn get_reference_phase(beam: &Beam) -> Complex<f32> {
     let exp_factor = {
@@ -727,20 +721,6 @@ fn get_n_linear_search(bins: &[SolidAngleBin], theta: f32, phi: f32) -> Option<u
         }
     }
     bin_idx
-}
-
-// TODO: Move to bins.rs
-fn get_n_simple(
-    num_theta: usize,
-    num_phi: usize,
-    delta_theta: f32,
-    delta_phi: f32,
-    theta: f32,
-    phi: f32,
-) -> Option<usize> {
-    let n_theta = ((theta / delta_theta).floor() as usize).min(num_theta - 1);
-    let n_phi = ((phi / delta_phi).floor() as usize).min(num_phi - 1);
-    Some(n_theta * num_phi + n_phi)
 }
 
 /// Collects a 2d array as a list of lists.
