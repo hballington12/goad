@@ -1,5 +1,3 @@
-use std::f32::consts::{PI, SQRT_2};
-
 use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamType, BeamVariant},
@@ -200,7 +198,6 @@ impl Problem {
         beams: &mut Vec<Beam>,
         binning: &BinningScheme,
         bins: &[SolidAngleBin],
-        scale: f32,
     ) -> Vec<Ampl> {
         // Create a vector to store the amplitudes
         let mut amplitudes = vec![Ampl::zeros(); bins.len()];
@@ -367,7 +364,6 @@ impl Problem {
                 &mut self.out_beam_queue,
                 &self.settings.binning,
                 &self.result.bins(),
-                self.settings.scale,
             ),
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams

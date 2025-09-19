@@ -2,7 +2,7 @@ use goad::{
     bins::{self, BinningScheme},
     multiproblem::MultiProblem,
     orientation::Euler,
-    problem::collect_mueller,
+    result::MuellerMatrix,
     settings,
 };
 use helpers::{compare_results, load_reference_mueller};
@@ -33,7 +33,12 @@ fn fixed_hex_30_30_30() {
     let mut multiproblem = MultiProblem::new(None, Some(settings));
     multiproblem.solve();
 
-    let result = collect_mueller(&multiproblem.result.mueller);
+    let result = multiproblem
+        .result
+        .field_2d
+        .iter()
+        .map(|m| m.mueller_total.unwrap().to_vec())
+        .collect::<Vec<Vec<f32>>>();
     let reference = load_reference_mueller("fixed_hex_30_30_30_mueller_scatgrid").unwrap();
     compare_results(result, reference, FRAC_TOL, ABS_TOL).unwrap();
 }
@@ -60,7 +65,12 @@ fn fixed_hex_30_20_20() {
     let mut multiproblem = MultiProblem::new(None, Some(settings));
     multiproblem.solve();
 
-    let result = collect_mueller(&multiproblem.result.mueller);
+    let result = multiproblem
+        .result
+        .field_2d
+        .iter()
+        .map(|m| m.mueller_total.unwrap().to_vec())
+        .collect::<Vec<Vec<f32>>>();
     let reference = load_reference_mueller("fixed_hex_30_20_20_mueller_scatgrid").unwrap();
     compare_results(result, reference, FRAC_TOL, ABS_TOL).unwrap();
 }

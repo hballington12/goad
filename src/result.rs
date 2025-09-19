@@ -916,25 +916,6 @@ impl Results {
     }
 }
 
-/// Helper function to integrate over theta with custom weighting
-/// Takes field_1d results and applies a weight function to (theta_radians, s11_value)
-fn integrate_theta_weighted<F>(field_1d: &[ScattResult1D], weight_fn: F) -> f32
-where
-    F: Fn(f32, f32) -> f32, // (theta_radians, s11_value) -> weighted_value
-{
-    field_1d
-        .iter()
-        .filter_map(|result| {
-            result.mueller_total.map(|mueller| {
-                let theta_rad = result.bin.center.to_radians();
-                let s11 = mueller.s11();
-                let bin_width = result.bin.width().to_radians();
-                weight_fn(theta_rad, s11) * bin_width
-            })
-        })
-        .sum()
-}
-
 /// Helper function to integrate over theta for a specific component with custom weighting
 fn integrate_theta_weighted_component<F>(
     field_1d: &[ScattResult1D],
