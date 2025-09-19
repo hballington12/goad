@@ -84,7 +84,7 @@ impl Beam {
             0,
             0,
             field,
-            BeamType::Initial,
+            BeamVariant::Initial,
             wavelength,
         ))
     }
@@ -103,7 +103,7 @@ impl Beam {
             0,
             0,
             field,
-            BeamType::Initial,
+            BeamVariant::Initial,
             wavelength,
         )
     }
@@ -165,7 +165,7 @@ impl Beam {
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
-            if self.type_ == BeamType::Initial {
+            if self.variant == BeamVariant::Initial {
                 let external_diff = Beam::new(
                     face.clone(),
                     self.prop,
@@ -173,7 +173,7 @@ impl Beam {
                     self.rec_count + 1,
                     self.tir_count,
                     Field::new(e_perp, self.prop, ampl).unwrap(),
-                    BeamType::ExternalDiff,
+                    BeamVariant::ExternalDiff,
                     self.wavelength,
                 );
                 outputs.push(external_diff);
@@ -218,7 +218,7 @@ impl Beam {
                         beam.rec_count,
                         beam.tir_count,
                         Field::new(beam.field.e_perp, beam.prop, ampl).unwrap(),
-                        beam.type_.clone(),
+                        beam.variant.clone(),
                         beam.wavelength,
                     );
 
@@ -389,7 +389,7 @@ fn create_reflected(
             beam.rec_count, // same recursion count, aligns with Macke 1996
             beam.tir_count + 1,
             Field::new(e_perp, prop, refl_ampl)?,
-            BeamType::Default(BeamVariant::Tir),
+            BeamVariant::Default(DefaultBeamVariant::Tir),
             beam.wavelength,
         )))
     } else {
@@ -404,7 +404,7 @@ fn create_reflected(
             beam.rec_count + 1,
             beam.tir_count,
             Field::new(e_perp, prop, refl_ampl)?,
-            BeamType::Default(BeamVariant::Refl),
+            BeamVariant::Default(DefaultBeamVariant::Refl),
             beam.wavelength,
         )))
     }
@@ -442,7 +442,7 @@ fn create_refracted(
             beam.rec_count + 1,
             beam.tir_count,
             Field::new(e_perp, prop, refr_ampl)?,
-            BeamType::Default(BeamVariant::Refr),
+            BeamVariant::Default(DefaultBeamVariant::Refr),
             beam.wavelength,
         )))
     }
@@ -474,7 +474,7 @@ impl Beam {
                     self.rec_count,
                     self.tir_count,
                     Field::new(self.field.e_perp, self.prop, ampl).unwrap(),
-                    BeamType::OutGoing,
+                    BeamVariant::OutGoing,
                     self.wavelength,
                 ))
             })
@@ -498,9 +498,9 @@ pub struct Beam {
     pub rec_count: i32,
     pub tir_count: i32,
     pub field: Field,
-    pub absorbed_power: f32, // power absorbed by the medium
-    pub clipping_area: f32,  // total area accounted for by intersections and remainders
-    pub type_: BeamType,     // type of beam, e.g. initial, default, outgoing, external diff
+    pub absorbed_power: f32,  // power absorbed by the medium
+    pub clipping_area: f32,   // total area accounted for by intersections and remainders
+    pub variant: BeamVariant, // type of beam, e.g. initial, default, outgoing, external diff
     pub wavelength: f32,
 }
 
@@ -513,7 +513,7 @@ impl Beam {
         rec_count: i32,
         tir_count: i32,
         field: Field,
-        type_: BeamType,
+        variant: BeamVariant,
         wavelength: f32,
     ) -> Self {
         let prop = prop.normalize();
@@ -526,7 +526,7 @@ impl Beam {
             field,
             absorbed_power: 0.0,
             clipping_area: 0.0,
-            type_,
+            variant,
             wavelength,
         }
     }
@@ -579,16 +579,16 @@ impl Beam {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BeamVariant {
+pub enum DefaultBeamVariant {
     Refl, // refraction
     Refr, // reflection
     Tir,  // total internal reflection
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum BeamType {
+pub enum BeamVariant {
     Initial,
-    Default(BeamVariant),
+    Default(DefaultBeamVariant),
     OutGoing,
     ExternalDiff,
 }

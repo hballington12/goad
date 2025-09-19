@@ -1,7 +1,7 @@
 use crate::diff::n2f_mapping_go;
 use crate::result::MuellerMatrix;
 use crate::{
-    beam::{Beam, BeamPropagation, BeamType, BeamVariant},
+    beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     bins::{generate_bins, SolidAngleBin},
     diff::Mapping,
     field::Field,
@@ -405,9 +405,9 @@ impl Problem {
         };
 
         // Compute the outputs by propagating the beam
-        let outputs = match &mut beam.type_ {
-            BeamType::Default(..) => self.propagate_default(&mut beam),
-            BeamType::Initial => self.propagate_initial(&mut beam),
+        let outputs = match &mut beam.variant {
+            BeamVariant::Default(..) => self.propagate_default(&mut beam),
+            BeamVariant::Initial => self.propagate_initial(&mut beam),
             _ => {
                 println!("Unknown beam type, returning empty outputs.");
                 Vec::new()
@@ -421,17 +421,19 @@ impl Problem {
         // Process each output beam
         for output in outputs.iter() {
             let output_power = output.power() / self.settings.scale.powi(2);
-            match (&beam.type_, &output.type_) {
-                (BeamType::Default(..), BeamType::Default(..)) => self.insert_beam(output.clone()),
-                (BeamType::Default(..), BeamType::OutGoing) => {
+            match (&beam.variant, &output.variant) {
+                (BeamVariant::Default(..), BeamVariant::Default(..)) => {
+                    self.insert_beam(output.clone())
+                }
+                (BeamVariant::Default(..), BeamVariant::OutGoing) => {
                     self.result.powers.output += output_power;
                     self.insert_outbeam(output.clone());
                 }
-                (BeamType::Initial, BeamType::Default(..)) => {
+                (BeamVariant::Initial, BeamVariant::Default(..)) => {
                     self.result.powers.input += output_power;
                     self.insert_beam(output.clone());
                 }
-                (BeamType::Initial, BeamType::ExternalDiff) => {
+                (BeamVariant::Initial, BeamVariant::ExternalDiff) => {
                     self.result.powers.ext_diff += output_power;
                     self.ext_diff_beam_queue.push(output.clone());
                 }
@@ -469,7 +471,7 @@ impl Problem {
         }
 
         // total internal reflection considerations
-        if let BeamType::Default(BeamVariant::Tir) = beam.type_ {
+        if let BeamVariant::Default(DefaultBeamVariant::Tir) = beam.variant {
             if beam.tir_count >= self.settings.max_tir {
                 self.result.powers.trnc_ref += beam.power() / self.settings.scale.powi(2);
                 return Vec::new();
