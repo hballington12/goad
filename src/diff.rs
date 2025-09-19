@@ -1,6 +1,5 @@
 use clap::ValueEnum;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
-use ndarray::Array2;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
@@ -135,10 +134,9 @@ pub fn n2f_aperture_diffraction(
     let cos_fov =
         (fov_factor.unwrap_or(1.0) * 2.0 * 2.0 * PI / (wavenumber * aperture_dimension)).cos();
 
-    let v1 = Array2::from_shape_vec((nv, 3), v1_data).expect("Shape error creating v1");
-
-    let x: Vec<f32> = v1.column(0).iter().cloned().collect();
-    let y: Vec<f32> = v1.column(1).iter().cloned().collect();
+    // Extract x and y coordinates from v1_data (which is stored as [x0, y0, z0, x1, y1, z1, ...])
+    let x: Vec<f32> = (0..nv).map(|i| v1_data[i * 3]).collect();
+    let y: Vec<f32> = (0..nv).map(|i| v1_data[i * 3 + 1]).collect();
 
     // Pre-calculate dx, dy, m, n, m_adj, n_adj
     let mut dx_vec = Vec::with_capacity(nv);
