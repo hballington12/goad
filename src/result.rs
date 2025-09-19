@@ -47,7 +47,7 @@ impl ScatteringBin for AngleBin {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, serde::Serialize)]
 pub enum GOComponent {
     Total,
     Beam,

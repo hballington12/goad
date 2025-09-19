@@ -6,10 +6,10 @@ use anyhow::Result;
 use pyo3::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[pyclass]
-#[derive(Subcommand, Debug, Clone, Deserialize, PartialEq)]
+#[derive(Subcommand, Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum Scheme {
     /// Solve the problem by averaging over a uniform distribution of angles.
     /// Example: `uniform 100`
@@ -21,7 +21,7 @@ pub enum Scheme {
 
 /// Euler angle order for the discrete orientation scheme.
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, PartialEq, Copy)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy)]
 pub enum EulerConvention {
     XZX,
     XYX,
@@ -38,7 +38,7 @@ pub enum EulerConvention {
 }
 
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Euler {
     #[pyo3(get, set)]
     pub alpha: f32,
@@ -236,7 +236,7 @@ impl Euler {
 }
 
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Orientation {
     #[pyo3(get, set)]
     pub scheme: Scheme,

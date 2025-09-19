@@ -54,8 +54,6 @@ pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
 
     validation::validate_config(&mut config);
 
-    println!("{:#?}", config);
-
     Ok(config)
 }
 

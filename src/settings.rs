@@ -5,7 +5,7 @@ pub mod validation;
 
 use nalgebra::Complex;
 use pyo3::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::bins;
@@ -13,13 +13,43 @@ use crate::diff::Mapping;
 use crate::orientation::Euler;
 use crate::{bins::BinningScheme, orientation::*};
 
+/// Configuration for output file generation
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct OutputConfig {
+    /// Enable writing of results.dat summary file
+    pub results_summary: bool,
+    /// Enable writing of settings.json configuration file
+    pub settings_json: bool,
+    /// Enable writing of powers.json power distribution file
+    pub powers_json: bool,
+    /// Enable writing of params.json derived parameters file
+    pub params_json: bool,
+    /// Enable writing of 2D Mueller matrix files
+    pub mueller_2d: bool,
+    /// Enable writing of 1D integrated Mueller matrix files
+    pub mueller_1d: bool,
+    /// Enable writing of specific Mueller components
+    pub mueller_components: MuellerComponentConfig,
+}
+
+/// Configuration for Mueller matrix component outputs
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+pub struct MuellerComponentConfig {
+    /// Enable total scattering component output
+    pub total: bool,
+    /// Enable beam component output
+    pub beam: bool,
+    /// Enable external diffraction component output
+    pub external: bool,
+}
+
 // Re-export constants, defaults, and loading functions for backward compatibility
 pub use self::constants::*;
 pub use self::loading::{load_config, load_config_with_cli, load_default_config};
 
 /// Runtime configuration for the application.
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Settings {
     pub wavelength: f32,
     pub beam_power_threshold: f32,
@@ -43,6 +73,8 @@ pub struct Settings {
     #[serde(default = "constants::default_fov_factor")]
     pub fov_factor: Option<f32>,
     pub mapping: Mapping,
+    #[serde(default = "constants::default_output_config")]
+    pub output: OutputConfig,
 }
 
 #[pymethods]
@@ -154,6 +186,7 @@ impl Settings {
             directory: PathBuf::from(directory),
             fov_factor: None,
             mapping,
+            output: constants::default_output_config(),
         };
 
         validation::validate_config(&mut settings);

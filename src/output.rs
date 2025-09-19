@@ -9,6 +9,112 @@ use ndarray::{s, Array1};
 
 use crate::bins::SolidAngleBin;
 use crate::result::{Mueller, Results};
+use crate::settings::{OutputConfig, Settings};
+
+/// Trait for writing output data to files
+pub trait OutputWriter {
+    /// Write data to a file in the output directory
+    fn write(&self, output_dir: &Path) -> Result<()>;
+
+    /// Get the filename this writer uses
+    fn filename(&self) -> String;
+
+    /// Check if this output is enabled in the configuration
+    fn is_enabled(&self, config: &OutputConfig) -> bool;
+}
+
+/// Manager for coordinating all output operations
+pub struct OutputManager<'a> {
+    pub settings: &'a Settings,
+    pub results: &'a Results,
+}
+
+impl<'a> OutputManager<'a> {
+    pub fn new(settings: &'a Settings, results: &'a Results) -> Self {
+        Self { settings, results }
+    }
+
+    /// Write all enabled outputs based on configuration
+    pub fn write_all(&self) -> Result<()> {
+        let output_dir = &self.settings.directory;
+        fs::create_dir_all(output_dir)?;
+
+        // Create all possible output writers
+        let writers: Vec<Box<dyn OutputWriter>> = vec![
+            Box::new(ResultsSummaryWriter::new(self.results)),
+            Box::new(SettingsJsonWriter::new(self.settings)),
+            Box::new(PowersJsonWriter::new(&self.results.powers)),
+            Box::new(ParamsJsonWriter::new(&self.results.params)),
+        ];
+
+        // Write enabled outputs
+        for writer in writers {
+            if writer.is_enabled(&self.settings.output) {
+                println!("Writing {}", writer.filename());
+                writer.write(output_dir)?;
+            }
+        }
+
+        // Handle Mueller matrix outputs separately (they have custom logic)
+        self.write_mueller_matrices()?;
+
+        Ok(())
+    }
+
+    fn write_mueller_matrices(&self) -> Result<()> {
+        if !self.settings.output.mueller_2d && !self.settings.output.mueller_1d {
+            return Ok(());
+        }
+
+        let output_dir = &self.settings.directory;
+        let config = &self.settings.output.mueller_components;
+
+        // Write 2D Mueller matrices
+        if self.settings.output.mueller_2d {
+            if config.total {
+                println!("Writing mueller_scatgrid");
+                let muellers: Vec<Mueller> = self
+                    .results
+                    .field_2d
+                    .iter()
+                    .filter_map(|r| r.mueller_total.clone())
+                    .collect();
+                write_mueller(&self.results.bins(), &muellers, "", output_dir)?;
+            }
+            if config.beam {
+                println!("Writing mueller_scatgrid_beam");
+                let muellers: Vec<Mueller> = self
+                    .results
+                    .field_2d
+                    .iter()
+                    .filter_map(|r| r.mueller_beam.clone())
+                    .collect();
+                write_mueller(&self.results.bins(), &muellers, "_beam", output_dir)?;
+            }
+            if config.external {
+                println!("Writing mueller_scatgrid_ext");
+                let muellers: Vec<Mueller> = self
+                    .results
+                    .field_2d
+                    .iter()
+                    .filter_map(|r| r.mueller_ext.clone())
+                    .collect();
+                write_mueller(&self.results.bins(), &muellers, "_ext", output_dir)?;
+            }
+        }
+
+        // Write 1D Mueller matrices
+        if self.settings.output.mueller_1d {
+            if let Some(_field_1d) = &self.results.field_1d {
+                // TODO: Implement 1D Mueller matrix writing
+                // This would require updating the existing commented out write_mueller_1d function
+                println!("1D Mueller matrix writing not yet implemented");
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -132,7 +238,7 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     // Write parameters section
     writeln!(writer, "\n# Parameters")?;
     writeln!(writer, "# ----------")?;
-    
+
     // Write parameters for Total component (backwards compatible)
     if let Some(scat) = result.params.scat_cross() {
         writeln!(writer, "Scattering Cross Section: {:.6}", scat)?;
@@ -146,21 +252,21 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     if let Some(asym) = result.params.asymmetry() {
         writeln!(writer, "Asymmetry Parameter: {:.6}", asym)?;
     }
-    
+
     // Write component-specific parameters
     writeln!(writer, "\n# Component-Specific Parameters")?;
     writeln!(writer, "# ------------------------------")?;
-    
+
     for component in [
         crate::result::GOComponent::Beam,
-        crate::result::GOComponent::ExtDiff
+        crate::result::GOComponent::ExtDiff,
     ] {
         let comp_str = match component {
             crate::result::GOComponent::Beam => "Beam",
             crate::result::GOComponent::ExtDiff => "ExtDiff",
             _ => continue,
         };
-        
+
         if let Some(scat) = result.params.scat_cross.get(&component) {
             writeln!(writer, "{} Scattering Cross Section: {:.6}", comp_str, scat)?;
         }
@@ -250,5 +356,118 @@ pub fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf
             Ok(dir.join(file_name))
         }
         None => Ok(PathBuf::from(file_name)),
+    }
+}
+
+// ========================================
+// Individual Output Writer Implementations
+// ========================================
+
+/// Writer for the results.dat summary file (existing implementation)
+pub struct ResultsSummaryWriter<'a> {
+    results: &'a Results,
+}
+
+impl<'a> ResultsSummaryWriter<'a> {
+    pub fn new(results: &'a Results) -> Self {
+        Self { results }
+    }
+}
+
+impl<'a> OutputWriter for ResultsSummaryWriter<'a> {
+    fn write(&self, output_dir: &Path) -> Result<()> {
+        write_result(self.results, output_dir)
+    }
+
+    fn filename(&self) -> String {
+        "results.dat".to_string()
+    }
+
+    fn is_enabled(&self, config: &OutputConfig) -> bool {
+        config.results_summary
+    }
+}
+
+/// Writer for settings.json file
+pub struct SettingsJsonWriter<'a> {
+    settings: &'a Settings,
+}
+
+impl<'a> SettingsJsonWriter<'a> {
+    pub fn new(settings: &'a Settings) -> Self {
+        Self { settings }
+    }
+}
+
+impl<'a> OutputWriter for SettingsJsonWriter<'a> {
+    fn write(&self, output_dir: &Path) -> Result<()> {
+        let path = output_path(Some(output_dir), &self.filename())?;
+        let json = serde_json::to_string_pretty(self.settings)?;
+        fs::write(path, json)?;
+        Ok(())
+    }
+
+    fn filename(&self) -> String {
+        "settings.json".to_string()
+    }
+
+    fn is_enabled(&self, config: &OutputConfig) -> bool {
+        config.settings_json
+    }
+}
+
+/// Writer for powers.json file
+pub struct PowersJsonWriter<'a> {
+    powers: &'a crate::powers::Powers,
+}
+
+impl<'a> PowersJsonWriter<'a> {
+    pub fn new(powers: &'a crate::powers::Powers) -> Self {
+        Self { powers }
+    }
+}
+
+impl<'a> OutputWriter for PowersJsonWriter<'a> {
+    fn write(&self, output_dir: &Path) -> Result<()> {
+        let path = output_path(Some(output_dir), &self.filename())?;
+        let json = serde_json::to_string_pretty(self.powers)?;
+        fs::write(path, json)?;
+        Ok(())
+    }
+
+    fn filename(&self) -> String {
+        "powers.json".to_string()
+    }
+
+    fn is_enabled(&self, config: &OutputConfig) -> bool {
+        config.powers_json
+    }
+}
+
+/// Writer for params.json file
+pub struct ParamsJsonWriter<'a> {
+    params: &'a crate::params::Params,
+}
+
+impl<'a> ParamsJsonWriter<'a> {
+    pub fn new(params: &'a crate::params::Params) -> Self {
+        Self { params }
+    }
+}
+
+impl<'a> OutputWriter for ParamsJsonWriter<'a> {
+    fn write(&self, output_dir: &Path) -> Result<()> {
+        let path = output_path(Some(output_dir), &self.filename())?;
+        let json = serde_json::to_string_pretty(self.params)?;
+        fs::write(path, json)?;
+        Ok(())
+    }
+
+    fn filename(&self) -> String {
+        "params.json".to_string()
+    }
+
+    fn is_enabled(&self, config: &OutputConfig) -> bool {
+        config.params_json
     }
 }

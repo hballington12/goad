@@ -1,6 +1,7 @@
 use std::{fmt, ops::*};
+use serde::Serialize;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Powers {
     pub input: f32,       // near-field input power
     pub output: f32,      // near-field output power

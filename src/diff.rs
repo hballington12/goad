@@ -2,7 +2,7 @@ use clap::ValueEnum;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
 use ndarray::Array2;
 use pyo3::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
 use crate::beam::Beam;
@@ -13,7 +13,7 @@ use crate::{geom, settings};
 
 /// Enum representing different mapping methods from near to far field.
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ValueEnum)]
 pub enum Mapping {
     GeometricOptics,
     ApertureDiffraction,

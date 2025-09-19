@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Represents a solid angle bin with theta and phi bins
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -21,7 +21,7 @@ impl SolidAngleBin {
 }
 
 /// Represents an angular bin with edges and center. Fields: `min`, `max`, `center`
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
 pub struct AngleBin {
     pub min: f32,    // min edge
     pub max: f32,    // max edge
@@ -90,7 +90,7 @@ mod tests {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub enum Scheme {
     Simple {
         num_theta: usize,
@@ -114,7 +114,7 @@ pub enum Scheme {
 /// for Mueller matrix and amplitude computations. Supports simple
 /// regular grids, custom intervals, and arbitrary bin arrangements.
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct BinningScheme {
     pub scheme: Scheme,
 }

@@ -1,19 +1,14 @@
 // use std::time::Instant;
 
-use std::io::Write;
-use std::{fs::File, io::BufWriter};
-
-use crate::result::{Mueller, MuellerMatrix};
 use crate::{
     bins::generate_bins,
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
     problem::{self, Problem},
-    result::{self, Results},
+    result::Results,
     settings::Settings,
 };
-use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 #[cfg(feature = "macroquad")]
 use macroquad::prelude::*;
@@ -144,53 +139,6 @@ impl MultiProblem {
         self.normalize_results(self.orientations.num_orientations as f32);
         self.result.try_mueller_to_1d(&self.settings.binning.scheme);
         let _ = self.result.compute_params(self.settings.wavelength);
-
-        // let end = Instant::now();
-        // let duration = end.duration_since(start);
-        // let time_per_orientation = duration / self.orientations.num_orientations as u32;
-
-        // println!(
-        //     "Time taken: {:.2?}, Time per orientation: {:.2?}",
-        //     duration, time_per_orientation
-        // );
-
-        // // try compute 1d mueller
-        // match self.settings.binning.scheme {
-        //     Scheme::Custom { .. } => {} // 1d mueller not supported for custom bins
-        //     _ => {
-        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller) {
-        //             Ok((theta, mueller_1d)) => {
-        //                 self.result.bins_1d = Some(theta);
-        //                 self.result.mueller_1d = Some(mueller_1d);
-
-        //                 // compute params
-        //                 let _ = self.result.compute_params(self.settings.wavelength);
-        //             }
-        //             Err(..) => {}
-        //         };
-        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_beam) {
-        //             Ok((theta, mueller_1d_beam)) => {
-        //                 self.result.bins_1d = Some(theta);
-        //                 self.result.mueller_1d_beam = Some(mueller_1d_beam);
-        //             }
-        //             Err(e) => {
-        //                 println!("Failed to compute 1d mueller (beam): {}", e);
-        //             }
-        //         };
-        //         match result::try_mueller_to_1d(&self.result.bins, &self.result.mueller_ext) {
-        //             Ok((theta, mueller_1d_ext)) => {
-        //                 self.result.bins_1d = Some(theta);
-        //                 self.result.mueller_1d_ext = Some(mueller_1d_ext);
-        //             }
-        //             Err(e) => {
-        //                 println!("Failed to compute 1d mueller (ext): {}", e);
-        //             }
-        //         };
-        //     }
-        // }
-
-        println!("Results:");
-        self.result.print();
     }
 
     /// Combines two Results objects by adding their fields
@@ -230,7 +178,6 @@ impl MultiProblem {
     fn normalize_results(&mut self, num_orientations: f32) {
         // Powers
         self.result.powers /= num_orientations;
-        println!("powers: {:?}", self.result.powers);
 
         for field in self.result.field_2d.iter_mut() {
             // Amplitude Matrices - divide by complex representation
@@ -259,65 +206,9 @@ impl MultiProblem {
     }
 
     pub fn writeup(&self) {
-        // Helper closure to write Mueller matrices to files
-        let write_mueller_2d =
-            |file_suffix: &str,
-             mueller_getter: &dyn Fn(&result::ScattResult2D) -> Option<Mueller>|
-             -> Result<()> {
-                let file_name = format!("mueller_scatgrid{}", file_suffix);
-                let path = output::output_path(Some(&self.settings.directory), &file_name)?;
-                let file = File::create(&path)?;
-                let mut writer = BufWriter::new(file);
-
-                for result in &self.result.field_2d {
-                    let bin = result.bin;
-                    write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
-
-                    if let Some(mueller) = mueller_getter(result) {
-                        for element in mueller.to_vec() {
-                            write!(writer, "{} ", element)?;
-                        }
-                    }
-                    writeln!(writer)?;
-                }
-                Ok(())
-            };
-
-        let write_mueller_1d =
-            |file_suffix: &str,
-             mueller_getter: &dyn Fn(&result::ScattResult1D) -> Option<Mueller>|
-             -> Result<()> {
-                let file_name = format!("mueller_scatgrid_1d{}", file_suffix);
-                let path = output::output_path(Some(&self.settings.directory), &file_name)?;
-                let file = File::create(&path)?;
-                let mut writer = BufWriter::new(file);
-
-                if let Some(field) = &self.result.field_1d {
-                    for result in field {
-                        let bin = result.bin;
-                        write!(writer, "{} ", bin.center)?;
-
-                        if let Some(mueller) = mueller_getter(result) {
-                            for element in mueller.to_vec() {
-                                write!(writer, "{} ", element)?;
-                            }
-                        }
-                        writeln!(writer)?;
-                    }
-                }
-                Ok(())
-            };
-
-        // Write all three Mueller matrix types
-        let _ = write_mueller_2d("", &|r| r.mueller_total);
-        let _ = write_mueller_2d("_beam", &|r| r.mueller_beam);
-        let _ = write_mueller_2d("_ext", &|r| r.mueller_ext);
-        let _ = write_mueller_1d("", &|r| r.mueller_total);
-        let _ = write_mueller_1d("_beam", &|r| r.mueller_beam);
-        let _ = write_mueller_1d("_ext", &|r| r.mueller_ext);
-
-        // Write generic results
-        let _ = output::write_result(&self.result, &self.settings.directory);
+        // Use the new unified output system
+        let output_manager = output::OutputManager::new(&self.settings, &self.result);
+        let _ = output_manager.write_all();
     }
 }
 
