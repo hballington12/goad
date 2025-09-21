@@ -149,6 +149,7 @@ impl Beam {
         medium_refr_index: Complex<f32>,
     ) -> Vec<Beam> {
         let n1 = self.refr_index;
+        let self_phase = self.field.phase;
 
         let mut outputs = Vec::new();
         for face in &intersections {
@@ -161,8 +162,9 @@ impl Beam {
                 e_perp = -e_perp;
             }
             let rot = get_rotation_matrix(&self, e_perp);
-            let (ampl, absorbed_intensity, ampl0) = get_ampl(&self, rot, face, n1);
-            let phase = self.field.phase;
+            let (ampl, absorbed_intensity, ampl0, arg) = get_ampl(&self, rot, face, n1);
+            // self.field.phase += arg; // update the phase
+            let phase = self_phase + arg;
 
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
@@ -182,12 +184,14 @@ impl Beam {
             }
 
             // untracked energy leaks can occur here if the amplitude matrix contains NaN values
-            let refracted =
-                create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2, phase)
-                    .unwrap_or(None);
-            let reflected =
-                create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2, phase)
-                    .unwrap_or(None);
+            let refracted = create_refracted(
+                face, ampl, e_perp, normal, self, theta_i, n1, n2, ampl0, phase,
+            )
+            .unwrap_or(None);
+            let reflected = create_reflected(
+                face, ampl, e_perp, normal, self, theta_i, n1, n2, ampl0, phase,
+            )
+            .unwrap_or(None);
 
             if refracted.is_some() {
                 outputs.push(refracted.unwrap().clone());
@@ -213,8 +217,12 @@ impl Beam {
                 for face in faces {
                     let dist = (face.data().midpoint - midpoint).dot(&beam.prop);
                     let arg = dist * beam.wavenumber() * medium_refr_index.re;
+                    // let arg = 0.0 as f32;
                     let ampl = beam.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
-                    let ampl0 = beam.field.ampl0.clone() * Complex::new(arg.cos(), arg.sin());
+                    // let ampl = beam.field.ampl.clone();
+                    let ampl0 = beam.field.ampl0.clone();
+                    let phase = beam.field.phase + arg;
+                    // let phase = beam.field.phase;
 
                     let new_beam = Beam::new(
                         face,
@@ -222,8 +230,7 @@ impl Beam {
                         beam.refr_index,
                         beam.rec_count,
                         beam.tir_count,
-                        Field::new(beam.field.e_perp, beam.prop, ampl, ampl0, beam.field.phase)
-                            .unwrap(),
+                        Field::new(beam.field.e_perp, beam.prop, ampl, ampl0, phase).unwrap(),
                         beam.variant.clone(),
                         beam.wavelength,
                     );
@@ -312,7 +319,7 @@ fn get_ampl(
     rot: Matrix2<Complex<f32>>,
     face: &Face,
     n1: Complex<f32>,
-) -> (Ampl, f32, Ampl) {
+) -> (Ampl, f32, Ampl, f32) {
     let mut ampl = rot * beam.field.ampl.clone();
     let mut ampl0 = rot * beam.field.ampl0;
 
@@ -320,11 +327,8 @@ fn get_ampl(
     let wavenumber = beam.wavenumber();
 
     let arg = dist * wavenumber * n1.re; // optical path length
+                                         // let arg = 0.0 as f32;
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
-
-    // REMOVE THIS LINE!!!
-    println!("REMOVE THIS LINE");
-    ampl0 *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
 
     let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
 
@@ -336,7 +340,7 @@ fn get_ampl(
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
     ampl0 *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
 
-    (ampl, absorbed_intensity, ampl0)
+    (ampl, absorbed_intensity, ampl0, arg)
 }
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
@@ -382,6 +386,7 @@ fn create_reflected(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
+    ampl0: Ampl,
     phase: f32,
 ) -> Result<Option<Beam>> {
     let prop = get_reflection_vector(&normal, &beam.prop);
@@ -393,6 +398,7 @@ fn create_reflected(
         // if total internal reflection
         let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
         let refl_ampl = fresnel * ampl;
+        let refl_ampl0 = fresnel * ampl0;
         debug_assert!(!Field::ampl_intensity(&refl_ampl).is_nan());
 
         Ok(Some(Beam::new(
@@ -401,7 +407,7 @@ fn create_reflected(
             n1,
             beam.rec_count, // same recursion count, aligns with Macke 1996
             beam.tir_count + 1,
-            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl, phase)?,
+            Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
             BeamVariant::Default(DefaultBeamVariant::Tir),
             beam.wavelength,
         )))
@@ -409,6 +415,7 @@ fn create_reflected(
         let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
         let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
         let refl_ampl = fresnel * ampl;
+        let refl_ampl0 = fresnel * ampl0;
 
         Ok(Some(Beam::new(
             face.clone(),
@@ -416,7 +423,7 @@ fn create_reflected(
             n1,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl, phase)?,
+            Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
             BeamVariant::Default(DefaultBeamVariant::Refl),
             beam.wavelength,
         )))
@@ -433,6 +440,7 @@ fn create_refracted(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
+    ampl0: Ampl,
     phase: f32,
 ) -> Result<Option<Beam>> {
     if theta_i >= (n2.re / n1.re).asin() {
@@ -443,6 +451,7 @@ fn create_refracted(
         let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
         let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
         let refr_ampl = fresnel * ampl.clone();
+        let refr_ampl0 = fresnel * ampl0.clone();
 
         debug_assert!(beam.prop.dot(&prop) > 0.0);
         debug_assert!(
@@ -455,7 +464,7 @@ fn create_refracted(
             n2,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refr_ampl.clone(), refr_ampl, phase)?,
+            Field::new(e_perp, prop, refr_ampl, refr_ampl0, phase)?,
             BeamVariant::Default(DefaultBeamVariant::Refr),
             beam.wavelength,
         )))
@@ -474,15 +483,18 @@ impl Beam {
         // midpoint of remainder to midpoint of original face. Propagate
         // the field back or forward by this distance.
         let self_midpoint = self.face.data().midpoint;
+        let self_phase = self.field.phase;
         let remainder_beams: Vec<_> = remainders
             .into_iter()
             .filter_map(|remainder| {
                 let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
                 let arg = dist * self.wavenumber() * medium_refr_index.re;
+                // let arg = 0.0 as f32;
                 let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
-                eprintln!("REMOVE THIs");
-                let ampl0 = self.field.ampl0.clone() * Complex::new(arg.cos(), arg.sin());
-                let phase = self.field.phase;
+                // let ampl = self.field.ampl.clone();
+                let ampl0 = self.field.ampl0.clone();
+                // self.field.phase += arg; // update phase
+                let phase = self_phase + arg;
                 Some(Beam::new(
                     remainder,
                     self.prop,

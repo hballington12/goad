@@ -352,10 +352,16 @@ impl Problem {
             self.propagate_next();
         }
         // for testing, compare the amplitude matrices of ampl and ampl0
-        for (i, beam) in self.out_beam_queue.iter().enumerate() {
+        for (i, beam) in self.out_beam_queue.iter_mut().enumerate() {
             println!("Comparing ampl for beam {}", i);
+            println!("Beam variant is {:?}", beam.variant);
+            println!("Phase is {}", beam.field.phase);
             let ampl = beam.field.ampl;
-            let ampl0 = beam.field.ampl0;
+            let phase = beam.field.phase;
+            // let phase = 0.0 as f32;
+            let ampl0 = beam.field.ampl0 * Complex::new(phase.cos(), phase.sin());
+            // beam.field.ampl = ampl0;
+
             assert!(
                 ampl.approx_eq(&ampl0, 0.01),
                 "ampl: {:#?}, ampl0: {:#?}",
@@ -594,7 +600,9 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
     let dist = bounds.1[2];
     let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
     let arg = -dist * wavenumber * medium_refractive_index.re;
+    // let arg = 0.0 as f32;
     field.ampl *= Complex::new(arg.cos(), arg.sin());
+    field.phase += arg;
 
     let beam = Beam::new_from_field(
         clip,
