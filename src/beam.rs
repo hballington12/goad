@@ -12,6 +12,7 @@ use crate::{
     field::Field,
     fresnel,
     geom::{Face, Geom},
+    result::Ampl,
     settings,
     snell::get_theta_t,
 };
@@ -160,7 +161,7 @@ impl Beam {
                 e_perp = -e_perp;
             }
             let rot = get_rotation_matrix(&self, e_perp);
-            let (ampl, absorbed_intensity) = get_ampl(&self, rot, face, n1);
+            let (ampl, absorbed_intensity, ampl0) = get_ampl(&self, rot, face, n1);
 
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
@@ -172,7 +173,7 @@ impl Beam {
                     n1,
                     self.rec_count + 1,
                     self.tir_count,
-                    Field::new(e_perp, self.prop, ampl).unwrap(),
+                    Field::new(e_perp, self.prop, ampl, ampl0).unwrap(),
                     BeamVariant::ExternalDiff,
                     self.wavelength,
                 );
@@ -217,7 +218,7 @@ impl Beam {
                         beam.refr_index,
                         beam.rec_count,
                         beam.tir_count,
-                        Field::new(beam.field.e_perp, beam.prop, ampl).unwrap(),
+                        Field::new(beam.field.e_perp, beam.prop, ampl, beam.field.ampl0).unwrap(),
                         beam.variant.clone(),
                         beam.wavelength,
                     );
@@ -306,8 +307,9 @@ fn get_ampl(
     rot: Matrix2<Complex<f32>>,
     face: &Face,
     n1: Complex<f32>,
-) -> (Matrix2<Complex<f32>>, f32) {
+) -> (Ampl, f32, Ampl) {
     let mut ampl = rot * beam.field.ampl.clone();
+    let mut ampl0 = rot * beam.field.ampl0;
 
     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
     let wavenumber = beam.wavenumber();
@@ -323,8 +325,9 @@ fn get_ampl(
     let exp_absorption = (-2.0 * wavenumber * n1.im * dist_sqrt).exp(); // absorption
 
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
+    ampl0 *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
 
-    (ampl, absorbed_intensity)
+    (ampl, absorbed_intensity, ampl0)
 }
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
@@ -363,7 +366,7 @@ fn get_n2(
 /// Creates a new reflected beam
 fn create_reflected(
     face: &Face,
-    ampl: Matrix2<Complex<f32>>,
+    ampl: Ampl,
     e_perp: Vector3<f32>,
     normal: Vector3<f32>,
     beam: &Beam,
@@ -388,7 +391,7 @@ fn create_reflected(
             n1,
             beam.rec_count, // same recursion count, aligns with Macke 1996
             beam.tir_count + 1,
-            Field::new(e_perp, prop, refl_ampl)?,
+            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl)?,
             BeamVariant::Default(DefaultBeamVariant::Tir),
             beam.wavelength,
         )))
@@ -403,7 +406,7 @@ fn create_reflected(
             n1,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refl_ampl)?,
+            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl)?,
             BeamVariant::Default(DefaultBeamVariant::Refl),
             beam.wavelength,
         )))
@@ -441,7 +444,7 @@ fn create_refracted(
             n2,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refr_ampl)?,
+            Field::new(e_perp, prop, refr_ampl.clone(), refr_ampl)?,
             BeamVariant::Default(DefaultBeamVariant::Refr),
             beam.wavelength,
         )))
@@ -465,15 +468,15 @@ impl Beam {
             .filter_map(|remainder| {
                 let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
                 let arg = dist * self.wavenumber() * medium_refr_index.re;
-                // let arg: f32 = 0.0;
                 let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
+                let ampl0 = self.field.ampl0.clone();
                 Some(Beam::new(
                     remainder,
                     self.prop,
                     self.refr_index,
                     self.rec_count,
                     self.tir_count,
-                    Field::new(self.field.e_perp, self.prop, ampl).unwrap(),
+                    Field::new(self.field.e_perp, self.prop, ampl, ampl0).unwrap(),
                     BeamVariant::OutGoing,
                     self.wavelength,
                 ))

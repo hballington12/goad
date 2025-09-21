@@ -80,11 +80,7 @@ impl Field {
 
     /// Creates an electric field with the given input perpendicular field
     /// vector, propagation vector, and amplitude matrix.
-    pub fn new(
-        e_perp: Vector3<f32>,
-        prop: Vector3<f32>,
-        ampl: Matrix2<Complex<f32>>,
-    ) -> Result<Self> {
+    pub fn new(e_perp: Vector3<f32>, prop: Vector3<f32>, ampl: Ampl, ampl0: Ampl) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
             let norm_e_perp_diff = e_perp.norm() - 1.0;
@@ -110,27 +106,9 @@ impl Field {
             ));
             }
         }
-
-        // let e_par = e_perp.cross(&prop).normalize();
-        // // check that e_par is perpendicular to e_perp and prop
-        // if e_par.dot(&e_perp).abs() >= settings::COLINEAR_THRESHOLD {
-        //     return Err(anyhow::anyhow!(
-        //         "e-par is not perpendicular to e-perp, e_perp is: {:?}, e_par is: {:?}",
-        //         e_perp,
-        //         e_par
-        //     ));
-        // }
-        // if e_par.dot(&prop).abs() >= settings::COLINEAR_THRESHOLD {
-        //     return Err(anyhow::anyhow!(
-        //         "e-par is not perpendicular to prop, prop is: {:?}, e_par is: {:?}",
-        //         prop,
-        //         e_par
-        //     ));
-        // }
-
         let field = Self {
-            ampl: ampl.clone(),
-            ampl0: ampl,
+            ampl,
+            ampl0,
             e_perp,
             e_par: e_perp.cross(&prop).normalize(),
         };
