@@ -30,12 +30,14 @@ mod tests {
     }
 }
 
+/// Essentially represents a plane wave field with phase, amplitude matrix, and corresponding electric field vectors.
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Field {
     pub ampl: Ampl,
     pub ampl0: Ampl,
     pub e_perp: Vector3<f32>,
     pub e_par: Vector3<f32>,
+    pub phase: f32,
 }
 
 impl Field {
@@ -73,6 +75,7 @@ impl Field {
             ampl0: Matrix2::identity(),
             e_perp,
             e_par: e_perp.cross(&prop).normalize(),
+            phase: 0.0,
         };
 
         Ok(field)
@@ -80,7 +83,13 @@ impl Field {
 
     /// Creates an electric field with the given input perpendicular field
     /// vector, propagation vector, and amplitude matrix.
-    pub fn new(e_perp: Vector3<f32>, prop: Vector3<f32>, ampl: Ampl, ampl0: Ampl) -> Result<Self> {
+    pub fn new(
+        e_perp: Vector3<f32>,
+        prop: Vector3<f32>,
+        ampl: Ampl,
+        ampl0: Ampl,
+        phase: f32,
+    ) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
             let norm_e_perp_diff = e_perp.norm() - 1.0;
@@ -111,6 +120,7 @@ impl Field {
             ampl0,
             e_perp,
             e_par: e_perp.cross(&prop).normalize(),
+            phase,
         };
 
         Ok(field)

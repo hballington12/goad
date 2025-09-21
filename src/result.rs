@@ -66,6 +66,33 @@ impl GOComponent {
 pub type Ampl = Matrix2<Complex<f32>>;
 pub type Mueller = Matrix4<f32>;
 
+/// Trait for approximate equality comparison with tolerance
+pub trait ApproxEq {
+    /// Check if two values are approximately equal within the given tolerance
+    fn approx_eq(&self, other: &Self, tolerance: f32) -> bool;
+}
+
+impl ApproxEq for Ampl {
+    /// Check if two amplitude matrices are approximately equal within tolerance
+    ///
+    /// Compares both real and imaginary parts of each complex element.
+    /// Returns true if all corresponding elements differ by less than the tolerance.
+    fn approx_eq(&self, other: &Self, tolerance: f32) -> bool {
+        for i in 0..2 {
+            for j in 0..2 {
+                let a = self[(i, j)];
+                let b = other[(i, j)];
+
+                // Check both real and imaginary parts
+                if (a.re - b.re).abs() > tolerance || (a.im - b.im).abs() > tolerance {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+}
+
 pub trait MuellerMatrix {
     fn s11(&self) -> f32;
     fn s12(&self) -> f32;
@@ -716,5 +743,38 @@ where
         None
     } else {
         Some(sum)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nalgebra::Complex;
+
+    #[test]
+    fn test_ampl_approx_eq() {
+        // Create two similar amplitude matrices
+        let ampl1 = Ampl::new(
+            Complex::new(1.0, 2.0),
+            Complex::new(3.0, 4.0),
+            Complex::new(5.0, 6.0),
+            Complex::new(7.0, 8.0),
+        );
+
+        let ampl2 = Ampl::new(
+            Complex::new(1.001, 2.001),
+            Complex::new(3.001, 4.001),
+            Complex::new(5.001, 6.001),
+            Complex::new(7.001, 8.001),
+        );
+
+        // Should be equal within tolerance
+        assert!(ampl1.approx_eq(&ampl2, 0.01));
+
+        // Should not be equal with stricter tolerance
+        assert!(!ampl1.approx_eq(&ampl2, 0.0001));
+
+        // Test with exact equality
+        assert!(ampl1.approx_eq(&ampl1, 0.0));
     }
 }

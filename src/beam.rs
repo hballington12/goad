@@ -162,6 +162,7 @@ impl Beam {
             }
             let rot = get_rotation_matrix(&self, e_perp);
             let (ampl, absorbed_intensity, ampl0) = get_ampl(&self, rot, face, n1);
+            let phase = self.field.phase;
 
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
@@ -173,7 +174,7 @@ impl Beam {
                     n1,
                     self.rec_count + 1,
                     self.tir_count,
-                    Field::new(e_perp, self.prop, ampl, ampl0).unwrap(),
+                    Field::new(e_perp, self.prop, ampl, ampl0, self.field.phase).unwrap(),
                     BeamVariant::ExternalDiff,
                     self.wavelength,
                 );
@@ -182,9 +183,11 @@ impl Beam {
 
             // untracked energy leaks can occur here if the amplitude matrix contains NaN values
             let refracted =
-                create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2).unwrap_or(None);
+                create_refracted(face, ampl, e_perp, normal, self, theta_i, n1, n2, phase)
+                    .unwrap_or(None);
             let reflected =
-                create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2).unwrap_or(None);
+                create_reflected(face, ampl, e_perp, normal, self, theta_i, n1, n2, phase)
+                    .unwrap_or(None);
 
             if refracted.is_some() {
                 outputs.push(refracted.unwrap().clone());
@@ -211,6 +214,7 @@ impl Beam {
                     let dist = (face.data().midpoint - midpoint).dot(&beam.prop);
                     let arg = dist * beam.wavenumber() * medium_refr_index.re;
                     let ampl = beam.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
+                    let ampl0 = beam.field.ampl0.clone() * Complex::new(arg.cos(), arg.sin());
 
                     let new_beam = Beam::new(
                         face,
@@ -218,7 +222,8 @@ impl Beam {
                         beam.refr_index,
                         beam.rec_count,
                         beam.tir_count,
-                        Field::new(beam.field.e_perp, beam.prop, ampl, beam.field.ampl0).unwrap(),
+                        Field::new(beam.field.e_perp, beam.prop, ampl, ampl0, beam.field.phase)
+                            .unwrap(),
                         beam.variant.clone(),
                         beam.wavelength,
                     );
@@ -317,6 +322,10 @@ fn get_ampl(
     let arg = dist * wavenumber * n1.re; // optical path length
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
 
+    // REMOVE THIS LINE!!!
+    println!("REMOVE THIS LINE");
+    ampl0 *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
+
     let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
 
     let absorbed_intensity = Field::ampl_intensity(&ampl)
@@ -373,6 +382,7 @@ fn create_reflected(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
+    phase: f32,
 ) -> Result<Option<Beam>> {
     let prop = get_reflection_vector(&normal, &beam.prop);
 
@@ -391,7 +401,7 @@ fn create_reflected(
             n1,
             beam.rec_count, // same recursion count, aligns with Macke 1996
             beam.tir_count + 1,
-            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl)?,
+            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl, phase)?,
             BeamVariant::Default(DefaultBeamVariant::Tir),
             beam.wavelength,
         )))
@@ -406,7 +416,7 @@ fn create_reflected(
             n1,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl)?,
+            Field::new(e_perp, prop, refl_ampl.clone(), refl_ampl, phase)?,
             BeamVariant::Default(DefaultBeamVariant::Refl),
             beam.wavelength,
         )))
@@ -423,6 +433,7 @@ fn create_refracted(
     theta_i: f32,
     n1: Complex<f32>,
     n2: Complex<f32>,
+    phase: f32,
 ) -> Result<Option<Beam>> {
     if theta_i >= (n2.re / n1.re).asin() {
         // if total internal reflection
@@ -444,7 +455,7 @@ fn create_refracted(
             n2,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refr_ampl.clone(), refr_ampl)?,
+            Field::new(e_perp, prop, refr_ampl.clone(), refr_ampl, phase)?,
             BeamVariant::Default(DefaultBeamVariant::Refr),
             beam.wavelength,
         )))
@@ -469,14 +480,16 @@ impl Beam {
                 let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
                 let arg = dist * self.wavenumber() * medium_refr_index.re;
                 let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
-                let ampl0 = self.field.ampl0.clone();
+                eprintln!("REMOVE THIs");
+                let ampl0 = self.field.ampl0.clone() * Complex::new(arg.cos(), arg.sin());
+                let phase = self.field.phase;
                 Some(Beam::new(
                     remainder,
                     self.prop,
                     self.refr_index,
                     self.rec_count,
                     self.tir_count,
-                    Field::new(self.field.e_perp, self.prop, ampl, ampl0).unwrap(),
+                    Field::new(self.field.e_perp, self.prop, ampl, ampl0, phase).unwrap(),
                     BeamVariant::OutGoing,
                     self.wavelength,
                 ))
