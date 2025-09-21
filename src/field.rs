@@ -1,3 +1,4 @@
+use crate::result::Ampl;
 #[cfg(debug_assertions)]
 use crate::settings;
 
@@ -31,7 +32,8 @@ mod tests {
 
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Field {
-    pub ampl: Matrix2<Complex<f32>>,
+    pub ampl: Ampl,
+    pub ampl0: Ampl,
     pub e_perp: Vector3<f32>,
     pub e_par: Vector3<f32>,
 }
@@ -68,6 +70,7 @@ impl Field {
 
         let field = Self {
             ampl: Matrix2::identity(),
+            ampl0: Matrix2::identity(),
             e_perp,
             e_par: e_perp.cross(&prop).normalize(),
         };
@@ -126,7 +129,8 @@ impl Field {
         // }
 
         let field = Self {
-            ampl,
+            ampl: ampl.clone(),
+            ampl0: ampl,
             e_perp,
             e_par: e_perp.cross(&prop).normalize(),
         };
