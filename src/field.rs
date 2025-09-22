@@ -76,6 +76,7 @@ pub trait AmplMatrix {
     fn s44(&self) -> f32;
     fn to_mueller(&self) -> Mueller;
     fn zeros() -> Self;
+    fn identity() -> Self;
 }
 
 impl AmplMatrix for Ampl {
@@ -163,6 +164,9 @@ impl AmplMatrix for Ampl {
     }
     fn zeros() -> Self {
         Self::zeros()
+    }
+    fn identity() -> Self {
+        Self::identity()
     }
 }
 
