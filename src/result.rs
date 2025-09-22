@@ -63,7 +63,7 @@ impl GOComponent {
     }
 }
 
-pub type Ampl = Matrix2<Complex<f32>>;
+type Ampl = Matrix2<Complex<f32>>;
 pub type Mueller = Matrix4<f32>;
 
 /// Trait for approximate equality comparison with tolerance
@@ -182,111 +182,6 @@ impl MuellerMatrix for Mueller {
             self.s43(),
             self.s44(),
         ]
-    }
-}
-
-pub trait AmplMatrix {
-    fn s11(&self) -> f32;
-    fn s12(&self) -> f32;
-    fn s13(&self) -> f32;
-    fn s14(&self) -> f32;
-    fn s21(&self) -> f32;
-    fn s22(&self) -> f32;
-    fn s23(&self) -> f32;
-    fn s24(&self) -> f32;
-    fn s31(&self) -> f32;
-    fn s32(&self) -> f32;
-    fn s33(&self) -> f32;
-    fn s34(&self) -> f32;
-    fn s41(&self) -> f32;
-    fn s42(&self) -> f32;
-    fn s43(&self) -> f32;
-    fn s44(&self) -> f32;
-    fn to_mueller(&self) -> Mueller;
-}
-
-impl AmplMatrix for Ampl {
-    fn s11(&self) -> f32 {
-        0.5 * (self[(0, 0)] * self[(0, 0)].conj()
-            + self[(0, 1)] * self[(0, 1)].conj()
-            + self[(1, 0)] * self[(1, 0)].conj()
-            + self[(1, 1)] * self[(1, 1)].conj())
-        .re
-    }
-    fn s12(&self) -> f32 {
-        0.5 * (self[(0, 0)] * self[(0, 0)].conj() - self[(0, 1)] * self[(0, 1)].conj()
-            + self[(1, 0)] * self[(1, 0)].conj()
-            - self[(1, 1)] * self[(1, 1)].conj())
-        .re
-    }
-    fn s13(&self) -> f32 {
-        (self[(0, 0)] * self[(0, 1)].conj() + self[(1, 1)] * self[(1, 0)].conj()).re
-    }
-    fn s14(&self) -> f32 {
-        (self[(0, 0)] * self[(0, 1)].conj() - self[(1, 1)] * self[(1, 0)].conj()).im
-    }
-    fn s21(&self) -> f32 {
-        0.5 * (self[(0, 0)] * self[(0, 0)].conj() + self[(0, 1)] * self[(0, 1)].conj()
-            - self[(1, 0)] * self[(1, 0)].conj()
-            - self[(1, 1)] * self[(1, 1)].conj())
-        .re
-    }
-    fn s22(&self) -> f32 {
-        0.5 * (self[(0, 0)] * self[(0, 0)].conj()
-            - self[(0, 1)] * self[(0, 1)].conj()
-            - self[(1, 0)] * self[(1, 0)].conj()
-            + self[(1, 1)] * self[(1, 1)].conj())
-        .re
-    }
-    fn s23(&self) -> f32 {
-        (self[(0, 0)] * self[(0, 1)].conj() - self[(1, 1)] * self[(1, 0)].conj()).re
-    }
-    fn s24(&self) -> f32 {
-        (self[(0, 0)] * self[(0, 1)].conj() + self[(1, 1)] * self[(1, 0)].conj()).im
-    }
-    fn s31(&self) -> f32 {
-        (self[(0, 0)] * self[(1, 0)].conj() + self[(1, 1)] * self[(0, 1)].conj()).re
-    }
-    fn s32(&self) -> f32 {
-        (self[(0, 0)] * self[(1, 0)].conj() - self[(1, 1)] * self[(0, 1)].conj()).re
-    }
-    fn s33(&self) -> f32 {
-        (self[(0, 0)] * self[(1, 1)].conj() + self[(0, 1)] * self[(1, 0)].conj()).re
-    }
-    fn s34(&self) -> f32 {
-        (self[(0, 0)] * self[(1, 1)].conj() + self[(0, 1)] * self[(1, 0)].conj()).im
-    }
-    fn s41(&self) -> f32 {
-        (self[(1, 0)] * self[(0, 0)].conj() + self[(1, 1)] * self[(0, 1)].conj()).im
-    }
-    fn s42(&self) -> f32 {
-        (self[(1, 0)] * self[(0, 0)].conj() - self[(1, 1)] * self[(0, 1)].conj()).im
-    }
-    fn s43(&self) -> f32 {
-        (self[(1, 1)] * self[(0, 0)].conj() - self[(0, 1)] * self[(1, 0)].conj()).im
-    }
-    fn s44(&self) -> f32 {
-        (self[(1, 1)] * self[(0, 0)].conj() - self[(0, 1)] * self[(1, 0)].conj()).re
-    }
-    fn to_mueller(&self) -> Mueller {
-        Mueller::new(
-            self.s11(),
-            self.s12(),
-            self.s13(),
-            self.s14(),
-            self.s21(),
-            self.s22(),
-            self.s23(),
-            self.s24(),
-            self.s31(),
-            self.s32(),
-            self.s33(),
-            self.s34(),
-            self.s41(),
-            self.s42(),
-            self.s43(),
-            self.s44(),
-        )
     }
 }
 

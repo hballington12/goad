@@ -1,4 +1,6 @@
 use crate::diff::n2f_mapping_go;
+use crate::field::Ampl;
+use crate::field::AmplMatrix;
 use crate::result::{ApproxEq, MuellerMatrix};
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
@@ -7,7 +9,7 @@ use crate::{
     field::Field,
     geom::{Face, Geom},
     orientation, output,
-    result::{Ampl, AmplMatrix, GOComponent, Mueller, Results, ScattResult, ScatteringBin},
+    result::{GOComponent, Mueller, Results, ScattResult, ScatteringBin},
     settings::{load_config, Settings},
 };
 
@@ -285,7 +287,7 @@ impl Problem {
     fn compute_mueller(&mut self) {
         for result in self.result.field_2d.iter_mut() {
             // Convert amplitude matrices to Mueller matrices
-            result.mueller_total = result.ampl_total.map(|a| a.to_mueller());
+            result.mueller_total = result.ampl_total.map(|a: Ampl| a.to_mueller());
             result.mueller_beam = result.ampl_beam.map(|a| a.to_mueller());
             result.mueller_ext = result.ampl_ext.map(|a| a.to_mueller());
         }

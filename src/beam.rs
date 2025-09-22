@@ -9,10 +9,9 @@ use crate::{
     bins::SolidAngleBin,
     clip::Clipping,
     diff,
-    field::Field,
+    field::{Ampl, Field},
     fresnel,
     geom::{Face, Geom},
-    result::Ampl,
     settings,
     snell::get_theta_t,
 };
@@ -162,9 +161,14 @@ impl Beam {
                 e_perp = -e_perp;
             }
             let rot = get_rotation_matrix(&self, e_perp);
-            let (ampl, absorbed_intensity, ampl0, arg) = get_ampl(&self, rot, face, n1);
-            // self.field.phase += arg; // update the phase
+            let (ampl, absorbed_intensity, ampl0, arg, mut field) = get_ampl(&self, rot, face, n1);
+            // need to set new field here with same prop but new e_perp
+
+            // we now have a copy of the field but after rotation and absorption etc.
+            field.e_perp = e_perp; // manually update the field vectors
             let phase = self_phase + arg;
+            let new_field = Field::new(e_perp, self.prop, ampl, ampl0, phase);
+            assert_eq!(field, new_field.unwrap());
 
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
@@ -176,20 +180,42 @@ impl Beam {
                     n1,
                     self.rec_count + 1,
                     self.tir_count,
-                    Field::new(e_perp, self.prop, ampl, ampl0, self.field.phase).unwrap(),
+                    // Field::new(e_perp, self.prop, ampl, ampl0, phase).unwrap(),
+                    field.clone(),
                     BeamVariant::ExternalDiff,
                     self.wavelength,
                 );
                 outputs.push(external_diff);
             }
 
+            println!("Note: remove clone()");
             // untracked energy leaks can occur here if the amplitude matrix contains NaN values
             let refracted = create_refracted(
-                face, ampl, e_perp, normal, self, theta_i, n1, n2, ampl0, phase,
+                face,
+                ampl,
+                e_perp,
+                normal,
+                self,
+                theta_i,
+                n1,
+                n2,
+                ampl0,
+                phase,
+                field.clone(),
             )
             .unwrap_or(None);
             let reflected = create_reflected(
-                face, ampl, e_perp, normal, self, theta_i, n1, n2, ampl0, phase,
+                face,
+                ampl,
+                e_perp,
+                normal,
+                self,
+                theta_i,
+                n1,
+                n2,
+                ampl0,
+                phase,
+                field.clone(),
             )
             .unwrap_or(None);
 
@@ -319,7 +345,10 @@ fn get_ampl(
     rot: Matrix2<Complex<f32>>,
     face: &Face,
     n1: Complex<f32>,
-) -> (Ampl, f32, Ampl, f32) {
+) -> (Ampl, f32, Ampl, f32, Field) {
+    let mut field = beam.field.clone();
+    field.matmul(&rot); // multiply both ampl and ampl0 by rot matrix
+
     let mut ampl = rot * beam.field.ampl.clone();
     let mut ampl0 = rot * beam.field.ampl0;
 
@@ -329,6 +358,7 @@ fn get_ampl(
     let arg = dist * wavenumber * n1.re; // optical path length
                                          // let arg = 0.0 as f32;
     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
+    field.wind(arg); // increment phase
 
     let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
 
@@ -339,8 +369,9 @@ fn get_ampl(
 
     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
     ampl0 *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
+    field.mul(exp_absorption); // multiply both ampl and ampl0 by exp_absorption factor
 
-    (ampl, absorbed_intensity, ampl0, arg)
+    (ampl, absorbed_intensity, ampl0, arg, field)
 }
 
 /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
@@ -388,8 +419,15 @@ fn create_reflected(
     n2: Complex<f32>,
     ampl0: Ampl,
     phase: f32,
+    mut field: Field,
 ) -> Result<Option<Beam>> {
+    assert_eq!(field.ampl, ampl);
+    assert_eq!(field.ampl0, ampl0);
+    assert_eq!(field.phase, phase);
+    assert_eq!(field.e_perp, e_perp);
+
     let prop = get_reflection_vector(&normal, &beam.prop);
+    field.prop = prop;
 
     debug_assert!((prop.dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
     debug_assert!(!Field::ampl_intensity(&ampl).is_nan());
@@ -399,6 +437,10 @@ fn create_reflected(
         let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
         let refl_ampl = fresnel * ampl;
         let refl_ampl0 = fresnel * ampl0;
+        field.matmul(&fresnel);
+        let new_field = Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?;
+
+        assert_eq!(new_field, field);
         debug_assert!(!Field::ampl_intensity(&refl_ampl).is_nan());
 
         Ok(Some(Beam::new(
@@ -407,7 +449,8 @@ fn create_reflected(
             n1,
             beam.rec_count, // same recursion count, aligns with Macke 1996
             beam.tir_count + 1,
-            Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
+            // Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
+            field,
             BeamVariant::Default(DefaultBeamVariant::Tir),
             beam.wavelength,
         )))
@@ -416,6 +459,10 @@ fn create_reflected(
         let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
         let refl_ampl = fresnel * ampl;
         let refl_ampl0 = fresnel * ampl0;
+        let new_field = Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?;
+
+        field.matmul(&fresnel);
+        assert_eq!(new_field, field);
 
         Ok(Some(Beam::new(
             face.clone(),
@@ -423,7 +470,8 @@ fn create_reflected(
             n1,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
+            // Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
+            field,
             BeamVariant::Default(DefaultBeamVariant::Refl),
             beam.wavelength,
         )))
@@ -442,7 +490,13 @@ fn create_refracted(
     n2: Complex<f32>,
     ampl0: Ampl,
     phase: f32,
+    mut field: Field,
 ) -> Result<Option<Beam>> {
+    assert_eq!(field.ampl, ampl);
+    assert_eq!(field.ampl0, ampl0);
+    assert_eq!(field.phase, phase);
+    assert_eq!(field.e_perp, e_perp);
+
     if theta_i >= (n2.re / n1.re).asin() {
         // if total internal reflection
         Ok(None)
@@ -452,6 +506,11 @@ fn create_refracted(
         let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
         let refr_ampl = fresnel * ampl.clone();
         let refr_ampl0 = fresnel * ampl0.clone();
+
+        field.prop = prop;
+        field.matmul(&fresnel);
+        let new_field = Field::new(e_perp, prop, refr_ampl, refr_ampl0, phase);
+        assert_eq!(new_field.unwrap(), field);
 
         debug_assert!(beam.prop.dot(&prop) > 0.0);
         debug_assert!(
@@ -464,7 +523,8 @@ fn create_refracted(
             n2,
             beam.rec_count + 1,
             beam.tir_count,
-            Field::new(e_perp, prop, refr_ampl, refr_ampl0, phase)?,
+            // Field::new(e_perp, prop, refr_ampl, refr_ampl0, phase)?,
+            field,
             BeamVariant::Default(DefaultBeamVariant::Refr),
             beam.wavelength,
         )))

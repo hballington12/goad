@@ -6,8 +6,7 @@ use std::f32::consts::PI;
 
 use crate::beam::Beam;
 use crate::bins::{get_n_linear_search, get_n_simple, BinningScheme, Scheme, SolidAngleBin};
-use crate::field::Field;
-use crate::result::Ampl;
+use crate::field::{Ampl, Field};
 use crate::{geom, settings};
 
 /// Enum representing different mapping methods from near to far field.
