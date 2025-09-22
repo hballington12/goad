@@ -215,11 +215,11 @@ impl Field {
     /// Returns the amplitude of the field
     pub fn ampl(&self) -> Ampl {
         let phase = self.phase;
-        self.ampl0() * Complex::new(phase.cos(), phase.sin())
+        self.ampl_wo_phase() * Complex::new(phase.cos(), phase.sin())
     }
 
-    /// Returns the amplitude of the field without phase
-    pub fn ampl0(&self) -> Ampl {
+    /// Returns the amplitude of the field without phase due to path length
+    pub fn ampl_wo_phase(&self) -> Ampl {
         self.ampl
     }
 

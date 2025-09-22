@@ -1,7 +1,7 @@
 use crate::diff::n2f_mapping_go;
 use crate::field::Ampl;
 use crate::field::AmplMatrix;
-use crate::result::{ApproxEq, MuellerMatrix};
+use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     bins::{generate_bins, SolidAngleBin},
@@ -352,24 +352,6 @@ impl Problem {
             }
 
             self.propagate_next();
-        }
-        // for testing, compare the amplitude matrices of ampl and ampl0
-        for (i, beam) in self.out_beam_queue.iter_mut().enumerate() {
-            println!("Comparing ampl for beam {}", i);
-            println!("Beam variant is {:?}", beam.variant);
-            println!("Phase is {}", beam.field.phase());
-            let ampl = beam.field.ampl();
-            let phase = beam.field.phase();
-            // let phase = 0.0 as f32;
-            let ampl0 = beam.field.ampl0() * Complex::new(phase.cos(), phase.sin());
-            // beam.field.ampl = ampl0;
-
-            assert!(
-                ampl.approx_eq(&ampl0, 0.01),
-                "ampl: {:#?}, ampl0: {:#?}",
-                ampl,
-                ampl0
-            );
         }
     }
 
