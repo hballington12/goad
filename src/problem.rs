@@ -195,7 +195,7 @@ impl Problem {
         }
     }
 
-    fn diffract_outbeams(
+    fn n2f_mapping_ad(
         queue: &[Beam],
         bins: &[SolidAngleBin],
         fov_factor: Option<f32>,
@@ -257,7 +257,7 @@ impl Problem {
     pub fn solve_far_ext_diff(&mut self) {
         let fov_factor = None; // don't truncate by field of view for external diffraction
         let bins = self.result.bins();
-        let ampls = Self::diffract_outbeams(&self.ext_diff_beam_queue, &bins, fov_factor);
+        let ampls = Self::n2f_mapping_ad(&self.ext_diff_beam_queue, &bins, fov_factor);
 
         Self::add_amplitudes_to_results(&mut self.result.field_2d, ampls, GOComponent::ExtDiff);
     }
@@ -272,7 +272,7 @@ impl Problem {
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
                 let bins = self.result.bins();
-                Self::diffract_outbeams(&self.out_beam_queue, &bins, fov_factor)
+                Self::n2f_mapping_ad(&self.out_beam_queue, &bins, fov_factor)
             }
         };
 
