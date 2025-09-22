@@ -40,9 +40,9 @@ impl BeamPropagation {
         let vec = input_mid - output_mid;
         let input_normal = input.face.data().normal;
         let norm_dist_to_plane = vec.dot(&input_normal);
-        let dist_to_plane = norm_dist_to_plane / (input_normal.dot(&input.prop));
+        let dist_to_plane = norm_dist_to_plane / (input_normal.dot(&input.field.prop()));
         // ray cast along propagation direction
-        let intsn = output_mid + dist_to_plane * input.prop;
+        let intsn = output_mid + dist_to_plane * input.field.prop();
         vec![
             Coord {
                 x: output_mid.coords.x,
@@ -77,7 +77,7 @@ impl Beam {
         medium_refr_index: Complex<f32>,
     ) -> Complex<f32> {
         let id = face.data().shape_id.unwrap();
-        if normal.dot(&self.prop) < 0.0 {
+        if normal.dot(&self.field.prop()) < 0.0 {
             geom.shapes[id].refr_index
         } else {
             geom.n_out(id, medium_refr_index)
@@ -86,11 +86,11 @@ impl Beam {
 
     /// Determines the new `e_perp` vector for an intersection at a `face`.
     fn get_e_perp(&self, normal: &Vector3<f32>) -> Vector3<f32> {
-        let dot = normal.dot(&self.prop);
+        let dot = normal.dot(&self.field.prop());
         let e_perp = if dot.abs() > 1.0 - settings::COLINEAR_THRESHOLD {
             -self.field.e_perp()
         } else {
-            normal.cross(&self.prop).normalize() // new e_perp
+            normal.cross(&self.field.prop()).normalize() // new e_perp
         };
         if dot > 0.0 {
             -e_perp
@@ -111,7 +111,6 @@ impl Beam {
         let field = Field::new_identity(e_perp, prop)?;
         Ok(Beam::new(
             face,
-            prop,
             refr_index,
             0,
             0,
@@ -123,14 +122,12 @@ impl Beam {
 
     pub fn new_from_field(
         face: Face,
-        prop: Vector3<f32>,
         refr_index: Complex<f32>,
         field: Field,
         wavelength: f32,
     ) -> Self {
         Beam::new(
             face,
-            prop,
             refr_index,
             0,
             0,
@@ -148,7 +145,8 @@ impl Beam {
         medium_refr_index: Complex<f32>,
         area_threshold: f32,
     ) -> Result<(Vec<Beam>, f32)> {
-        let mut clipping = Clipping::new(geom, &mut self.face, &self.prop);
+        let prop = self.field.prop();
+        let mut clipping = Clipping::new(geom, &mut self.face, &prop);
         clipping.clip(area_threshold)?;
 
         self.clipping_area = match clipping.stats {
@@ -184,14 +182,14 @@ impl Beam {
         let mut outputs = Vec::new();
         for face in &intersections {
             let normal = face.data().normal;
-            let theta_i = normal.dot(&self.prop).abs().acos();
+            let theta_i = normal.dot(&self.field.prop()).abs().acos();
             let n2 = self.get_n2(geom, face, normal, medium_refr_index);
             let e_perp = self.get_e_perp(&normal);
 
             // START NEW
 
             let mut field = self.field.new_from_e_perp(&e_perp);
-            let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.prop); // z-distance
+            let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.field.prop()); // z-distance
             let wavenumber = self.wavenumber();
             field.wind(dist * wavenumber * n1.re); // increment phase
             let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
@@ -207,7 +205,6 @@ impl Beam {
             if self.variant == BeamVariant::Initial {
                 let external_diff = Beam::new(
                     face.clone(),
-                    self.prop,
                     n1,
                     self.rec_count + 1,
                     self.tir_count,
@@ -220,10 +217,12 @@ impl Beam {
 
             println!("Note: remove clone()");
             // untracked energy leaks can occur here if the amplitude matrix contains NaN values
-            let refracted = create_refracted(face, normal, self, theta_i, n1, n2, field.clone())
+            let refracted = self
+                .create_refracted(face, normal, theta_i, n1, n2, field.clone())
                 .unwrap_or(None);
-            let reflected =
-                create_reflected(face, normal, self, theta_i, n1, n2, field).unwrap_or(None);
+            let reflected = self
+                .create_reflected(face, normal, theta_i, n1, n2, field)
+                .unwrap_or(None);
 
             if refracted.is_some() {
                 outputs.push(refracted.unwrap());
@@ -247,7 +246,7 @@ impl Beam {
             Face::Complex { .. } => {
                 let faces = Face::earcut(&beam.face);
                 for face in faces {
-                    let dist = (face.data().midpoint - midpoint).dot(&beam.prop);
+                    let dist = (face.data().midpoint - midpoint).dot(&beam.field.prop());
                     let arg = dist * beam.wavenumber() * medium_refr_index.re;
                     // let arg = 0.0 as f32;
                     let ampl = beam.field.ampl().clone() * Complex::new(arg.cos(), arg.sin());
@@ -258,11 +257,11 @@ impl Beam {
 
                     let new_beam = Beam::new(
                         face,
-                        beam.prop,
                         beam.refr_index,
                         beam.rec_count,
                         beam.tir_count,
-                        Field::new(beam.field.e_perp(), beam.prop, ampl, ampl0, phase).unwrap(),
+                        Field::new(beam.field.e_perp(), beam.field.prop(), ampl, ampl0, phase)
+                            .unwrap(),
                         beam.variant.clone(),
                         beam.wavelength,
                     );
@@ -276,13 +275,13 @@ impl Beam {
 
     /// Computes the polar scattering angle of a beam in degrees
     fn get_polar_angle(&self) -> f32 {
-        ((-self.prop[2]).acos().to_degrees()).abs() // compute outgoing theta
+        ((-self.field.prop()[2]).acos().to_degrees()).abs() // compute outgoing theta
     }
 
     /// Computes the azimuthal scattering angle of a beam in degrees. Returns a value in the range [0, 360)
     fn get_azimuthal_angle(&self) -> f32 {
-        let kx = self.prop[0];
-        let ky = self.prop[1];
+        let kx = self.field.prop()[0];
+        let ky = self.field.prop()[1];
         let mut phi = ky.atan2(kx).to_degrees();
         if phi < 0.0 {
             phi += 360.0
@@ -387,105 +386,100 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
 //         .map(|x| nalgebra::Complex::new(x, 0.0))
 // }
 
-/// Creates a new reflected beam
-fn create_reflected(
-    face: &Face,
-    normal: Vector3<f32>,
-    beam: &Beam,
-    theta_i: f32,
-    n1: Complex<f32>,
-    n2: Complex<f32>,
-    mut field: Field,
-) -> Result<Option<Beam>> {
-    let prop = get_reflection_vector(&normal, &beam.prop);
-    field.set_prop(prop);
-
-    debug_assert!((field.prop().dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
-    debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
-
-    if theta_i > (n2.re / n1.re).asin() {
-        // if total internal reflection
-        let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
-        field.matmul(&fresnel);
-
-        debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
-
-        Ok(Some(Beam::new(
-            face.clone(),
-            prop,
-            n1,
-            beam.rec_count, // same recursion count, aligns with Macke 1996
-            beam.tir_count + 1,
-            // Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
-            field,
-            BeamVariant::Default(DefaultBeamVariant::Tir),
-            beam.wavelength,
-        )))
-    } else {
-        let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
-        let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
-
-        field.matmul(&fresnel);
-
-        Ok(Some(Beam::new(
-            face.clone(),
-            prop,
-            n1,
-            beam.rec_count + 1,
-            beam.tir_count,
-            // Field::new(e_perp, prop, refl_ampl, refl_ampl0, phase)?,
-            field,
-            BeamVariant::Default(DefaultBeamVariant::Refl),
-            beam.wavelength,
-        )))
-    }
-}
-
-/// Creates a new refracted beam.
-fn create_refracted(
-    face: &Face,
-    normal: Vector3<f32>,
-    beam: &Beam,
-    theta_i: f32,
-    n1: Complex<f32>,
-    n2: Complex<f32>,
-    mut field: Field,
-) -> Result<Option<Beam>> {
-    if theta_i >= (n2.re / n1.re).asin() {
-        // if total internal reflection
-        Ok(None)
-    } else {
-        let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
-        let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
-        let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
-
-        field.set_prop(prop);
-        field.matmul(&fresnel);
-
-        debug_assert!(field.prop().dot(&prop) > 0.0);
-        debug_assert!(
-            (field.prop().dot(&normal).abs() - theta_t.cos()).abs() < settings::COLINEAR_THRESHOLD
-        );
-
-        Ok(Some(Beam::new(
-            face.clone(),
-            prop,
-            n2,
-            beam.rec_count + 1,
-            beam.tir_count,
-            // Field::new(e_perp, prop, refr_ampl, refr_ampl0, phase)?,
-            field,
-            BeamVariant::Default(DefaultBeamVariant::Refr),
-            beam.wavelength,
-        )))
-    }
-}
-
 /// Converts the remainder faces from a clipping into beams with the same field
 /// properties as the original beam.
 impl Beam {
+    /// Creates a new reflected beam
+    fn create_reflected(
+        &self,
+        face: &Face,
+        normal: Vector3<f32>,
+        theta_i: f32,
+        n1: Complex<f32>,
+        n2: Complex<f32>,
+        mut field: Field,
+    ) -> Result<Option<Beam>> {
+        let prop = get_reflection_vector(&normal, &self.field.prop());
+        field.set_prop(prop);
+
+        debug_assert!((field.prop().dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
+        debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
+
+        if theta_i > (n2.re / n1.re).asin() {
+            // if total internal reflection
+            let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
+            field.matmul(&fresnel);
+
+            debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
+
+            Ok(Some(Beam::new(
+                face.clone(),
+                n1,
+                self.rec_count, // same recursion count, aligns with Macke 1996
+                self.tir_count + 1,
+                field,
+                BeamVariant::Default(DefaultBeamVariant::Tir),
+                self.wavelength,
+            )))
+        } else {
+            let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
+            let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
+
+            field.matmul(&fresnel);
+
+            Ok(Some(Beam::new(
+                face.clone(),
+                n1,
+                self.rec_count + 1,
+                self.tir_count,
+                field,
+                BeamVariant::Default(DefaultBeamVariant::Refl),
+                self.wavelength,
+            )))
+        }
+    }
+
+    /// Creates a new refracted beam.
+    fn create_refracted(
+        &self,
+        face: &Face,
+        normal: Vector3<f32>,
+        theta_i: f32,
+        n1: Complex<f32>,
+        n2: Complex<f32>,
+        mut field: Field,
+    ) -> Result<Option<Beam>> {
+        if theta_i >= (n2.re / n1.re).asin() {
+            // if total internal reflection
+            Ok(None)
+        } else {
+            let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
+            let prop = get_refraction_vector(&normal, &self.field.prop(), theta_i, theta_t);
+            let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
+
+            field.set_prop(prop);
+            field.matmul(&fresnel);
+
+            debug_assert!(field.prop().dot(&prop) > 0.0);
+            debug_assert!(
+                (field.prop().dot(&normal).abs() - theta_t.cos()).abs()
+                    < settings::COLINEAR_THRESHOLD
+            );
+
+            Ok(Some(Beam::new(
+                face.clone(),
+                n2,
+                self.rec_count + 1,
+                self.tir_count,
+                field,
+                BeamVariant::Default(DefaultBeamVariant::Refr),
+                self.wavelength,
+            )))
+        }
+    }
+
     fn remainders_to_beams(
-        &mut self,
+        &self,
         remainders: Vec<Face>,
         medium_refr_index: Complex<f32>,
     ) -> Vec<Beam> {
@@ -493,25 +487,20 @@ impl Beam {
         // midpoint of remainder to midpoint of original face. Propagate
         // the field back or forward by this distance.
         let self_midpoint = self.face.data().midpoint;
-        let self_phase = self.field.phase();
         let remainder_beams: Vec<_> = remainders
             .into_iter()
             .filter_map(|remainder| {
-                let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
+                let dist = (remainder.data().midpoint - self_midpoint).dot(&self.field.prop());
                 let arg = dist * self.wavenumber() * medium_refr_index.re;
-                // let arg = 0.0 as f32;
-                let ampl = self.field.ampl().clone() * Complex::new(arg.cos(), arg.sin());
-                // let ampl = self.field.ampl.clone();
-                let ampl0 = self.field.ampl0().clone();
-                // self.field.phase += arg; // update phase
-                let phase = self_phase + arg;
+                let mut field = self.field.clone();
+                field.wind(arg);
+
                 Some(Beam::new(
                     remainder,
-                    self.prop,
                     self.refr_index,
                     self.rec_count,
                     self.tir_count,
-                    Field::new(self.field.e_perp(), self.prop, ampl, ampl0, phase).unwrap(),
+                    field,
                     BeamVariant::OutGoing,
                     self.wavelength,
                 ))
@@ -531,7 +520,6 @@ impl Beam {
 #[derive(Debug, Clone, PartialEq)] // Added Default derive
 pub struct Beam {
     pub face: Face,
-    pub prop: Vector3<f32>,
     pub refr_index: Complex<f32>,
     pub rec_count: i32,
     pub tir_count: i32,
@@ -546,7 +534,6 @@ pub struct Beam {
 impl Beam {
     pub fn new(
         face: Face,
-        prop: Vector3<f32>,
         refr_index: Complex<f32>,
         rec_count: i32,
         tir_count: i32,
@@ -554,10 +541,8 @@ impl Beam {
         variant: BeamVariant,
         wavelength: f32,
     ) -> Self {
-        let prop = prop.normalize();
         Self {
             face,
-            prop,
             refr_index,
             rec_count,
             tir_count,
@@ -573,7 +558,7 @@ impl Beam {
     pub fn csa(&self) -> f32 {
         let area = self.face.data().area.unwrap();
         let norm = self.face.data().normal;
-        let cosine = self.prop.dot(&norm).abs();
+        let cosine = self.field.prop().dot(&norm).abs();
 
         area * cosine
     }
@@ -596,7 +581,7 @@ impl Beam {
             Face::Simple(face) => {
                 let verts = &face.exterior;
                 let ampl = self.field.ampl();
-                let prop = self.prop;
+                let prop = self.field.prop();
                 let vk7 = self.field.e_perp();
                 diff::n2f_aperture_diffraction(
                     verts,

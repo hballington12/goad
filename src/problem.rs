@@ -604,13 +604,7 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
     let arg = -dist * wavenumber * medium_refractive_index.re;
     field.wind(arg);
 
-    let beam = Beam::new_from_field(
-        clip,
-        -Vector3::z(),
-        medium_refractive_index,
-        field,
-        wavelength,
-    );
+    let beam = Beam::new_from_field(clip, medium_refractive_index, field, wavelength);
     beam
 }
 
