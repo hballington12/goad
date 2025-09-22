@@ -159,7 +159,7 @@ impl Beam {
                 // ensure e_perp is pointing in the correct direction
                 e_perp = -e_perp;
             }
-            let rot = get_rotation_matrix(&self, e_perp);
+            let rot = self.field.get_rotation_matrix(e_perp);
 
             // START NEW
 
@@ -170,13 +170,13 @@ impl Beam {
             let arg = dist * wavenumber * n1.re; // optical path length
             field.wind(arg); // increment phase
             let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
-            let absorbed_intensity = Field::ampl_intensity(&field.ampl)
-                * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
+            let absorbed_intensity =
+                field.intensity() * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
             let exp_absorption = (-2.0 * wavenumber * n1.im * dist_sqrt).exp(); // absorption
             field.mul(exp_absorption); // multiply both ampl and ampl0 by exp_absorption factor
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
-            field.e_perp = e_perp; // manually update the field vectors
+            field.set_e_perp(e_perp); // manually update the field vectors
 
             // END NEW
 
@@ -187,7 +187,6 @@ impl Beam {
                     n1,
                     self.rec_count + 1,
                     self.tir_count,
-                    // Field::new(e_perp, self.prop, ampl, ampl0, phase).unwrap(),
                     field.clone(),
                     BeamVariant::ExternalDiff,
                     self.wavelength,
@@ -203,10 +202,10 @@ impl Beam {
                 create_reflected(face, normal, self, theta_i, n1, n2, field).unwrap_or(None);
 
             if refracted.is_some() {
-                outputs.push(refracted.unwrap().clone());
+                outputs.push(refracted.unwrap());
             }
             if reflected.is_some() {
-                outputs.push(reflected.unwrap().clone());
+                outputs.push(reflected.unwrap());
             }
         }
 
@@ -227,10 +226,10 @@ impl Beam {
                     let dist = (face.data().midpoint - midpoint).dot(&beam.prop);
                     let arg = dist * beam.wavenumber() * medium_refr_index.re;
                     // let arg = 0.0 as f32;
-                    let ampl = beam.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
+                    let ampl = beam.field.ampl().clone() * Complex::new(arg.cos(), arg.sin());
                     // let ampl = beam.field.ampl.clone();
-                    let ampl0 = beam.field.ampl0.clone();
-                    let phase = beam.field.phase + arg;
+                    let ampl0 = beam.field.ampl0().clone();
+                    let phase = beam.field.phase() + arg;
                     // let phase = beam.field.phase;
 
                     let new_beam = Beam::new(
@@ -239,7 +238,7 @@ impl Beam {
                         beam.refr_index,
                         beam.rec_count,
                         beam.tir_count,
-                        Field::new(beam.field.e_perp, beam.prop, ampl, ampl0, phase).unwrap(),
+                        Field::new(beam.field.e_perp(), beam.prop, ampl, ampl0, phase).unwrap(),
                         beam.variant.clone(),
                         beam.wavelength,
                     );
@@ -319,55 +318,55 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
     result
 }
 
-/// Takes an amplitude matrix from the input beam data, rotates it into the new
-/// scattering plane using the rotation matrix `rot`, computes the distance to
-/// the intersection `face`, and applies the corresponding phase and absorption
-/// factors.
-fn get_ampl(
-    beam: &Beam,
-    rot: Matrix2<Complex<f32>>,
-    face: &Face,
-    n1: Complex<f32>,
-) -> (Ampl, f32, Ampl, f32, Field) {
-    let mut field = beam.field.clone();
-    field.matmul(&rot); // multiply both ampl and ampl0 by rot matrix
+// /// Takes an amplitude matrix from the input beam data, rotates it into the new
+// /// scattering plane using the rotation matrix `rot`, computes the distance to
+// /// the intersection `face`, and applies the corresponding phase and absorption
+// /// factors.
+// fn get_ampl(
+//     beam: &Beam,
+//     rot: Matrix2<Complex<f32>>,
+//     face: &Face,
+//     n1: Complex<f32>,
+// ) -> (Ampl, f32, Ampl, f32, Field) {
+//     let mut field = beam.field.clone();
+//     field.matmul(&rot); // multiply both ampl and ampl0 by rot matrix
 
-    let mut ampl = rot * beam.field.ampl.clone();
-    let mut ampl0 = rot * beam.field.ampl0;
+//     let mut ampl = rot * beam.field.ampl.clone();
+//     let mut ampl0 = rot * beam.field.ampl0;
 
-    let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
-    let wavenumber = beam.wavenumber();
+//     let dist = (face.midpoint() - beam.face.data().midpoint).dot(&beam.prop); // z-distance
+//     let wavenumber = beam.wavenumber();
 
-    let arg = dist * wavenumber * n1.re; // optical path length
-                                         // let arg = 0.0 as f32;
-    ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
-    field.wind(arg); // increment phase
+//     let arg = dist * wavenumber * n1.re; // optical path length
+//                                          // let arg = 0.0 as f32;
+//     ampl *= Complex::new(arg.cos(), arg.sin()); //  apply distance phase factor
+//     field.wind(arg); // increment phase
 
-    let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
+//     let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
 
-    let absorbed_intensity = Field::ampl_intensity(&ampl)
-        * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
+//     let absorbed_intensity = Field::ampl_intensity(&ampl)
+//         * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
 
-    let exp_absorption = (-2.0 * wavenumber * n1.im * dist_sqrt).exp(); // absorption
+//     let exp_absorption = (-2.0 * wavenumber * n1.im * dist_sqrt).exp(); // absorption
 
-    ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
-    ampl0 *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
-    field.mul(exp_absorption); // multiply both ampl and ampl0 by exp_absorption factor
+//     ampl *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
+//     ampl0 *= Complex::new(exp_absorption, 0.0); //  apply absorption factor
+//     field.mul(exp_absorption); // multiply both ampl and ampl0 by exp_absorption factor
 
-    (ampl, absorbed_intensity, ampl0, arg, field)
-}
+//     (ampl, absorbed_intensity, ampl0, arg, field)
+// }
 
-/// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
-/// in `beam` to the plane perpendicular to `e_perp`.
-fn get_rotation_matrix(beam: &Beam, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
-    Field::rotation_matrix(beam.field.e_perp, e_perp, beam.prop)
-        .map(|x| nalgebra::Complex::new(x, 0.0))
-}
+// /// Returns a rotation matrix for rotating from the plane perpendicular to e_perp
+// /// in `beam` to the plane perpendicular to `e_perp`.
+// fn get_rotation_matrix(beam: &Beam, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
+//     Field::rotation_matrix(beam.field.e_perp(), e_perp, beam.prop)
+//         .map(|x| nalgebra::Complex::new(x, 0.0))
+// }
 
 /// Determines the new `e_perp` vector for an intersection at a `face`.
 fn get_e_perp(normal: Vector3<f32>, beam: &Beam) -> Vector3<f32> {
     if normal.dot(&beam.prop).abs() > 1.0 - settings::COLINEAR_THRESHOLD {
-        -beam.field.e_perp
+        -beam.field.e_perp()
     } else {
         normal.cross(&beam.prop).normalize() // new e_perp
     }
@@ -401,17 +400,17 @@ fn create_reflected(
     mut field: Field,
 ) -> Result<Option<Beam>> {
     let prop = get_reflection_vector(&normal, &beam.prop);
-    field.prop = prop;
+    field.set_prop(prop);
 
-    debug_assert!((field.prop.dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
-    debug_assert!(!Field::ampl_intensity(&field.ampl).is_nan());
+    debug_assert!((field.prop().dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
+    debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
 
     if theta_i > (n2.re / n1.re).asin() {
         // if total internal reflection
         let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
         field.matmul(&fresnel);
 
-        debug_assert!(!Field::ampl_intensity(&field.ampl).is_nan());
+        debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
 
         Ok(Some(Beam::new(
             face.clone(),
@@ -462,12 +461,12 @@ fn create_refracted(
         let prop = get_refraction_vector(&normal, &beam.prop, theta_i, theta_t);
         let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
 
-        field.prop = prop;
+        field.set_prop(prop);
         field.matmul(&fresnel);
 
-        debug_assert!(field.prop.dot(&prop) > 0.0);
+        debug_assert!(field.prop().dot(&prop) > 0.0);
         debug_assert!(
-            (field.prop.dot(&normal).abs() - theta_t.cos()).abs() < settings::COLINEAR_THRESHOLD
+            (field.prop().dot(&normal).abs() - theta_t.cos()).abs() < settings::COLINEAR_THRESHOLD
         );
 
         Ok(Some(Beam::new(
@@ -496,16 +495,16 @@ impl Beam {
         // midpoint of remainder to midpoint of original face. Propagate
         // the field back or forward by this distance.
         let self_midpoint = self.face.data().midpoint;
-        let self_phase = self.field.phase;
+        let self_phase = self.field.phase();
         let remainder_beams: Vec<_> = remainders
             .into_iter()
             .filter_map(|remainder| {
                 let dist = (remainder.data().midpoint - self_midpoint).dot(&self.prop);
                 let arg = dist * self.wavenumber() * medium_refr_index.re;
                 // let arg = 0.0 as f32;
-                let ampl = self.field.ampl.clone() * Complex::new(arg.cos(), arg.sin());
+                let ampl = self.field.ampl().clone() * Complex::new(arg.cos(), arg.sin());
                 // let ampl = self.field.ampl.clone();
-                let ampl0 = self.field.ampl0.clone();
+                let ampl0 = self.field.ampl0().clone();
                 // self.field.phase += arg; // update phase
                 let phase = self_phase + arg;
                 Some(Beam::new(
@@ -514,7 +513,7 @@ impl Beam {
                     self.refr_index,
                     self.rec_count,
                     self.tir_count,
-                    Field::new(self.field.e_perp, self.prop, ampl, ampl0, phase).unwrap(),
+                    Field::new(self.field.e_perp(), self.prop, ampl, ampl0, phase).unwrap(),
                     BeamVariant::OutGoing,
                     self.wavelength,
                 ))
@@ -598,9 +597,9 @@ impl Beam {
         match &self.face {
             Face::Simple(face) => {
                 let verts = &face.exterior;
-                let ampl = self.field.ampl;
+                let ampl = self.field.ampl();
                 let prop = self.prop;
-                let vk7 = self.field.e_perp;
+                let vk7 = self.field.e_perp();
                 diff::n2f_aperture_diffraction(
                     verts,
                     ampl,

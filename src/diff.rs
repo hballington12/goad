@@ -79,7 +79,7 @@ pub fn n2f_mapping_go(
 
         // Compute far-field amplitude matrix
         let ampl = rotation // rotation from beam plane to scattering plane
-            * beam.field.ampl // outgoing beam amplitude matrix
+            * beam.field.ampl() // outgoing beam amplitude matrix
             * prerotation // pre-rotation of the initial incidence
             * Complex::new(scale_factor, 0.0) // amplitude scaling factor
             * phase_correction; // reference phase correction
@@ -558,7 +558,7 @@ fn get_reference_phase(beam: &Beam) -> Complex<f32> {
 fn get_mapping_rotations(beam: &Beam, phi: f32) -> (Matrix2<Complex<f32>>, Matrix2<Complex<f32>>) {
     let (sin_phi, cos_phi) = phi.to_radians().sin_cos();
     let hc = Vector3::new(sin_phi, -cos_phi, 0.0);
-    let rotation = Field::rotation_matrix(beam.field.e_perp, hc, beam.prop);
+    let rotation = Field::rotation_matrix(beam.field.e_perp(), hc, beam.prop);
 
     let prerotation = Field::rotation_matrix(
         Vector3::x(),

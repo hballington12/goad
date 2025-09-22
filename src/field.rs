@@ -33,23 +33,23 @@ mod tests {
     fn field_partial_eq_with_tolerance() {
         let e_perp = Vector3::x();
         let prop = Vector3::z();
-        
+
         // Create two nearly identical fields
         let field1 = Field::new_identity(e_perp, prop).unwrap();
-        
+
         // Create a slightly different field
         let e_perp2 = Vector3::new(1.0 + 1e-6, 0.0, 0.0).normalize();
         let mut field2 = Field::new_identity(e_perp2, prop).unwrap();
         field2.phase = 1e-6;
-        
+
         // Should be equal within tolerance (1e-5)
         assert_eq!(field1, field2);
-        
+
         // Create a field with larger differences
         let e_perp3 = Vector3::new(1.0 + 1e-4, 0.0, 0.0).normalize();
         let mut field3 = Field::new_identity(e_perp3, prop).unwrap();
         field3.phase = 1e-4;
-        
+
         // Should not be equal (difference exceeds tolerance)
         assert_ne!(field1, field3);
     }
@@ -169,18 +169,18 @@ impl AmplMatrix for Ampl {
 /// Essentially represents a plane wave field with phase, amplitude matrix, and corresponding electric field vectors.
 #[derive(Debug, Clone)]
 pub struct Field {
-    pub ampl: Ampl,
-    pub ampl0: Ampl,
-    pub e_perp: Vector3<f32>,
-    pub phase: f32,
-    pub prop: Vector3<f32>,
+    ampl: Ampl,
+    ampl0: Ampl,
+    e_perp: Vector3<f32>,
+    phase: f32,
+    prop: Vector3<f32>,
 }
 
 impl PartialEq for Field {
     /// Compare two Field structs with a tolerance of 1e-5
     fn eq(&self, other: &Self) -> bool {
         const TOLERANCE: f32 = 1e-5;
-        
+
         // Check amplitude matrices using ApproxEq trait
         self.ampl.approx_eq(&other.ampl, TOLERANCE)
             && self.ampl0.approx_eq(&other.ampl0, TOLERANCE)
@@ -216,9 +216,64 @@ impl Field {
         self.phase += arg;
     }
 
+    // Getters
+
+    /// Returns the propagation vector of the field
+    pub fn prop(&self) -> Vector3<f32> {
+        self.prop
+    }
+
+    /// Returns the amplitude of the field
+    pub fn ampl(&self) -> Ampl {
+        self.ampl
+    }
+
+    /// Returns the amplitude of the field without phase
+    pub fn ampl0(&self) -> Ampl {
+        self.ampl0
+    }
+
+    /// Returns the phase of the field
+    pub fn phase(&self) -> f32 {
+        self.phase
+    }
+
+    /// Returns the perpendicular component of the electric field
+    pub fn e_perp(&self) -> Vector3<f32> {
+        self.e_perp
+    }
+
     /// Returns the parallel component of the electric field
     pub fn e_par(&self) -> Vector3<f32> {
         self.e_perp.cross(&self.prop).normalize()
+    }
+
+    // Setters
+
+    pub fn set_ampl(&mut self, ampl: Ampl) {
+        self.ampl = ampl;
+    }
+
+    pub fn set_ampl0(&mut self, ampl0: Ampl) {
+        self.ampl0 = ampl0;
+    }
+
+    pub fn set_phase(&mut self, phase: f32) {
+        self.phase = phase;
+    }
+
+    pub fn set_e_perp(&mut self, e_perp: Vector3<f32>) {
+        self.e_perp = e_perp;
+    }
+
+    pub fn set_prop(&mut self, prop: Vector3<f32>) {
+        self.prop = prop;
+    }
+
+    /// Returns a rotation matrix for rotating from the current plane perpendicular to the plane perpendicular to `e_perp`.
+    pub fn get_rotation_matrix(&self, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
+        Field::rotation_matrix(self.e_perp, e_perp, self.prop)
+            .map(|x| nalgebra::Complex::new(x, 0.0))
     }
 
     /// Creates a new unit electric field with the given input perpendicular
@@ -327,7 +382,7 @@ impl Field {
 
     /// Returns the field intensity.
     pub fn intensity(&self) -> f32 {
-        Self::ampl_intensity(&self.ampl)
+        0.5 * self.ampl.norm_squared()
     }
 
     pub fn ampl_intensity(ampl: &Matrix2<Complex<f32>>) -> f32 {
