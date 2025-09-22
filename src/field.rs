@@ -262,8 +262,8 @@ impl Field {
         self.phase = phase;
     }
 
-    pub fn set_e_perp(&mut self, e_perp: Vector3<f32>) {
-        self.e_perp = e_perp;
+    pub fn set_e_perp(&mut self, e_perp: &Vector3<f32>) {
+        self.e_perp = *e_perp;
     }
 
     pub fn set_prop(&mut self, prop: Vector3<f32>) {
@@ -271,9 +271,17 @@ impl Field {
     }
 
     /// Returns a rotation matrix for rotating from the current plane perpendicular to the plane perpendicular to `e_perp`.
-    pub fn get_rotation_matrix(&self, e_perp: Vector3<f32>) -> Matrix2<Complex<f32>> {
-        Field::rotation_matrix(self.e_perp, e_perp, self.prop)
+    pub fn get_rotation_matrix(&self, e_perp: &Vector3<f32>) -> Matrix2<Complex<f32>> {
+        Field::rotation_matrix(self.e_perp, *e_perp, self.prop)
             .map(|x| nalgebra::Complex::new(x, 0.0))
+    }
+
+    pub fn new_from_e_perp(&self, e_perp: &Vector3<f32>) -> Self {
+        let rot = self.get_rotation_matrix(e_perp);
+        let mut field = self.clone();
+        field.set_e_perp(e_perp);
+        field.matmul(&rot);
+        field
     }
 
     /// Creates a new unit electric field with the given input perpendicular

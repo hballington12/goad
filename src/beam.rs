@@ -9,7 +9,7 @@ use crate::{
     bins::SolidAngleBin,
     clip::Clipping,
     diff,
-    field::{Ampl, Field},
+    field::Field,
     fresnel,
     geom::{Face, Geom},
     settings,
@@ -67,6 +67,38 @@ impl BeamPropagation {
 }
 
 impl Beam {
+    /// Determines the refractive index of the second medium when a beam intersects
+    /// with a face.
+    fn get_n2(
+        &self,
+        geom: &Geom,
+        face: &Face,
+        normal: Vector3<f32>,
+        medium_refr_index: Complex<f32>,
+    ) -> Complex<f32> {
+        let id = face.data().shape_id.unwrap();
+        if normal.dot(&self.prop) < 0.0 {
+            geom.shapes[id].refr_index
+        } else {
+            geom.n_out(id, medium_refr_index)
+        }
+    }
+
+    /// Determines the new `e_perp` vector for an intersection at a `face`.
+    fn get_e_perp(&self, normal: &Vector3<f32>) -> Vector3<f32> {
+        let dot = normal.dot(&self.prop);
+        let e_perp = if dot.abs() > 1.0 - settings::COLINEAR_THRESHOLD {
+            -self.field.e_perp()
+        } else {
+            normal.cross(&self.prop).normalize() // new e_perp
+        };
+        if dot > 0.0 {
+            -e_perp
+        } else {
+            e_perp
+        }
+    }
+
     /// Creates a new initial field. The amplitude matrix is the identity matrix
     /// with the specified perpendicular field vector.
     pub fn new_initial(
@@ -153,22 +185,15 @@ impl Beam {
         for face in &intersections {
             let normal = face.data().normal;
             let theta_i = normal.dot(&self.prop).abs().acos();
-            let n2 = get_n2(geom, self, face, normal, medium_refr_index);
-            let mut e_perp = get_e_perp(normal, &self); // TODO: put the switcheroo below inside the function
-            if normal.dot(&self.prop) > 0.0 {
-                // ensure e_perp is pointing in the correct direction
-                e_perp = -e_perp;
-            }
-            let rot = self.field.get_rotation_matrix(e_perp);
+            let n2 = self.get_n2(geom, face, normal, medium_refr_index);
+            let e_perp = self.get_e_perp(&normal);
 
             // START NEW
 
-            let mut field = self.field.clone();
-            field.matmul(&rot);
+            let mut field = self.field.new_from_e_perp(&e_perp);
             let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.prop); // z-distance
             let wavenumber = self.wavenumber();
-            let arg = dist * wavenumber * n1.re; // optical path length
-            field.wind(arg); // increment phase
+            field.wind(dist * wavenumber * n1.re); // increment phase
             let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
             let absorbed_intensity =
                 field.intensity() * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
@@ -176,7 +201,6 @@ impl Beam {
             field.mul(exp_absorption); // multiply both ampl and ampl0 by exp_absorption factor
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
-            field.set_e_perp(e_perp); // manually update the field vectors
 
             // END NEW
 
@@ -362,32 +386,6 @@ fn get_reflection_vector(norm: &Vector3<f32>, prop: &Vector3<f32>) -> Vector3<f3
 //     Field::rotation_matrix(beam.field.e_perp(), e_perp, beam.prop)
 //         .map(|x| nalgebra::Complex::new(x, 0.0))
 // }
-
-/// Determines the new `e_perp` vector for an intersection at a `face`.
-fn get_e_perp(normal: Vector3<f32>, beam: &Beam) -> Vector3<f32> {
-    if normal.dot(&beam.prop).abs() > 1.0 - settings::COLINEAR_THRESHOLD {
-        -beam.field.e_perp()
-    } else {
-        normal.cross(&beam.prop).normalize() // new e_perp
-    }
-}
-
-/// Determines the refractive index of the second medium when a beam intersects
-/// with a face.
-fn get_n2(
-    geom: &mut Geom,
-    beam: &mut Beam,
-    face: &Face,
-    normal: Vector3<f32>,
-    medium_refr_index: Complex<f32>,
-) -> Complex<f32> {
-    let id = face.data().shape_id.unwrap();
-    if normal.dot(&beam.prop) < 0.0 {
-        geom.shapes[id].refr_index
-    } else {
-        geom.n_out(id, medium_refr_index)
-    }
-}
 
 /// Creates a new reflected beam
 fn create_reflected(
