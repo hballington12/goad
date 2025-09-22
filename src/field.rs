@@ -21,15 +21,6 @@ mod tests {
     }
 
     #[test]
-    fn null_ampl() {
-        let e_perp = Vector3::x();
-        let prop = Vector3::z();
-        let mut field = Field::new_identity(e_perp, prop).unwrap();
-        field.ampl *= Complex::ZERO;
-        assert!((field.intensity()).abs() < settings::COLINEAR_THRESHOLD);
-    }
-
-    #[test]
     fn field_partial_eq_with_tolerance() {
         let e_perp = Vector3::x();
         let prop = Vector3::z();
@@ -174,7 +165,6 @@ impl AmplMatrix for Ampl {
 #[derive(Debug, Clone)]
 pub struct Field {
     ampl: Ampl,
-    ampl0: Ampl,
     e_perp: Vector3<f32>,
     phase: f32,
     prop: Vector3<f32>,
@@ -187,7 +177,6 @@ impl PartialEq for Field {
 
         // Check amplitude matrices using ApproxEq trait
         self.ampl.approx_eq(&other.ampl, TOLERANCE)
-            && self.ampl0.approx_eq(&other.ampl0, TOLERANCE)
             // Check vectors component-wise with tolerance
             && (self.e_perp.x - other.e_perp.x).abs() < TOLERANCE
             && (self.e_perp.y - other.e_perp.y).abs() < TOLERANCE
@@ -201,22 +190,18 @@ impl PartialEq for Field {
 }
 
 impl Field {
-    /// Multiply the field by a complex-valued rotation matrix
+    /// Multiply the field amplitude by a complex-valued rotation matrix
     pub fn matmul(&mut self, rot: &Matrix2<Complex<f32>>) {
         self.ampl = rot * self.ampl;
-        self.ampl0 = rot * self.ampl0;
     }
 
-    /// Multiply the field by a real-valued factor
+    /// Multiply the field amplitude by a real-valued factor
     pub fn mul(&mut self, fac: f32) {
-        let complex_fac = Complex::new(fac, 0.0);
-        self.ampl *= complex_fac;
-        self.ampl0 *= complex_fac;
+        self.ampl *= Complex::new(fac, 0.0);
     }
 
     /// Increment the phase by a real value
     pub fn wind(&mut self, arg: f32) {
-        self.ampl *= Complex::new(arg.cos(), arg.sin());
         self.phase += arg;
     }
 
@@ -229,12 +214,13 @@ impl Field {
 
     /// Returns the amplitude of the field
     pub fn ampl(&self) -> Ampl {
-        self.ampl
+        let phase = self.phase;
+        self.ampl0() * Complex::new(phase.cos(), phase.sin())
     }
 
     /// Returns the amplitude of the field without phase
     pub fn ampl0(&self) -> Ampl {
-        self.ampl0
+        self.ampl
     }
 
     /// Returns the phase of the field
@@ -254,12 +240,8 @@ impl Field {
 
     // Setters
 
-    pub fn set_ampl(&mut self, ampl: Ampl) {
-        self.ampl = ampl;
-    }
-
-    pub fn set_ampl0(&mut self, ampl0: Ampl) {
-        self.ampl0 = ampl0;
+    pub fn set_ampl(&mut self, ampl0: Ampl) {
+        self.ampl = ampl0;
     }
 
     pub fn set_phase(&mut self, phase: f32) {
@@ -319,7 +301,6 @@ impl Field {
 
         let field = Self {
             ampl: Matrix2::identity(),
-            ampl0: Matrix2::identity(),
             e_perp,
             phase: 0.0,
             prop,
@@ -330,13 +311,7 @@ impl Field {
 
     /// Creates an electric field with the given input perpendicular field
     /// vector, propagation vector, and amplitude matrix.
-    pub fn new(
-        e_perp: Vector3<f32>,
-        prop: Vector3<f32>,
-        ampl: Ampl,
-        ampl0: Ampl,
-        phase: f32,
-    ) -> Result<Self> {
+    pub fn new(e_perp: Vector3<f32>, prop: Vector3<f32>, ampl0: Ampl, phase: f32) -> Result<Self> {
         #[cfg(debug_assertions)]
         {
             let norm_e_perp_diff = e_perp.norm() - 1.0;
@@ -363,8 +338,7 @@ impl Field {
             }
         }
         let field = Self {
-            ampl,
-            ampl0,
+            ampl: ampl0,
             e_perp,
             phase,
             prop,
