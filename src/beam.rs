@@ -9,7 +9,7 @@ use crate::{
     bins::SolidAngleBin,
     clip::Clipping,
     diff,
-    field::Field,
+    field::{Ampl, Field},
     fresnel,
     geom::{Face, Geom},
     settings,
@@ -524,18 +524,14 @@ impl Beam {
         2.0 * PI / self.wavelength
     }
 
-    pub fn diffract(
-        &self,
-        bins: &[SolidAngleBin],
-        fov_factor: Option<f32>,
-    ) -> Vec<Matrix2<Complex<f32>>> {
+    pub fn diffract(&self, bins: &[SolidAngleBin], fov_factor: Option<f32>) -> Vec<(usize, Ampl)> {
         match &self.face {
             Face::Simple(face) => {
                 let verts = &face.exterior;
                 let ampl = self.field.ampl();
                 let prop = self.field.prop();
                 let vk7 = self.field.e_perp();
-                diff::n2f_aperture_diffraction(
+                let ampls = diff::n2f_aperture_diffraction(
                     verts,
                     ampl,
                     prop,
@@ -543,11 +539,12 @@ impl Beam {
                     bins,
                     self.wavenumber(),
                     fov_factor,
-                )
+                );
+                ampls.into_iter().enumerate().collect()
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");
-                vec![Matrix2::zeros(); bins.len()]
+                vec![]
             }
         }
     }

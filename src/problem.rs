@@ -1,19 +1,18 @@
 use crate::diff::n2f_go;
-use crate::field::Ampl;
 use crate::field::AmplMatrix;
 use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
-    bins::{generate_bins, SolidAngleBin},
+    bins::generate_bins,
     diff::Mapping,
     field::Field,
     geom::{Face, Geom},
     orientation, output,
-    result::{GOComponent, Mueller, Results, ScattResult, ScatteringBin},
+    result::{GOComponent, Mueller, Results},
     settings::{load_config, Settings},
 };
 
-use nalgebra::{Complex, Matrix2, Point3, Vector3};
+use nalgebra::{Complex, Point3, Vector3};
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
@@ -117,26 +116,28 @@ impl Problem {
 impl Problem {
     /// Mapping from near to far field using geometric optics.
     pub fn n2f_mapping_go(&mut self) {
+        let coherence = self.settings.coherence;
         for beam in self.out_beam_queue.iter() {
-            for (n, ampl) in n2f_go(&self.settings.binning, &self.result.bins(), beam).iter() {
+            let tuples = n2f_go(&self.settings.binning, &self.result.bins(), beam);
+            for (n, ampl) in tuples {
                 if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
                     continue; // skip invalid amplitudes
                 }
-                // if coherence, sum the amplitudes now, reduce to mueller later
-                if self.settings.coherence {
+                // if coherence, sum amplitudes now, reduce to mueller later
+                if coherence {
                     let ampl_target = match GOComponent::Beam {
-                        GOComponent::Total => &mut self.result.field_2d[*n].ampl_total,
-                        GOComponent::Beam => &mut self.result.field_2d[*n].ampl_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[*n].ampl_ext,
+                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
                     };
                     *ampl_target += ampl;
                 } else {
                     // if no coherence, reduce to mueller now
                     let mueller = ampl.to_mueller();
                     let mueller_target = match GOComponent::Beam {
-                        GOComponent::Total => &mut self.result.field_2d[*n].mueller_total,
-                        GOComponent::Beam => &mut self.result.field_2d[*n].mueller_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[*n].mueller_ext,
+                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
                     };
                     *mueller_target += mueller;
                 }
@@ -144,9 +145,19 @@ impl Problem {
         }
 
         // if coherence, reduce to mueller now
-        if self.settings.coherence {
+        if coherence {
             for result in self.result.field_2d.iter_mut() {
-                result.mueller_beam = result.ampl_beam.to_mueller();
+                match GOComponent::Beam {
+                    GOComponent::Total => {
+                        result.mueller_total = result.ampl_total.to_mueller();
+                    }
+                    GOComponent::Beam => {
+                        result.mueller_beam = result.ampl_beam.to_mueller();
+                    }
+                    GOComponent::ExtDiff => {
+                        result.mueller_ext = result.ampl_ext.to_mueller();
+                    }
+                }
             }
         }
     }
@@ -231,59 +242,74 @@ impl Problem {
         }
     }
 
-    fn n2f_mapping_ad(
-        queue: &[Beam],
-        bins: &[SolidAngleBin],
-        fov_factor: Option<f32>,
-    ) -> Vec<Ampl> {
+    fn n2f_mapping_ad(&mut self, component: GOComponent, fov_factor: Option<f32>) {
         // Calculate far-field amplitudes by diffracting all outbeams in parallel
-        queue
-            .par_iter()
-            .map(|outbeam| outbeam.diffract(&bins, fov_factor))
-            .reduce(
-                || vec![Matrix2::<Complex<f32>>::zeros(); bins.len()],
-                |mut acc, local| {
-                    acc.iter_mut().zip(local).for_each(|(a, l)| *a += l);
-                    acc
-                },
-            )
+        let coherence = self.settings.coherence;
+        let queue = match component {
+            GOComponent::Beam => &self.out_beam_queue,
+            GOComponent::ExtDiff => &self.ext_diff_beam_queue,
+            GOComponent::Total => panic!("No such queue exists for component: {:?}", component),
+        };
+        for beam in queue.iter() {
+            let tuples = beam.diffract(&self.result.bins(), fov_factor);
+            for (n, ampl) in tuples {
+                if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+                    continue; // skip invalid amplitudes
+                }
+                // if coherence, sum amplitudes now, reduce to mueller later
+                if coherence {
+                    let ampl_target = match component {
+                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
+                    };
+                    *ampl_target += ampl;
+                } else {
+                    // if no coherence, reduce to mueller now
+                    let mueller = ampl.to_mueller();
+                    let mueller_target = match component {
+                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
+                    };
+                    *mueller_target += mueller;
+                }
+            }
+        }
+
+        // if coherence, reduce to mueller now
+        if coherence {
+            for result in self.result.field_2d.iter_mut() {
+                match component {
+                    GOComponent::Total => {
+                        result.mueller_total = result.ampl_total.to_mueller();
+                    }
+                    GOComponent::Beam => {
+                        result.mueller_beam = result.ampl_beam.to_mueller();
+                    }
+                    GOComponent::ExtDiff => {
+                        result.mueller_ext = result.ampl_ext.to_mueller();
+                    }
+                }
+            }
+        }
     }
 
     /// Combines the external diffraction and outbeams to get the far-field solution.
     fn combine_far(&mut self) {
         for result in self.result.field_2d.iter_mut() {
-            result.ampl_total = result.ampl_beam + result.ampl_ext;
-        }
-    }
-
-    /// Helper to add amplitudes to results, handling None cases
-    fn add_amplitudes_to_results<B: ScatteringBin>(
-        results: &mut [ScattResult<B>],
-        amplitudes: Vec<Ampl>,
-        component: GOComponent,
-    ) {
-        for (result, ampl) in results.iter_mut().zip(amplitudes) {
-            // Skip invalid amplitudes
-            if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
-                continue;
+            if self.settings.coherence {
+                result.ampl_total = result.ampl_beam + result.ampl_ext;
+                result.mueller_total = result.ampl_total.to_mueller();
+            } else {
+                result.mueller_total = result.mueller_beam + result.mueller_ext;
             }
-
-            let target = match component {
-                GOComponent::Total => &mut result.ampl_total,
-                GOComponent::Beam => &mut result.ampl_beam,
-                GOComponent::ExtDiff => &mut result.ampl_ext,
-            };
-
-            *target += ampl;
         }
     }
 
     pub fn solve_far_ext_diff(&mut self) {
-        let fov_factor = None; // don't truncate by field of view for external diffraction
-        let bins = self.result.bins();
-        let ampls = Self::n2f_mapping_ad(&self.ext_diff_beam_queue, &bins, fov_factor);
-
-        Self::add_amplitudes_to_results(&mut self.result.field_2d, ampls, GOComponent::ExtDiff);
+        let fov_factor = None; // no FOV truncation for ext diffraction
+        self.n2f_mapping_ad(GOComponent::ExtDiff, fov_factor);
     }
 
     pub fn solve_far_outbeams(&mut self) {
@@ -293,13 +319,7 @@ impl Problem {
             }
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
-                let bins = self.result.bins();
-                let ampls = Self::n2f_mapping_ad(&self.out_beam_queue, &bins, fov_factor);
-                Self::add_amplitudes_to_results(
-                    &mut self.result.field_2d,
-                    ampls,
-                    GOComponent::Beam,
-                );
+                self.n2f_mapping_ad(GOComponent::Beam, fov_factor);
             }
         };
     }
@@ -309,19 +329,9 @@ impl Problem {
         self.combine_far();
     }
 
-    fn compute_mueller(&mut self) {
-        for result in self.result.field_2d.iter_mut() {
-            // Convert amplitude matrices to Mueller matrices
-            result.mueller_total = result.ampl_total.to_mueller();
-            // result.mueller_beam = result.ampl_beam.to_mueller(); // moved!
-            result.mueller_ext = result.ampl_ext.to_mueller();
-        }
-    }
-
     pub fn solve(&mut self) {
         self.solve_near();
         self.solve_far();
-        self.compute_mueller();
         self.try_mueller_to_1d();
     }
 
