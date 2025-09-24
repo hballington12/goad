@@ -237,18 +237,22 @@ impl Problem {
             }
         }
 
-        if coherence {
-            for result in self.result.field_2d.iter_mut() {
-                match component {
-                    GOComponent::Total => {
-                        result.mueller_total = result.ampl_total.to_mueller();
-                    }
-                    GOComponent::Beam => {
-                        result.mueller_beam = result.ampl_beam.to_mueller();
-                    }
-                    GOComponent::ExtDiff => {
-                        result.mueller_ext = result.ampl_ext.to_mueller();
-                    }
+        if self.settings.coherence {
+            self.reduce_ampl_to_mueller(component);
+        }
+    }
+
+    fn reduce_ampl_to_mueller(&mut self, component: GOComponent) {
+        for result in self.result.field_2d.iter_mut() {
+            match component {
+                GOComponent::Total => {
+                    result.mueller_total = result.ampl_total.to_mueller();
+                }
+                GOComponent::Beam => {
+                    result.mueller_beam = result.ampl_beam.to_mueller();
+                }
+                GOComponent::ExtDiff => {
+                    result.mueller_ext = result.ampl_ext.to_mueller();
                 }
             }
         }
@@ -269,7 +273,7 @@ impl Problem {
             };
 
             for (n, ampl) in tuples {
-                if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+                if !ampl.is_valid() {
                     continue; // skip invalid amplitudes
                 }
                 // if coherence, sum amplitudes now, reduce to mueller later
@@ -291,22 +295,9 @@ impl Problem {
                     *mueller_target += mueller;
                 }
             }
-
-            if coherence {
-                for result in self.result.field_2d.iter_mut() {
-                    match component {
-                        GOComponent::Total => {
-                            result.mueller_total = result.ampl_total.to_mueller();
-                        }
-                        GOComponent::Beam => {
-                            result.mueller_beam = result.ampl_beam.to_mueller();
-                        }
-                        GOComponent::ExtDiff => {
-                            result.mueller_ext = result.ampl_ext.to_mueller();
-                        }
-                    }
-                }
-            }
+        }
+        if coherence {
+            self.reduce_ampl_to_mueller(component);
         }
     }
     pub fn solve_far(&mut self) {

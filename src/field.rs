@@ -68,6 +68,7 @@ pub trait AmplMatrix {
     fn to_mueller(&self) -> Mueller;
     fn zeros() -> Self;
     fn identity() -> Self;
+    fn is_valid(&self) -> bool;
 }
 
 impl AmplMatrix for Ampl {
@@ -158,6 +159,9 @@ impl AmplMatrix for Ampl {
     }
     fn identity() -> Self {
         Self::identity()
+    }
+    fn is_valid(&self) -> bool {
+        self.iter().all(|c| c.re.is_finite() && c.im.is_finite())
     }
 }
 
