@@ -222,9 +222,17 @@ impl Problem {
     }
 
     pub fn solve_far_queue(&mut self, component: GOComponent) {
-        let (queue, mapping) = match component {
-            GOComponent::Beam => (&mut self.out_beam_queue, self.settings.mapping),
-            GOComponent::ExtDiff => (&mut self.ext_diff_beam_queue, Mapping::ApertureDiffraction),
+        let (queue, mapping, fov_factor) = match component {
+            GOComponent::Beam => (
+                &mut self.out_beam_queue,
+                self.settings.mapping,
+                self.settings.fov_factor,
+            ),
+            GOComponent::ExtDiff => (
+                &mut self.ext_diff_beam_queue,
+                Mapping::ApertureDiffraction,
+                None,
+            ),
             GOComponent::Total => {
                 panic!("No such beam queue exists for GOComponent: {:?}", component)
             }
@@ -236,9 +244,7 @@ impl Problem {
                     // TODO: convert to Beam method
                     n2f_go(&self.settings.binning, &self.result.bins(), beam)
                 }
-                Mapping::ApertureDiffraction => {
-                    beam.diffract(&self.result.bins(), self.settings.fov_factor)
-                }
+                Mapping::ApertureDiffraction => beam.diffract(&self.result.bins(), fov_factor),
             };
 
             for (n, ampl) in tuples {
