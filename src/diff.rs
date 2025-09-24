@@ -11,7 +11,7 @@ use crate::{geom, settings};
 
 /// Enum representing different mapping methods from near to far field.
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ValueEnum, Copy)]
 pub enum Mapping {
     GeometricOptics,
     ApertureDiffraction,

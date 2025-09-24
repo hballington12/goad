@@ -205,43 +205,6 @@ impl Problem {
         }
     }
 
-    pub fn solve_far_ext_diff(&mut self) {
-        let fov_factor = None; // no FOV truncation for ext diffraction
-                               // self.n2f_mapping_ad(GOComponent::ExtDiff, fov_factor);
-        let component = GOComponent::ExtDiff;
-        let coherence = self.settings.coherence;
-        for beam in self.ext_diff_beam_queue.iter() {
-            let tuples = beam.diffract(&self.result.bins(), fov_factor);
-            for (n, ampl) in tuples {
-                if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
-                    continue; // skip invalid amplitudes
-                }
-                // if coherence, sum amplitudes now, reduce to mueller later
-                if coherence {
-                    let ampl_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
-                    };
-                    *ampl_target += ampl;
-                } else {
-                    // if no coherence, reduce to mueller now
-                    let mueller = ampl.to_mueller();
-                    let mueller_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
-                    };
-                    *mueller_target += mueller;
-                }
-            }
-        }
-
-        if self.settings.coherence {
-            self.reduce_ampl_to_mueller(component);
-        }
-    }
-
     fn reduce_ampl_to_mueller(&mut self, component: GOComponent) {
         for result in self.result.field_2d.iter_mut() {
             match component {
@@ -258,11 +221,17 @@ impl Problem {
         }
     }
 
-    pub fn solve_far_outbeams(&mut self) {
-        let component = GOComponent::Beam;
+    pub fn solve_far_queue(&mut self, component: GOComponent) {
+        let (queue, mapping) = match component {
+            GOComponent::Beam => (&mut self.out_beam_queue, self.settings.mapping),
+            GOComponent::ExtDiff => (&mut self.ext_diff_beam_queue, Mapping::ApertureDiffraction),
+            GOComponent::Total => {
+                panic!("No such beam queue exists for GOComponent: {:?}", component)
+            }
+        };
         let coherence = self.settings.coherence;
-        for beam in self.out_beam_queue.iter() {
-            let tuples = match self.settings.mapping {
+        for beam in queue.iter() {
+            let tuples = match mapping {
                 Mapping::GeometricOptics => {
                     // TODO: convert to Beam method
                     n2f_go(&self.settings.binning, &self.result.bins(), beam)
@@ -301,8 +270,8 @@ impl Problem {
         }
     }
     pub fn solve_far(&mut self) {
-        self.solve_far_ext_diff();
-        self.solve_far_outbeams();
+        self.solve_far_queue(GOComponent::ExtDiff);
+        self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
     }
 
