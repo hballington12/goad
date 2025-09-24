@@ -14,7 +14,6 @@ use crate::{
 
 use nalgebra::{Complex, Point3, Vector3};
 use pyo3::prelude::*;
-use rayon::prelude::*;
 
 #[cfg(test)]
 mod tests {
@@ -115,7 +114,7 @@ impl Problem {
 
 impl Problem {
     /// Mapping from near to far field using geometric optics.
-    pub fn n2f_mapping_go(&mut self) {
+    pub fn n2f_mapping_go(&mut self, component: GOComponent) {
         let coherence = self.settings.coherence;
         for beam in self.out_beam_queue.iter() {
             let tuples = n2f_go(&self.settings.binning, &self.result.bins(), beam);
@@ -125,7 +124,7 @@ impl Problem {
                 }
                 // if coherence, sum amplitudes now, reduce to mueller later
                 if coherence {
-                    let ampl_target = match GOComponent::Beam {
+                    let ampl_target = match component {
                         GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
                         GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
                         GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
@@ -134,7 +133,7 @@ impl Problem {
                 } else {
                     // if no coherence, reduce to mueller now
                     let mueller = ampl.to_mueller();
-                    let mueller_target = match GOComponent::Beam {
+                    let mueller_target = match component {
                         GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
                         GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
                         GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
@@ -147,7 +146,7 @@ impl Problem {
         // if coherence, reduce to mueller now
         if coherence {
             for result in self.result.field_2d.iter_mut() {
-                match GOComponent::Beam {
+                match component {
                     GOComponent::Total => {
                         result.mueller_total = result.ampl_total.to_mueller();
                     }
@@ -315,7 +314,7 @@ impl Problem {
     pub fn solve_far_outbeams(&mut self) {
         match self.settings.mapping {
             Mapping::GeometricOptics => {
-                self.n2f_mapping_go();
+                self.n2f_mapping_go(GOComponent::Beam);
             }
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
