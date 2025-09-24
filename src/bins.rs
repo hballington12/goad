@@ -95,6 +95,8 @@ pub enum Scheme {
     Simple {
         num_theta: usize,
         num_phi: usize,
+        delta_theta: f32,
+        delta_phi: f32,
     },
     Interval {
         thetas: Vec<f32>,
@@ -106,6 +108,19 @@ pub enum Scheme {
         bins: Vec<(f32, f32)>,
         file: Option<String>,
     },
+}
+
+impl Scheme {
+    pub fn new_simple(num_theta: usize, num_phi: usize) -> Self {
+        let delta_theta = 180.0 / num_theta as f32;
+        let delta_phi = 360.0 / num_phi as f32;
+        Scheme::Simple {
+            num_theta,
+            num_phi,
+            delta_theta,
+            delta_phi,
+        }
+    }
 }
 
 /// Angular binning scheme for scattering calculations.
@@ -143,7 +158,7 @@ impl BinningScheme {
         }
 
         Ok(BinningScheme {
-            scheme: Scheme::Simple { num_theta, num_phi },
+            scheme: Scheme::new_simple(num_theta, num_phi),
         })
     }
 
@@ -279,7 +294,9 @@ pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<SolidAngleBin> {
 
 pub fn generate_bins(bin_type: &Scheme) -> Vec<SolidAngleBin> {
     match bin_type {
-        Scheme::Simple { num_theta, num_phi } => simple_bins(*num_theta, *num_phi),
+        Scheme::Simple {
+            num_theta, num_phi, ..
+        } => simple_bins(*num_theta, *num_phi),
         Scheme::Interval {
             thetas,
             theta_spacings,

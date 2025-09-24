@@ -38,6 +38,10 @@ pub struct CliArgs {
     /// Set the near to far field mapping method.
     #[arg(long, value_enum)]
     pub mapping: Option<Mapping>,
+
+    /// Set the coherence settings for near to far field mapping
+    #[arg(long, value_enum)]
+    pub coherence: Option<bool>,
 }
 
 /// Beam propagation parameters
@@ -275,7 +279,7 @@ pub fn update_settings_from_cli(config: &mut Settings) {
             let num_theta = simple_bins[0];
             let num_phi = simple_bins[1];
             config.binning = BinningScheme {
-                scheme: bins::Scheme::Simple { num_theta, num_phi },
+                scheme: bins::Scheme::new_simple(num_theta, num_phi),
             };
         } else {
             eprintln!(

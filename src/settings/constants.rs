@@ -61,6 +61,8 @@ pub const DEFAULT_PHI_BINS: usize = 181;
 pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
 /// Default mapping from near to far-field
 pub const DEFAULT_MAPPING: Mapping = Mapping::ApertureDiffraction;
+/// Default coherence settings
+pub const DEFAULT_COHERENCE: bool = true;
 
 // =================
 // Default Functions

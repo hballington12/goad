@@ -18,10 +18,7 @@ fn fixed_hex_30_30_30() {
     let mut settings = settings::load_default_config().unwrap();
     // Reduce binning for faster testing
     settings.binning = BinningScheme {
-        scheme: bins::Scheme::Simple {
-            num_theta: 19,
-            num_phi: 19,
-        },
+        scheme: bins::Scheme::new_simple(19, 19),
     };
     settings.orientation = goad::orientation::Orientation {
         scheme: goad::orientation::Scheme::Discrete {
@@ -48,10 +45,7 @@ fn fixed_hex_30_20_20() {
     let mut settings = settings::load_default_config().unwrap();
     // Reduce binning for faster testing
     settings.binning = BinningScheme {
-        scheme: bins::Scheme::Simple {
-            num_theta: 19,
-            num_phi: 19,
-        },
+        scheme: bins::Scheme::new_simple(19, 19),
     };
     settings.orientation = goad::orientation::Orientation {
         scheme: goad::orientation::Scheme::Discrete {

@@ -1,4 +1,3 @@
-use crate::bins::Scheme;
 use crate::diff::n2f_go;
 use crate::field::Ampl;
 use crate::field::AmplMatrix;
@@ -118,49 +117,37 @@ impl Problem {
 impl Problem {
     /// Mapping from near to far field using geometric optics.
     pub fn n2f_mapping_go(&mut self) {
-        // temp bools
-        let coherent = true;
-        let component = GOComponent::Beam;
-
-        // Create a vector to store the amplitudes
-        let beams = &self.out_beam_queue;
-        let binning = &self.settings.binning;
-        let bins = self.result.bins();
-
-        // Precompute theta and phi spacings if using Simple binning
-        let (delta_theta, delta_phi) = match binning.scheme {
-            Scheme::Simple { num_theta, num_phi } => (
-                Some(180.0 / (num_theta as f32)),
-                Some(360.0 / (num_phi as f32)),
-            ),
-            Scheme::Interval { .. } => (None, None),
-            Scheme::Custom { .. } => (None, None),
-        };
-
-        for beam in beams.iter() {
-            if let Some((n, ampl)) = n2f_go(binning, &bins, delta_theta, delta_phi, beam) {
+        for beam in self.out_beam_queue.iter() {
+            for (n, ampl) in n2f_go(&self.settings.binning, &self.result.bins(), beam).iter() {
                 if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
                     continue; // skip invalid amplitudes
                 }
-                // sum the far-field amplitude matrix, reduce to mueller later
-                if coherent {
-                    let target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
+                // if coherence, sum the amplitudes now, reduce to mueller later
+                if self.settings.coherence {
+                    let ampl_target = match GOComponent::Beam {
+                        GOComponent::Total => &mut self.result.field_2d[*n].ampl_total,
+                        GOComponent::Beam => &mut self.result.field_2d[*n].ampl_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[*n].ampl_ext,
                     };
-                    *target += ampl;
+                    *ampl_target += ampl;
                 } else {
-                    // incoherent, reduce to mueller and add directly
+                    // if no coherence, reduce to mueller now
                     let mueller = ampl.to_mueller();
-                    let target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
+                    let mueller_target = match GOComponent::Beam {
+                        GOComponent::Total => &mut self.result.field_2d[*n].mueller_total,
+                        GOComponent::Beam => &mut self.result.field_2d[*n].mueller_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[*n].mueller_ext,
                     };
-                    *target += mueller;
+                    *mueller_target += mueller;
                 }
-            };
+            }
+        }
+
+        // if coherence, reduce to mueller now
+        if self.settings.coherence {
+            for result in self.result.field_2d.iter_mut() {
+                result.mueller_beam = result.ampl_beam.to_mueller();
+            }
         }
     }
 
@@ -303,12 +290,6 @@ impl Problem {
         match self.settings.mapping {
             Mapping::GeometricOptics => {
                 self.n2f_mapping_go();
-                let coherent = true;
-                if coherent {
-                    for result in self.result.field_2d.iter_mut() {
-                        result.mueller_beam = result.ampl_beam.to_mueller();
-                    }
-                }
             }
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams

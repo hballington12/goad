@@ -75,6 +75,7 @@ pub struct Settings {
     pub mapping: Mapping,
     #[serde(default = "constants::default_output_config")]
     pub output: OutputConfig,
+    pub coherence: bool,
 }
 
 #[pymethods]
@@ -97,6 +98,7 @@ impl Settings {
         scale = 1.0,
         directory = "goad_run",
         mapping = DEFAULT_MAPPING,
+        coherence = DEFAULT_COHERENCE,
     ))]
     fn py_new(
         geom_path: String,
@@ -115,6 +117,7 @@ impl Settings {
         scale: f32,
         directory: &str,
         mapping: Mapping,
+        coherence: bool,
     ) -> PyResult<Self> {
         // Input validation
         if wavelength <= 0.0 {
@@ -187,6 +190,7 @@ impl Settings {
             fov_factor: None,
             mapping,
             output: constants::default_output_config(),
+            coherence,
         };
 
         validation::validate_config(&mut settings);

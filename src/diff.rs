@@ -17,20 +17,27 @@ pub enum Mapping {
     ApertureDiffraction,
 }
 
-/// Map a beam to the far-field using geometric optics. Assumes delta theta and delta phi are provided if the binning scheme is Simple.
-pub fn n2f_go(
-    binning: &BinningScheme,
-    bins: &[SolidAngleBin],
-    delta_theta: Option<f32>,
-    delta_phi: Option<f32>,
-    beam: &Beam,
-) -> Option<(usize, Ampl)> {
+/// Map a beam to the far-field using geometric optics. Assumes delta theta and delta phi are provided if the binning scheme is Simple. Returns a single-element vector containing the bin index and amplitude matrix.
+pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> Vec<(usize, Ampl)> {
+    // Use the precomputed theta and phi spacings if using Simple binning
+    let (delta_theta, delta_phi) = match binning.scheme {
+        Scheme::Simple {
+            num_theta: _,
+            num_phi: _,
+            delta_theta,
+            delta_phi,
+        } => (Some(delta_theta), Some(delta_phi)),
+        Scheme::Interval { .. } => (None, None),
+        Scheme::Custom { .. } => (None, None),
+    };
     // Get beam scattering angles
     let (theta, phi) = beam.get_scattering_angles();
 
     // Map scattering angles to corresponding bin
     let Some(n) = (match &binning.scheme {
-        Scheme::Simple { num_theta, num_phi } => {
+        Scheme::Simple {
+            num_theta, num_phi, ..
+        } => {
             // Safe to unwrap because we know the scheme is Simple
             get_n_simple(
                 *num_theta,
@@ -46,7 +53,7 @@ pub fn n2f_go(
             todo!("GO outbeam is not yet supported for custom binning.")
         }
     }) else {
-        return None;
+        return vec![];
     };
 
     // Get amplitude rotation matrices
@@ -72,7 +79,7 @@ pub fn n2f_go(
         * Complex::new(scale_factor, 0.0) // amplitude scaling factor
         * phase_correction; // reference phase correction
 
-    Some((n, ampl))
+    vec![(n, ampl)]
 }
 
 /// Mapping from near to far field using aperture diffraction theory.
