@@ -114,34 +114,34 @@ impl Problem {
 
 impl Problem {
     /// Mapping from near to far field using geometric optics.
-    pub fn n2f_mapping_go(&mut self, component: GOComponent) {
+    pub fn n2f_mapping_go(&mut self, beam: &Beam, component: GOComponent) {
         let coherence = self.settings.coherence;
-        for beam in self.out_beam_queue.iter() {
-            let tuples = n2f_go(&self.settings.binning, &self.result.bins(), beam);
-            for (n, ampl) in tuples {
-                if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
-                    continue; // skip invalid amplitudes
-                }
-                // if coherence, sum amplitudes now, reduce to mueller later
-                if coherence {
-                    let ampl_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
-                    };
-                    *ampl_target += ampl;
-                } else {
-                    // if no coherence, reduce to mueller now
-                    let mueller = ampl.to_mueller();
-                    let mueller_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
-                    };
-                    *mueller_target += mueller;
-                }
-            }
-        }
+        // for beam in self.out_beam_queue.iter() {
+        n2f_go(&self.settings.binning, &self.result.bins(), beam);
+        // for (n, ampl) in tuples {
+        //     if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+        //         continue; // skip invalid amplitudes
+        //     }
+        //     // if coherence, sum amplitudes now, reduce to mueller later
+        //     if coherence {
+        //         let ampl_target = match component {
+        //             GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
+        //             GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
+        //             GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
+        //         };
+        //         *ampl_target += ampl;
+        //     } else {
+        //         // if no coherence, reduce to mueller now
+        //         let mueller = ampl.to_mueller();
+        //         let mueller_target = match component {
+        //             GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
+        //             GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
+        //             GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
+        //         };
+        //         *mueller_target += mueller;
+        //     }
+        //     // }
+        // }
 
         // if coherence, reduce to mueller now
         if coherence {
@@ -312,15 +312,59 @@ impl Problem {
     }
 
     pub fn solve_far_outbeams(&mut self) {
-        match self.settings.mapping {
-            Mapping::GeometricOptics => {
-                self.n2f_mapping_go(GOComponent::Beam);
+        let component = GOComponent::Beam;
+        let coherence = self.settings.coherence;
+        for beam in self.out_beam_queue.iter() {
+            let tuples = match self.settings.mapping {
+                Mapping::GeometricOptics => {
+                    // TODO: convert to Beam method
+                    n2f_go(&self.settings.binning, &self.result.bins(), beam)
+                }
+                Mapping::ApertureDiffraction => {
+                    beam.diffract(&self.result.bins(), self.settings.fov_factor)
+                }
+            };
+
+            for (n, ampl) in tuples {
+                if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+                    continue; // skip invalid amplitudes
+                }
+                // if coherence, sum amplitudes now, reduce to mueller later
+                if coherence {
+                    let ampl_target = match component {
+                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
+                    };
+                    *ampl_target += ampl;
+                } else {
+                    // if no coherence, reduce to mueller now
+                    let mueller = ampl.to_mueller();
+                    let mueller_target = match component {
+                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
+                    };
+                    *mueller_target += mueller;
+                }
             }
-            Mapping::ApertureDiffraction => {
-                let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
-                self.n2f_mapping_ad(GOComponent::Beam, fov_factor);
+
+            if coherence {
+                for result in self.result.field_2d.iter_mut() {
+                    match component {
+                        GOComponent::Total => {
+                            result.mueller_total = result.ampl_total.to_mueller();
+                        }
+                        GOComponent::Beam => {
+                            result.mueller_beam = result.ampl_beam.to_mueller();
+                        }
+                        GOComponent::ExtDiff => {
+                            result.mueller_ext = result.ampl_ext.to_mueller();
+                        }
+                    }
+                }
             }
-        };
+        }
     }
     pub fn solve_far(&mut self) {
         self.solve_far_ext_diff();
