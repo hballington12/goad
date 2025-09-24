@@ -8,7 +8,6 @@
 # Configuration options specified on the command line will override values given
 #   in this file, as well as those set by environment variables.
 
-# Generic configuration
 wavelength = 0.532 # wavelength in dimension of the geometry file
 medium_refr_index = [
     1.0,
@@ -22,46 +21,82 @@ particle_refr_index = [
 ] # Refractive index of the particle/s (real and imaginary parts)
 # For files containing multiple shapes, use a nested list for different values
 # for each shape, eg. [[1.31,0.0],[1.5,0.001]]
-geom_name = "./examples/data/hex.obj" # Geometry file name for the particle
-beam_power_threshold = 0.005          # Threshold for truncation by beam power
-beam_area_threshold_fac = 0.1         # Factor for truncating beams by area
-cutoff = 0.99                         # Total power cutoff fraction
-max_rec = 10                          # Maximum number of recursions
-max_tir = 10                          # Maximum number of total internal reflections
-distortion = 0.0                      # Distortion factor for the geometry
-directory = "goad_run"                # Directory for output files
-# seed = 6                              # Seed (comment out for no seed)
-# geom_scale = [1.0, 1.0, 1.0] # Scale factor for the geometry
-# fov_factor = 1.0                      # Field of view factor for diffraction (comment out for no truncation)
+geom_name = "examples/data/hex.obj" # Geometry file name for the particle
+beam_power_threshold = 0.0001          # Threshold for truncation by beam power
+beam_area_threshold_fac = 0.0001      # Factor for truncating beams by area
+cutoff = 0.99999                        # Total power cutoff fraction
+max_rec = 10                         # Maximum number of recursions
+max_tir = 10                         # Maximum number of total internal reflections
+distortion = 0.0                    # Distortion factor for the geometry
+directory = "goad_run"              # Directory for output files
+# seed = 6                            # Seed (comment out for no seed)
+geom_scale = [1,1,1]        # Scale factor for the geometry
+# fov_factor = 1.0 # Field of view factor for diffraction (comment out for no truncation)
 mapping = "ApertureDiffraction" # ApertureDiffraction / GeometricOptics
+coherence = true # Enable coherence for near to far field mapping
 
 [binning] # Binning configuration
 
-    [binning.scheme] # Uncomment the desired binning scheme below
+[binning.scheme] # Uncomment the desired binning scheme below
 
-        [binning.scheme.Simple] # Simple square grid binning
-            num_theta = 181 # Number of theta bins
-            num_phi = 181   # Number of phi bins
 
-            # [binning.scheme.Interval] # Interval binning with specified theta and phi spacings
-            # thetas = [0, 1, 175, 179, 180]
-            # theta_spacings = [0.1, 1, 0.5, 0.1]
-            # phis = [0, 360]
-            # phi_spacings = [2]
+# [binning.scheme.Simple] # Simple square grid binning
+# num_theta = 180 # Number of theta bins
+# num_phi = 5    # Number of phi bins
 
-            # [binning.scheme.Custom] # Custom binning with specified [theta,phi] angular bins
-            #     bins = [[0, 0], [0, 40], [20, 180]] # custom bins, unless a file is specified below
-            #     # file = "custom_bins.toml"           # File containing custom bins, relative to working directory
-            #     # see the template directory for an example custom_bins.toml file
+[binning.scheme.Interval] # Interval binning with specified theta and phi spacings
+thetas = [0,180]
+theta_spacings =[2]
+phis = [0, 360]
+phi_spacings = [4]
+
+# [binning.scheme.Custom] # Custom binning with specified [theta,phi] angular bins
+# bins = [
+#     [
+#         0,
+#         0,
+#     ],
+#     [
+#         0,
+#         40,
+#     ],
+#     [
+#         20,
+#         180,
+#     ],
+# ] # custom bins, unless a file is specified below
+# file = "phips_bins.toml" # File containing custom bins, relative to working directory
 
 
 [orientation] # Orientation configuration
-    euler_convention = "ZYZ" # Euler angle convention
+euler_convention = "ZYZ" # Euler angle convention
 
-    [orientation.scheme] # Uncomment the desired orientation scheme below
+[orientation.scheme] # Uncomment the desired orientation scheme below
 
-        [orientation.scheme.Discrete] # Disscrete orientation with specified Euler angles
-            eulers = [[30, 30, 20], [30, 20, 50]] # Array of Euler angles in degrees
+[orientation.scheme.Discrete] # Discrete orientation with specified Euler angles
+eulers = [[30,30,0]]
 
-            # [orientation.scheme.Uniform] # Random uniform distribution
-            # num_orients = 2 # Number of orientations to generate
+# [orientation.scheme.Uniform] # Random uniform distribution
+# num_orients = 100 # Number of orientations to generate
+
+# ===================================
+# OUTPUT CONFIGURATION
+# ===================================
+[output]
+# Summary file (human-readable text) - DEFAULT: true
+results_summary = true
+
+# JSON files for structured data access - DEFAULT: false
+settings_json = true   # Enable to dump settings.json (entire config)
+powers_json = true     # Enable to dump powers.json (power distribution)
+params_json = true     # Enable to dump params.json (derived parameters)
+
+# Mueller matrix files (custom format) - DEFAULT: true
+mueller_2d = true       # Enable 2D Mueller matrix files
+mueller_1d = true       # Enable 1D integrated Mueller matrix files
+
+# Control which Mueller components are written - DEFAULT: all true
+[output.mueller_components]
+total = true           # Total scattering (mueller_scatgrid)
+beam = true            # Beam component (mueller_scatgrid_beam)
+external = true        # External diffraction (mueller_scatgrid_ext)

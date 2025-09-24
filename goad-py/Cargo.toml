@@ -1,6 +1,6 @@
 [package]
 name = "goad-py"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 description = "Physical optics light scattering computation"
 license = "GPL-3.0"

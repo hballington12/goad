@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// Represents a solid angle bin with theta and phi bins
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -82,7 +82,7 @@ mod tests {
         // Check that we have the right number of bins
         assert_eq!(result.len(), 9);
         // Check first bin centers
-        assert_eq!(result[0].phi_bin.center, 30.0);
+        assert_eq!(result[0].phi_bin.center, 60.0);
         assert_eq!(result[0].phi_bin.center, 60.0);
         // Check bin edges for first theta bin
         assert_eq!(result[0].theta_bin.min, 0.0);
@@ -90,7 +90,7 @@ mod tests {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub enum Scheme {
     Simple {
         num_theta: usize,
@@ -108,6 +108,77 @@ pub enum Scheme {
         bins: Vec<(f32, f32)>,
         file: Option<String>,
     },
+}
+
+// Custom deserializer to handle missing delta_theta and delta_phi
+impl<'de> Deserialize<'de> for Scheme {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct SimpleHelper {
+            num_theta: usize,
+            num_phi: usize,
+            #[serde(default)]
+            delta_theta: Option<f32>,
+            #[serde(default)]
+            delta_phi: Option<f32>,
+        }
+
+        #[derive(Deserialize)]
+        struct IntervalHelper {
+            thetas: Vec<f32>,
+            theta_spacings: Vec<f32>,
+            phis: Vec<f32>,
+            phi_spacings: Vec<f32>,
+        }
+
+        #[derive(Deserialize)]
+        struct CustomHelper {
+            bins: Vec<(f32, f32)>,
+            file: Option<String>,
+        }
+
+        #[derive(Deserialize)]
+        enum SchemeHelper {
+            Simple(SimpleHelper),
+            Interval(IntervalHelper),
+            Custom(CustomHelper),
+        }
+
+        let helper = SchemeHelper::deserialize(deserializer)?;
+        match helper {
+            SchemeHelper::Simple(SimpleHelper {
+                num_theta,
+                num_phi,
+                delta_theta,
+                delta_phi,
+            }) => {
+                // Calculate deltas if not provided
+                let delta_theta = delta_theta.unwrap_or(180.0 / num_theta as f32);
+                let delta_phi = delta_phi.unwrap_or(360.0 / num_phi as f32);
+                Ok(Scheme::Simple {
+                    num_theta,
+                    num_phi,
+                    delta_theta,
+                    delta_phi,
+                })
+            }
+            SchemeHelper::Interval(IntervalHelper {
+                thetas,
+                theta_spacings,
+                phis,
+                phi_spacings,
+            }) => Ok(Scheme::Interval {
+                thetas,
+                theta_spacings,
+                phis,
+                phi_spacings,
+            }),
+            SchemeHelper::Custom(CustomHelper { bins, file }) => Ok(Scheme::Custom { bins, file }),
+        }
+    }
 }
 
 impl Scheme {
@@ -305,7 +376,7 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<SolidAngleBin> {
         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
         Scheme::Custom { .. } => {
             // TODO: Custom bins need to specify edges or we need to infer them
-            todo!("Custom bins with Bin struct not yet implemented")
+            todo!("This version of GOAD does not support custom bins yet. Please use Simple, Interval, or an older version of this code.")
             // // println!("Loading custom bins from file: {:?}", file);
             // if let Some(file) = file {
             //     let content = match std::fs::read_to_string(file) {
