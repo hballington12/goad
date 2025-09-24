@@ -113,54 +113,6 @@ impl Problem {
 }
 
 impl Problem {
-    /// Mapping from near to far field using geometric optics.
-    pub fn n2f_mapping_go(&mut self, beam: &Beam, component: GOComponent) {
-        let coherence = self.settings.coherence;
-        // for beam in self.out_beam_queue.iter() {
-        n2f_go(&self.settings.binning, &self.result.bins(), beam);
-        // for (n, ampl) in tuples {
-        //     if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
-        //         continue; // skip invalid amplitudes
-        //     }
-        //     // if coherence, sum amplitudes now, reduce to mueller later
-        //     if coherence {
-        //         let ampl_target = match component {
-        //             GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
-        //             GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
-        //             GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
-        //         };
-        //         *ampl_target += ampl;
-        //     } else {
-        //         // if no coherence, reduce to mueller now
-        //         let mueller = ampl.to_mueller();
-        //         let mueller_target = match component {
-        //             GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
-        //             GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
-        //             GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
-        //         };
-        //         *mueller_target += mueller;
-        //     }
-        //     // }
-        // }
-
-        // if coherence, reduce to mueller now
-        if coherence {
-            for result in self.result.field_2d.iter_mut() {
-                match component {
-                    GOComponent::Total => {
-                        result.mueller_total = result.ampl_total.to_mueller();
-                    }
-                    GOComponent::Beam => {
-                        result.mueller_beam = result.ampl_beam.to_mueller();
-                    }
-                    GOComponent::ExtDiff => {
-                        result.mueller_ext = result.ampl_ext.to_mueller();
-                    }
-                }
-            }
-        }
-    }
-
     /// Creates a new `Problem` from optional `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
@@ -241,15 +193,24 @@ impl Problem {
         }
     }
 
-    fn n2f_mapping_ad(&mut self, component: GOComponent, fov_factor: Option<f32>) {
-        // Calculate far-field amplitudes by diffracting all outbeams in parallel
+    /// Combines the external diffraction and outbeams to get the far-field solution.
+    fn combine_far(&mut self) {
+        for result in self.result.field_2d.iter_mut() {
+            if self.settings.coherence {
+                result.ampl_total = result.ampl_beam + result.ampl_ext;
+                result.mueller_total = result.ampl_total.to_mueller();
+            } else {
+                result.mueller_total = result.mueller_beam + result.mueller_ext;
+            }
+        }
+    }
+
+    pub fn solve_far_ext_diff(&mut self) {
+        let fov_factor = None; // no FOV truncation for ext diffraction
+                               // self.n2f_mapping_ad(GOComponent::ExtDiff, fov_factor);
+        let component = GOComponent::ExtDiff;
         let coherence = self.settings.coherence;
-        let queue = match component {
-            GOComponent::Beam => &self.out_beam_queue,
-            GOComponent::ExtDiff => &self.ext_diff_beam_queue,
-            GOComponent::Total => panic!("No such queue exists for component: {:?}", component),
-        };
-        for beam in queue.iter() {
+        for beam in self.ext_diff_beam_queue.iter() {
             let tuples = beam.diffract(&self.result.bins(), fov_factor);
             for (n, ampl) in tuples {
                 if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
@@ -276,7 +237,6 @@ impl Problem {
             }
         }
 
-        // if coherence, reduce to mueller now
         if coherence {
             for result in self.result.field_2d.iter_mut() {
                 match component {
@@ -292,23 +252,6 @@ impl Problem {
                 }
             }
         }
-    }
-
-    /// Combines the external diffraction and outbeams to get the far-field solution.
-    fn combine_far(&mut self) {
-        for result in self.result.field_2d.iter_mut() {
-            if self.settings.coherence {
-                result.ampl_total = result.ampl_beam + result.ampl_ext;
-                result.mueller_total = result.ampl_total.to_mueller();
-            } else {
-                result.mueller_total = result.mueller_beam + result.mueller_ext;
-            }
-        }
-    }
-
-    pub fn solve_far_ext_diff(&mut self) {
-        let fov_factor = None; // no FOV truncation for ext diffraction
-        self.n2f_mapping_ad(GOComponent::ExtDiff, fov_factor);
     }
 
     pub fn solve_far_outbeams(&mut self) {
