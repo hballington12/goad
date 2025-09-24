@@ -250,7 +250,7 @@ impl Results {
         }
     }
 
-    pub fn try_mueller_to_1d(&mut self, binning_scheme: &crate::bins::Scheme) {
+    pub fn mueller_to_1d(&mut self, binning_scheme: &crate::bins::Scheme) {
         // Step 1: Check scheme compatibility
         match binning_scheme {
             Scheme::Custom { .. } => return, // Skip custom binning
@@ -298,7 +298,7 @@ impl Results {
     }
 
     /// Computes the parameters of the result
-    pub fn compute_params(&mut self, wavelength: f32) -> std::result::Result<(), anyhow::Error> {
+    pub fn compute_params(&mut self, wavelength: f32) {
         // Compute all 4 parameters for Total
         self.compute_scat_cross(wavelength, GOComponent::Total);
         self.compute_asymmetry(wavelength, GOComponent::Total);
@@ -312,8 +312,6 @@ impl Results {
         // Compute scat_cross and asymmetry for ExtDiff
         self.compute_scat_cross(wavelength, GOComponent::ExtDiff);
         self.compute_asymmetry(wavelength, GOComponent::ExtDiff);
-
-        Ok(())
     }
 
     pub fn compute_asymmetry(&mut self, wavelength: f32, component: GOComponent) {

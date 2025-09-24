@@ -165,7 +165,7 @@ impl MultiProblem {
 
         // Compute 1D integration
         info_pb.set_message("Computing 1D integrated Mueller matrices...");
-        self.result.try_mueller_to_1d(&self.settings.binning.scheme);
+        self.result.mueller_to_1d(&self.settings.binning.scheme);
 
         // Compute derived parameters
         info_pb.set_message("Computing scattering parameters...");

@@ -205,7 +205,7 @@ impl Problem {
         }
     }
 
-    fn reduce_ampl_to_mueller(&mut self, component: GOComponent) {
+    fn ampl_to_mueller(&mut self, component: GOComponent) {
         for result in self.result.field_2d.iter_mut() {
             match component {
                 GOComponent::Total => {
@@ -266,34 +266,31 @@ impl Problem {
             }
         }
         if coherence {
-            self.reduce_ampl_to_mueller(component);
+            self.ampl_to_mueller(component);
         }
     }
+
+    /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
     pub fn solve_far(&mut self) {
         self.solve_far_queue(GOComponent::ExtDiff);
         self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
     }
 
+    /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self) {
         self.solve_near();
         self.solve_far();
-        self.try_mueller_to_1d();
+        self.mueller_to_1d();
+        self.compute_params();
     }
 
-    pub fn try_mueller_to_1d(&mut self) {
-        self.result.try_mueller_to_1d(&self.settings.binning.scheme);
+    pub fn compute_params(&mut self) {
+        let _ = self.result.compute_params(self.settings.wavelength);
     }
 
-    pub fn try_params(&mut self) {
-        match self.result.compute_params(self.settings.wavelength) {
-            Ok(()) => {
-                // println!("Params computed successfully");
-            }
-            Err(e) => {
-                println!("Failed to compute params: {}", e);
-            }
-        }
+    pub fn mueller_to_1d(&mut self) {
+        self.result.mueller_to_1d(&self.settings.binning.scheme);
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>) {
@@ -308,8 +305,7 @@ impl Problem {
         }
         self.illuminate();
         self.solve();
-        self.try_mueller_to_1d();
-        self.try_params();
+        self.compute_params();
     }
 
     /// Trace beams to solve the near-field problem.
