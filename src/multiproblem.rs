@@ -187,26 +187,9 @@ impl MultiProblem {
         // Add Mueller matrix elements
         for (a, i) in acc.field_2d.iter_mut().zip(item.field_2d.into_iter()) {
             // Handle Mueller matrices
-            a.mueller_total = match (a.mueller_total, i.mueller_total) {
-                (Some(a_val), Some(i_val)) => Some(a_val + i_val),
-                (Some(a_val), None) => Some(a_val),
-                (None, Some(i_val)) => Some(i_val),
-                (None, None) => None,
-            };
-
-            a.mueller_beam = match (a.mueller_beam, i.mueller_beam) {
-                (Some(a_val), Some(i_val)) => Some(a_val + i_val),
-                (Some(a_val), None) => Some(a_val),
-                (None, Some(i_val)) => Some(i_val),
-                (None, None) => None,
-            };
-
-            a.mueller_ext = match (a.mueller_ext, i.mueller_ext) {
-                (Some(a_val), Some(i_val)) => Some(a_val + i_val),
-                (Some(a_val), None) => Some(a_val),
-                (None, Some(i_val)) => Some(i_val),
-                (None, None) => None,
-            };
+            a.mueller_total += i.mueller_total;
+            a.mueller_beam += i.mueller_beam;
+            a.mueller_ext += i.mueller_ext;
         }
 
         acc
@@ -220,26 +203,14 @@ impl MultiProblem {
         for field in self.result.field_2d.iter_mut() {
             // Amplitude Matrices - divide by complex representation
             let div_c = Complex::from(num_orientations);
-            if let Some(ampl) = field.ampl_total.as_mut() {
-                *ampl /= div_c;
-            }
-            if let Some(ampl) = field.ampl_beam.as_mut() {
-                *ampl /= div_c;
-            }
-            if let Some(ampl) = field.ampl_ext.as_mut() {
-                *ampl /= div_c;
-            }
+            field.ampl_total /= div_c;
+            field.ampl_beam /= div_c;
+            field.ampl_ext /= div_c;
 
             // Mueller Matrices - divide by real value
-            if let Some(mueller) = field.mueller_total.as_mut() {
-                *mueller /= num_orientations;
-            }
-            if let Some(mueller) = field.mueller_beam.as_mut() {
-                *mueller /= num_orientations;
-            }
-            if let Some(mueller) = field.mueller_ext.as_mut() {
-                *mueller /= num_orientations;
-            }
+            field.mueller_total /= num_orientations;
+            field.mueller_beam /= num_orientations;
+            field.mueller_ext /= num_orientations;
         }
     }
 

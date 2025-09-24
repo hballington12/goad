@@ -37,7 +37,7 @@ fn fixed_hex_30_30_30() {
         .result
         .field_2d
         .iter()
-        .map(|m| m.mueller_total.unwrap().to_vec())
+        .map(|m| m.mueller_total.to_vec())
         .collect::<Vec<Vec<f32>>>();
     let reference = load_reference_mueller("fixed_hex_30_30_30_mueller_scatgrid").unwrap();
     compare_results(result, reference, FRAC_TOL, ABS_TOL).unwrap();
@@ -69,7 +69,7 @@ fn fixed_hex_30_20_20() {
         .result
         .field_2d
         .iter()
-        .map(|m| m.mueller_total.unwrap().to_vec())
+        .map(|m| m.mueller_total.to_vec())
         .collect::<Vec<Vec<f32>>>();
     let reference = load_reference_mueller("fixed_hex_30_20_20_mueller_scatgrid").unwrap();
     compare_results(result, reference, FRAC_TOL, ABS_TOL).unwrap();

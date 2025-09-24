@@ -1,4 +1,5 @@
-use crate::diff::n2f_mapping_go;
+use crate::bins::Scheme;
+use crate::diff::n2f_go;
 use crate::field::Ampl;
 use crate::field::AmplMatrix;
 use crate::result::MuellerMatrix;
@@ -115,6 +116,54 @@ impl Problem {
 }
 
 impl Problem {
+    /// Mapping from near to far field using geometric optics.
+    pub fn n2f_mapping_go(&mut self) {
+        // temp bools
+        let coherent = true;
+        let component = GOComponent::Beam;
+
+        // Create a vector to store the amplitudes
+        let beams = &self.out_beam_queue;
+        let binning = &self.settings.binning;
+        let bins = self.result.bins();
+
+        // Precompute theta and phi spacings if using Simple binning
+        let (delta_theta, delta_phi) = match binning.scheme {
+            Scheme::Simple { num_theta, num_phi } => (
+                Some(180.0 / (num_theta as f32)),
+                Some(360.0 / (num_phi as f32)),
+            ),
+            Scheme::Interval { .. } => (None, None),
+            Scheme::Custom { .. } => (None, None),
+        };
+
+        for beam in beams.iter() {
+            if let Some((n, ampl)) = n2f_go(binning, &bins, delta_theta, delta_phi, beam) {
+                if !ampl.iter().all(|c| c.re.is_finite() && c.im.is_finite()) {
+                    continue; // skip invalid amplitudes
+                }
+                // sum the far-field amplitude matrix, reduce to mueller later
+                if coherent {
+                    let target = match component {
+                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
+                    };
+                    *target += ampl;
+                } else {
+                    // incoherent, reduce to mueller and add directly
+                    let mueller = ampl.to_mueller();
+                    let target = match component {
+                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
+                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
+                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
+                    };
+                    *target += mueller;
+                }
+            };
+        }
+    }
+
     /// Creates a new `Problem` from optional `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
@@ -216,16 +265,7 @@ impl Problem {
     /// Combines the external diffraction and outbeams to get the far-field solution.
     fn combine_far(&mut self) {
         for result in self.result.field_2d.iter_mut() {
-            // Combine beam and external diffraction amplitudes
-            let ampl_total = match (result.ampl_beam, result.ampl_ext) {
-                (Some(beam), Some(ext)) => beam + ext,
-                (Some(beam), None) => beam,
-                (None, Some(ext)) => ext,
-                (None, None) => continue, // Skip if both are None
-            };
-
-            // Store the combined amplitude
-            result.ampl_total = Some(ampl_total);
+            result.ampl_total = result.ampl_beam + result.ampl_ext;
         }
     }
 
@@ -241,16 +281,13 @@ impl Problem {
                 continue;
             }
 
-            let target_ampl = match component {
+            let target = match component {
                 GOComponent::Total => &mut result.ampl_total,
                 GOComponent::Beam => &mut result.ampl_beam,
                 GOComponent::ExtDiff => &mut result.ampl_ext,
             };
 
-            match target_ampl.as_mut() {
-                Some(existing) => *existing += ampl,
-                None => *target_ampl = Some(ampl),
-            }
+            *target += ampl;
         }
     }
 
@@ -263,20 +300,27 @@ impl Problem {
     }
 
     pub fn solve_far_outbeams(&mut self) {
-        let ampls = match self.settings.mapping {
-            Mapping::GeometricOptics => n2f_mapping_go(
-                &mut self.out_beam_queue,
-                &self.settings.binning,
-                &self.result.bins(),
-            ),
+        match self.settings.mapping {
+            Mapping::GeometricOptics => {
+                self.n2f_mapping_go();
+                let coherent = true;
+                if coherent {
+                    for result in self.result.field_2d.iter_mut() {
+                        result.mueller_beam = result.ampl_beam.to_mueller();
+                    }
+                }
+            }
             Mapping::ApertureDiffraction => {
                 let fov_factor = self.settings.fov_factor; // truncate by field of view for outbeams
                 let bins = self.result.bins();
-                Self::n2f_mapping_ad(&self.out_beam_queue, &bins, fov_factor)
+                let ampls = Self::n2f_mapping_ad(&self.out_beam_queue, &bins, fov_factor);
+                Self::add_amplitudes_to_results(
+                    &mut self.result.field_2d,
+                    ampls,
+                    GOComponent::Beam,
+                );
             }
         };
-
-        Self::add_amplitudes_to_results(&mut self.result.field_2d, ampls, GOComponent::Beam);
     }
     pub fn solve_far(&mut self) {
         self.solve_far_ext_diff();
@@ -287,9 +331,9 @@ impl Problem {
     fn compute_mueller(&mut self) {
         for result in self.result.field_2d.iter_mut() {
             // Convert amplitude matrices to Mueller matrices
-            result.mueller_total = result.ampl_total.map(|a| a.to_mueller());
-            result.mueller_beam = result.ampl_beam.map(|a| a.to_mueller());
-            result.mueller_ext = result.ampl_ext.map(|a| a.to_mueller());
+            result.mueller_total = result.ampl_total.to_mueller();
+            // result.mueller_beam = result.ampl_beam.to_mueller(); // moved!
+            result.mueller_ext = result.ampl_ext.to_mueller();
         }
     }
 
@@ -361,21 +405,21 @@ impl Problem {
             .result
             .field_2d
             .iter()
-            .map(|field| field.mueller_total.unwrap_or_else(Mueller::zeros))
+            .map(|field| field.mueller_total)
             .collect();
 
         let mueller_beam: Vec<Mueller> = self
             .result
             .field_2d
             .iter()
-            .map(|field| field.mueller_beam.unwrap_or_else(Mueller::zeros))
+            .map(|field| field.mueller_beam)
             .collect();
 
         let mueller_ext: Vec<Mueller> = self
             .result
             .field_2d
             .iter()
-            .map(|field| field.mueller_ext.unwrap_or_else(Mueller::zeros))
+            .map(|field| field.mueller_ext)
             .collect();
 
         let _ = output::write_mueller(

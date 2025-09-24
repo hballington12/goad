@@ -17,83 +17,62 @@ pub enum Mapping {
     ApertureDiffraction,
 }
 
-/// Mapping from near to far field using geometric optics.
-pub fn n2f_mapping_go(
-    beams: &mut Vec<Beam>,
+/// Map a beam to the far-field using geometric optics. Assumes delta theta and delta phi are provided if the binning scheme is Simple.
+pub fn n2f_go(
     binning: &BinningScheme,
     bins: &[SolidAngleBin],
-) -> Vec<Ampl> {
-    // Create a vector to store the amplitudes
-    let mut amplitudes = vec![Ampl::zeros(); bins.len()];
+    delta_theta: Option<f32>,
+    delta_phi: Option<f32>,
+    beam: &Beam,
+) -> Option<(usize, Ampl)> {
+    // Get beam scattering angles
+    let (theta, phi) = beam.get_scattering_angles();
 
-    // Precompute theta and phi spacings if using Simple binning
-    let (delta_theta, delta_phi) = match binning.scheme {
+    // Map scattering angles to corresponding bin
+    let Some(n) = (match &binning.scheme {
         Scheme::Simple { num_theta, num_phi } => {
-            let delta_theta = 180.0 / (num_theta as f32);
-            let delta_phi = 360.0 / (num_phi as f32);
-            (Some(delta_theta), Some(delta_phi))
+            // Safe to unwrap because we know the scheme is Simple
+            get_n_simple(
+                *num_theta,
+                *num_phi,
+                delta_theta.unwrap(),
+                delta_phi.unwrap(),
+                theta,
+                phi,
+            )
         }
-        Scheme::Interval { .. } => (None, None),
-        Scheme::Custom { .. } => (None, None),
+        Scheme::Interval { .. } => get_n_linear_search(bins, theta, phi),
+        Scheme::Custom { .. } => {
+            todo!("GO outbeam is not yet supported for custom binning.")
+        }
+    }) else {
+        return None;
     };
 
-    for beam in beams.iter() {
-        // Get beam scattering angles
-        let (theta, phi) = beam.get_scattering_angles();
+    // Get amplitude rotation matrices
+    let (rotation, prerotation) = get_mapping_rotations(beam, phi);
 
-        // Map scattering angles to corresponding bin
-        let Some(n) = (match &binning.scheme {
-            Scheme::Simple { num_theta, num_phi } => {
-                // Safe to unwrap because we know the scheme is Simple
-                get_n_simple(
-                    *num_theta,
-                    *num_phi,
-                    delta_theta.unwrap(),
-                    delta_phi.unwrap(),
-                    theta,
-                    phi,
-                )
-            }
-            Scheme::Interval { .. } => get_n_linear_search(bins, theta, phi),
-            Scheme::Custom { .. } => {
-                todo!("GO outbeam is not yet supported for custom binning.")
-            }
-        }) else {
-            continue;
-        };
+    // Calculate the reference phase correction
+    let phase_correction = get_reference_phase(beam);
 
-        // Get amplitude rotation matrices
-        let (rotation, prerotation) = get_mapping_rotations(beam, phi);
+    // Compute solid angle
+    let solid_angle = &bins[n].solid_angle();
 
-        // Calculate the reference phase correction
-        let phase_correction = get_reference_phase(beam);
+    // Compute scaling factor (sqrt <- amplitude, not intensity)
+    let scale_factor = beam.csa().sqrt() // account for beam cross-sectional area
+        / solid_angle.sqrt() // account for Jacobian: Cartesian to spherical
+        * 5.34464802915 // bodge empirical factor (probably slight underestimate)
+        / beam.wavelength;
+    // account for scaled wavelength
 
-        // Compute solid angle
-        let solid_angle = &bins[n].solid_angle();
+    // Compute far-field amplitude matrix
+    let ampl = rotation // rotation from beam plane to scattering plane
+        * beam.field.ampl() // outgoing beam amplitude matrix
+        * prerotation // pre-rotation of the initial incidence
+        * Complex::new(scale_factor, 0.0) // amplitude scaling factor
+        * phase_correction; // reference phase correction
 
-        // Compute scaling factor (sqrt <- amplitude, not intensity)
-        let scale_factor = beam.csa().sqrt() // account for beam cross-sectional area
-            / solid_angle.sqrt() // account for Jacobian: Cartesian to spherical
-            * 5.34464802915 // bodge empirical factor (probably slight underestimate)
-            / beam.wavelength; // account for scaled wavelength
-
-        // Compute far-field amplitude matrix
-        let ampl = rotation // rotation from beam plane to scattering plane
-            * beam.field.ampl() // outgoing beam amplitude matrix
-            * prerotation // pre-rotation of the initial incidence
-            * Complex::new(scale_factor, 0.0) // amplitude scaling factor
-            * phase_correction; // reference phase correction
-
-        // sum the far-field amplitude matrix, reduce to mueller later
-        amplitudes[n] += ampl;
-        // or, add mueller directly now (no interference between beams)
-        // let mueller = output::ampl_to_mueller(&[(theta, phi)], &[ampl2]);
-        // for i in 0..16 {
-        //     mueller_out[(n, i)] += mueller[(0, i)];
-        // }
-    }
-
-    amplitudes
+    Some((n, ampl))
 }
 
 /// Mapping from near to far field using aperture diffraction theory.

@@ -189,25 +189,25 @@ impl MuellerMatrix for Mueller {
 #[derive(Debug, Clone)]
 pub struct ScattResult<B: ScatteringBin> {
     pub bin: B,
-    pub ampl_total: Option<Ampl>,
-    pub ampl_beam: Option<Ampl>,
-    pub ampl_ext: Option<Ampl>,
-    pub mueller_total: Option<Mueller>,
-    pub mueller_beam: Option<Mueller>,
-    pub mueller_ext: Option<Mueller>,
+    pub ampl_total: Ampl,
+    pub ampl_beam: Ampl,
+    pub ampl_ext: Ampl,
+    pub mueller_total: Mueller,
+    pub mueller_beam: Mueller,
+    pub mueller_ext: Mueller,
 }
 
 impl<B: ScatteringBin> ScattResult<B> {
     /// Creates a new empty ScattResult.
-    pub fn new_empty(bin: B) -> Self {
+    pub fn new(bin: B) -> Self {
         Self {
             bin,
-            ampl_total: None,
-            ampl_beam: None,
-            ampl_ext: None,
-            mueller_total: None,
-            mueller_beam: None,
-            mueller_ext: None,
+            ampl_total: Ampl::zeros(),
+            ampl_beam: Ampl::zeros(),
+            ampl_ext: Ampl::zeros(),
+            mueller_total: Mueller::zeros(),
+            mueller_beam: Mueller::zeros(),
+            mueller_ext: Mueller::zeros(),
         }
     }
 }
@@ -241,10 +241,7 @@ impl Results {
 
     /// Creates a new `Result` with empty mueller and amplitude matrix
     pub fn new_empty(bins: &[SolidAngleBin]) -> Self {
-        let field = bins
-            .iter()
-            .map(|&bin| ScattResult2D::new_empty(bin))
-            .collect();
+        let field = bins.iter().map(|&bin| ScattResult2D::new(bin)).collect();
         Self {
             field_2d: field,
             powers: Powers::new(),
@@ -284,52 +281,20 @@ impl Results {
     fn integrate_over_phi(phi_group: Vec<&ScattResult2D>) -> ScattResult1D {
         // All results in group have same theta bin
         let theta_bin = phi_group[0].bin.theta_bin;
+        let mut result = ScattResult1D::new(theta_bin);
 
-        // Calculate weighted sums (no normalization - preserve 2π factor for cross-section)
-        let mut mueller_total_sum = Mueller::zeros();
-        let mut mueller_beam_sum = Mueller::zeros();
-        let mut mueller_ext_sum = Mueller::zeros();
-        let mut has_total = false;
-        let mut has_beam = false;
-        let mut has_ext = false;
-
-        for result in phi_group {
+        for phi_result in phi_group {
             // Convert phi width to radians to match theta integration units
-            let phi_width_rad = result.bin.phi_bin.width().to_radians();
+            let phi_width_rad = phi_result.bin.phi_bin.width().to_radians();
 
-            // Integrate Mueller matrices (weighted by phi bin width in radians)
-            if let Some(mueller) = result.mueller_total {
-                mueller_total_sum += mueller * phi_width_rad;
-                has_total = true;
-            }
-            if let Some(mueller) = result.mueller_beam {
-                mueller_beam_sum += mueller * phi_width_rad;
-                has_beam = true;
-            }
-            if let Some(mueller) = result.mueller_ext {
-                mueller_ext_sum += mueller * phi_width_rad;
-                has_ext = true;
-            }
+            // Integrate Mueller (weighted by phi bin width in radians)
+            result.mueller_total += phi_result.mueller_total * phi_width_rad;
+            result.mueller_beam += phi_result.mueller_beam * phi_width_rad;
+            result.mueller_ext += phi_result.mueller_ext * phi_width_rad;
         }
 
         // Return integrated values without normalization to preserve 2π factor
-        ScattResult1D {
-            bin: theta_bin,
-            ampl_total: None, // Amplitudes not integrated
-            ampl_beam: None,
-            ampl_ext: None,
-            mueller_total: if has_total {
-                Some(mueller_total_sum)
-            } else {
-                None
-            },
-            mueller_beam: if has_beam {
-                Some(mueller_beam_sum)
-            } else {
-                None
-            },
-            mueller_ext: if has_ext { Some(mueller_ext_sum) } else { None },
-        }
+        result
     }
 
     /// Computes the parameters of the result
@@ -360,9 +325,7 @@ impl Results {
                         theta.sin() * theta.cos() * s11 / (scatt * k.powi(2))
                     });
 
-                if let Some(val) = asymmetry {
-                    self.params.asymmetry.insert(component, val);
-                }
+                self.params.asymmetry.insert(component, asymmetry);
             }
         }
     }
@@ -376,9 +339,7 @@ impl Results {
                     theta.sin() * s11 / k.powi(2)
                 });
 
-            if let Some(val) = scat_cross {
-                self.params.scat_cross.insert(component, val);
-            }
+            self.params.scat_cross.insert(component, scat_cross);
         }
     }
 
@@ -461,29 +422,21 @@ impl Results {
     /// Get the Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self
-            .field_2d
-            .iter()
-            .filter_map(|r| r.mueller_total)
-            .collect();
+        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_total).collect();
         crate::problem::collect_mueller(&muellers)
     }
 
     /// Get the beam Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller_beam(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self
-            .field_2d
-            .iter()
-            .filter_map(|r| r.mueller_beam)
-            .collect();
+        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_beam).collect();
         crate::problem::collect_mueller(&muellers)
     }
 
     /// Get the external diffraction Mueller matrix as a list of lists
     #[getter]
     pub fn get_mueller_ext(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self.field_2d.iter().filter_map(|r| r.mueller_ext).collect();
+        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_ext).collect();
         crate::problem::collect_mueller(&muellers)
     }
 
@@ -491,7 +444,7 @@ impl Results {
     #[getter]
     pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
         if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().filter_map(|r| r.mueller_total).collect();
+            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_total).collect();
             crate::problem::collect_mueller(&muellers)
         } else {
             Vec::new()
@@ -502,7 +455,7 @@ impl Results {
     #[getter]
     pub fn get_mueller_1d_beam(&self) -> Vec<Vec<f32>> {
         if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().filter_map(|r| r.mueller_beam).collect();
+            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_beam).collect();
             crate::problem::collect_mueller(&muellers)
         } else {
             Vec::new()
@@ -513,7 +466,7 @@ impl Results {
     #[getter]
     pub fn get_mueller_1d_ext(&self) -> Vec<Vec<f32>> {
         if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().filter_map(|r| r.mueller_ext).collect();
+            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_ext).collect();
             crate::problem::collect_mueller(&muellers)
         } else {
             Vec::new()
@@ -611,34 +564,26 @@ fn integrate_theta_weighted_component<F>(
     field_1d: &[ScattResult1D],
     component: GOComponent,
     weight_fn: F,
-) -> Option<f32>
+) -> f32
 where
     F: Fn(f32, f32) -> f32, // (theta_radians, s11_value) -> weighted_value
 {
     let sum: f32 = field_1d
         .iter()
-        .filter_map(|result| {
+        .map(|result| {
             let mueller = match component {
                 GOComponent::Total => result.mueller_total,
                 GOComponent::Beam => result.mueller_beam,
                 GOComponent::ExtDiff => result.mueller_ext,
             };
-
-            mueller.map(|m| {
-                let theta_rad = result.bin.center.to_radians();
-                let s11 = m.s11();
-                let bin_width = result.bin.width().to_radians();
-                weight_fn(theta_rad, s11) * bin_width
-            })
+            let s11 = mueller.s11();
+            let theta_rad = result.bin.center.to_radians();
+            let bin_width = result.bin.width().to_radians();
+            weight_fn(theta_rad, s11) * bin_width
         })
         .sum();
 
-    // Return None if sum is 0 (no data for this component)
-    if sum == 0.0 {
-        None
-    } else {
-        Some(sum)
-    }
+    sum
 }
 
 #[cfg(test)]

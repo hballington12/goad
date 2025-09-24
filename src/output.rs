@@ -70,31 +70,31 @@ impl<'a> OutputManager<'a> {
         // Write 2D Mueller matrices
         if self.settings.output.mueller_2d {
             if config.total {
-                let muellers: Vec<Mueller> = self
+                let muellers = &self
                     .results
                     .field_2d
                     .iter()
-                    .filter_map(|r| r.mueller_total.clone())
-                    .collect();
-                write_mueller(&self.results.bins(), &muellers, "", output_dir)?;
+                    .map(|f| f.mueller_total)
+                    .collect::<Vec<_>>();
+                write_mueller(&self.results.bins(), muellers, "", output_dir)?;
             }
             if config.beam {
-                let muellers: Vec<Mueller> = self
+                let muellers = &self
                     .results
                     .field_2d
                     .iter()
-                    .filter_map(|r| r.mueller_beam.clone())
-                    .collect();
-                write_mueller(&self.results.bins(), &muellers, "_beam", output_dir)?;
+                    .map(|f| f.mueller_beam)
+                    .collect::<Vec<_>>();
+                write_mueller(&self.results.bins(), muellers, "_beam", output_dir)?;
             }
             if config.external {
-                let muellers: Vec<Mueller> = self
+                let muellers = &self
                     .results
                     .field_2d
                     .iter()
-                    .filter_map(|r| r.mueller_ext.clone())
-                    .collect();
-                write_mueller(&self.results.bins(), &muellers, "_ext", output_dir)?;
+                    .map(|f| f.mueller_ext)
+                    .collect::<Vec<_>>();
+                write_mueller(&self.results.bins(), muellers, "_ext", output_dir)?;
             }
         }
 
@@ -184,7 +184,7 @@ pub fn write_mueller_1d<F>(
     output_dir: &Path,
 ) -> Result<()>
 where
-    F: Fn(&crate::result::ScattResult1D) -> Option<Mueller>,
+    F: Fn(&crate::result::ScattResult1D) -> Mueller,
 {
     let file_name = format!("mueller_scatgrid_1d{}", suffix);
     let path = output_path(Some(output_dir), &file_name)?;
@@ -195,11 +195,11 @@ where
         let bin = result.bin;
         write!(writer, "{} ", bin.center)?;
 
-        if let Some(mueller) = mueller_getter(result) {
-            for element in mueller.to_vec() {
-                write!(writer, "{} ", element)?;
-            }
+        let mueller = mueller_getter(result);
+        for element in mueller.to_vec() {
+            write!(writer, "{} ", element)?;
         }
+
         writeln!(writer)?;
     }
 
