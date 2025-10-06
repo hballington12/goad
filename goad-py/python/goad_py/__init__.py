@@ -2,6 +2,11 @@
 from goad_py._goad_py import *
 
 # Import Python modules
-from .convergence import Convergence, Convergable, ConvergenceResults
+from .convergence import (
+    Convergence,
+    Convergable,
+    ConvergenceResults,
+    EnsembleConvergence,
+)
 
-__all__ = ['Convergence', 'Convergable', 'ConvergenceResults']
+__all__ = ["Convergence", "Convergable", "ConvergenceResults", "EnsembleConvergence"]

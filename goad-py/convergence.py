@@ -2,23 +2,31 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 import goad_py as goad
+import os
+import random
+from pathlib import Path
 
 
 @dataclass
 class Convergable:
     """Represents a variable to monitor for convergence."""
+
     variable: str  # 'asymmetry', 'scatt', 'ext', or 'albedo'
-    tolerance_type: str = 'relative'  # 'relative' or 'absolute'
+    tolerance_type: str = "relative"  # 'relative' or 'absolute'
     tolerance: float = 0.01
 
     def __post_init__(self):
-        valid_variables = {'asymmetry', 'scatt', 'ext', 'albedo'}
+        valid_variables = {"asymmetry", "scatt", "ext", "albedo"}
         if self.variable not in valid_variables:
-            raise ValueError(f"Invalid variable '{self.variable}'. Must be one of {valid_variables}")
+            raise ValueError(
+                f"Invalid variable '{self.variable}'. Must be one of {valid_variables}"
+            )
 
-        valid_types = {'relative', 'absolute'}
+        valid_types = {"relative", "absolute"}
         if self.tolerance_type not in valid_types:
-            raise ValueError(f"Invalid tolerance_type '{self.tolerance_type}'. Must be one of {valid_types}")
+            raise ValueError(
+                f"Invalid tolerance_type '{self.tolerance_type}'. Must be one of {valid_types}"
+            )
 
         if self.tolerance <= 0:
             raise ValueError(f"Tolerance must be positive, got {self.tolerance}")
@@ -27,13 +35,16 @@ class Convergable:
 @dataclass
 class ConvergenceResults:
     """Results from a convergence study."""
+
     converged: bool
     n_orientations: int
     values: Dict[str, float]  # Final mean values for each tracked variable
     sem_values: Dict[str, float]  # Final SEM values for each tracked variable
     mueller_1d: Optional[np.ndarray] = None
     mueller_2d: Optional[np.ndarray] = None
-    convergence_history: List[Tuple[int, str, float]] = None  # (n_orientations, variable, sem)
+    convergence_history: List[Tuple[int, str, float]] = (
+        None  # (n_orientations, variable, sem)
+    )
     warning: Optional[str] = None
 
 
@@ -48,7 +59,7 @@ class Convergence:
         max_orientations: int = 100_000,
         min_batches: int = 10,
         mueller_1d: bool = True,
-        mueller_2d: bool = False
+        mueller_2d: bool = False,
     ):
         """
         Initialize a convergence study.
@@ -78,8 +89,10 @@ class Convergence:
             raise ValueError(f"batch_size must be positive, got {batch_size}")
 
         if max_orientations <= 0:
-            raise ValueError(f"max_orientations must be positive, got {max_orientations}")
-        
+            raise ValueError(
+                f"max_orientations must be positive, got {max_orientations}"
+            )
+
         if min_batches <= 0:
             raise ValueError(f"min_batches must be positive, got {min_batches}")
 
@@ -102,8 +115,12 @@ class Convergence:
             batch_size: Number of orientations in this batch
         """
         # Check for None values indicating Custom binning
-        if (results.asymmetry is None or results.scat_cross is None or
-            results.ext_cross is None or results.albedo is None):
+        if (
+            results.asymmetry is None
+            or results.scat_cross is None
+            or results.ext_cross is None
+            or results.albedo is None
+        ):
             raise ValueError(
                 "Received None values for integrated properties. "
                 "This likely means Custom binning scheme is being used. "
@@ -111,26 +128,22 @@ class Convergence:
             )
 
         # Store batch data for proper statistical analysis
-        batch_info = {
-            'batch_size': batch_size,
-            'values': {},
-            'weights': {}
-        }
+        batch_info = {"batch_size": batch_size, "values": {}, "weights": {}}
 
         # Store values and weights for tracked variables
         for conv in self.convergables:
-            if conv.variable == 'asymmetry':
-                batch_info['values']['asymmetry'] = results.asymmetry
-                batch_info['weights']['asymmetry'] = results.scat_cross
-            elif conv.variable == 'scatt':
-                batch_info['values']['scatt'] = results.scat_cross
-                batch_info['weights']['scatt'] = 1.0  # Equal weighting
-            elif conv.variable == 'ext':
-                batch_info['values']['ext'] = results.ext_cross
-                batch_info['weights']['ext'] = 1.0  # Equal weighting
-            elif conv.variable == 'albedo':
-                batch_info['values']['albedo'] = results.albedo
-                batch_info['weights']['albedo'] = results.ext_cross + results.scat_cross
+            if conv.variable == "asymmetry":
+                batch_info["values"]["asymmetry"] = results.asymmetry
+                batch_info["weights"]["asymmetry"] = results.scat_cross
+            elif conv.variable == "scatt":
+                batch_info["values"]["scatt"] = results.scat_cross
+                batch_info["weights"]["scatt"] = 1.0  # Equal weighting
+            elif conv.variable == "ext":
+                batch_info["values"]["ext"] = results.ext_cross
+                batch_info["weights"]["ext"] = 1.0  # Equal weighting
+            elif conv.variable == "albedo":
+                batch_info["values"]["albedo"] = results.albedo
+                batch_info["weights"]["albedo"] = results.ext_cross + results.scat_cross
 
         self.batch_data.append(batch_info)
 
@@ -162,7 +175,7 @@ class Convergence:
             Tuple of (mean, sem)
         """
         if not self.batch_data:
-            return 0.0, float('inf')
+            return 0.0, float("inf")
 
         # Extract batch values and weights
         batch_values = []
@@ -170,20 +183,20 @@ class Convergence:
         batch_sizes = []
 
         for batch in self.batch_data:
-            if variable in batch['values']:
-                batch_values.append(batch['values'][variable])
-                batch_weights.append(batch['weights'][variable])
-                batch_sizes.append(batch['batch_size'])
+            if variable in batch["values"]:
+                batch_values.append(batch["values"][variable])
+                batch_weights.append(batch["weights"][variable])
+                batch_sizes.append(batch["batch_size"])
 
         if not batch_values:
-            return 0.0, float('inf')
+            return 0.0, float("inf")
 
         batch_values = np.array(batch_values)
         batch_weights = np.array(batch_weights)
         batch_sizes = np.array(batch_sizes)
 
         # For weighted variables (asymmetry, albedo), use weighted statistics
-        if variable in ['asymmetry', 'albedo']:
+        if variable in ["asymmetry", "albedo"]:
             # Calculate weighted mean across batches
             # Each batch contributes: weight * batch_size * value
             total_weighted_sum = np.sum(batch_weights * batch_sizes * batch_values)
@@ -192,17 +205,23 @@ class Convergence:
 
             # Calculate weighted variance between batches
             if len(batch_values) < 2:
-                return weighted_mean, float('inf')  # Cannot estimate variance with < 2 batches
+                return weighted_mean, float(
+                    "inf"
+                )  # Cannot estimate variance with < 2 batches
 
             # For batch means, we need to account for the effective weight of each batch
             effective_weights = batch_weights * batch_sizes
-            weighted_variance_batch_means = np.sum(effective_weights * (batch_values - weighted_mean)**2) / np.sum(effective_weights)
+            weighted_variance_batch_means = np.sum(
+                effective_weights * (batch_values - weighted_mean) ** 2
+            ) / np.sum(effective_weights)
 
             # Scale up to estimate population variance
             # Batch means have variance = population_variance / average_batch_size
             # So population_variance ≈ batch_means_variance * average_batch_size
             avg_batch_size = np.average(batch_sizes, weights=effective_weights)
-            estimated_population_variance = weighted_variance_batch_means * avg_batch_size
+            estimated_population_variance = (
+                weighted_variance_batch_means * avg_batch_size
+            )
 
             # Calculate SEM for the total sample (using n-1 for sample standard error)
             total_n = np.sum(batch_sizes)
@@ -219,7 +238,7 @@ class Convergence:
 
             # Calculate variance between batch means
             if len(batch_values) < 2:
-                return mean, float('inf')
+                return mean, float("inf")
 
             batch_means_variance = np.var(batch_values, ddof=1)
 
@@ -246,7 +265,7 @@ class Convergence:
             mean, sem = self._calculate_mean_and_sem(conv.variable)
 
             # Calculate tolerance based on type
-            if conv.tolerance_type == 'relative':
+            if conv.tolerance_type == "relative":
                 # Relative tolerance: SEM / |mean| < tolerance
                 if mean != 0:
                     relative_sem = sem / abs(mean)
@@ -269,7 +288,7 @@ class Convergence:
         # Check minimum batches requirement first
         if len(self.batch_data) < self.min_batches:
             return False
-            
+
         converged_status = self._check_convergence()
         return all(converged_status.values())
 
@@ -291,11 +310,11 @@ class Convergence:
             ci_upper = mean + 1.96 * sem
 
             # Format based on tolerance type
-            if conv.tolerance_type == 'relative':
+            if conv.tolerance_type == "relative":
                 if mean != 0:
                     relative_sem = sem / abs(mean)
-                    target_str = f"{conv.tolerance*100:.1f}%"
-                    current_str = f"{relative_sem*100:.2f}%"
+                    target_str = f"{conv.tolerance * 100:.1f}%"
+                    current_str = f"{relative_sem * 100:.2f}%"
                 else:
                     target_str = f"{conv.tolerance} (abs, mean=0)"
                     current_str = f"{sem:.4g}"
@@ -307,7 +326,9 @@ class Convergence:
             status = "✓" if converged_status[conv.variable] else "❌"
 
             # Print line with mean, SEM, CI, and convergence status
-            print(f"  {conv.variable:<10}: {mean:.6f} ± {sem:.6f} [{ci_lower:.6f}, {ci_upper:.6f}] | SEM: {current_str} (target: {target_str}) {status}")
+            print(
+                f"  {conv.variable:<10}: {mean:.6f} ± {sem:.6f} [{ci_lower:.6f}, {ci_upper:.6f}] | SEM: {current_str} (target: {target_str}) {status}"
+            )
 
             # Add to convergence history
             self.convergence_history.append((self.n_orientations, conv.variable, sem))
@@ -378,5 +399,182 @@ class Convergence:
             mueller_1d=mueller_1d,
             mueller_2d=mueller_2d,
             convergence_history=self.convergence_history,
-            warning=warning
+            warning=warning,
         )
+
+
+class EnsembleConvergence(Convergence):
+    """Runs convergence study over an ensemble of particle geometries.
+
+    Each batch randomly samples from a directory of geometry files,
+    allowing convergence analysis of orientation-averaged and
+    geometry-averaged scattering properties.
+    """
+
+    def __init__(
+        self,
+        settings: goad.Settings,
+        convergables: List[Convergable],
+        geom_dir: str,
+        batch_size: int = 24,
+        max_orientations: int = 100_000,
+        min_batches: int = 10,
+        mueller_1d: bool = True,
+        mueller_2d: bool = False,
+    ):
+        """
+        Initialize an ensemble convergence study.
+
+        Args:
+            settings: GOAD settings for the simulation (geom_path will be overridden)
+            convergables: List of variables to monitor for convergence
+            geom_dir: Directory containing .obj geometry files
+            batch_size: Number of orientations per iteration
+            max_orientations: Maximum total orientations before stopping
+            min_batches: Minimum number of batches before allowing convergence
+            mueller_1d: Whether to collect 1D Mueller matrices
+            mueller_2d: Whether to collect 2D Mueller matrices
+        """
+        # Discover all .obj files in directory
+        geom_path = Path(geom_dir)
+        if not geom_path.exists():
+            raise ValueError(f"Geometry directory does not exist: {geom_dir}")
+
+        if not geom_path.is_dir():
+            raise ValueError(f"Path is not a directory: {geom_dir}")
+
+        self.geom_files = sorted([f.name for f in geom_path.glob("*.obj")])
+
+        if not self.geom_files:
+            raise ValueError(f"No .obj files found in directory: {geom_dir}")
+
+        self.geom_dir = str(geom_path.resolve())
+
+        print(f"Found {len(self.geom_files)} geometry files in {self.geom_dir}")
+
+        # Call parent constructor
+        super().__init__(
+            settings=settings,
+            convergables=convergables,
+            batch_size=batch_size,
+            max_orientations=max_orientations,
+            min_batches=min_batches,
+            mueller_1d=mueller_1d,
+            mueller_2d=mueller_2d,
+        )
+
+    def run(self) -> ConvergenceResults:
+        """Run the ensemble convergence study.
+
+        Each batch iteration randomly selects a geometry file from the
+        ensemble directory before running the orientation averaging.
+
+        Returns:
+            ConvergenceResults containing final ensemble-averaged values
+        """
+        iteration = 0
+        converged = False
+        warning = None
+
+        while not converged and self.n_orientations < self.max_orientations:
+            iteration += 1
+
+            # Randomly select a geometry file for this batch
+            geom_file = random.choice(self.geom_files)
+            geom_path = os.path.join(self.geom_dir, geom_file)
+
+            # Update settings with selected geometry
+            self.settings.geom_name = geom_path
+
+            # Determine batch size for this iteration
+            remaining = self.max_orientations - self.n_orientations
+            batch_size = min(self.batch_size, remaining)
+
+            # Create orientations for this batch
+            orientations = goad.create_uniform_orientation(batch_size)
+            self.settings.orientation = orientations
+
+            # Run MultiProblem with selected geometry
+            mp = goad.MultiProblem(self.settings)
+            mp.py_solve()
+
+            # Update statistics
+            self._update_statistics(mp.results, batch_size)
+
+            # Print progress (with geometry info)
+            print(
+                f"\nIteration {iteration} ({self.n_orientations} orientations) - Geometry: {geom_file}"
+            )
+            self._print_progress_without_header(iteration)
+
+            # Check convergence
+            converged = self._all_converged()
+
+        # Prepare final results
+        if converged:
+            print(f"\nConverged after {self.n_orientations} orientations.")
+        else:
+            warning = f"Maximum orientations ({self.max_orientations}) reached without convergence"
+            print(f"\nWarning: {warning}")
+
+        # Calculate final values and SEMs
+        final_values = {}
+        final_sems = {}
+        for conv in self.convergables:
+            mean, sem = self._calculate_mean_and_sem(conv.variable)
+            final_values[conv.variable] = mean
+            final_sems[conv.variable] = sem
+
+        # Prepare Mueller matrices
+        mueller_1d = None
+        mueller_2d = None
+        if self.mueller_1d and self.mueller_1d_sum is not None:
+            mueller_1d = self.mueller_1d_sum / self.n_orientations
+        if self.mueller_2d and self.mueller_2d_sum is not None:
+            mueller_2d = self.mueller_2d_sum / self.n_orientations
+
+        return ConvergenceResults(
+            converged=converged,
+            n_orientations=self.n_orientations,
+            values=final_values,
+            sem_values=final_sems,
+            mueller_1d=mueller_1d,
+            mueller_2d=mueller_2d,
+            convergence_history=self.convergence_history,
+            warning=warning,
+        )
+
+    def _print_progress_without_header(self, iteration: int):
+        """Print convergence progress without iteration header (already printed with geometry)."""
+        converged_status = self._check_convergence()
+
+        for conv in self.convergables:
+            mean, sem = self._calculate_mean_and_sem(conv.variable)
+
+            # Calculate 95% CI
+            ci_lower = mean - 1.96 * sem
+            ci_upper = mean + 1.96 * sem
+
+            # Format based on tolerance type
+            if conv.tolerance_type == "relative":
+                if mean != 0:
+                    relative_sem = sem / abs(mean)
+                    target_str = f"{conv.tolerance * 100:.1f}%"
+                    current_str = f"{relative_sem * 100:.2f}%"
+                else:
+                    target_str = f"{conv.tolerance} (abs, mean=0)"
+                    current_str = f"{sem:.4g}"
+            else:
+                target_str = f"{conv.tolerance}"
+                current_str = f"{sem:.4g}"
+
+            # Status indicator
+            status = "✓" if converged_status[conv.variable] else "❌"
+
+            # Print line with mean, SEM, CI, and convergence status
+            print(
+                f"  {conv.variable:<10}: {mean:.6f} ± {sem:.6f} [{ci_lower:.6f}, {ci_upper:.6f}] | SEM: {current_str} (target: {target_str}) {status}"
+            )
+
+            # Add to convergence history
+            self.convergence_history.append((self.n_orientations, conv.variable, sem))
