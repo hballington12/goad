@@ -50,22 +50,14 @@ theta_spacings =[2]
 phis = [0, 360]
 phi_spacings = [4]
 
-# [binning.scheme.Custom] # Custom binning with specified [theta,phi] angular bins
+# [binning.scheme.Custom] # Custom binning with specified bin edges [[theta_min, theta_max], [phi_min, phi_max]]
 # bins = [
-#     [
-#         0,
-#         0,
-#     ],
-#     [
-#         0,
-#         40,
-#     ],
-#     [
-#         20,
-#         180,
-#     ],
-# ] # custom bins, unless a file is specified below
-# file = "phips_bins.toml" # File containing custom bins, relative to working directory
+#     [[0.0, 10.0], [0.0, 90.0]],      # First bin: theta 0-10°, phi 0-90°
+#     [[0.0, 10.0], [90.0, 180.0]],    # Second bin: theta 0-10°, phi 90-180°
+#     [[10.0, 20.0], [0.0, 90.0]],     # Third bin: theta 10-20°, phi 0-90°
+#     [[10.0, 20.0], [90.0, 180.0]],   # Fourth bin: theta 10-20°, phi 90-180°
+# ]
+# file = "phips_bins_edges.toml" # Or load bins from external file (relative to working directory)
 
 
 [orientation] # Orientation configuration

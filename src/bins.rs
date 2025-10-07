@@ -105,7 +105,7 @@ pub enum Scheme {
         phi_spacings: Vec<f32>,
     },
     Custom {
-        bins: Vec<(f32, f32)>,
+        bins: Vec<[[f32; 2]; 2]>, // Each bin is [[theta_min, theta_max], [phi_min, phi_max]]
         file: Option<String>,
     },
 }
@@ -136,7 +136,8 @@ impl<'de> Deserialize<'de> for Scheme {
 
         #[derive(Deserialize)]
         struct CustomHelper {
-            bins: Vec<(f32, f32)>,
+            #[serde(default)]
+            bins: Vec<[[f32; 2]; 2]>,
             file: Option<String>,
         }
 
@@ -176,7 +177,33 @@ impl<'de> Deserialize<'de> for Scheme {
                 phis,
                 phi_spacings,
             }),
-            SchemeHelper::Custom(CustomHelper { bins, file }) => Ok(Scheme::Custom { bins, file }),
+            SchemeHelper::Custom(CustomHelper { mut bins, file }) => {
+                // If file is specified, load bins from file
+                if let Some(ref filepath) = file {
+                    #[derive(Deserialize)]
+                    struct CustomBinsFile {
+                        bins: Vec<[[f32; 2]; 2]>,
+                    }
+
+                    let content = std::fs::read_to_string(filepath).map_err(|e| {
+                        serde::de::Error::custom(format!(
+                            "Failed to read custom bins file '{}': {}",
+                            filepath, e
+                        ))
+                    })?;
+
+                    let file_data: CustomBinsFile = toml::from_str(&content).map_err(|e| {
+                        serde::de::Error::custom(format!(
+                            "Failed to parse custom bins file '{}': {}",
+                            filepath, e
+                        ))
+                    })?;
+
+                    bins = file_data.bins;
+                }
+
+                Ok(Scheme::Custom { bins, file })
+            }
         }
     }
 }
@@ -208,7 +235,7 @@ pub struct BinningScheme {
 #[pymethods]
 impl BinningScheme {
     #[new]
-    fn py_new(bins: Vec<(f32, f32)>) -> Self {
+    fn py_new(bins: Vec<[[f32; 2]; 2]>) -> Self {
         BinningScheme {
             scheme: Scheme::Custom { bins, file: None },
         }
@@ -251,9 +278,10 @@ impl BinningScheme {
         }
     }
 
-    /// Create a custom binning scheme with explicit bin positions
+    /// Create a custom binning scheme with explicit bin edges
+    /// Each bin is specified as [[theta_min, theta_max], [phi_min, phi_max]]
     #[staticmethod]
-    fn custom(bins: Vec<(f32, f32)>) -> Self {
+    fn custom(bins: Vec<[[f32; 2]; 2]>) -> Self {
         BinningScheme {
             scheme: Scheme::Custom { bins, file: None },
         }
@@ -363,6 +391,19 @@ pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<SolidAngleBin> {
     bins
 }
 
+/// Generate custom bins from explicit edge specifications
+/// Each bin is [[theta_min, theta_max], [phi_min, phi_max]]
+pub fn custom_bins(bin_specs: &[[[f32; 2]; 2]]) -> Vec<SolidAngleBin> {
+    bin_specs
+        .iter()
+        .map(|&[[theta_min, theta_max], [phi_min, phi_max]]| {
+            let theta_bin = AngleBin::new(theta_min, theta_max);
+            let phi_bin = AngleBin::new(phi_min, phi_max);
+            SolidAngleBin::new(theta_bin, phi_bin)
+        })
+        .collect()
+}
+
 pub fn generate_bins(bin_type: &Scheme) -> Vec<SolidAngleBin> {
     match bin_type {
         Scheme::Simple {
@@ -374,39 +415,8 @@ pub fn generate_bins(bin_type: &Scheme) -> Vec<SolidAngleBin> {
             phis,
             phi_spacings,
         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
-        Scheme::Custom { .. } => {
-            // TODO: Custom bins need to specify edges or we need to infer them
-            todo!("This version of GOAD does not support custom bins yet. Please use Simple, Interval, or an older version of this code.")
-            // // println!("Loading custom bins from file: {:?}", file);
-            // if let Some(file) = file {
-            //     let content = match std::fs::read_to_string(file) {
-            //         Ok(content) => content,
-            //         Err(e) => panic!("Could not read file '{}': {}", file, e),
-            //     };
-
-            //     // Parse the TOML file
-            //     match toml::from_str::<CustomBins>(&content) {
-            //         Ok(custom_bins) => {
-            //             // println!("Loaded {} custom bins from file", custom_bins.bins.len());
-            //             custom_bins.bins
-            //         }
-            //         Err(e) => {
-            //             eprintln!("Error parsing custom bins file: {}", e);
-            //             eprintln!("Falling back to default bins");
-            //             bins.to_vec()
-            //         }
-            //     }
-            // } else {
-            //     bins.to_vec()
-            // }
-        }
+        Scheme::Custom { bins, .. } => custom_bins(bins),
     }
-}
-
-// Define a struct to match the TOML structure
-#[derive(Debug, Deserialize)]
-struct CustomBins {
-    _bins: Vec<(f32, f32)>,
 }
 
 /// Gets the index of a theta-phi bin, assuming a `Simple` binning scheme, given an input theta and phi.

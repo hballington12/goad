@@ -49,9 +49,7 @@ pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> V
             )
         }
         Scheme::Interval { .. } => get_n_linear_search(bins, theta, phi),
-        Scheme::Custom { .. } => {
-            todo!("GO outbeam is not yet supported for custom binning.")
-        }
+        Scheme::Custom { .. } => get_n_linear_search(bins, theta, phi),
     }) else {
         return vec![];
     };

@@ -253,7 +253,9 @@ impl Results {
     pub fn mueller_to_1d(&mut self, binning_scheme: &crate::bins::Scheme) {
         // Step 1: Check scheme compatibility
         match binning_scheme {
-            Scheme::Custom { .. } => return, // Skip custom binning
+            Scheme::Custom { .. } => {
+                return;
+            }
             Scheme::Simple { .. } | Scheme::Interval { .. } => {}
         }
 

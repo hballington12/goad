@@ -229,6 +229,150 @@ impl Settings {
     fn get_orientation(&self) -> Orientation {
         self.orientation.clone()
     }
+
+    /// Set the geometry file path
+    #[setter]
+    fn set_geom_path(&mut self, geom_path: String) {
+        self.geom_name = geom_path;
+    }
+
+    /// Get the geometry file path
+    #[getter]
+    fn get_geom_path(&self) -> String {
+        self.geom_name.clone()
+    }
+
+    /// Set the wavelength
+    #[setter]
+    fn set_wavelength(&mut self, wavelength: f32) {
+        self.wavelength = wavelength;
+    }
+
+    /// Get the wavelength
+    #[getter]
+    fn get_wavelength(&self) -> f32 {
+        self.wavelength
+    }
+
+    /// Set the particle refractive index (real part)
+    #[setter]
+    fn set_particle_refr_index_re(&mut self, re: f32) {
+        if !self.particle_refr_index.is_empty() {
+            self.particle_refr_index[0].re = re;
+        }
+    }
+
+    /// Get the particle refractive index (real part)
+    #[getter]
+    fn get_particle_refr_index_re(&self) -> f32 {
+        if !self.particle_refr_index.is_empty() {
+            self.particle_refr_index[0].re
+        } else {
+            0.0
+        }
+    }
+
+    /// Set the particle refractive index (imaginary part)
+    #[setter]
+    fn set_particle_refr_index_im(&mut self, im: f32) {
+        if !self.particle_refr_index.is_empty() {
+            self.particle_refr_index[0].im = im;
+        }
+    }
+
+    /// Get the particle refractive index (imaginary part)
+    #[getter]
+    fn get_particle_refr_index_im(&self) -> f32 {
+        if !self.particle_refr_index.is_empty() {
+            self.particle_refr_index[0].im
+        } else {
+            0.0
+        }
+    }
+
+    /// Set the medium refractive index (real part)
+    #[setter]
+    fn set_medium_refr_index_re(&mut self, re: f32) {
+        self.medium_refr_index.re = re;
+    }
+
+    /// Get the medium refractive index (real part)
+    #[getter]
+    fn get_medium_refr_index_re(&self) -> f32 {
+        self.medium_refr_index.re
+    }
+
+    /// Set the medium refractive index (imaginary part)
+    #[setter]
+    fn set_medium_refr_index_im(&mut self, im: f32) {
+        self.medium_refr_index.im = im;
+    }
+
+    /// Get the medium refractive index (imaginary part)
+    #[getter]
+    fn get_medium_refr_index_im(&self) -> f32 {
+        self.medium_refr_index.im
+    }
+
+    /// Set the beam power threshold
+    #[setter]
+    fn set_beam_power_threshold(&mut self, threshold: f32) {
+        self.beam_power_threshold = threshold;
+    }
+
+    /// Get the beam power threshold
+    #[getter]
+    fn get_beam_power_threshold(&self) -> f32 {
+        self.beam_power_threshold
+    }
+
+    /// Set the cutoff
+    #[setter]
+    fn set_cutoff(&mut self, cutoff: f32) {
+        self.cutoff = cutoff;
+    }
+
+    /// Get the cutoff
+    #[getter]
+    fn get_cutoff(&self) -> f32 {
+        self.cutoff
+    }
+
+    /// Set the max recursion depth
+    #[setter]
+    fn set_max_rec(&mut self, max_rec: i32) {
+        self.max_rec = max_rec;
+    }
+
+    /// Get the max recursion depth
+    #[getter]
+    fn get_max_rec(&self) -> i32 {
+        self.max_rec
+    }
+
+    /// Set the max TIR bounces
+    #[setter]
+    fn set_max_tir(&mut self, max_tir: i32) {
+        self.max_tir = max_tir;
+    }
+
+    /// Get the max TIR bounces
+    #[getter]
+    fn get_max_tir(&self) -> i32 {
+        self.max_tir
+    }
+
+    /// Set the binning scheme
+    #[setter]
+    fn set_binning(&mut self, binning: BinningScheme) {
+        self.binning = binning;
+    }
+
+    /// Get the binning scheme
+    #[getter]
+    fn get_binning(&self) -> BinningScheme {
+        self.binning.clone()
+    }
 }
 
 impl Settings {
