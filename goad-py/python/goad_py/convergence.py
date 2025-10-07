@@ -14,6 +14,9 @@ class Convergable:
     variable: str  # 'asymmetry', 'scatt', 'ext', 'albedo', or Mueller element like 'S11', 'S12', etc.
     tolerance_type: str = "relative"  # 'relative' or 'absolute'
     tolerance: float = 0.01
+    theta_indices: Optional[List[int]] = (
+        None  # For Mueller elements: specific theta bin indices to check (None = all bins)
+    )
 
     def __post_init__(self):
         # Scalar integrated parameters
@@ -33,12 +36,22 @@ class Convergable:
                 f"Invalid tolerance_type '{self.tolerance_type}'. Must be one of {valid_types}"
             )
 
+        if self.tolerance <= 0:
+            raise ValueError(f"Tolerance must be positive, got {self.tolerance}")
+
+        # Validate theta_indices only for Mueller elements
+        if self.theta_indices is not None:
+            if not self.is_mueller():
+                raise ValueError("theta_indices can only be used with Mueller elements")
+            # Convert range to list if needed
+            if isinstance(self.theta_indices, range):
+                self.theta_indices = list(self.theta_indices)
+            if not isinstance(self.theta_indices, list):
+                raise ValueError("theta_indices must be a list or range of integers")
+
     def is_mueller(self) -> bool:
         """Check if this convergable is a Mueller matrix element."""
         return self.variable.startswith("S") and len(self.variable) == 3
-
-        if self.tolerance <= 0:
-            raise ValueError(f"Tolerance must be positive, got {self.tolerance}")
 
 
 @dataclass
@@ -358,7 +371,7 @@ class Convergence:
 
         for conv in self.convergables:
             if conv.is_mueller():
-                # Mueller element - check ALL theta bins converged
+                # Mueller element - check theta bins (all or specific indices)
                 mean_array, sem_array = self._calculate_mean_and_sem_array(
                     conv.variable
                 )
@@ -367,18 +380,32 @@ class Convergence:
                     converged[conv.variable] = False
                     continue
 
-                # Check convergence at each theta bin
+                # Select theta bins to check
+                if conv.theta_indices is not None:
+                    # Check only specified indices
+                    indices = [i for i in conv.theta_indices if i < len(mean_array)]
+                    if not indices:
+                        converged[conv.variable] = False
+                        continue
+                    mean_subset = mean_array[indices]
+                    sem_subset = sem_array[indices]
+                else:
+                    # Check all bins
+                    mean_subset = mean_array
+                    sem_subset = sem_array
+
+                # Check convergence at selected theta bins
                 if conv.tolerance_type == "relative":
-                    # Relative tolerance: SEM / |mean| < tolerance at ALL theta
+                    # Relative tolerance: SEM / |mean| < tolerance
                     relative_sem = np.where(
-                        mean_array != 0,
-                        sem_array / np.abs(mean_array),
-                        sem_array / conv.tolerance,
+                        mean_subset != 0,
+                        sem_subset / np.abs(mean_subset),
+                        sem_subset / conv.tolerance,
                     )
                     converged[conv.variable] = np.all(relative_sem < conv.tolerance)
                 else:
-                    # Absolute tolerance: SEM < tolerance at ALL theta
-                    converged[conv.variable] = np.all(sem_array < conv.tolerance)
+                    # Absolute tolerance: SEM < tolerance
+                    converged[conv.variable] = np.all(sem_subset < conv.tolerance)
             else:
                 # Scalar variable
                 mean, sem = self._calculate_mean_and_sem(conv.variable)
@@ -463,20 +490,46 @@ class Convergence:
                 worst_theta = theta_bins[worst_idx]
                 worst_mean = mean_array[worst_idx]
 
-                # Count converged bins
-                if conv.tolerance_type == "relative":
-                    converged_bins = np.sum(relative_sem_array < conv.tolerance)
+                # Count converged bins (either all or specified indices)
+                if conv.theta_indices is not None:
+                    # Only checking specific bins
+                    indices = [i for i in conv.theta_indices if i < len(mean_array)]
+                    if conv.tolerance_type == "relative":
+                        converged_bins = np.sum(
+                            relative_sem_array[indices] < conv.tolerance
+                        )
+                    else:
+                        converged_bins = np.sum(sem_array[indices] < conv.tolerance)
+                    total_bins = len(indices)
+                    bin_desc = (
+                        f"θ={[theta_bins[i] for i in indices]}"
+                        if len(indices) <= 3
+                        else f"{len(indices)} bins"
+                    )
                 else:
-                    converged_bins = np.sum(sem_array < conv.tolerance)
+                    # Checking all bins
+                    if conv.tolerance_type == "relative":
+                        converged_bins = np.sum(relative_sem_array < conv.tolerance)
+                    else:
+                        converged_bins = np.sum(sem_array < conv.tolerance)
+                    total_bins = len(mean_array)
+                    bin_desc = f"{total_bins} bins"
 
-                total_bins = len(mean_array)
                 status = "✓" if converged_status[conv.variable] else "❌"
 
                 # Print Mueller convergence info
-                print(
-                    f"  {conv.variable:<10}: {converged_bins}/{total_bins} bins converged | "
-                    f"Worst θ={worst_theta:.1f}°: {worst_mean:.4g} | SEM: {current_str} (target: {target_str}) {status}"
-                )
+                if conv.theta_indices is not None and len(conv.theta_indices) <= 3:
+                    # For small number of specific bins, show them explicitly
+                    print(
+                        f"  {conv.variable:<10}: {converged_bins}/{total_bins} {bin_desc} | "
+                        f"Worst θ={worst_theta:.1f}°: {worst_mean:.4g} | SEM: {current_str} (target: {target_str}) {status}"
+                    )
+                else:
+                    # For many bins, use standard format
+                    print(
+                        f"  {conv.variable:<10}: {converged_bins}/{total_bins} bins converged | "
+                        f"Worst θ={worst_theta:.1f}°: {worst_mean:.4g} | SEM: {current_str} (target: {target_str}) {status}"
+                    )
 
                 # Add worst SEM to convergence history
                 self.convergence_history.append(
