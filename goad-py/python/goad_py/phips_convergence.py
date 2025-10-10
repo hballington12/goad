@@ -349,9 +349,15 @@ class PHIPSConvergence:
             converged = self._check_convergence()
 
             # Print progress
-            print(
-                f"\nBatch {len(self.batch_data)} ({self.n_orientations} total orientations):"
-            )
+            min_required = self.min_batches * self.batch_size
+            if self.n_orientations < min_required:
+                print(
+                    f"\nBatch {len(self.batch_data)} ({self.n_orientations}/{min_required} total orientations, min not reached):"
+                )
+            else:
+                print(
+                    f"\nBatch {len(self.batch_data)} ({self.n_orientations} total orientations, min {min_required} reached):"
+                )
             self._print_progress(converged)
 
             # Store history
@@ -508,9 +514,15 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
             converged = self._check_convergence()
 
             # Print progress (with geometry info)
-            print(
-                f"\nBatch {len(self.batch_data)} ({self.n_orientations} total orientations) - Geometry: {geom_file}"
-            )
+            min_required = self.min_batches * self.batch_size
+            if self.n_orientations < min_required:
+                print(
+                    f"\nBatch {len(self.batch_data)} ({self.n_orientations}/{min_required} total orientations, min not reached) - Geometry: {geom_file}"
+                )
+            else:
+                print(
+                    f"\nBatch {len(self.batch_data)} ({self.n_orientations} total orientations, min {min_required} reached) - Geometry: {geom_file}"
+                )
             self._print_progress(converged)
 
             # Store history

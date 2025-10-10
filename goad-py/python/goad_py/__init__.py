@@ -9,4 +9,43 @@ from .convergence import (
     EnsembleConvergence,
 )
 
-__all__ = ["Convergence", "Convergable", "ConvergenceResults", "EnsembleConvergence"]
+from .phips_convergence import (
+    PHIPSConvergence,
+    PHIPSConvergable,
+    PHIPSEnsembleConvergence,
+)
+
+# Import unified convergence API
+from .unified_convergence import (
+    # Main entry points
+    run_convergence,
+    run_convergence_sweep,
+    # Classes
+    UnifiedConvergence,
+    UnifiedResults,
+    ConvergenceConfig,
+    # Modes
+    ConvergenceMode,
+    StandardMode,
+    PHIPSMode,
+)
+
+__all__ = [
+    # Legacy convergence API (still supported)
+    "Convergence",
+    "Convergable",
+    "ConvergenceResults",
+    "EnsembleConvergence",
+    "PHIPSConvergence",
+    "PHIPSConvergable",
+    "PHIPSEnsembleConvergence",
+    # Unified convergence API (recommended)
+    "run_convergence",
+    "run_convergence_sweep",
+    "UnifiedConvergence",
+    "UnifiedResults",
+    "ConvergenceConfig",
+    "ConvergenceMode",
+    "StandardMode",
+    "PHIPSMode",
+]

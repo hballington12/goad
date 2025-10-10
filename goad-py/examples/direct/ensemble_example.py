@@ -13,7 +13,7 @@ print("=" * 50)
 
 # Get absolute path to geometry directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
-geom_dir = os.path.join(current_dir, "..", "examples", "data")
+geom_dir = os.path.join(current_dir, "..", "..", "..", "examples", "data")
 geom_dir = os.path.abspath(geom_dir)
 
 print(f"Using geometry directory: {geom_dir}")

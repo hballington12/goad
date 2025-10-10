@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Configuration
 GEOM_DIR = "./test_obj"  # Directory with multiple .obj files
-PHIPS_BINS_FILE = "../phips_bins_edges.toml"
+PHIPS_BINS_FILE = "../../phips_bins_edges.toml"
 WAVELENGTH = 0.532  # microns
 PARTICLE_REFR_INDEX = 1.31 + 0.0j  # Ice refractive index at 532nm
 BATCH_SIZE = 32  # Smaller batches for ensemble

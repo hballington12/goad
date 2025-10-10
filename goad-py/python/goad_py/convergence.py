@@ -152,48 +152,35 @@ class Convergence:
         # Store batch data for proper statistical analysis
         batch_info = {"batch_size": batch_size, "values": {}, "weights": {}}
 
-        # Store values and weights for tracked variables
-        for conv in self.convergables:
-            if conv.variable == "asymmetry":
-                batch_info["values"]["asymmetry"] = results.asymmetry
-                batch_info["weights"]["asymmetry"] = results.scat_cross
-            elif conv.variable == "scatt":
-                batch_info["values"]["scatt"] = results.scat_cross
-                batch_info["weights"]["scatt"] = 1.0  # Equal weighting
-            elif conv.variable == "ext":
-                batch_info["values"]["ext"] = results.ext_cross
-                batch_info["weights"]["ext"] = 1.0  # Equal weighting
-            elif conv.variable == "albedo":
-                batch_info["values"]["albedo"] = results.albedo
-                batch_info["weights"]["albedo"] = results.ext_cross + results.scat_cross
-            elif conv.is_mueller():
-                # Extract Mueller element from mueller_1d
-                if results.mueller_1d is None:
-                    raise ValueError(
-                        f"Mueller element '{conv.variable}' requested but mueller_1d is None. "
-                        "Ensure mueller_1d=True in Convergence initialization."
-                    )
+        # Always store all 4 integrated parameters (for unified API output)
+        batch_info["values"]["asymmetry"] = results.asymmetry
+        batch_info["weights"]["asymmetry"] = results.scat_cross
+        batch_info["values"]["scatt"] = results.scat_cross
+        batch_info["weights"]["scatt"] = 1.0  # Equal weighting
+        batch_info["values"]["ext"] = results.ext_cross
+        batch_info["weights"]["ext"] = 1.0  # Equal weighting
+        batch_info["values"]["albedo"] = results.albedo
+        batch_info["weights"]["albedo"] = results.ext_cross + results.scat_cross
 
-                # Get Mueller matrix element index (S11->0, S12->1, ..., S44->15)
-                row = int(conv.variable[1]) - 1
-                col = int(conv.variable[2]) - 1
-                mueller_idx = row * 4 + col
+        # Always store ALL 16 Mueller elements (for unified API output with full SEM)
+        if self.mueller_1d and results.mueller_1d is not None:
+            mueller_1d_array = np.array(results.mueller_1d)  # Shape: (n_theta, 16)
 
-                # Extract the specific element across all theta bins
-                mueller_1d_array = np.array(results.mueller_1d)  # Shape: (n_theta, 16)
-                mueller_element = mueller_1d_array[:, mueller_idx]  # Shape: (n_theta,)
+            # Store all 16 Mueller elements (S11, S12, ..., S44)
+            for row in range(1, 5):
+                for col in range(1, 5):
+                    element_name = f"S{row}{col}"
+                    mueller_idx = (row - 1) * 4 + (col - 1)
+                    mueller_element = mueller_1d_array[
+                        :, mueller_idx
+                    ]  # Shape: (n_theta,)
 
-                batch_info["values"][conv.variable] = mueller_element
-                batch_info["weights"][conv.variable] = (
-                    1.0  # Equal weighting for Mueller
-                )
+                    batch_info["values"][element_name] = mueller_element
+                    batch_info["weights"][element_name] = 1.0  # Equal weighting
 
-                # Store theta bins if not already stored (for display purposes)
-                if (
-                    "mueller_theta_bins" not in batch_info
-                    and results.bins_1d is not None
-                ):
-                    batch_info["mueller_theta_bins"] = np.array(results.bins_1d)
+            # Store theta bins if not already stored (for display purposes)
+            if "mueller_theta_bins" not in batch_info and results.bins_1d is not None:
+                batch_info["mueller_theta_bins"] = np.array(results.bins_1d)
 
         self.batch_data.append(batch_info)
 
@@ -444,7 +431,18 @@ class Convergence:
         Args:
             iteration: Current iteration number
         """
-        print(f"\nIteration {iteration} ({self.n_orientations} orientations):")
+        # Calculate minimum required orientations
+        min_required = self.min_batches * self.batch_size
+
+        # Show progress with min orientations requirement
+        if self.n_orientations < min_required:
+            print(
+                f"\nIteration {iteration} ({self.n_orientations}/{min_required} orientations, min not reached):"
+            )
+        else:
+            print(
+                f"\nIteration {iteration} ({self.n_orientations} orientations, min {min_required} reached):"
+            )
 
         converged_status = self._check_convergence()
 
@@ -626,11 +624,35 @@ class Convergence:
                 final_values[conv.variable] = mean
                 final_sems[conv.variable] = sem
 
-        # Prepare Mueller matrices
+        # Prepare Mueller matrices with SEM
         mueller_1d = None
+        mueller_1d_sem = None
         mueller_2d = None
+
         if self.mueller_1d and self.mueller_1d_sum is not None:
             mueller_1d = self.mueller_1d_sum / self.n_orientations
+
+            # Compute SEM for all 16 Mueller elements
+            # mueller_1d shape: (n_theta, 16)
+            n_theta = mueller_1d.shape[0]
+            mueller_1d_sem = np.zeros_like(mueller_1d)
+
+            for row in range(1, 5):
+                for col in range(1, 5):
+                    element_name = f"S{row}{col}"
+                    mueller_idx = (row - 1) * 4 + (col - 1)
+
+                    # Calculate mean and SEM for this element across all theta bins
+                    mean_array, sem_array = self._calculate_mean_and_sem_array(
+                        element_name
+                    )
+
+                    if len(sem_array) > 0:
+                        mueller_1d_sem[:, mueller_idx] = sem_array
+
+            # Store mueller_1d_sem in final_values for unified API access
+            final_values["mueller_1d_sem"] = mueller_1d_sem
+
         if self.mueller_2d and self.mueller_2d_sum is not None:
             mueller_2d = self.mueller_2d_sum / self.n_orientations
 
@@ -745,9 +767,15 @@ class EnsembleConvergence(Convergence):
             self._update_statistics(mp.results, batch_size)
 
             # Print progress (with geometry info)
-            print(
-                f"\nIteration {iteration} ({self.n_orientations} orientations) - Geometry: {geom_file}"
-            )
+            min_required = self.min_batches * self.batch_size
+            if self.n_orientations < min_required:
+                print(
+                    f"\nIteration {iteration} ({self.n_orientations}/{min_required} orientations, min not reached) - Geometry: {geom_file}"
+                )
+            else:
+                print(
+                    f"\nIteration {iteration} ({self.n_orientations} orientations, min {min_required} reached) - Geometry: {geom_file}"
+                )
             self._print_progress_without_header(iteration)
 
             # Check convergence
@@ -775,11 +803,35 @@ class EnsembleConvergence(Convergence):
                 final_values[conv.variable] = mean
                 final_sems[conv.variable] = sem
 
-        # Prepare Mueller matrices
+        # Prepare Mueller matrices with SEM
         mueller_1d = None
+        mueller_1d_sem = None
         mueller_2d = None
+
         if self.mueller_1d and self.mueller_1d_sum is not None:
             mueller_1d = self.mueller_1d_sum / self.n_orientations
+
+            # Compute SEM for all 16 Mueller elements
+            # mueller_1d shape: (n_theta, 16)
+            n_theta = mueller_1d.shape[0]
+            mueller_1d_sem = np.zeros_like(mueller_1d)
+
+            for row in range(1, 5):
+                for col in range(1, 5):
+                    element_name = f"S{row}{col}"
+                    mueller_idx = (row - 1) * 4 + (col - 1)
+
+                    # Calculate mean and SEM for this element across all theta bins
+                    mean_array, sem_array = self._calculate_mean_and_sem_array(
+                        element_name
+                    )
+
+                    if len(sem_array) > 0:
+                        mueller_1d_sem[:, mueller_idx] = sem_array
+
+            # Store mueller_1d_sem in final_values for unified API access
+            final_values["mueller_1d_sem"] = mueller_1d_sem
+
         if self.mueller_2d and self.mueller_2d_sum is not None:
             mueller_2d = self.mueller_2d_sum / self.n_orientations
 

@@ -1,0 +1,220 @@
+{
+  "converged": true,
+  "n_orientations": 288,
+  "mode": "phips",
+  "is_ensemble": false,
+  "warning": null,
+  "asymmetry": null,
+  "scatt": null,
+  "ext": null,
+  "albedo": null,
+  "mueller_1d": null,
+  "bins_1d": null,
+  "phips_dscs": [
+    [
+      3.9103428919710814e-11,
+      5.871908163539666e-12
+    ],
+    [
+      4.319101145183495e-11,
+      6.9312118070405516e-12
+    ],
+    [
+      1.3911828211634516e-11,
+      2.2054184315058902e-12
+    ],
+    [
+      7.431092423302383e-12,
+      1.0269483456445906e-12
+    ],
+    [
+      8.630160079349545e-12,
+      1.9664683125520894e-12
+    ],
+    [
+      4.289962714515376e-12,
+      6.251336746863726e-13
+    ],
+    [
+      2.770677274554383e-12,
+      3.9828612024742303e-13
+    ],
+    [
+      3.509371405702656e-12,
+      8.189938206015675e-13
+    ],
+    [
+      5.6848421566441524e-12,
+      2.3417823031644564e-12
+    ],
+    [
+      8.14745442943873e-12,
+      3.589446317080161e-12
+    ],
+    [
+      2.6275850501826095e-12,
+      4.64921732223245e-13
+    ],
+    [
+      4.579841261124424e-12,
+      1.9856218107310593e-12
+    ],
+    [
+      3.08750258367267e-12,
+      6.529099006961535e-13
+    ],
+    [
+      2.436083518718389e-12,
+      6.4648788726908e-13
+    ],
+    [
+      1.7054138285086072e-12,
+      3.46257877023424e-13
+    ],
+    [
+      1.586771307633886e-12,
+      2.720878534409043e-13
+    ],
+    [
+      2.0811837893462174e-12,
+      3.3892629767382376e-13
+    ],
+    [
+      3.4341232114694018e-12,
+      8.710228449709641e-13
+    ],
+    [
+      3.71308540928705e-12,
+      7.970525645744767e-13
+    ],
+    [
+      4.299085757568136e-12,
+      6.265579418125709e-13
+    ]
+  ],
+  "detector_angles": [
+    18.0,
+    26.0,
+    34.0,
+    42.0,
+    50.0,
+    58.0,
+    66.0,
+    74.0,
+    82.0,
+    90.0,
+    98.0,
+    106.0,
+    114.0,
+    122.0,
+    130.0,
+    138.0,
+    146.0,
+    154.0,
+    162.0,
+    170.0
+  ],
+  "convergence_history": [
+    {
+      "n_orientations": 24,
+      "variable": "phips_dscs",
+      "sem": Infinity
+    },
+    {
+      "n_orientations": 48,
+      "variable": "phips_dscs",
+      "sem": 0.8961805181783692
+    },
+    {
+      "n_orientations": 72,
+      "variable": "phips_dscs",
+      "sem": 0.842404348500421
+    },
+    {
+      "n_orientations": 96,
+      "variable": "phips_dscs",
+      "sem": 0.7739315691794301
+    },
+    {
+      "n_orientations": 120,
+      "variable": "phips_dscs",
+      "sem": 0.7023091431322517
+    },
+    {
+      "n_orientations": 144,
+      "variable": "phips_dscs",
+      "sem": 0.6872443441236943
+    },
+    {
+      "n_orientations": 168,
+      "variable": "phips_dscs",
+      "sem": 0.6722944348750853
+    },
+    {
+      "n_orientations": 192,
+      "variable": "phips_dscs",
+      "sem": 0.588575830580374
+    },
+    {
+      "n_orientations": 216,
+      "variable": "phips_dscs",
+      "sem": 0.5230617286022305
+    },
+    {
+      "n_orientations": 240,
+      "variable": "phips_dscs",
+      "sem": 0.5065132477261213
+    },
+    {
+      "n_orientations": 264,
+      "variable": "phips_dscs",
+      "sem": 0.5029631078254295
+    },
+    {
+      "n_orientations": 288,
+      "variable": "phips_dscs",
+      "sem": 0.4405604656235475
+    }
+  ],
+  "config": {
+    "geometry": "/Users/ixguard/Documents/work/rust/goad/examples/data/hex.obj",
+    "mode": "phips",
+    "convergence_targets": [
+      {
+        "tolerance": 0.5,
+        "tolerance_type": "relative",
+        "detector_indices": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ]
+      }
+    ],
+    "wavelength": 0.532,
+    "particle_refr_index_re": 1.31,
+    "particle_refr_index_im": 0.0,
+    "medium_refr_index_re": 1.0,
+    "medium_refr_index_im": 0.0,
+    "batch_size": 24,
+    "max_orientations": 500,
+    "min_batches": 5,
+    "mueller_1d": false,
+    "is_ensemble": false
+  }
+}

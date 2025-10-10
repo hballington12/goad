@@ -20,7 +20,7 @@ print("=" * 50)
 
 # Setup geometry path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-geom_path = os.path.join(current_dir, "..", "examples", "data", "hex.obj")
+geom_path = os.path.join(current_dir, "..", "..", "..", "examples", "data", "hex.obj")
 geom_path = os.path.abspath(geom_path)
 
 print(f"Geometry: {geom_path}")
