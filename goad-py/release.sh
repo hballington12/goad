@@ -21,7 +21,7 @@ Usage: $0 <command> [version]
 
 Commands:
   patch         Bump patch version (0.2.0 -> 0.2.1)
-  minor         Bump minor version (0.2.0 -> 0.3.0)  
+  minor         Bump minor version (0.2.0 -> 0.3.0)
   major         Bump major version (0.2.0 -> 1.0.0)
   custom <ver>  Set specific version (e.g., 0.2.1-rc1)
   tag           Create git tag for current version
@@ -45,12 +45,12 @@ EOF
 bump_version() {
     local bump_type=$1
     local new_version
-    
+
     IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
     local major=${VERSION_PARTS[0]}
-    local minor=${VERSION_PARTS[1]} 
+    local minor=${VERSION_PARTS[1]}
     local patch=${VERSION_PARTS[2]}
-    
+
     case $bump_type in
         "patch")
             new_version="$major.$minor.$((patch + 1))"
@@ -74,15 +74,15 @@ bump_version() {
             exit 1
             ;;
     esac
-    
+
     echo "📝 Updating version: $CURRENT_VERSION -> $new_version"
-    
-    # Update pyproject.toml
-    sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$new_version\"/" pyproject.toml
-    
-    # Update Cargo.toml
-    sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$new_version\"/" Cargo.toml
-    
+
+    # Update pyproject.toml (macOS-compatible sed)
+    sed -i '' "s/version = \"$CURRENT_VERSION\"/version = \"$new_version\"/" pyproject.toml
+
+    # Update Cargo.toml (macOS-compatible sed)
+    sed -i '' "s/version = \"$CURRENT_VERSION\"/version = \"$new_version\"/" Cargo.toml
+
     echo "✅ Version updated to $new_version"
     echo ""
     echo "📝 Next steps:"
@@ -95,7 +95,7 @@ bump_version() {
 create_tag() {
     local version=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
     local tag="v$version"
-    
+
     # Check if working directory is clean
     if [ -n "$(git status --porcelain)" ]; then
         echo "⚠️  Warning: Working directory has uncommitted changes"
@@ -107,18 +107,18 @@ create_tag() {
             exit 1
         fi
     fi
-    
+
     echo "🏷️  Creating tag: $tag"
-    
+
     # Check if tag already exists
     if git tag -l | grep -q "^$tag$"; then
         echo "❌ Error: Tag $tag already exists"
         exit 1
     fi
-    
+
     # Create annotated tag
     git tag -a "$tag" -m "Release $tag"
-    
+
     echo "✅ Tag created: $tag"
     echo ""
     echo "🚀 To trigger release:"
@@ -126,7 +126,7 @@ create_tag() {
     echo ""
     echo "This will:"
     echo "- Trigger GitHub Actions CI"
-    echo "- Build wheels for all platforms" 
+    echo "- Build wheels for all platforms"
     echo "- Run tests"
     echo "- Publish to PyPI automatically"
 }
