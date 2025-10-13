@@ -6,10 +6,7 @@ Demonstrates converging on PHIPS detector bins (all except the first one).
 PHIPS detectors measure scattering at 20 specific angles from 18° to 170°.
 """
 
-import sys
 from pathlib import Path
-
-sys.path.insert(0, "../../python")
 import goad_py as goad
 
 print("=" * 80)
