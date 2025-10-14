@@ -63,9 +63,11 @@ pub struct Settings {
     pub max_tir: i32,
     pub binning: BinningScheme,
     pub seed: Option<u64>,
+    /// Problem scaling factor - scales the entire problem (geometry, wavelength, and beam area thresholds)
     #[serde(default = "constants::default_scale_factor")]
     pub scale: f32,
     pub distortion: Option<f32>,
+    /// Per-axis geometry scaling [x, y, z] - scales only the geometry in each dimension
     #[serde(default = "constants::default_geom_scale")]
     pub geom_scale: Option<Vec<f32>>,
     #[serde(default = "constants::default_directory")]
@@ -372,6 +374,54 @@ impl Settings {
     #[getter]
     fn get_binning(&self) -> BinningScheme {
         self.binning.clone()
+    }
+
+    /// Set the per-axis geometry scaling [x, y, z]
+    #[setter]
+    fn set_geom_scale(&mut self, geom_scale: Option<Vec<f32>>) {
+        self.geom_scale = geom_scale;
+    }
+
+    /// Get the per-axis geometry scaling [x, y, z]
+    #[getter]
+    fn get_geom_scale(&self) -> Option<Vec<f32>> {
+        self.geom_scale.clone()
+    }
+
+    /// Set the seed for random number generation
+    #[setter]
+    fn set_seed(&mut self, seed: Option<u64>) {
+        self.seed = seed;
+    }
+
+    /// Get the seed for random number generation
+    #[getter]
+    fn get_seed(&self) -> Option<u64> {
+        self.seed
+    }
+
+    /// Set the distortion factor
+    #[setter]
+    fn set_distortion(&mut self, distortion: Option<f32>) {
+        self.distortion = distortion;
+    }
+
+    /// Get the distortion factor
+    #[getter]
+    fn get_distortion(&self) -> Option<f32> {
+        self.distortion
+    }
+
+    /// Set the field of view factor
+    #[setter]
+    fn set_fov_factor(&mut self, fov_factor: Option<f32>) {
+        self.fov_factor = fov_factor;
+    }
+
+    /// Get the field of view factor
+    #[getter]
+    fn get_fov_factor(&self) -> Option<f32> {
+        self.fov_factor
     }
 }
 

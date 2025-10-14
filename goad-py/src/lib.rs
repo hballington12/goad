@@ -1,6 +1,7 @@
 use goad::{
     self,
     bins::BinningScheme,
+    diff::Mapping,
     geom::Geom,
     geom::Shape,
     multiproblem::MultiProblem,
@@ -74,6 +75,9 @@ fn _goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<EulerConvention>()?;
     m.add_class::<Orientation>()?;
     m.add_class::<Scheme>()?;
+
+    // Mapping enum
+    m.add_class::<Mapping>()?;
 
     // Helper functions for orientations
     m.add_function(wrap_pyfunction!(uniform_orientation, m)?)?;

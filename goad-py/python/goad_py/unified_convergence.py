@@ -11,6 +11,8 @@ Features:
 - Strict input validation
 - Uniform output format (UnifiedResults)
 - Support for parameter sweeps
+- Full control over beam tracing, geometry transformations, and advanced optics
+- Reproducible results via random seed control
 """
 
 from dataclasses import dataclass, field, asdict
@@ -212,6 +214,96 @@ class PHIPSMode(ConvergenceMode):
 
 
 @dataclass
+class BeamTracingConfig:
+    """Beam tracing performance and accuracy parameters."""
+
+    beam_power_threshold: float = 0.05
+    beam_area_threshold_fac: float = 4.0
+    cutoff: float = 0.001
+    max_rec: int = 100
+    max_tir: int = 100
+
+    def __post_init__(self):
+        """Validate beam tracing parameters."""
+        if self.beam_power_threshold <= 0 or self.beam_power_threshold > 1:
+            raise ValueError(
+                f"beam_power_threshold must be in range (0, 1], got {self.beam_power_threshold}"
+            )
+
+        if self.beam_area_threshold_fac <= 0:
+            raise ValueError(
+                f"beam_area_threshold_fac must be positive, got {self.beam_area_threshold_fac}"
+            )
+
+        if self.cutoff < 0 or self.cutoff > 1:
+            raise ValueError(f"cutoff must be between 0 and 1, got {self.cutoff}")
+
+        if self.max_rec < 0:
+            raise ValueError(f"max_rec must be non-negative, got {self.max_rec}")
+
+        if self.max_tir < 0:
+            raise ValueError(f"max_tir must be non-negative, got {self.max_tir}")
+
+
+@dataclass
+class GeometryTransformConfig:
+    """Geometry transformation parameters.
+
+    Attributes:
+        scale: Problem scaling factor - scales the entire problem including geometry,
+               wavelength, and beam area thresholds (default: 1.0)
+        distortion: Geometry distortion factor (optional)
+        geom_scale: Per-axis geometry scaling [x, y, z] - scales only the geometry
+                    in each dimension independently (optional)
+    """
+
+    scale: float = 1.0
+    distortion: Optional[float] = None
+    geom_scale: Optional[List[float]] = None
+
+    def __post_init__(self):
+        """Validate geometry transformations."""
+        if self.scale <= 0:
+            raise ValueError(f"scale must be positive, got {self.scale}")
+
+        if self.geom_scale is not None:
+            if len(self.geom_scale) != 3:
+                raise ValueError(
+                    f"geom_scale must have exactly 3 values [x, y, z], "
+                    f"got {len(self.geom_scale)}"
+                )
+            if any(s <= 0 for s in self.geom_scale):
+                raise ValueError("All geom_scale values must be positive")
+
+
+@dataclass
+class AdvancedConfig:
+    """Advanced optical calculation parameters."""
+
+    mapping: Optional[Any] = (
+        "ApertureDiffraction"  # String that will be converted to enum in __post_init__
+    )
+    coherence: bool = False
+    fov_factor: Optional[float] = None
+
+    def __post_init__(self):
+        """Validate advanced optics settings and convert mapping string to enum."""
+        # Convert string mapping to enum if needed
+        if isinstance(self.mapping, str):
+            if self.mapping == "ApertureDiffraction":
+                self.mapping = goad.Mapping.ApertureDiffraction
+            elif self.mapping == "GeometricOptics":
+                self.mapping = goad.Mapping.GeometricOptics
+            else:
+                raise ValueError(
+                    f"Invalid mapping '{self.mapping}'. Must be 'ApertureDiffraction' or 'GeometricOptics'"
+                )
+
+        if self.fov_factor is not None and self.fov_factor <= 0:
+            raise ValueError(f"fov_factor must be positive, got {self.fov_factor}")
+
+
+@dataclass
 class ConvergenceConfig:
     """
     Unified configuration for all convergence types.
@@ -220,6 +312,29 @@ class ConvergenceConfig:
     - Standard convergence (integrated parameters, Mueller elements)
     - PHIPS detector convergence
     - Single geometry or ensemble averaging
+
+    Attributes:
+        geometry: Path to .obj file or directory of .obj files (ensemble)
+        mode: ConvergenceMode instance (StandardMode or PHIPSMode)
+        convergence_targets: List of convergence target dicts
+
+        wavelength: Wavelength in microns (default: 0.532)
+        particle_refr_index_re: Real part of particle refractive index (default: 1.31)
+        particle_refr_index_im: Imaginary part of particle refractive index (default: 0.0)
+        medium_refr_index_re: Real part of medium refractive index (default: 1.0)
+        medium_refr_index_im: Imaginary part of medium refractive index (default: 0.0)
+
+        batch_size: Orientations per batch (default: 24)
+        max_orientations: Maximum orientations (default: 100,000)
+        min_batches: Minimum batches before convergence check (default: 10)
+
+        beam_tracing: BeamTracingConfig instance for beam tracing parameters
+        geometry_transform: GeometryTransformConfig instance for geometry transformations
+        advanced_config: AdvancedConfig instance for advanced optical parameters
+        seed: Random seed for reproducibility (optional)
+
+        mueller_1d: Compute 1D Mueller matrix (default: True, standard mode only)
+        output_dir: Output directory path (optional)
     """
 
     # Required fields
@@ -238,6 +353,20 @@ class ConvergenceConfig:
     batch_size: int = 24
     max_orientations: int = 100_000
     min_batches: int = 10
+
+    # Beam tracing configuration
+    beam_tracing: BeamTracingConfig = field(default_factory=BeamTracingConfig)
+
+    # Geometry transformations
+    geometry_transform: GeometryTransformConfig = field(
+        default_factory=GeometryTransformConfig
+    )
+
+    # Advanced optics
+    advanced_config: AdvancedConfig = field(default_factory=AdvancedConfig)
+
+    # Random seed for reproducibility
+    seed: Optional[int] = None
 
     # Mueller matrix output (only for StandardMode)
     mueller_1d: bool = True
@@ -312,6 +441,24 @@ class ConvergenceConfig:
             "batch_size": self.batch_size,
             "max_orientations": self.max_orientations,
             "min_batches": self.min_batches,
+            "beam_tracing": {
+                "beam_power_threshold": self.beam_tracing.beam_power_threshold,
+                "beam_area_threshold_fac": self.beam_tracing.beam_area_threshold_fac,
+                "cutoff": self.beam_tracing.cutoff,
+                "max_rec": self.beam_tracing.max_rec,
+                "max_tir": self.beam_tracing.max_tir,
+            },
+            "geometry_transform": {
+                "scale": self.geometry_transform.scale,
+                "distortion": self.geometry_transform.distortion,
+                "geom_scale": self.geometry_transform.geom_scale,
+            },
+            "advanced_config": {
+                "mapping": str(self.advanced_config.mapping),
+                "coherence": self.advanced_config.coherence,
+                "fov_factor": self.advanced_config.fov_factor,
+            },
+            "seed": self.seed,
             "mueller_1d": self.mueller_1d,
             "is_ensemble": self.is_ensemble(),
         }
@@ -664,7 +811,7 @@ class UnifiedConvergence:
         else:
             geom_path_str = str(self.config.geometry)
 
-        # Create GOAD settings
+        # Create GOAD settings with all parameters
         settings = goad.Settings(
             geom_path=geom_path_str,
             wavelength=self.config.wavelength,
@@ -673,7 +820,31 @@ class UnifiedConvergence:
             medium_refr_index_re=self.config.medium_refr_index_re,
             medium_refr_index_im=self.config.medium_refr_index_im,
             binning=self.config.mode.get_binning(),
+            # Beam tracing parameters
+            beam_power_threshold=self.config.beam_tracing.beam_power_threshold,
+            beam_area_threshold_fac=self.config.beam_tracing.beam_area_threshold_fac,
+            cutoff=self.config.beam_tracing.cutoff,
+            max_rec=self.config.beam_tracing.max_rec,
+            max_tir=self.config.beam_tracing.max_tir,
+            # Geometry transformations
+            scale=self.config.geometry_transform.scale,
+            # Advanced configuration
+            mapping=self.config.advanced_config.mapping,
+            coherence=self.config.advanced_config.coherence,
         )
+
+        # Set optional parameters if provided
+        if self.config.seed is not None:
+            settings.seed = self.config.seed
+
+        if self.config.geometry_transform.distortion is not None:
+            settings.distortion = self.config.geometry_transform.distortion
+
+        if self.config.geometry_transform.geom_scale is not None:
+            settings.geom_scale = self.config.geometry_transform.geom_scale
+
+        if self.config.advanced_config.fov_factor is not None:
+            settings.fov_factor = self.config.advanced_config.fov_factor
 
         # Create convergence instance based on mode
         if isinstance(self.config.mode, StandardMode):
@@ -881,18 +1052,45 @@ def run_convergence(
         tolerance_type: "relative" or "absolute"
         mode: ConvergenceMode instance, or string "auto"/"standard"/"phips"
         **kwargs: Additional settings:
+            # Optical settings
             - wavelength: Wavelength in microns (default: 0.532)
             - particle_refr_index_re: Real part of particle refractive index
             - particle_refr_index_im: Imaginary part of particle refractive index
             - medium_refr_index_re: Real part of medium refractive index
             - medium_refr_index_im: Imaginary part of medium refractive index
+
+            # Convergence parameters
             - batch_size: Orientations per batch (default: 24)
             - max_orientations: Maximum orientations (default: 100,000)
             - min_batches: Minimum batches before convergence (default: 10)
             - mueller_1d: Compute 1D Mueller matrix (default: True, standard mode only)
+
+            # Mode settings
             - phips_bins_file: Path to PHIPS bins TOML (required if mode="phips")
             - n_theta: Number of theta bins for standard mode (default: 181)
             - n_phi: Number of phi bins for standard mode (default: 181)
+
+            # Beam tracing parameters
+            - beam_power_threshold: Beam power threshold (default: 0.05)
+            - beam_area_threshold_fac: Beam area threshold factor (default: 4.0)
+            - cutoff: Ray power cutoff (default: 0.001)
+            - max_rec: Max recursion depth (default: 100)
+            - max_tir: Max TIR bounces (default: 100)
+
+            # Geometry transformations
+            - scale: Problem scaling factor - scales entire problem including geometry,
+                     wavelength, and beam area thresholds (default: 1.0)
+            - distortion: Geometry distortion factor (optional)
+            - geom_scale: Per-axis geometry scaling [x, y, z] - scales only geometry
+                          in each dimension independently (optional)
+
+            # Advanced configuration
+            - mapping: DSCS mapping scheme (default: goad.Mapping.ApertureDiffraction)
+            - coherence: Enable coherent scattering (default: False)
+            - fov_factor: Field of view factor (optional)
+
+            # Reproducibility
+            - seed: Random seed for orientations (optional)
 
     Returns:
         UnifiedResults object
@@ -924,7 +1122,44 @@ def run_convergence(
             [{"variable": "S11", "tolerance": 0.1, "theta_indices": [180]}],
             batch_size=12
         )
+
+        # Advanced: custom beam tracing and geometry scaling
+        results = run_convergence(
+            "complex_particle.obj",
+            "asymmetry",
+            max_rec=200,
+            max_tir=150,
+            cutoff=0.0001,
+            scale=2.0,
+            seed=42
+        )
     """
+    # Extract beam tracing parameters from kwargs
+    beam_tracing = BeamTracingConfig(
+        beam_power_threshold=kwargs.pop("beam_power_threshold", 0.05),
+        beam_area_threshold_fac=kwargs.pop("beam_area_threshold_fac", 4.0),
+        cutoff=kwargs.pop("cutoff", 0.001),
+        max_rec=kwargs.pop("max_rec", 100),
+        max_tir=kwargs.pop("max_tir", 100),
+    )
+
+    # Extract geometry transform parameters
+    geometry_transform = GeometryTransformConfig(
+        scale=kwargs.pop("scale", 1.0),
+        distortion=kwargs.pop("distortion", None),
+        geom_scale=kwargs.pop("geom_scale", None),
+    )
+
+    # Extract advanced configuration parameters
+    advanced_config = AdvancedConfig(
+        mapping=kwargs.pop("mapping", "ApertureDiffraction"),
+        coherence=kwargs.pop("coherence", False),
+        fov_factor=kwargs.pop("fov_factor", None),
+    )
+
+    # Extract seed
+    seed = kwargs.pop("seed", None)
+
     # Normalize targets to list of dicts
     target_dicts = _normalize_targets(targets, tolerance, tolerance_type)
 
@@ -946,9 +1181,16 @@ def run_convergence(
                 f"Invalid mode string '{mode}'. Must be 'auto', 'standard', or 'phips'"
             )
 
-    # Build config
+    # Build config with new parameters
     config = ConvergenceConfig(
-        geometry=geometry, mode=mode, convergence_targets=target_dicts, **kwargs
+        geometry=geometry,
+        mode=mode,
+        convergence_targets=target_dicts,
+        beam_tracing=beam_tracing,
+        geometry_transform=geometry_transform,
+        advanced_config=advanced_config,
+        seed=seed,
+        **kwargs,  # Remaining kwargs (wavelength, particle_refr_index_re, etc.)
     )
 
     # Run
