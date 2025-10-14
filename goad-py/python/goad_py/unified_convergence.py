@@ -217,11 +217,11 @@ class PHIPSMode(ConvergenceMode):
 class BeamTracingConfig:
     """Beam tracing performance and accuracy parameters."""
 
-    beam_power_threshold: float = 0.05
-    beam_area_threshold_fac: float = 4.0
-    cutoff: float = 0.001
-    max_rec: int = 100
-    max_tir: int = 100
+    beam_power_threshold: float = 0.01
+    beam_area_threshold_fac: float = 0.01
+    cutoff: float = 0.999
+    max_rec: int = 10
+    max_tir: int = 10
 
     def __post_init__(self):
         """Validate beam tracing parameters."""
@@ -283,7 +283,7 @@ class AdvancedConfig:
     mapping: Optional[Any] = (
         "ApertureDiffraction"  # String that will be converted to enum in __post_init__
     )
-    coherence: bool = False
+    coherence: bool = True
     fov_factor: Optional[float] = None
 
     def __post_init__(self):
