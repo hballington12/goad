@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "goad-py"
-version = "0.6.0"
+version = "0.6.1"
 description = "Physical optics light scattering computation"
 authors = [{name = "Harry Ballington", email = "ballington@uni-wuppertal.de"}]
 license = {text = "GPL-3.0"}
