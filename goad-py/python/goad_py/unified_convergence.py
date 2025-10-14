@@ -217,8 +217,8 @@ class PHIPSMode(ConvergenceMode):
 class BeamTracingConfig:
     """Beam tracing performance and accuracy parameters."""
 
-    beam_power_threshold: float = 0.01
-    beam_area_threshold_fac: float = 0.01
+    beam_power_threshold: float = 0.005
+    beam_area_threshold_fac: float = 0.001
     cutoff: float = 0.999
     max_rec: int = 10
     max_tir: int = 10
@@ -1071,11 +1071,11 @@ def run_convergence(
             - n_phi: Number of phi bins for standard mode (default: 181)
 
             # Beam tracing parameters
-            - beam_power_threshold: Beam power threshold (default: 0.05)
-            - beam_area_threshold_fac: Beam area threshold factor (default: 4.0)
-            - cutoff: Ray power cutoff (default: 0.001)
-            - max_rec: Max recursion depth (default: 100)
-            - max_tir: Max TIR bounces (default: 100)
+            - beam_power_threshold: Beam power threshold (default: 0.005)
+            - beam_area_threshold_fac: Beam area threshold factor (default: 0.001)
+            - cutoff: Ray power cutoff (default: 0.999)
+            - max_rec: Max recursion depth (default: 10)
+            - max_tir: Max TIR bounces (default: 10)
 
             # Geometry transformations
             - scale: Problem scaling factor - scales entire problem including geometry,
@@ -1086,7 +1086,7 @@ def run_convergence(
 
             # Advanced configuration
             - mapping: DSCS mapping scheme (default: goad.Mapping.ApertureDiffraction)
-            - coherence: Enable coherent scattering (default: False)
+            - coherence: Enable coherent scattering (default: True)
             - fov_factor: Field of view factor (optional)
 
             # Reproducibility
@@ -1136,11 +1136,11 @@ def run_convergence(
     """
     # Extract beam tracing parameters from kwargs
     beam_tracing = BeamTracingConfig(
-        beam_power_threshold=kwargs.pop("beam_power_threshold", 0.05),
-        beam_area_threshold_fac=kwargs.pop("beam_area_threshold_fac", 4.0),
-        cutoff=kwargs.pop("cutoff", 0.001),
-        max_rec=kwargs.pop("max_rec", 100),
-        max_tir=kwargs.pop("max_tir", 100),
+        beam_power_threshold=kwargs.pop("beam_power_threshold", 0.005),
+        beam_area_threshold_fac=kwargs.pop("beam_area_threshold_fac", 0.001),
+        cutoff=kwargs.pop("cutoff", 0.999),
+        max_rec=kwargs.pop("max_rec", 10),
+        max_tir=kwargs.pop("max_tir", 10),
     )
 
     # Extract geometry transform parameters
@@ -1153,7 +1153,7 @@ def run_convergence(
     # Extract advanced configuration parameters
     advanced_config = AdvancedConfig(
         mapping=kwargs.pop("mapping", "ApertureDiffraction"),
-        coherence=kwargs.pop("coherence", False),
+        coherence=kwargs.pop("coherence", True),
         fov_factor=kwargs.pop("fov_factor", None),
     )
 
