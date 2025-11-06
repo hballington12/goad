@@ -104,37 +104,50 @@ impl MultiProblem {
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
-        // Initialize multi-progress display
-        let m = MultiProgress::new();
         let n = self.orientations.num_orientations;
 
-        // Status spinner (top) - shows current phase
-        let status_pb = m.add(ProgressBar::new_spinner());
-        status_pb.set_style(ProgressStyle::with_template("{spinner:.cyan} Status: {msg}").unwrap());
-        status_pb.enable_steady_tick(Duration::from_millis(100));
+        // Initialize progress display only if not in quiet mode
+        let (status_pb, pb, info_pb) = if !self.settings.quiet {
+            let m = MultiProgress::new();
 
-        // Main progress bar for orientations
-        let pb = m.add(ProgressBar::new(n as u64));
-        pb.set_style(
-            ProgressStyle::with_template(
-            "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
+            // Status spinner (top) - shows current phase
+            let status_pb = m.add(ProgressBar::new_spinner());
+            status_pb
+                .set_style(ProgressStyle::with_template("{spinner:.cyan} Status: {msg}").unwrap());
+            status_pb.enable_steady_tick(Duration::from_millis(100));
+
+            // Main progress bar for orientations
+            let pb = m.add(ProgressBar::new(n as u64));
+            pb.set_style(
+                ProgressStyle::with_template(
+                "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
+                )
+                .unwrap()
+                .progress_chars("█▇▆▅▄▃▂▁")
+            );
+            pb.set_message("Computing orientations");
+
+            // Info display (bottom) - shows additional context
+            let info_pb = m.add(ProgressBar::new_spinner());
+            info_pb.set_style(ProgressStyle::with_template("ℹ️  {msg}").unwrap());
+            info_pb.enable_steady_tick(Duration::from_millis(500));
+
+            // Phase 1: Initialization
+            status_pb.set_message("Initializing geometry and solver...");
+            info_pb.set_message(format!(
+                "Geometry: {} | Orientations: {}",
+                self.settings.geom_name, n
+            ));
+
+            (status_pb, pb, info_pb)
+        } else {
+            // In quiet mode, create hidden progress bars
+            (
+                ProgressBar::hidden(),
+                ProgressBar::hidden(),
+                ProgressBar::hidden(),
             )
-            .unwrap()
-            .progress_chars("█▇▆▅▄▃▂▁")
-        );
-        pb.set_message("Computing orientations");
-
-        // Info display (bottom) - shows additional context
-        let info_pb = m.add(ProgressBar::new_spinner());
-        info_pb.set_style(ProgressStyle::with_template("ℹ️  {msg}").unwrap());
-        info_pb.enable_steady_tick(Duration::from_millis(500));
-
-        // Phase 1: Initialization
-        status_pb.set_message("Initializing geometry and solver...");
-        info_pb.set_message(format!(
-            "Geometry: {} | Orientations: {}",
-            self.settings.geom_name, n
-        ));
+        };
 
         // init a base problem that can be reset
         let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));

@@ -63,6 +63,8 @@ pub const DEFAULT_EULER_ORDER: EulerConvention = EulerConvention::ZYZ;
 pub const DEFAULT_MAPPING: Mapping = Mapping::ApertureDiffraction;
 /// Default coherence settings
 pub const DEFAULT_COHERENCE: bool = true;
+/// Default quiet mode (false = show progress bars)
+pub const DEFAULT_QUIET: bool = false;
 
 // =================
 // Default Functions
@@ -124,4 +126,8 @@ pub fn default_output_config() -> OutputConfig {
             external: true,
         },
     }
+}
+
+pub fn default_quiet() -> bool {
+    DEFAULT_QUIET
 }

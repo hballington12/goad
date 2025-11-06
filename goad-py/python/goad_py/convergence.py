@@ -1,10 +1,18 @@
+import contextlib
 import os
 import random
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from rich.console import Console, Group
+from rich.live import Live
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
+from rich.spinner import Spinner
+from rich.table import Table
+from rich.text import Text
 
 from . import _goad_py as goad
 
@@ -98,6 +106,8 @@ class Convergence:
             mueller_2d: Whether to collect 2D Mueller matrices
         """
         self.settings = settings
+        # Enable quiet mode to suppress Rust progress bars
+        self.settings.quiet = True
         self.convergables = convergables
         self.batch_size = batch_size
         self.max_orientations = max_orientations
@@ -130,6 +140,11 @@ class Convergence:
         # Mueller matrix accumulation
         self.mueller_1d_sum = None
         self.mueller_2d_sum = None
+
+        # Rich console and progress tracking
+        self._console = Console()
+        self._progress = None
+        self._progress_tasks = {}  # Map variable names to task IDs
 
     def _update_statistics(self, results: goad.Results, batch_size: int):
         """Update statistics with new batch results.
@@ -427,28 +442,101 @@ class Convergence:
         converged_status = self._check_convergence()
         return all(converged_status.values())
 
-    def _print_progress(self, iteration: int):
-        """Print convergence progress.
+    def _get_convergence_type(self) -> str:
+        """Get the convergence type name for display."""
+        class_name = self.__class__.__name__
+        if class_name == "EnsembleConvergence":
+            return "Ensemble"
+        elif class_name == "Convergence":
+            return "Standard"
+        else:
+            return class_name
+
+    def _get_power_ratio_color(self, power_ratio: float) -> str:
+        """Get rich color for power ratio based on value."""
+        if power_ratio >= 0.95:
+            return "green"
+        elif power_ratio >= 0.9:
+            return "blue"
+        elif power_ratio >= 0.8:
+            return "yellow"
+        else:
+            return "red"
+
+    def _build_progress_display(self, iteration: int, power_ratio: float = None):
+        """Build convergence progress display as a renderable.
 
         Args:
             iteration: Current iteration number
+            power_ratio: Power ratio from the solver (optional)
+
+        Returns:
+            Rich renderable (Group) containing the full display
         """
         # Calculate minimum required orientations
         min_required = self.min_batches * self.batch_size
 
-        # Show progress with min orientations requirement
-        if self.n_orientations < min_required:
-            print(
-                f"\nIteration {iteration} ({self.n_orientations}/{min_required} orientations, min not reached):"
+        # Initialize progress on first call
+        if self._progress is None:
+            self._progress = Progress(
+                TextColumn("[bold]{task.fields[variable]:<12}"),
+                BarColumn(bar_width=25),
+                TextColumn("[bold]{task.percentage:>3.0f}%"),
+                TextColumn("[cyan]{task.fields[sem_info]}"),
+                console=self._console,
+                transient=False,
             )
+            # Add tasks for each convergable
+            for conv in self.convergables:
+                task_id = self._progress.add_task(
+                    "",
+                    total=100,
+                    variable=conv.variable,
+                    sem_info="[SEM: -- / --]",
+                )
+                self._progress_tasks[conv.variable] = task_id
+
+        # Build title line with convergence type and spinner
+        convergence_type = self._get_convergence_type()
+        spinner = Spinner("dots", style="yellow")
+        title = Text.assemble(
+            ("GOAD: ", "bold cyan"),
+            (f"[Convergence: {convergence_type}] ", "bold white"),
+        )
+
+        # Build batch header
+        batch_str = f"[Batch: {iteration}]"
+
+        # Color orient based on whether min is reached
+        orient_color = "green" if self.n_orientations >= min_required else "red"
+        orient_text = Text(
+            f"[Orient: {self.n_orientations}/{min_required}]", style=orient_color
+        )
+
+        # Color power ratio if available
+        if power_ratio is not None:
+            power_color = self._get_power_ratio_color(power_ratio)
+            power_text = Text(f"Power: {power_ratio:.3f}", style=power_color)
         else:
-            print(
-                f"\nIteration {iteration} ({self.n_orientations} orientations, min {min_required} reached):"
-            )
+            power_text = Text("Power: N/A")
+
+        # Build full header
+        header = Text.assemble(
+            batch_str,
+            " ",
+            orient_text,
+            " ",
+            power_text,
+        )
+
+        separator = Text("━" * 70)
 
         converged_status = self._check_convergence()
 
+        # Update each task
         for conv in self.convergables:
+            task_id = self._progress_tasks[conv.variable]
+
             if conv.is_mueller():
                 # Mueller element - show worst-case theta bin
                 mean_array, sem_array = self._calculate_mean_and_sem_array(
@@ -456,21 +544,10 @@ class Convergence:
                 )
 
                 if len(mean_array) == 0:
-                    print(f"  {conv.variable:<10}: No data yet")
+                    self._progress.update(
+                        task_id, completed=0, sem_info="[SEM: -- / --]"
+                    )
                     continue
-
-                # Get theta bins from results (assuming we have access to bins_1d)
-                if hasattr(self, "settings") and hasattr(self.settings, "binning"):
-                    # We'll get theta values from the first batch's mueller_1d if available
-                    theta_bins = None
-                    for batch in self.batch_data:
-                        if "mueller_theta_bins" in batch:
-                            theta_bins = batch["mueller_theta_bins"]
-                            break
-                    if theta_bins is None:
-                        theta_bins = np.arange(len(mean_array))
-                else:
-                    theta_bins = np.arange(len(mean_array))
 
                 # Calculate relative SEM for each theta
                 if conv.tolerance_type == "relative":
@@ -487,49 +564,21 @@ class Convergence:
                     target_str = f"{conv.tolerance}"
                     current_str = f"{worst_sem:.4g}"
 
-                worst_theta = theta_bins[worst_idx]
-                worst_mean = mean_array[worst_idx]
-
-                # Count converged bins (either all or specified indices)
-                if conv.theta_indices is not None:
-                    # Only checking specific bins
-                    indices = [i for i in conv.theta_indices if i < len(mean_array)]
-                    if conv.tolerance_type == "relative":
-                        converged_bins = np.sum(
-                            relative_sem_array[indices] < conv.tolerance
-                        )
-                    else:
-                        converged_bins = np.sum(sem_array[indices] < conv.tolerance)
-                    total_bins = len(indices)
-                    bin_desc = (
-                        f"θ={[theta_bins[i] for i in indices]}"
-                        if len(indices) <= 3
-                        else f"{len(indices)} bins"
-                    )
+                # Calculate progress based on worst SEM
+                if conv.tolerance_type == "relative":
+                    current_sem = worst_sem
+                    target_sem = conv.tolerance
                 else:
-                    # Checking all bins
-                    if conv.tolerance_type == "relative":
-                        converged_bins = np.sum(relative_sem_array < conv.tolerance)
-                    else:
-                        converged_bins = np.sum(sem_array < conv.tolerance)
-                    total_bins = len(mean_array)
-                    bin_desc = f"{total_bins} bins"
+                    current_sem = worst_sem
+                    target_sem = conv.tolerance
 
-                status = "✓" if converged_status[conv.variable] else "❌"
-
-                # Print Mueller convergence info
-                if conv.theta_indices is not None and len(conv.theta_indices) <= 3:
-                    # For small number of specific bins, show them explicitly
-                    print(
-                        f"  {conv.variable:<10}: {converged_bins}/{total_bins} {bin_desc} | "
-                        f"Worst θ={worst_theta:.1f}°: {worst_mean:.4g} | SEM: {current_str} (target: {target_str}) {status}"
-                    )
+                if current_sem > 0 and not np.isinf(current_sem):
+                    progress = min(100.0, (target_sem / current_sem) * 100.0)
                 else:
-                    # For many bins, use standard format
-                    print(
-                        f"  {conv.variable:<10}: {converged_bins}/{total_bins} bins converged | "
-                        f"Worst θ={worst_theta:.1f}°: {worst_mean:.4g} | SEM: {current_str} (target: {target_str}) {status}"
-                    )
+                    progress = 0.0
+
+                sem_info = f"[SEM: {current_str} / {target_str}]"
+                self._progress.update(task_id, completed=progress, sem_info=sem_info)
 
                 # Add worst SEM to convergence history
                 self.convergence_history.append(
@@ -539,35 +588,65 @@ class Convergence:
                 # Scalar variable
                 mean, sem = self._calculate_mean_and_sem(conv.variable)
 
-                # Calculate 95% CI
-                ci_lower = mean - 1.96 * sem
-                ci_upper = mean + 1.96 * sem
+                # Calculate progress: min(100, (target / current) * 100)
+                if sem > 0 and not np.isinf(sem):
+                    progress = min(100.0, (conv.tolerance / sem) * 100.0)
+                else:
+                    progress = 0.0
 
-                # Format based on tolerance type
+                # Format SEM display based on tolerance type
                 if conv.tolerance_type == "relative":
+                    # Relative: show as percentage
                     if mean != 0:
                         relative_sem = sem / abs(mean)
+                        current_str = f"{relative_sem * 100:.1f}%"
                         target_str = f"{conv.tolerance * 100:.1f}%"
-                        current_str = f"{relative_sem * 100:.2f}%"
                     else:
-                        target_str = f"{conv.tolerance} (abs, mean=0)"
+                        # Mean is zero, fall back to absolute
                         current_str = f"{sem:.4g}"
+                        target_str = f"{conv.tolerance:.4g}"
                 else:
-                    target_str = f"{conv.tolerance}"
+                    # Absolute: show raw values
                     current_str = f"{sem:.4g}"
+                    target_str = f"{conv.tolerance:.4g}"
 
-                # Status indicator
-                status = "✓" if converged_status[conv.variable] else "❌"
-
-                # Print line with mean, SEM, CI, and convergence status
-                print(
-                    f"  {conv.variable:<10}: {mean:.6f} ± {sem:.6f} [{ci_lower:.6f}, {ci_upper:.6f}] | SEM: {current_str} (target: {target_str}) {status}"
-                )
+                sem_info = f"[SEM: {current_str} / {target_str}]"
+                self._progress.update(task_id, completed=progress, sem_info=sem_info)
 
                 # Add to convergence history
                 self.convergence_history.append(
                     (self.n_orientations, conv.variable, sem)
                 )
+
+        # Build progress bar lines
+        progress_lines = []
+        for conv in self.convergables:
+            task_id = self._progress_tasks[conv.variable]
+            task = self._progress.tasks[task_id]
+
+            # Manually render the progress bar for this task
+            bar_width = 25
+            filled = int((task.percentage / 100) * bar_width)
+            bar = "█" * filled + "░" * (bar_width - filled)
+
+            variable_text = f"{task.fields['variable']:<12}"
+            progress_pct = f"{int(task.percentage)}%"
+            sem_info = task.fields["sem_info"]
+
+            line = Text.assemble(
+                f"{variable_text} [{bar}] {progress_pct:>3} ",
+                (sem_info, "cyan"),
+            )
+            progress_lines.append(line)
+
+        # Return a Group containing all elements (title + spinner, blank line, batch header, separator, progress bars)
+        return Group(
+            Group(title, spinner),
+            Text(""),  # Blank line
+            header,
+            separator,
+            *progress_lines,
+        )
 
     def run(self) -> ConvergenceResults:
         """Run the convergence study.
@@ -579,45 +658,67 @@ class Convergence:
         converged = False
         warning = None
 
-        while not converged and self.n_orientations < self.max_orientations:
-            iteration += 1
+        # Create Live context for smooth updating display
+        with Live(console=self._console, refresh_per_second=4, transient=False) as live:
+            while not converged and self.n_orientations < self.max_orientations:
+                iteration += 1
 
-            # Determine batch size for this iteration
-            remaining = self.max_orientations - self.n_orientations
-            batch_size = min(self.batch_size, remaining)
+                # Determine batch size for this iteration
+                remaining = self.max_orientations - self.n_orientations
+                batch_size = min(self.batch_size, remaining)
 
-            # Set batch size
-            orientations = goad.create_uniform_orientation(batch_size)
+                # Set batch size
+                orientations = goad.create_uniform_orientation(batch_size)
 
-            # Set the orientations for the settings
-            self.settings.orientation = orientations
+                # Set the orientations for the settings
+                self.settings.orientation = orientations
 
-            # Run MultiProblem with error handling for bad geometries
-            try:
-                mp = goad.MultiProblem(self.settings)
-                mp.py_solve()
-            except Exception as e:
-                # Geometry loading failed (bad faces, degenerate geometry, etc.)
-                # For single-geometry convergence, we can't skip - must raise error
-                error_msg = (
-                    f"Failed to initialize MultiProblem with geometry '{self.settings.geom_path}': {e}\n"
-                    f"Please check geometry file for:\n"
-                    f"  - Degenerate faces (area = 0)\n"
-                    f"  - Non-planar geometry\n"
-                    f"  - Faces that are too small\n"
-                    f"  - Invalid mesh topology\n"
-                    f"  - Geometry file corruption"
-                )
-                raise type(e)(error_msg) from e
+                # Run MultiProblem with error handling for bad geometries
+                # Suppress Rust progress bars by redirecting stderr at fd level
+                try:
+                    mp = goad.MultiProblem(self.settings)
+                    # Redirect stderr file descriptor to suppress Rust progress bars
+                    stderr_fd = sys.stderr.fileno()
+                    with open(os.devnull, "w") as devnull:
+                        old_stderr_fd = os.dup(stderr_fd)
+                        try:
+                            os.dup2(devnull.fileno(), stderr_fd)
+                            mp.py_solve()
+                        finally:
+                            os.dup2(old_stderr_fd, stderr_fd)
+                            os.close(old_stderr_fd)
+                except Exception as e:
+                    # Geometry loading failed (bad faces, degenerate geometry, etc.)
+                    # For single-geometry convergence, we can't skip - must raise error
+                    error_msg = (
+                        f"Failed to initialize MultiProblem with geometry '{self.settings.geom_path}': {e}\n"
+                        f"Please check geometry file for:\n"
+                        f"  - Degenerate faces (area = 0)\n"
+                        f"  - Non-planar geometry\n"
+                        f"  - Faces that are too small\n"
+                        f"  - Invalid mesh topology\n"
+                        f"  - Geometry file corruption"
+                    )
+                    raise type(e)(error_msg) from e
 
-            # Update statistics
-            self._update_statistics(mp.results, batch_size)
+                # Update statistics
+                self._update_statistics(mp.results, batch_size)
 
-            # Print progress
-            self._print_progress(iteration)
+                # Extract power ratio from results
+                try:
+                    powers = mp.results.powers  # It's a property, not a method
+                    power_in = powers.get("input", 1.0)
+                    power_out = powers.get("output", 0.0)
+                    power_ratio = power_out / power_in if power_in > 0 else 0.0
+                except Exception:
+                    power_ratio = None
 
-            # Check convergence
-            converged = self._all_converged()
+                # Update live display
+                display = self._build_progress_display(iteration, power_ratio)
+                live.update(display)
+
+                # Check convergence
+                converged = self._all_converged()
 
         # Prepare final results
         if converged:

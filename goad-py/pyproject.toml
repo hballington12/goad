@@ -30,6 +30,7 @@ classifiers = [
 dependencies = [
     "numpy>=1.20.0",
     "toml>=0.10.0",
+    "rich>=13.0.0",
 ]
 
 [project.urls]

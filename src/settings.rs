@@ -78,6 +78,9 @@ pub struct Settings {
     #[serde(default = "constants::default_output_config")]
     pub output: OutputConfig,
     pub coherence: bool,
+    /// Suppress progress bars and status messages
+    #[serde(default = "constants::default_quiet")]
+    pub quiet: bool,
 }
 
 #[pymethods]
@@ -101,6 +104,7 @@ impl Settings {
         directory = "goad_run",
         mapping = DEFAULT_MAPPING,
         coherence = DEFAULT_COHERENCE,
+        quiet = DEFAULT_QUIET,
     ))]
     fn py_new(
         geom_path: String,
@@ -120,6 +124,7 @@ impl Settings {
         directory: &str,
         mapping: Mapping,
         coherence: bool,
+        quiet: bool,
     ) -> PyResult<Self> {
         // Input validation
         if wavelength <= 0.0 {
@@ -193,6 +198,7 @@ impl Settings {
             mapping,
             output: constants::default_output_config(),
             coherence,
+            quiet,
         };
 
         validation::validate_config(&mut settings);
@@ -422,6 +428,18 @@ impl Settings {
     #[getter]
     fn get_fov_factor(&self) -> Option<f32> {
         self.fov_factor
+    }
+
+    /// Set quiet mode (suppress progress bars)
+    #[setter]
+    fn set_quiet(&mut self, quiet: bool) {
+        self.quiet = quiet;
+    }
+
+    /// Get quiet mode
+    #[getter]
+    fn get_quiet(&self) -> bool {
+        self.quiet
     }
 }
 
