@@ -51,12 +51,22 @@ impl MultiProblem {
     /// Creates a new `MultiProblem` from optional `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
-    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
+    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> anyhow::Result<Self> {
         let settings = settings
             .unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
-        let mut geom = geom.unwrap_or_else(|| {
-            Geom::from_file(&settings.geom_name).expect("Failed to load geometry")
-        });
+        let mut geom = match geom {
+            Some(g) => g,
+            None => Geom::from_file(&settings.geom_name).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to load geometry file '{}': {}\n\
+                    Hint: This may be caused by degenerate faces (zero cross product), \
+                    faces that are too small, or non-planar geometry. \
+                    Please check and fix the geometry file.",
+                    settings.geom_name,
+                    e
+                )
+            })?,
+        };
 
         problem::init_geom(&settings, &mut geom);
 
@@ -64,12 +74,12 @@ impl MultiProblem {
         let bins = generate_bins(&settings.binning.scheme);
         let result = Results::new_empty(&bins);
 
-        Self {
+        Ok(Self {
             geom,
             orientations,
             settings,
             result,
-        }
+        })
     }
 
     /// Regenerates the orientations for the problem.
@@ -244,8 +254,11 @@ impl MultiProblem {
         let mut geom = match geom {
             Some(g) => g,
             None => Geom::from_file(&settings.geom_name).map_err(|e| {
-                pyo3::exceptions::PyFileNotFoundError::new_err(format!(
-                    "Failed to load geometry file '{}': {}",
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "Failed to load geometry file '{}': {}\n\
+                    Hint: This may be caused by degenerate faces (zero cross product), \
+                    faces that are too small, or non-planar geometry. \
+                    Please check and fix the geometry file.",
                     settings.geom_name, e
                 ))
             })?,
