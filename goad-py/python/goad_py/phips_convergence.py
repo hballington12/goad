@@ -6,12 +6,14 @@ which requires Custom binning with PHIPS detector geometry and post-processing
 to compute mean DSCS at each of the 20 PHIPS detectors.
 """
 
-from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
-import numpy as np
 import os
 import random
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
 from . import _goad_py as goad
 from .convergence import ConvergenceResults
 

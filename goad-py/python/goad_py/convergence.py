@@ -1,10 +1,12 @@
-from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
-import numpy as np
-from . import _goad_py as goad
 import os
 import random
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
+from . import _goad_py as goad
 
 
 @dataclass
@@ -608,18 +610,6 @@ class Convergence:
         else:
             warning = f"Maximum orientations ({self.max_orientations}) reached without convergence"
             print(f"\nWarning: {warning}")
-
-        # Report skipped geometries
-        if skipped_geometries:
-            print(
-                f"\nNote: Skipped {len(skipped_geometries)} geometry file(s) due to errors:"
-            )
-            for geom_file in skipped_geometries:
-                print(f"  - {geom_file}")
-            if warning:
-                warning += f" | Skipped {len(skipped_geometries)} bad geometries"
-            else:
-                warning = f"Skipped {len(skipped_geometries)} bad geometries"
 
         # Calculate final values and SEMs
         final_values = {}
