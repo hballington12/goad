@@ -7,15 +7,14 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from rich.columns import Columns
-from rich.console import Console, Group
-from rich.live import Live
-from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
-from rich.spinner import Spinner
-from rich.table import Table
-from rich.text import Text
+from rich.console import Console
 
 from . import _goad_py as goad
+from .convergence_display import (
+    ArrayConvergenceVariable,
+    ConvergenceDisplay,
+    ConvergenceVariable,
+)
 
 
 @dataclass
@@ -142,10 +141,38 @@ class Convergence:
         self.mueller_1d_sum = None
         self.mueller_2d_sum = None
 
-        # Rich console and progress tracking
+        # Rich console
         self._console = Console()
-        self._progress = None
-        self._progress_tasks = {}  # Map variable names to task IDs
+
+        # Create display variables for the new display system
+        display_variables = []
+        for conv in self.convergables:
+            if conv.is_mueller():
+                display_variables.append(
+                    ArrayConvergenceVariable(
+                        name=conv.variable,
+                        tolerance=conv.tolerance,
+                        tolerance_type=conv.tolerance_type,
+                        indices=conv.theta_indices,
+                    )
+                )
+            else:
+                display_variables.append(
+                    ConvergenceVariable(
+                        name=conv.variable,
+                        tolerance=conv.tolerance,
+                        tolerance_type=conv.tolerance_type,
+                    )
+                )
+
+        # Initialize display system
+        self._display = ConvergenceDisplay(
+            variables=display_variables,
+            batch_size=self.batch_size,
+            min_batches=self.min_batches,
+            convergence_type=self._get_convergence_type(),
+            console=self._console,
+        )
 
     def _update_statistics(self, results: goad.Results, batch_size: int):
         """Update statistics with new batch results.
@@ -480,272 +507,50 @@ class Convergence:
         # Default implementation: re-raise error (fail fast for single geometry)
         return False
 
-    def _get_power_ratio_color(self, power_ratio: float) -> str:
-        """Get rich color for power ratio based on value."""
-        if power_ratio >= 0.95:
-            return "green"
-        elif power_ratio >= 0.9:
-            return "blue"
-        elif power_ratio >= 0.8:
-            return "yellow"
-        else:
-            return "red"
+    def _get_theta_bins(self, variable: str) -> Optional[np.ndarray]:
+        """Get theta bins for Mueller elements from batch data."""
+        for batch in self.batch_data:
+            if "mueller_theta_bins" in batch:
+                return batch["mueller_theta_bins"]
 
-    def _build_progress_display(
-        self, iteration: int, power_ratio: float = None, geom_info: Optional[str] = None
-    ):
-        """Build convergence progress display as a renderable.
+        # Fallback: infer from array length
+        mean_array, _ = self._calculate_mean_and_sem_array(variable)
+        if len(mean_array) > 0:
+            return np.linspace(0, 180, len(mean_array))
 
-        Args:
-            iteration: Current iteration number
-            power_ratio: Power ratio from the solver (optional)
-            geom_info: Optional geometry info to display (for ensemble mode)
+        return None
 
-        Returns:
-            Rich renderable (Group) containing the full display
-        """
-        # Calculate minimum required orientations
-        min_required = self.min_batches * self.batch_size
-
-        # Initialize progress on first call
-        if self._progress is None:
-            self._progress = Progress(
-                TextColumn("[bold]{task.fields[variable]:<12}"),
-                BarColumn(bar_width=25),
-                TextColumn("[bold]{task.percentage:>3.0f}%"),
-                TextColumn("[cyan]{task.fields[sem_info]}"),
-                console=self._console,
-                transient=False,
-            )
-            # Add tasks for each convergable
-            for conv in self.convergables:
-                task_id = self._progress.add_task(
-                    "",
-                    total=100,
-                    variable=conv.variable,
-                    sem_info="[SEM: -- / --]",
-                )
-                self._progress_tasks[conv.variable] = task_id
-
-        # Build title line with convergence type and inline spinner
-        convergence_type = self._get_convergence_type()
-        spinner = Spinner("aesthetic", style="cyan")
-        # Create title text and combine with spinner using Columns for same-line display
-        title_text = Text.assemble(
-            ("GOAD: ", "bold cyan"),
-            (f"[Convergence: {convergence_type}] ", "bold white"),
-        )
-        title = Columns([title_text, spinner], expand=False, padding=(0, 1))
-
-        # Build batch header with min_batches
-        batch_str = f"[Batch: {iteration}/{self.min_batches}]"
-
-        # Color orient based on whether min is reached
-        orient_color = "green" if self.n_orientations >= min_required else "red"
-        orient_text = Text(
-            f"[Orient: {self.n_orientations}/{min_required} ({self.batch_size})]",
-            style=orient_color,
-        )
-
-        # Color power ratio if available
-        if power_ratio is not None:
-            power_color = self._get_power_ratio_color(power_ratio)
-            power_text = Text(f"Power: {power_ratio:.3f}", style=power_color)
-        else:
-            power_text = Text("Power: N/A")
-
-        # Build full header with optional geometry info
-        header_parts = [
-            batch_str,
-            " ",
-            orient_text,
-            " ",
-            power_text,
-        ]
-
-        # Add geometry info if provided (for ensemble mode)
-        if geom_info:
-            header_parts.extend([" ", (f"[{geom_info}]", "dim")])
-
-        header = Text.assemble(*header_parts)
-
-        separator = Text("━" * 70)
-
-        converged_status = self._check_convergence()
-
-        # Update each task
+    def _update_convergence_history(self):
+        """Update convergence history with current SEM values."""
         for conv in self.convergables:
-            task_id = self._progress_tasks[conv.variable]
-
             if conv.is_mueller():
-                # Mueller element - show worst-case theta bin
-                mean_array, sem_array = self._calculate_mean_and_sem_array(
-                    conv.variable
-                )
-
-                if len(mean_array) == 0:
-                    self._progress.update(
-                        task_id, completed=0, sem_info="[SEM: -- / --]"
-                    )
-                    continue
-
-                # Calculate relative SEM for each theta
-                if conv.tolerance_type == "relative":
-                    relative_sem_array = np.where(
-                        mean_array != 0, sem_array / np.abs(mean_array), float("inf")
-                    )
-                    worst_idx = np.argmax(relative_sem_array)
-                    worst_sem = relative_sem_array[worst_idx]
-                    target_str = f"{conv.tolerance * 100:.1f}%"
-                    current_str = f"{worst_sem * 100:.2f}%"
-                else:
-                    worst_idx = np.argmax(sem_array)
-                    worst_sem = sem_array[worst_idx]
-                    target_str = f"{conv.tolerance}"
-                    current_str = f"{worst_sem:.4g}"
-
-                # Calculate progress based on worst SEM using sqrt for smoother progression
-                if conv.tolerance_type == "relative":
-                    current_sem = worst_sem
-                    target_sem = conv.tolerance
-                else:
-                    current_sem = worst_sem
-                    target_sem = conv.tolerance
-
-                if current_sem > 0 and not np.isinf(current_sem):
-                    progress = min(100.0, np.sqrt(target_sem / current_sem) * 100.0)
-                else:
-                    progress = 0.0
-
-                sem_info = f"[SEM: {current_str} / {target_str}]"
-                self._progress.update(task_id, completed=progress, sem_info=sem_info)
-
-                # Add worst SEM to convergence history
-                self.convergence_history.append(
-                    (self.n_orientations, conv.variable, worst_sem)
-                )
-            else:
-                # Scalar variable
-                mean, sem = self._calculate_mean_and_sem(conv.variable)
-
-                # Calculate progress based on tolerance type using sqrt for smoother progression
-                if conv.tolerance_type == "relative":
-                    # Relative: use relative SEM for progress
-                    if mean != 0:
-                        relative_sem = sem / abs(mean)
-                        current_str = f"{relative_sem * 100:.1f}%"
-                        target_str = f"{conv.tolerance * 100:.1f}%"
-                        # Progress: sqrt(target / current) * 100, capped at 100
-                        if relative_sem > 0 and not np.isinf(relative_sem):
-                            progress = min(
-                                100.0, np.sqrt(conv.tolerance / relative_sem) * 100.0
-                            )
-                        else:
-                            progress = 0.0
-                    else:
-                        # Mean is zero, fall back to absolute
-                        current_str = f"{sem:.4g}"
-                        target_str = f"{conv.tolerance:.4g}"
-                        if sem > 0 and not np.isinf(sem):
-                            progress = min(100.0, np.sqrt(conv.tolerance / sem) * 100.0)
-                        else:
-                            progress = 0.0
-                else:
-                    # Absolute: show raw values
-                    current_str = f"{sem:.4g}"
-                    target_str = f"{conv.tolerance:.4g}"
-                    # Progress: sqrt(target / current) * 100, capped at 100
-                    if sem > 0 and not np.isinf(sem):
-                        progress = min(100.0, np.sqrt(conv.tolerance / sem) * 100.0)
-                    else:
-                        progress = 0.0
-
-                sem_info = f"[SEM: {current_str} / {target_str}]"
-                self._progress.update(task_id, completed=progress, sem_info=sem_info)
-
-                # Add to convergence history
-                self.convergence_history.append(
-                    (self.n_orientations, conv.variable, sem)
-                )
-
-        # Build progress bar lines with live mean values
-        progress_lines = []
-        for conv in self.convergables:
-            task_id = self._progress_tasks[conv.variable]
-            task = self._progress.tasks[task_id]
-
-            # Get current mean value or convergence info
-            if conv.is_mueller():
+                # Mueller element - track worst SEM
                 mean_array, sem_array = self._calculate_mean_and_sem_array(
                     conv.variable
                 )
                 if len(mean_array) > 0:
-                    # Get theta bins from batch data
-                    theta_bins = None
-                    for batch in self.batch_data:
-                        if "mueller_theta_bins" in batch:
-                            theta_bins = batch["mueller_theta_bins"]
-                            break
-                    if theta_bins is None:
-                        theta_bins = np.linspace(0, 180, len(mean_array))
-
-                    # Count converged bins and find worst theta
                     if conv.tolerance_type == "relative":
                         relative_sem_array = np.where(
                             mean_array != 0,
                             sem_array / np.abs(mean_array),
                             float("inf"),
                         )
-                        converged_mask = relative_sem_array < conv.tolerance
-                        worst_idx = np.argmax(relative_sem_array)
+                        worst_sem = np.max(relative_sem_array)
                     else:
-                        converged_mask = sem_array < conv.tolerance
-                        worst_idx = np.argmax(sem_array)
+                        worst_sem = np.max(sem_array)
 
-                    converged_count = np.sum(converged_mask)
-                    total_bins = len(mean_array)
-                    worst_theta = theta_bins[worst_idx]
-
-                    # Format: (65/181) θ=76°
-                    mean_str = (
-                        f"({converged_count}/{total_bins}) Worst: θ={worst_theta:.0f}°"
+                    self.convergence_history.append(
+                        (self.n_orientations, conv.variable, worst_sem)
                     )
-                else:
-                    mean_str = "--"
             else:
-                mean, _ = self._calculate_mean_and_sem(conv.variable)
-                if not np.isinf(mean):
-                    mean_str = f"{mean:.4f}"
-                else:
-                    mean_str = "--"
+                # Scalar variable
+                mean, sem = self._calculate_mean_and_sem(conv.variable)
+                if conv.tolerance_type == "relative" and mean != 0:
+                    sem = sem / abs(mean)
 
-            # Manually render the progress bar for this task
-            bar_width = 25
-            filled = int((task.percentage / 100) * bar_width)
-            bar = "█" * filled + "░" * (bar_width - filled)
-
-            variable_text = f"{task.fields['variable']:<12}"
-            mean_display = f"{mean_str:>8}"
-            progress_pct = f"{int(task.percentage)}%"
-            sem_info = task.fields["sem_info"]
-
-            line = Text.assemble(
-                f"{variable_text} ",
-                (mean_display, "bold green"),
-                f" [{bar}] {progress_pct:>3} ",
-                (sem_info, "cyan"),
-            )
-            progress_lines.append(line)
-
-        # Return a Group containing all elements (title with inline spinner, blank line, batch header, separator, progress bars)
-        return Group(
-            separator,
-            title,
-            Text(""),  # Blank line
-            header,
-            separator,
-            *progress_lines,
-        )
+                self.convergence_history.append(
+                    (self.n_orientations, conv.variable, sem)
+                )
 
     def run(self) -> ConvergenceResults:
         """Run the convergence study.
@@ -757,12 +562,18 @@ class Convergence:
         converged = False
         warning = None
 
-        # Create Live context for smooth updating display (slower refresh for smoother animation)
-        with Live(
-            console=self._console, refresh_per_second=1.3, transient=False
-        ) as live:
+        # Create Live context for smooth updating display
+        with self._display.create_live_context() as live:
             # Show initial display before first batch
-            initial_display = self._build_progress_display(0, None, None)
+            initial_display = self._display.build_display(
+                iteration=0,
+                n_orientations=self.n_orientations,
+                get_stats=self._calculate_mean_and_sem,
+                get_array_stats=self._calculate_mean_and_sem_array,
+                get_bin_labels=self._get_theta_bins,
+                power_ratio=None,
+                geom_info=None,
+            )
             live.update(initial_display)
 
             while not converged and self.n_orientations < self.max_orientations:
@@ -827,9 +638,18 @@ class Convergence:
                 except Exception:
                     power_ratio = None
 
+                # Update convergence history
+                self._update_convergence_history()
+
                 # Update live display with optional geometry info
-                display = self._build_progress_display(
-                    iteration, power_ratio, geom_info
+                display = self._display.build_display(
+                    iteration=iteration,
+                    n_orientations=self.n_orientations,
+                    get_stats=self._calculate_mean_and_sem,
+                    get_array_stats=self._calculate_mean_and_sem_array,
+                    get_bin_labels=self._get_theta_bins,
+                    power_ratio=power_ratio,
+                    geom_info=geom_info,
                 )
                 live.update(display)
 

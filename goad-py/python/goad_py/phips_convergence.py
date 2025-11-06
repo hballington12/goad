@@ -13,9 +13,14 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from rich.console import Console
 
 from . import _goad_py as goad
 from .convergence import ConvergenceResults
+from .convergence_display import (
+    ArrayConvergenceVariable,
+    ConvergenceDisplay,
+)
 
 
 @dataclass
@@ -78,6 +83,8 @@ class PHIPSConvergence:
             min_batches: Minimum number of batches before allowing convergence
         """
         self.settings = settings
+        # Enable quiet mode to suppress Rust progress bars
+        self.settings.quiet = True
         self.convergable = convergable
         self.batch_size = batch_size
         self.max_orientations = max_orientations
@@ -110,6 +117,26 @@ class PHIPSConvergence:
 
         # Accumulated PHIPS DSCS for final average
         self.phips_dscs_sum = None
+
+        # Rich console
+        self._console = Console()
+
+        # Create display variable for PHIPS DSCS
+        display_variable = ArrayConvergenceVariable(
+            name="phips_dscs",
+            tolerance=convergable.tolerance,
+            tolerance_type=convergable.tolerance_type,
+            indices=convergable.detector_indices,
+        )
+
+        # Initialize display system
+        self._display = ConvergenceDisplay(
+            variables=[display_variable],
+            batch_size=self.batch_size,
+            min_batches=self.min_batches,
+            convergence_type=self._get_convergence_type(),
+            console=self._console,
+        )
 
     def _compute_phips_dscs_from_mueller2d(self, results: goad.Results) -> np.ndarray:
         """
@@ -264,59 +291,43 @@ class PHIPSConvergence:
 
         return converged
 
-    def _print_progress(self, converged: bool):
-        """Print convergence progress."""
+    def _get_convergence_type(self) -> str:
+        """Get the convergence type name for display."""
+        class_name = self.__class__.__name__
+        if class_name == "PHIPSEnsembleConvergence":
+            return "PHIPS Ensemble"
+        elif class_name == "PHIPSConvergence":
+            return "PHIPS"
+        else:
+            return class_name
+
+    def _get_detector_angles(self, variable: str) -> np.ndarray:
+        """Get detector angles for PHIPS detectors."""
+        return self.detector_centers
+
+    def _get_phips_stats(self, variable: str) -> Tuple[float, float]:
+        """Get mean and SEM for a single PHIPS detector (not used for array display)."""
+        # This is not used since PHIPS uses array display, but required by interface
+        return 0.0, 0.0
+
+    def _update_convergence_history(self):
+        """Update convergence history with current worst-case SEM."""
         mean_dscs, sem_dscs = self._calculate_phips_mean_and_sem()
 
-        # Determine which detectors to display
-        if self.convergable.detector_indices is not None:
-            check_indices = self.convergable.detector_indices
-        else:
-            check_indices = np.where(~np.isnan(mean_dscs))[0]
+        if len(mean_dscs) > 0:
+            # Find worst-case detector
+            if self.convergable.tolerance_type == "relative":
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    relative_sem = np.where(
+                        mean_dscs != 0, sem_dscs / np.abs(mean_dscs), np.inf
+                    )
+                worst_sem = np.max(relative_sem)
+            else:
+                worst_sem = np.max(sem_dscs)
 
-        if len(check_indices) == 0:
-            print(f"  PHIPS DSCS: No valid detectors")
-            return
-
-        # Find worst-case detector (highest relative SEM)
-        mean_subset = mean_dscs[check_indices]
-        sem_subset = sem_dscs[check_indices]
-
-        with np.errstate(divide="ignore", invalid="ignore"):
-            relative_sem = np.where(
-                mean_subset != 0, sem_subset / np.abs(mean_subset), np.inf
+            self.convergence_history.append(
+                (self.n_orientations, "phips_dscs", worst_sem)
             )
-
-        worst_idx_in_subset = np.argmax(relative_sem)
-        worst_detector_idx = check_indices[worst_idx_in_subset]
-        worst_theta = self.detector_centers[worst_detector_idx]
-        worst_mean = mean_subset[worst_idx_in_subset]
-        worst_sem = sem_subset[worst_idx_in_subset]
-        worst_rel_sem = relative_sem[worst_idx_in_subset]
-
-        # Count converged detectors
-        if self.convergable.tolerance_type == "relative":
-            converged_mask = relative_sem < self.convergable.tolerance
-        else:
-            converged_mask = sem_subset < self.convergable.tolerance
-
-        n_converged = np.sum(converged_mask)
-        n_total = len(check_indices)
-
-        status = "✓" if converged else "..."
-
-        if self.convergable.tolerance_type == "relative":
-            current_str = f"{worst_rel_sem * 100:.2f}%"
-            target_str = f"{self.convergable.tolerance * 100:.2f}%"
-        else:
-            current_str = f"{worst_sem:.4g}"
-            target_str = f"{self.convergable.tolerance:.4g}"
-
-        print(
-            f"  PHIPS DSCS: {n_converged}/{n_total} detectors converged | "
-            f"Worst θ={worst_theta:.1f}°: {worst_mean:.4g} | "
-            f"SEM: {current_str} (target: {target_str}) {status}"
-        )
 
     def run(self) -> ConvergenceResults:
         """
@@ -325,68 +336,68 @@ class PHIPSConvergence:
         Returns:
             ConvergenceResults with PHIPS DSCS values
         """
-        print(f"\nStarting PHIPS convergence study:")
-        print(f"  Batch size: {self.batch_size}")
-        print(f"  Max orientations: {self.max_orientations}")
-        print(
-            f"  Tolerance: {self.convergable.tolerance * 100:.1f}% ({self.convergable.tolerance_type})"
-        )
-        print(f"  Min batches: {self.min_batches}")
-
+        iteration = 0
         converged = False
 
-        while not converged and self.n_orientations < self.max_orientations:
-            # Create orientations for this batch
-            orientations = goad.create_uniform_orientation(self.batch_size)
-            self.settings.orientation = orientations
+        # Create Live context for smooth updating display
+        with self._display.create_live_context() as live:
+            # Show initial display before first batch
+            initial_display = self._display.build_display(
+                iteration=0,
+                n_orientations=self.n_orientations,
+                get_stats=self._get_phips_stats,
+                get_array_stats=lambda var: self._calculate_phips_mean_and_sem(),
+                get_bin_labels=self._get_detector_angles,
+                power_ratio=None,
+                geom_info=None,
+            )
+            live.update(initial_display)
 
-            # Run MultiProblem with error handling for bad geometries
-            try:
-                mp = goad.MultiProblem(self.settings)
-                mp.py_solve()
-            except Exception as e:
-                # Geometry loading failed (bad faces, degenerate geometry, etc.)
-                # For single-geometry convergence, we can't skip - must raise error
-                error_msg = (
-                    f"Failed to initialize MultiProblem with geometry '{self.settings.geom_path}': {e}\n"
-                    f"Please check geometry file for:\n"
-                    f"  - Degenerate faces (area = 0)\n"
-                    f"  - Non-planar geometry\n"
-                    f"  - Faces that are too small\n"
-                    f"  - Invalid mesh topology\n"
-                    f"  - Geometry file corruption"
+            while not converged and self.n_orientations < self.max_orientations:
+                iteration += 1
+
+                # Create orientations for this batch
+                orientations = goad.create_uniform_orientation(self.batch_size)
+                self.settings.orientation = orientations
+
+                # Run MultiProblem with error handling for bad geometries
+                try:
+                    mp = goad.MultiProblem(self.settings)
+                    mp.py_solve()
+                except Exception as e:
+                    # Geometry loading failed (bad faces, degenerate geometry, etc.)
+                    # For single-geometry convergence, we can't skip - must raise error
+                    error_msg = (
+                        f"Failed to initialize MultiProblem with geometry '{self.settings.geom_path}': {e}\n"
+                        f"Please check geometry file for:\n"
+                        f"  - Degenerate faces (area = 0)\n"
+                        f"  - Non-planar geometry\n"
+                        f"  - Faces that are too small\n"
+                        f"  - Invalid mesh topology\n"
+                        f"  - Geometry file corruption"
+                    )
+                    raise type(e)(error_msg) from e
+
+                # Update statistics
+                self._update_statistics(mp.results, self.batch_size)
+
+                # Update convergence history
+                self._update_convergence_history()
+
+                # Check convergence
+                converged = self._check_convergence()
+
+                # Update live display
+                display = self._display.build_display(
+                    iteration=iteration,
+                    n_orientations=self.n_orientations,
+                    get_stats=self._get_phips_stats,
+                    get_array_stats=lambda var: self._calculate_phips_mean_and_sem(),
+                    get_bin_labels=self._get_detector_angles,
+                    power_ratio=None,
+                    geom_info=None,
                 )
-                raise type(e)(error_msg) from e
-
-            # Update statistics
-            self._update_statistics(mp.results, self.batch_size)
-
-            # Check convergence
-            converged = self._check_convergence()
-
-            # Print progress
-            min_required = self.min_batches * self.batch_size
-            if self.n_orientations < min_required:
-                print(
-                    f"\nBatch {len(self.batch_data)} ({self.n_orientations}/{min_required} total orientations, min not reached):"
-                )
-            else:
-                print(
-                    f"\nBatch {len(self.batch_data)} ({self.n_orientations} total orientations, min {min_required} reached):"
-                )
-            self._print_progress(converged)
-
-            # Store history
-            mean_dscs, sem_dscs = self._calculate_phips_mean_and_sem()
-            # Use worst-case SEM for history
-            valid_mask = ~np.isnan(mean_dscs)
-            if np.any(valid_mask):
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    relative_sem = sem_dscs[valid_mask] / np.abs(mean_dscs[valid_mask])
-                worst_sem = np.max(relative_sem)
-                self.convergence_history.append(
-                    (self.n_orientations, "phips_dscs", worst_sem)
-                )
+                live.update(display)
 
         # Compute final results
         mean_dscs, sem_dscs = self._calculate_phips_mean_and_sem()
@@ -405,28 +416,13 @@ class PHIPSConvergence:
             else f"Did not converge within {self.max_orientations} orientations",
         )
 
-        # Print summary
-        print(f"\n{'=' * 60}")
+        # Print final summary
         if converged:
-            print(f"✓ Converged after {self.n_orientations} orientations")
+            print(f"\nConverged after {self.n_orientations} orientations.")
         else:
-            print(f"✗ Did not converge (reached {self.n_orientations} orientations)")
-        print(f"{'=' * 60}")
-
-        # Print detector summary
-        print(f"\nPHIPS Detector DSCS Summary:")
-        valid_mask = ~np.isnan(mean_dscs)
-        for i in range(self.NUM_DETECTORS):
-            theta = self.detector_centers[i]
-            if valid_mask[i]:
-                mean_val = mean_dscs[i]
-                sem_val = sem_dscs[i]
-                rel_sem = sem_val / abs(mean_val) * 100
-                print(
-                    f"  Detector {i:2d} (θ={theta:6.1f}°): {mean_val:.6e} ± {sem_val:.6e} ({rel_sem:.2f}%)"
-                )
-            else:
-                print(f"  Detector {i:2d} (θ={theta:6.1f}°): No data")
+            print(
+                f"\nWarning: Did not converge within {self.max_orientations} orientations"
+            )
 
         return results
 
@@ -496,78 +492,79 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
         Returns:
             ConvergenceResults with ensemble-averaged PHIPS DSCS values
         """
-        print(f"\nStarting PHIPS Ensemble convergence study:")
-        print(f"  Geometry files: {len(self.geom_files)}")
-        print(f"  Batch size: {self.batch_size}")
-        print(f"  Max orientations: {self.max_orientations}")
-        print(
-            f"  Tolerance: {self.convergable.tolerance * 100:.1f}% ({self.convergable.tolerance_type})"
-        )
-        print(f"  Min batches: {self.min_batches}")
-
+        iteration = 0
         converged = False
         skipped_geometries = []  # Track skipped geometry files
 
-        while not converged and self.n_orientations < self.max_orientations:
-            # Randomly select a geometry file for this batch
-            geom_file = random.choice(self.geom_files)
-            geom_path = os.path.join(self.geom_dir, geom_file)
+        # Create Live context for smooth updating display
+        with self._display.create_live_context() as live:
+            # Show initial display before first batch
+            initial_display = self._display.build_display(
+                iteration=0,
+                n_orientations=self.n_orientations,
+                get_stats=self._get_phips_stats,
+                get_array_stats=lambda var: self._calculate_phips_mean_and_sem(),
+                get_bin_labels=self._get_detector_angles,
+                power_ratio=None,
+                geom_info=None,
+            )
+            live.update(initial_display)
 
-            # Create orientations for this batch
-            orientations = goad.create_uniform_orientation(self.batch_size)
+            while not converged and self.n_orientations < self.max_orientations:
+                iteration += 1
 
-            # Update settings with selected geometry and orientations
-            self.settings.geom_path = geom_path
-            self.settings.orientation = orientations
+                # Randomly select a geometry file for this batch
+                geom_file = random.choice(self.geom_files)
+                geom_path = os.path.join(self.geom_dir, geom_file)
 
-            # Run MultiProblem
-            try:
-                mp = goad.MultiProblem(self.settings)
-                mp.py_solve()
-            except Exception as e:
-                # Geometry loading failed (bad faces, degenerate geometry, etc.)
-                print(f"\nWarning: Skipping geometry '{geom_file}': {e}")
-                skipped_geometries.append(geom_file)
+                # Create orientations for this batch
+                orientations = goad.create_uniform_orientation(self.batch_size)
 
-                # Check if all geometries have been skipped
-                if len(skipped_geometries) >= len(self.geom_files):
-                    raise ValueError(
-                        f"All {len(self.geom_files)} geometry files failed to load. "
-                        "Please check geometry files for degenerate faces, non-planar geometry, "
-                        "or faces that are too small."
-                    )
+                # Update settings with selected geometry and orientations
+                self.settings.geom_path = geom_path
+                self.settings.orientation = orientations
 
-                # Skip this iteration without updating statistics
-                continue
+                # Run MultiProblem
+                try:
+                    mp = goad.MultiProblem(self.settings)
+                    mp.py_solve()
+                except Exception as e:
+                    # Geometry loading failed (bad faces, degenerate geometry, etc.)
+                    print(f"\nWarning: Skipping geometry '{geom_file}': {e}")
+                    skipped_geometries.append(geom_file)
 
-            # Update statistics
-            self._update_statistics(mp.results, self.batch_size)
+                    # Check if all geometries have been skipped
+                    if len(skipped_geometries) >= len(self.geom_files):
+                        raise ValueError(
+                            f"All {len(self.geom_files)} geometry files failed to load. "
+                            "Please check geometry files for degenerate faces, non-planar geometry, "
+                            "or faces that are too small."
+                        )
 
-            # Check convergence
-            converged = self._check_convergence()
+                    # Skip this iteration without updating statistics
+                    continue
 
-            # Print progress (with geometry info)
-            min_required = self.min_batches * self.batch_size
-            if self.n_orientations < min_required:
-                print(
-                    f"\nBatch {len(self.batch_data)} ({self.n_orientations}/{min_required} total orientations, min not reached) - Geometry: {geom_file}"
+                # Update statistics
+                self._update_statistics(mp.results, self.batch_size)
+
+                # Update convergence history
+                self._update_convergence_history()
+
+                # Check convergence
+                converged = self._check_convergence()
+
+                # Update live display with geometry info
+                geom_info = f"Geom: {geom_file}"
+                display = self._display.build_display(
+                    iteration=iteration,
+                    n_orientations=self.n_orientations,
+                    get_stats=self._get_phips_stats,
+                    get_array_stats=lambda var: self._calculate_phips_mean_and_sem(),
+                    get_bin_labels=self._get_detector_angles,
+                    power_ratio=None,
+                    geom_info=geom_info,
                 )
-            else:
-                print(
-                    f"\nBatch {len(self.batch_data)} ({self.n_orientations} total orientations, min {min_required} reached) - Geometry: {geom_file}"
-                )
-            self._print_progress(converged)
-
-            # Store history
-            mean_dscs, sem_dscs = self._calculate_phips_mean_and_sem()
-            valid_mask = ~np.isnan(mean_dscs)
-            if np.any(valid_mask):
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    relative_sem = sem_dscs[valid_mask] / np.abs(mean_dscs[valid_mask])
-                worst_sem = np.max(relative_sem)
-                self.convergence_history.append(
-                    (self.n_orientations, "phips_dscs", worst_sem)
-                )
+                live.update(display)
 
         # Compute final results
         mean_dscs, sem_dscs = self._calculate_phips_mean_and_sem()
@@ -594,36 +591,18 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
             warning=warning,
         )
 
-        # Print summary
-        print(f"\n{'=' * 60}")
+        # Print final summary
         if converged:
-            print(f"✓ Ensemble Converged after {self.n_orientations} orientations")
+            print(f"\nEnsemble converged after {self.n_orientations} orientations.")
         else:
-            print(f"✗ Did not converge (reached {self.n_orientations} orientations)")
-        print(f"  Geometries sampled: {len(self.geom_files)}")
+            print(
+                f"\nWarning: Did not converge within {self.max_orientations} orientations"
+            )
 
-        # Report skipped geometries
+        # Report skipped geometries if any
         if skipped_geometries:
             print(
-                f"\nNote: Skipped {len(skipped_geometries)} geometry file(s) due to errors:"
+                f"Note: Skipped {len(skipped_geometries)} geometry file(s) due to errors"
             )
-            for geom_file in skipped_geometries:
-                print(f"  - {geom_file}")
-        print(f"{'=' * 60}")
-
-        # Print detector summary
-        print(f"\nPHIPS Detector DSCS Summary (Ensemble-Averaged):")
-        valid_mask = ~np.isnan(mean_dscs)
-        for i in range(self.NUM_DETECTORS):
-            theta = self.detector_centers[i]
-            if valid_mask[i]:
-                mean_val = mean_dscs[i]
-                sem_val = sem_dscs[i]
-                rel_sem = sem_val / abs(mean_val) * 100
-                print(
-                    f"  Detector {i:2d} (θ={theta:6.1f}°): {mean_val:.6e} ± {sem_val:.6e} ({rel_sem:.2f}%)"
-                )
-            else:
-                print(f"  Detector {i:2d} (θ={theta:6.1f}°): No data")
 
         return results
