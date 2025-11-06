@@ -340,9 +340,23 @@ class PHIPSConvergence:
             orientations = goad.create_uniform_orientation(self.batch_size)
             self.settings.orientation = orientations
 
-            # Run MultiProblem
-            mp = goad.MultiProblem(self.settings)
-            mp.py_solve()
+            # Run MultiProblem with error handling for bad geometries
+            try:
+                mp = goad.MultiProblem(self.settings)
+                mp.py_solve()
+            except Exception as e:
+                # Geometry loading failed (bad faces, degenerate geometry, etc.)
+                # For single-geometry convergence, we can't skip - must raise error
+                error_msg = (
+                    f"Failed to initialize MultiProblem with geometry '{self.settings.geom_path}': {e}\n"
+                    f"Please check geometry file for:\n"
+                    f"  - Degenerate faces (area = 0)\n"
+                    f"  - Non-planar geometry\n"
+                    f"  - Faces that are too small\n"
+                    f"  - Invalid mesh topology\n"
+                    f"  - Geometry file corruption"
+                )
+                raise type(e)(error_msg) from e
 
             # Update statistics
             self._update_statistics(mp.results, self.batch_size)
@@ -510,7 +524,7 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
             try:
                 mp = goad.MultiProblem(self.settings)
                 mp.py_solve()
-            except ValueError as e:
+            except Exception as e:
                 # Geometry loading failed (bad faces, degenerate geometry, etc.)
                 print(f"\nWarning: Skipping geometry '{geom_file}': {e}")
                 skipped_geometries.append(geom_file)
