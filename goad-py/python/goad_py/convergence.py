@@ -609,6 +609,18 @@ class Convergence:
             warning = f"Maximum orientations ({self.max_orientations}) reached without convergence"
             print(f"\nWarning: {warning}")
 
+        # Report skipped geometries
+        if skipped_geometries:
+            print(
+                f"\nNote: Skipped {len(skipped_geometries)} geometry file(s) due to errors:"
+            )
+            for geom_file in skipped_geometries:
+                print(f"  - {geom_file}")
+            if warning:
+                warning += f" | Skipped {len(skipped_geometries)} bad geometries"
+            else:
+                warning = f"Skipped {len(skipped_geometries)} bad geometries"
+
         # Calculate final values and SEMs
         final_values = {}
         final_sems = {}
@@ -740,6 +752,7 @@ class EnsembleConvergence(Convergence):
         iteration = 0
         converged = False
         warning = None
+        skipped_geometries = []  # Track skipped geometry files
 
         while not converged and self.n_orientations < self.max_orientations:
             iteration += 1
@@ -760,8 +773,24 @@ class EnsembleConvergence(Convergence):
             self.settings.orientation = orientations
 
             # Run MultiProblem with selected geometry
-            mp = goad.MultiProblem(self.settings)
-            mp.py_solve()
+            try:
+                mp = goad.MultiProblem(self.settings)
+                mp.py_solve()
+            except ValueError as e:
+                # Geometry loading failed (bad faces, degenerate geometry, etc.)
+                print(f"\nWarning: Skipping geometry '{geom_file}': {e}")
+                skipped_geometries.append(geom_file)
+
+                # Check if all geometries have been skipped
+                if len(skipped_geometries) >= len(self.geom_files):
+                    raise ValueError(
+                        f"All {len(self.geom_files)} geometry files failed to load. "
+                        "Please check geometry files for degenerate faces, non-planar geometry, "
+                        "or faces that are too small."
+                    )
+
+                # Skip this iteration without updating statistics
+                continue
 
             # Update statistics
             self._update_statistics(mp.results, batch_size)

@@ -490,6 +490,7 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
         print(f"  Min batches: {self.min_batches}")
 
         converged = False
+        skipped_geometries = []  # Track skipped geometry files
 
         while not converged and self.n_orientations < self.max_orientations:
             # Randomly select a geometry file for this batch
@@ -504,8 +505,24 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
             self.settings.orientation = orientations
 
             # Run MultiProblem
-            mp = goad.MultiProblem(self.settings)
-            mp.py_solve()
+            try:
+                mp = goad.MultiProblem(self.settings)
+                mp.py_solve()
+            except ValueError as e:
+                # Geometry loading failed (bad faces, degenerate geometry, etc.)
+                print(f"\nWarning: Skipping geometry '{geom_file}': {e}")
+                skipped_geometries.append(geom_file)
+
+                # Check if all geometries have been skipped
+                if len(skipped_geometries) >= len(self.geom_files):
+                    raise ValueError(
+                        f"All {len(self.geom_files)} geometry files failed to load. "
+                        "Please check geometry files for degenerate faces, non-planar geometry, "
+                        "or faces that are too small."
+                    )
+
+                # Skip this iteration without updating statistics
+                continue
 
             # Update statistics
             self._update_statistics(mp.results, self.batch_size)
@@ -539,6 +556,16 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
         # Compute final results
         mean_dscs, sem_dscs = self._calculate_phips_mean_and_sem()
 
+        # Prepare warning message
+        warning = None
+        if not converged:
+            warning = f"Did not converge within {self.max_orientations} orientations"
+
+        # Add skipped geometries info to warning
+        if skipped_geometries:
+            skipped_msg = f"Skipped {len(skipped_geometries)} bad geometries"
+            warning = f"{warning} | {skipped_msg}" if warning else skipped_msg
+
         # Create results
         results = ConvergenceResults(
             converged=converged,
@@ -548,9 +575,7 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
             mueller_1d=None,
             mueller_2d=None,
             convergence_history=self.convergence_history,
-            warning=None
-            if converged
-            else f"Did not converge within {self.max_orientations} orientations",
+            warning=warning,
         )
 
         # Print summary
@@ -560,6 +585,14 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
         else:
             print(f"✗ Did not converge (reached {self.n_orientations} orientations)")
         print(f"  Geometries sampled: {len(self.geom_files)}")
+
+        # Report skipped geometries
+        if skipped_geometries:
+            print(
+                f"\nNote: Skipped {len(skipped_geometries)} geometry file(s) due to errors:"
+            )
+            for geom_file in skipped_geometries:
+                print(f"  - {geom_file}")
         print(f"{'=' * 60}")
 
         # Print detector summary
