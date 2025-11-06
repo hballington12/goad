@@ -27,7 +27,8 @@ fn fixed_hex_30_30_30() {
         euler_convention: goad::orientation::EulerConvention::ZYZ,
     };
 
-    let mut multiproblem = MultiProblem::new(None, Some(settings));
+    let mut multiproblem =
+        MultiProblem::new(None, Some(settings)).expect("Failed to create MultiProblem");
     multiproblem.solve();
 
     let result = multiproblem
@@ -56,7 +57,8 @@ fn fixed_hex_30_20_20() {
     // Change the refractive index
     settings.particle_refr_index = vec![Complex32::new(1.3117, 0.1)];
 
-    let mut multiproblem = MultiProblem::new(None, Some(settings));
+    let mut multiproblem =
+        MultiProblem::new(None, Some(settings)).expect("Failed to create MultiProblem");
     multiproblem.solve();
 
     let result = multiproblem
