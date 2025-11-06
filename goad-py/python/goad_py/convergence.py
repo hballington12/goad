@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+from rich.columns import Columns
 from rich.console import Console, Group
 from rich.live import Live
 from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn
@@ -452,6 +453,33 @@ class Convergence:
         else:
             return class_name
 
+    def _get_next_geometry(self, iteration: int) -> Tuple[str, Optional[str]]:
+        """Hook method to get geometry for next batch.
+
+        Args:
+            iteration: Current iteration number
+
+        Returns:
+            Tuple of (geom_path, optional_display_info)
+            - geom_path: Path to geometry file to use
+            - optional_display_info: Optional string to display (e.g., "Geometry: hex.obj")
+        """
+        # Default implementation: use fixed geometry from settings
+        return self.settings.geom_path, None
+
+    def _handle_geometry_error(self, error: Exception, geom_path: str) -> bool:
+        """Hook method to handle geometry loading errors.
+
+        Args:
+            error: The exception that occurred
+            geom_path: Path to the geometry that failed
+
+        Returns:
+            True to skip this geometry and continue, False to raise the error
+        """
+        # Default implementation: re-raise error (fail fast for single geometry)
+        return False
+
     def _get_power_ratio_color(self, power_ratio: float) -> str:
         """Get rich color for power ratio based on value."""
         if power_ratio >= 0.95:
@@ -463,12 +491,15 @@ class Convergence:
         else:
             return "red"
 
-    def _build_progress_display(self, iteration: int, power_ratio: float = None):
+    def _build_progress_display(
+        self, iteration: int, power_ratio: float = None, geom_info: Optional[str] = None
+    ):
         """Build convergence progress display as a renderable.
 
         Args:
             iteration: Current iteration number
             power_ratio: Power ratio from the solver (optional)
+            geom_info: Optional geometry info to display (for ensemble mode)
 
         Returns:
             Rich renderable (Group) containing the full display
@@ -496,21 +527,24 @@ class Convergence:
                 )
                 self._progress_tasks[conv.variable] = task_id
 
-        # Build title line with convergence type and spinner
+        # Build title line with convergence type and inline spinner
         convergence_type = self._get_convergence_type()
-        spinner = Spinner("dots", style="yellow")
-        title = Text.assemble(
+        spinner = Spinner("aesthetic", style="cyan")
+        # Create title text and combine with spinner using Columns for same-line display
+        title_text = Text.assemble(
             ("GOAD: ", "bold cyan"),
             (f"[Convergence: {convergence_type}] ", "bold white"),
         )
+        title = Columns([title_text, spinner], expand=False, padding=(0, 1))
 
-        # Build batch header
-        batch_str = f"[Batch: {iteration}]"
+        # Build batch header with min_batches
+        batch_str = f"[Batch: {iteration}/{self.min_batches}]"
 
         # Color orient based on whether min is reached
         orient_color = "green" if self.n_orientations >= min_required else "red"
         orient_text = Text(
-            f"[Orient: {self.n_orientations}/{min_required}]", style=orient_color
+            f"[Orient: {self.n_orientations}/{min_required} ({self.batch_size})]",
+            style=orient_color,
         )
 
         # Color power ratio if available
@@ -520,14 +554,20 @@ class Convergence:
         else:
             power_text = Text("Power: N/A")
 
-        # Build full header
-        header = Text.assemble(
+        # Build full header with optional geometry info
+        header_parts = [
             batch_str,
             " ",
             orient_text,
             " ",
             power_text,
-        )
+        ]
+
+        # Add geometry info if provided (for ensemble mode)
+        if geom_info:
+            header_parts.extend([" ", (f"[{geom_info}]", "dim")])
+
+        header = Text.assemble(*header_parts)
 
         separator = Text("━" * 70)
 
@@ -564,7 +604,7 @@ class Convergence:
                     target_str = f"{conv.tolerance}"
                     current_str = f"{worst_sem:.4g}"
 
-                # Calculate progress based on worst SEM
+                # Calculate progress based on worst SEM using sqrt for smoother progression
                 if conv.tolerance_type == "relative":
                     current_sem = worst_sem
                     target_sem = conv.tolerance
@@ -573,7 +613,7 @@ class Convergence:
                     target_sem = conv.tolerance
 
                 if current_sem > 0 and not np.isinf(current_sem):
-                    progress = min(100.0, (target_sem / current_sem) * 100.0)
+                    progress = min(100.0, np.sqrt(target_sem / current_sem) * 100.0)
                 else:
                     progress = 0.0
 
@@ -588,27 +628,37 @@ class Convergence:
                 # Scalar variable
                 mean, sem = self._calculate_mean_and_sem(conv.variable)
 
-                # Calculate progress: min(100, (target / current) * 100)
-                if sem > 0 and not np.isinf(sem):
-                    progress = min(100.0, (conv.tolerance / sem) * 100.0)
-                else:
-                    progress = 0.0
-
-                # Format SEM display based on tolerance type
+                # Calculate progress based on tolerance type using sqrt for smoother progression
                 if conv.tolerance_type == "relative":
-                    # Relative: show as percentage
+                    # Relative: use relative SEM for progress
                     if mean != 0:
                         relative_sem = sem / abs(mean)
                         current_str = f"{relative_sem * 100:.1f}%"
                         target_str = f"{conv.tolerance * 100:.1f}%"
+                        # Progress: sqrt(target / current) * 100, capped at 100
+                        if relative_sem > 0 and not np.isinf(relative_sem):
+                            progress = min(
+                                100.0, np.sqrt(conv.tolerance / relative_sem) * 100.0
+                            )
+                        else:
+                            progress = 0.0
                     else:
                         # Mean is zero, fall back to absolute
                         current_str = f"{sem:.4g}"
                         target_str = f"{conv.tolerance:.4g}"
+                        if sem > 0 and not np.isinf(sem):
+                            progress = min(100.0, np.sqrt(conv.tolerance / sem) * 100.0)
+                        else:
+                            progress = 0.0
                 else:
                     # Absolute: show raw values
                     current_str = f"{sem:.4g}"
                     target_str = f"{conv.tolerance:.4g}"
+                    # Progress: sqrt(target / current) * 100, capped at 100
+                    if sem > 0 and not np.isinf(sem):
+                        progress = min(100.0, np.sqrt(conv.tolerance / sem) * 100.0)
+                    else:
+                        progress = 0.0
 
                 sem_info = f"[SEM: {current_str} / {target_str}]"
                 self._progress.update(task_id, completed=progress, sem_info=sem_info)
@@ -618,11 +668,56 @@ class Convergence:
                     (self.n_orientations, conv.variable, sem)
                 )
 
-        # Build progress bar lines
+        # Build progress bar lines with live mean values
         progress_lines = []
         for conv in self.convergables:
             task_id = self._progress_tasks[conv.variable]
             task = self._progress.tasks[task_id]
+
+            # Get current mean value or convergence info
+            if conv.is_mueller():
+                mean_array, sem_array = self._calculate_mean_and_sem_array(
+                    conv.variable
+                )
+                if len(mean_array) > 0:
+                    # Get theta bins from batch data
+                    theta_bins = None
+                    for batch in self.batch_data:
+                        if "mueller_theta_bins" in batch:
+                            theta_bins = batch["mueller_theta_bins"]
+                            break
+                    if theta_bins is None:
+                        theta_bins = np.linspace(0, 180, len(mean_array))
+
+                    # Count converged bins and find worst theta
+                    if conv.tolerance_type == "relative":
+                        relative_sem_array = np.where(
+                            mean_array != 0,
+                            sem_array / np.abs(mean_array),
+                            float("inf"),
+                        )
+                        converged_mask = relative_sem_array < conv.tolerance
+                        worst_idx = np.argmax(relative_sem_array)
+                    else:
+                        converged_mask = sem_array < conv.tolerance
+                        worst_idx = np.argmax(sem_array)
+
+                    converged_count = np.sum(converged_mask)
+                    total_bins = len(mean_array)
+                    worst_theta = theta_bins[worst_idx]
+
+                    # Format: (65/181) θ=76°
+                    mean_str = (
+                        f"({converged_count}/{total_bins}) Worst: θ={worst_theta:.0f}°"
+                    )
+                else:
+                    mean_str = "--"
+            else:
+                mean, _ = self._calculate_mean_and_sem(conv.variable)
+                if not np.isinf(mean):
+                    mean_str = f"{mean:.4f}"
+                else:
+                    mean_str = "--"
 
             # Manually render the progress bar for this task
             bar_width = 25
@@ -630,18 +725,22 @@ class Convergence:
             bar = "█" * filled + "░" * (bar_width - filled)
 
             variable_text = f"{task.fields['variable']:<12}"
+            mean_display = f"{mean_str:>8}"
             progress_pct = f"{int(task.percentage)}%"
             sem_info = task.fields["sem_info"]
 
             line = Text.assemble(
-                f"{variable_text} [{bar}] {progress_pct:>3} ",
+                f"{variable_text} ",
+                (mean_display, "bold green"),
+                f" [{bar}] {progress_pct:>3} ",
                 (sem_info, "cyan"),
             )
             progress_lines.append(line)
 
-        # Return a Group containing all elements (title + spinner, blank line, batch header, separator, progress bars)
+        # Return a Group containing all elements (title with inline spinner, blank line, batch header, separator, progress bars)
         return Group(
-            Group(title, spinner),
+            separator,
+            title,
             Text(""),  # Blank line
             header,
             separator,
@@ -658,10 +757,19 @@ class Convergence:
         converged = False
         warning = None
 
-        # Create Live context for smooth updating display
-        with Live(console=self._console, refresh_per_second=4, transient=False) as live:
+        # Create Live context for smooth updating display (slower refresh for smoother animation)
+        with Live(
+            console=self._console, refresh_per_second=1.3, transient=False
+        ) as live:
+            # Show initial display before first batch
+            initial_display = self._build_progress_display(0, None, None)
+            live.update(initial_display)
+
             while not converged and self.n_orientations < self.max_orientations:
                 iteration += 1
+
+                # Get geometry for this batch (hook method - can be overridden)
+                geom_path, geom_info = self._get_next_geometry(iteration)
 
                 # Determine batch size for this iteration
                 remaining = self.max_orientations - self.n_orientations
@@ -670,7 +778,8 @@ class Convergence:
                 # Set batch size
                 orientations = goad.create_uniform_orientation(batch_size)
 
-                # Set the orientations for the settings
+                # Set the geometry path and orientations for the settings
+                self.settings.geom_path = geom_path
                 self.settings.orientation = orientations
 
                 # Run MultiProblem with error handling for bad geometries
@@ -689,17 +798,22 @@ class Convergence:
                             os.close(old_stderr_fd)
                 except Exception as e:
                     # Geometry loading failed (bad faces, degenerate geometry, etc.)
-                    # For single-geometry convergence, we can't skip - must raise error
-                    error_msg = (
-                        f"Failed to initialize MultiProblem with geometry '{self.settings.geom_path}': {e}\n"
-                        f"Please check geometry file for:\n"
-                        f"  - Degenerate faces (area = 0)\n"
-                        f"  - Non-planar geometry\n"
-                        f"  - Faces that are too small\n"
-                        f"  - Invalid mesh topology\n"
-                        f"  - Geometry file corruption"
-                    )
-                    raise type(e)(error_msg) from e
+                    # Check if subclass wants to handle this error (e.g., skip for ensemble)
+                    if self._handle_geometry_error(e, geom_path):
+                        # Skip this geometry and continue
+                        continue
+                    else:
+                        # For single-geometry convergence, we can't skip - must raise error
+                        error_msg = (
+                            f"Failed to initialize MultiProblem with geometry '{geom_path}': {e}\n"
+                            f"Please check geometry file for:\n"
+                            f"  - Degenerate faces (area = 0)\n"
+                            f"  - Non-planar geometry\n"
+                            f"  - Faces that are too small\n"
+                            f"  - Invalid mesh topology\n"
+                            f"  - Geometry file corruption"
+                        )
+                        raise type(e)(error_msg) from e
 
                 # Update statistics
                 self._update_statistics(mp.results, batch_size)
@@ -713,8 +827,10 @@ class Convergence:
                 except Exception:
                     power_ratio = None
 
-                # Update live display
-                display = self._build_progress_display(iteration, power_ratio)
+                # Update live display with optional geometry info
+                display = self._build_progress_display(
+                    iteration, power_ratio, geom_info
+                )
                 live.update(display)
 
                 # Check convergence
@@ -846,172 +962,49 @@ class EnsembleConvergence(Convergence):
             mueller_2d=mueller_2d,
         )
 
-    def run(self) -> ConvergenceResults:
-        """Run the ensemble convergence study.
+        # Track skipped geometries for error handling
+        self.skipped_geometries = []
 
-        Each batch iteration randomly selects a geometry file from the
-        ensemble directory before running the orientation averaging.
+    def _get_next_geometry(self, iteration: int) -> Tuple[str, Optional[str]]:
+        """Override to randomly select geometry from ensemble.
+
+        Args:
+            iteration: Current iteration number
 
         Returns:
-            ConvergenceResults containing final ensemble-averaged values
+            Tuple of (geom_path, display_info)
         """
-        iteration = 0
-        converged = False
-        warning = None
-        skipped_geometries = []  # Track skipped geometry files
+        # Randomly select a geometry file for this batch
+        geom_file = random.choice(self.geom_files)
+        geom_path = os.path.join(self.geom_dir, geom_file)
+        geom_info = f"Geom: {geom_file}"
 
-        while not converged and self.n_orientations < self.max_orientations:
-            iteration += 1
+        return geom_path, geom_info
 
-            # Randomly select a geometry file for this batch
-            geom_file = random.choice(self.geom_files)
-            geom_path = os.path.join(self.geom_dir, geom_file)
+    def _handle_geometry_error(self, error: Exception, geom_path: str) -> bool:
+        """Override to skip bad geometries in ensemble mode.
 
-            # Determine batch size for this iteration
-            remaining = self.max_orientations - self.n_orientations
-            batch_size = min(self.batch_size, remaining)
+        Args:
+            error: The exception that occurred
+            geom_path: Path to the geometry that failed
 
-            # Create orientations for this batch
-            orientations = goad.create_uniform_orientation(batch_size)
+        Returns:
+            True to skip this geometry and continue
+        """
+        # Extract just the filename
+        geom_file = os.path.basename(geom_path)
 
-            # Update settings with selected geometry and orientations
-            self.settings.geom_path = geom_path
-            self.settings.orientation = orientations
+        # Print warning and track skipped geometry
+        print(f"\nWarning: Skipping geometry '{geom_file}': {error}")
+        self.skipped_geometries.append(geom_file)
 
-            # Run MultiProblem with selected geometry
-            try:
-                mp = goad.MultiProblem(self.settings)
-                mp.py_solve()
-            except Exception as e:
-                # Geometry loading failed (bad faces, degenerate geometry, etc.)
-                print(f"\nWarning: Skipping geometry '{geom_file}': {e}")
-                skipped_geometries.append(geom_file)
-
-                # Check if all geometries have been skipped
-                if len(skipped_geometries) >= len(self.geom_files):
-                    raise ValueError(
-                        f"All {len(self.geom_files)} geometry files failed to load. "
-                        "Please check geometry files for degenerate faces, non-planar geometry, "
-                        "or faces that are too small."
-                    )
-
-                # Skip this iteration without updating statistics
-                continue
-
-            # Update statistics
-            self._update_statistics(mp.results, batch_size)
-
-            # Print progress (with geometry info)
-            min_required = self.min_batches * self.batch_size
-            if self.n_orientations < min_required:
-                print(
-                    f"\nIteration {iteration} ({self.n_orientations}/{min_required} orientations, min not reached) - Geometry: {geom_file}"
-                )
-            else:
-                print(
-                    f"\nIteration {iteration} ({self.n_orientations} orientations, min {min_required} reached) - Geometry: {geom_file}"
-                )
-            self._print_progress_without_header(iteration)
-
-            # Check convergence
-            converged = self._all_converged()
-
-        # Prepare final results
-        if converged:
-            print(f"\nConverged after {self.n_orientations} orientations.")
-        else:
-            warning = f"Maximum orientations ({self.max_orientations}) reached without convergence"
-            print(f"\nWarning: {warning}")
-
-        # Calculate final values and SEMs
-        final_values = {}
-        final_sems = {}
-        for conv in self.convergables:
-            if conv.is_mueller():
-                mean_array, sem_array = self._calculate_mean_and_sem_array(
-                    conv.variable
-                )
-                final_values[conv.variable] = mean_array
-                final_sems[conv.variable] = sem_array
-            else:
-                mean, sem = self._calculate_mean_and_sem(conv.variable)
-                final_values[conv.variable] = mean
-                final_sems[conv.variable] = sem
-
-        # Prepare Mueller matrices with SEM
-        mueller_1d = None
-        mueller_1d_sem = None
-        mueller_2d = None
-
-        if self.mueller_1d and self.mueller_1d_sum is not None:
-            mueller_1d = self.mueller_1d_sum / self.n_orientations
-
-            # Compute SEM for all 16 Mueller elements
-            # mueller_1d shape: (n_theta, 16)
-            n_theta = mueller_1d.shape[0]
-            mueller_1d_sem = np.zeros_like(mueller_1d)
-
-            for row in range(1, 5):
-                for col in range(1, 5):
-                    element_name = f"S{row}{col}"
-                    mueller_idx = (row - 1) * 4 + (col - 1)
-
-                    # Calculate mean and SEM for this element across all theta bins
-                    mean_array, sem_array = self._calculate_mean_and_sem_array(
-                        element_name
-                    )
-
-                    if len(sem_array) > 0:
-                        mueller_1d_sem[:, mueller_idx] = sem_array
-
-            # Store mueller_1d_sem in final_values for unified API access
-            final_values["mueller_1d_sem"] = mueller_1d_sem
-
-        if self.mueller_2d and self.mueller_2d_sum is not None:
-            mueller_2d = self.mueller_2d_sum / self.n_orientations
-
-        return ConvergenceResults(
-            converged=converged,
-            n_orientations=self.n_orientations,
-            values=final_values,
-            sem_values=final_sems,
-            mueller_1d=mueller_1d,
-            mueller_2d=mueller_2d,
-            convergence_history=self.convergence_history,
-            warning=warning,
-        )
-
-    def _print_progress_without_header(self, iteration: int):
-        """Print convergence progress without iteration header (already printed with geometry)."""
-        converged_status = self._check_convergence()
-
-        for conv in self.convergables:
-            mean, sem = self._calculate_mean_and_sem(conv.variable)
-
-            # Calculate 95% CI
-            ci_lower = mean - 1.96 * sem
-            ci_upper = mean + 1.96 * sem
-
-            # Format based on tolerance type
-            if conv.tolerance_type == "relative":
-                if mean != 0:
-                    relative_sem = sem / abs(mean)
-                    target_str = f"{conv.tolerance * 100:.1f}%"
-                    current_str = f"{relative_sem * 100:.2f}%"
-                else:
-                    target_str = f"{conv.tolerance} (abs, mean=0)"
-                    current_str = f"{sem:.4g}"
-            else:
-                target_str = f"{conv.tolerance}"
-                current_str = f"{sem:.4g}"
-
-            # Status indicator
-            status = "✓" if converged_status[conv.variable] else "❌"
-
-            # Print line with mean, SEM, CI, and convergence status
-            print(
-                f"  {conv.variable:<10}: {mean:.6f} ± {sem:.6f} [{ci_lower:.6f}, {ci_upper:.6f}] | SEM: {current_str} (target: {target_str}) {status}"
+        # Check if all geometries have been skipped
+        if len(self.skipped_geometries) >= len(self.geom_files):
+            raise ValueError(
+                f"All {len(self.geom_files)} geometry files failed to load. "
+                "Please check geometry files for degenerate faces, non-planar geometry, "
+                "or faces that are too small."
             )
 
-            # Add to convergence history
-            self.convergence_history.append((self.n_orientations, conv.variable, sem))
+        # Skip this geometry and continue
+        return True
