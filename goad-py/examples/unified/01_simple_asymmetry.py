@@ -6,8 +6,9 @@ This example demonstrates the simplest use of the unified convergence API:
 converging on the asymmetry parameter for a single geometry.
 """
 
-import goad_py as goad
 from pathlib import Path
+
+import goad_py as goad
 
 # Get path to geometry file
 current_dir = Path(__file__).parent
@@ -25,6 +26,7 @@ results = goad.run_convergence(
     tolerance_type="relative",
     batch_size=12,
     max_orientations=1000,
+    log_file="convergence.log",
 )
 
 # Print results

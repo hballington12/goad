@@ -92,6 +92,7 @@ class Convergence:
         min_batches: int = 10,
         mueller_1d: bool = True,
         mueller_2d: bool = False,
+        log_file: Optional[str] = None,
     ):
         """
         Initialize a convergence study.
@@ -104,6 +105,7 @@ class Convergence:
             min_batches: Minimum number of batches before allowing convergence
             mueller_1d: Whether to collect 1D Mueller matrices
             mueller_2d: Whether to collect 2D Mueller matrices
+            log_file: Optional path to log file for convergence progress
         """
         self.settings = settings
         # Enable quiet mode to suppress Rust progress bars
@@ -172,6 +174,7 @@ class Convergence:
             min_batches=self.min_batches,
             convergence_type=self._get_convergence_type(),
             console=self._console,
+            log_file=log_file,
         )
 
     def _update_statistics(self, results: goad.Results, batch_size: int):

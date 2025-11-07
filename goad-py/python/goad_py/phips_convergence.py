@@ -71,6 +71,7 @@ class PHIPSConvergence:
         batch_size: int = 24,
         max_orientations: int = 100_000,
         min_batches: int = 10,
+        log_file: Optional[str] = None,
     ):
         """
         Initialize a PHIPS convergence study.
@@ -81,6 +82,7 @@ class PHIPSConvergence:
             batch_size: Number of orientations per iteration
             max_orientations: Maximum total orientations before stopping
             min_batches: Minimum number of batches before allowing convergence
+            log_file: Optional path to log file for convergence progress
         """
         self.settings = settings
         # Enable quiet mode to suppress Rust progress bars
@@ -136,6 +138,7 @@ class PHIPSConvergence:
             min_batches=self.min_batches,
             convergence_type=self._get_convergence_type(),
             console=self._console,
+            log_file=log_file,
         )
 
     def _compute_phips_dscs_from_mueller2d(self, results: goad.Results) -> np.ndarray:
@@ -444,6 +447,7 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
         batch_size: int = 24,
         max_orientations: int = 100_000,
         min_batches: int = 10,
+        log_file: Optional[str] = None,
     ):
         """
         Initialize a PHIPS ensemble convergence study.
@@ -455,6 +459,7 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
             batch_size: Number of orientations per iteration
             max_orientations: Maximum total orientations before stopping
             min_batches: Minimum number of batches before allowing convergence
+            log_file: Optional path to log file for convergence progress
         """
         # Discover all .obj files in directory
         geom_path = Path(geom_dir)
@@ -480,6 +485,7 @@ class PHIPSEnsembleConvergence(PHIPSConvergence):
             batch_size=batch_size,
             max_orientations=max_orientations,
             min_batches=min_batches,
+            log_file=log_file,
         )
 
     def run(self) -> ConvergenceResults:

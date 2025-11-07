@@ -267,6 +267,7 @@ class ConvergenceDisplay:
         min_batches: int,
         convergence_type: str = "standard",
         console: Optional[Console] = None,
+        log_file: Optional[str] = None,
     ):
         """
         Initialize convergence display.
@@ -277,12 +278,25 @@ class ConvergenceDisplay:
             min_batches: Minimum batches before convergence check
             convergence_type: Display string for convergence mode
             console: Optional Rich console (creates one if None)
+            log_file: Optional path to log file for convergence progress
         """
         self.variables = variables
         self.batch_size = batch_size
         self.min_batches = min_batches
         self.convergence_type = convergence_type
         self._console = console or Console()
+
+        # File logging
+        self.log_file = log_file
+        self._file_console = None
+        self._file_handle = None
+        if self.log_file:
+            # Create a separate console for file output
+            self._file_handle = open(self.log_file, "w")
+            self._file_console = Console(file=self._file_handle, width=120)
+            # Write header
+            self._file_console.print(f"GOAD Convergence Log - {convergence_type}")
+            self._file_console.print("=" * 120)
 
         # Progress tracking
         self._progress: Optional[Progress] = None
@@ -463,8 +477,8 @@ class ConvergenceDisplay:
             )
             progress_lines.append(line)
 
-        # Return full display
-        return Group(
+        # Build full display
+        display = Group(
             separator,
             title,
             Text(""),  # Blank line
@@ -472,6 +486,12 @@ class ConvergenceDisplay:
             separator,
             *progress_lines,
         )
+
+        # Log to file if enabled
+        if self._file_console is not None:
+            self._file_console.print(display)
+
+        return display
 
     def _get_power_ratio_color(self, power_ratio: float) -> str:
         """Get color for power ratio based on threshold."""
@@ -497,3 +517,16 @@ class ConvergenceDisplay:
             refresh_per_second=refresh_per_second,
             transient=False,
         )
+
+    def close(self):
+        """Close the log file if open."""
+        if self._file_handle is not None:
+            self._file_console.print("\n" + "=" * 120)
+            self._file_console.print("End of convergence log")
+            self._file_handle.close()
+            self._file_handle = None
+            self._file_console = None
+
+    def __del__(self):
+        """Cleanup when object is destroyed."""
+        self.close()

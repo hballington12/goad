@@ -15,27 +15,27 @@ Features:
 - Reproducible results via random seed control
 """
 
-from dataclasses import dataclass, field, asdict
-from typing import List, Dict, Optional, Union, Any, Tuple
-from pathlib import Path
-import numpy as np
 import json
-import toml
 from abc import ABC, abstractmethod
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+import toml
 
 from . import _goad_py as goad
 from .convergence import (
-    Convergence,
     Convergable,
+    Convergence,
     ConvergenceResults,
     EnsembleConvergence,
 )
 from .phips_convergence import (
-    PHIPSConvergence,
     PHIPSConvergable,
+    PHIPSConvergence,
     PHIPSEnsembleConvergence,
 )
-
 
 # ============================================================================
 # Convergence Modes
@@ -373,6 +373,7 @@ class ConvergenceConfig:
 
     # Output options
     output_dir: Optional[str] = None
+    log_file: Optional[str] = None
 
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -872,6 +873,7 @@ class UnifiedConvergence:
                 min_batches=self.config.min_batches,
                 mueller_1d=self.config.mueller_1d,
                 mueller_2d=False,
+                log_file=self.config.log_file,
             )
         else:
             self._convergence = Convergence(
@@ -882,6 +884,7 @@ class UnifiedConvergence:
                 min_batches=self.config.min_batches,
                 mueller_1d=self.config.mueller_1d,
                 mueller_2d=False,
+                log_file=self.config.log_file,
             )
 
     def _setup_phips(self, settings):
@@ -903,6 +906,7 @@ class UnifiedConvergence:
                 batch_size=self.config.batch_size,
                 max_orientations=self.config.max_orientations,
                 min_batches=self.config.min_batches,
+                log_file=self.config.log_file,
             )
         else:
             self._convergence = PHIPSConvergence(
@@ -911,6 +915,7 @@ class UnifiedConvergence:
                 batch_size=self.config.batch_size,
                 max_orientations=self.config.max_orientations,
                 min_batches=self.config.min_batches,
+                log_file=self.config.log_file,
             )
 
     def run(self) -> UnifiedResults:
@@ -1092,6 +1097,9 @@ def run_convergence(
             # Reproducibility
             - seed: Random seed for orientations (optional)
 
+            # Output options
+            - log_file: Path to log file for convergence progress (optional)
+
     Returns:
         UnifiedResults object
 
@@ -1157,8 +1165,9 @@ def run_convergence(
         fov_factor=kwargs.pop("fov_factor", None),
     )
 
-    # Extract seed
+    # Extract seed and log_file
     seed = kwargs.pop("seed", None)
+    log_file = kwargs.pop("log_file", None)
 
     # Normalize targets to list of dicts
     target_dicts = _normalize_targets(targets, tolerance, tolerance_type)
@@ -1190,6 +1199,7 @@ def run_convergence(
         geometry_transform=geometry_transform,
         advanced_config=advanced_config,
         seed=seed,
+        log_file=log_file,
         **kwargs,  # Remaining kwargs (wavelength, particle_refr_index_re, etc.)
     )
 
