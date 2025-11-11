@@ -7,6 +7,7 @@ PHIPS detectors measure scattering at 20 specific angles from 18° to 170°.
 """
 
 from pathlib import Path
+
 import goad_py as goad
 
 print("=" * 80)
@@ -48,6 +49,7 @@ results = goad.run_convergence(
     max_orientations=500,  # Reduced for demo
     min_batches=5,  # Reduced minimum batches
     mueller_1d=False,  # PHIPS mode doesn't support Mueller matrices
+    log_file="phips_convergence.log",
 )
 
 # Print summary

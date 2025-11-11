@@ -743,6 +743,7 @@ class EnsembleConvergence(Convergence):
         min_batches: int = 10,
         mueller_1d: bool = True,
         mueller_2d: bool = False,
+        log_file: Optional[str] = None,
     ):
         """
         Initialize an ensemble convergence study.
@@ -783,6 +784,7 @@ class EnsembleConvergence(Convergence):
             min_batches=min_batches,
             mueller_1d=mueller_1d,
             mueller_2d=mueller_2d,
+            log_file=log_file,
         )
 
         # Track skipped geometries for error handling
