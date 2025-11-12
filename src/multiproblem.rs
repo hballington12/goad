@@ -129,7 +129,7 @@ impl MultiProblem {
 
             // Info display (bottom) - shows additional context
             let info_pb = m.add(ProgressBar::new_spinner());
-            info_pb.set_style(ProgressStyle::with_template("ℹ️  {msg}").unwrap());
+            info_pb.set_style(ProgressStyle::with_template("{msg}").unwrap());
             info_pb.enable_steady_tick(Duration::from_millis(500));
 
             // Phase 1: Initialization
