@@ -165,7 +165,9 @@ impl MultiProblem {
                 let mut problem = problem_base.clone();
                 let euler = Euler::new(*a, *b, *g);
 
-                problem.run(Some(&euler)); // run the problem with an euler rotation
+                if let Err(err) = problem.run(Some(&euler)) {
+                    eprintln!("Error running problem (will skip this iteration): {}", err);
+                }
 
                 pb.inc(1);
                 problem.result

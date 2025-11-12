@@ -12,6 +12,7 @@ use crate::{
     settings::{load_config, Settings},
 };
 
+use anyhow::Result;
 use nalgebra::{Complex, Point3, Vector3};
 use pyo3::prelude::*;
 
@@ -96,7 +97,10 @@ impl Problem {
             }
         };
 
-        self.run(Some(euler));
+        if let Err(err) = self.run(Some(&euler)) {
+            eprintln!("Error running problem (will skip this solve): {}", err);
+        }
+
         Ok(())
     }
 
@@ -299,11 +303,11 @@ impl Problem {
         self.result.mueller_to_1d(&self.settings.binning.scheme);
     }
 
-    pub fn run(&mut self, euler: Option<&orientation::Euler>) {
+    pub fn run(&mut self, euler: Option<&orientation::Euler>) -> Result<()> {
         self.init();
         match euler {
             Some(euler) => {
-                self.orient(euler);
+                self.orient(euler)?;
             }
             None => {
                 // No rotation
@@ -312,6 +316,7 @@ impl Problem {
         self.illuminate();
         self.solve();
         self.compute_params();
+        Ok(())
     }
 
     /// Trace beams to solve the near-field problem.
@@ -508,13 +513,9 @@ impl Problem {
         self.out_beam_queue.insert(pos, beam);
     }
 
-    pub fn orient(&mut self, euler: &orientation::Euler) {
-        if let Err(error) = self
-            .geom
+    pub fn orient(&mut self, euler: &orientation::Euler) -> Result<()> {
+        self.geom
             .euler_rotate(euler, self.settings.orientation.euler_convention)
-        {
-            panic!("Error rotating geometry: {}", error);
-        }
     }
 }
 

@@ -6,8 +6,9 @@ This example shows how to use interval binning to focus angular resolution
 where you need it most (e.g., fine resolution near forward scattering).
 """
 
-import goad_py as goad
 from pathlib import Path
+
+import goad_py as goad
 
 # Get path to geometry file
 current_dir = Path(__file__).parent
