@@ -499,8 +499,8 @@ impl Results {
 
     /// Get all parameters as a dictionary
     #[getter]
-    pub fn get_params(&self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    pub fn get_params(&self) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let dict = pyo3::types::PyDict::new(py);
 
             // Add backwards-compatible top-level keys for Total component
@@ -539,8 +539,8 @@ impl Results {
 
     /// Get the powers as a dictionary
     #[getter]
-    pub fn get_powers(&self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    pub fn get_powers(&self) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let dict = pyo3::types::PyDict::new(py);
             dict.set_item("input", self.powers.input)?;
             dict.set_item("output", self.powers.output)?;

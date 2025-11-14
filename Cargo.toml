@@ -17,7 +17,7 @@
     itertools = "0.14.0"
     nalgebra = { version = "0.33.2", features = ["serde"] }
     num-complex = { version = "0.4.6", features = ["serde"] }
-    pyo3 = "0.24.1"
+    pyo3 = { version = "0.27.1", features = ["extension-module"] }
     rand = "0.9.0"
     rand_distr = "0.5.1"
     rayon = "1.10.0"
@@ -30,13 +30,12 @@
 default = []
 visualization = []
 
-[workspace]
-members = [
-    "goad-py",
-]
-
-[profile.release]
-opt-level = "z"     # Optimize for size
-lto = true          # Enable Link Time Optimization
-codegen-units = 1   # Reduce parallel codegen units to improve optimization
-strip = true        # Strip symbols from binary
+# [workspace]
+# members = [
+#     # "goad-py", # to be removed
+#     "python",
+# ]
+#
+[lib]
+name = "goad"
+crate-type = ["cdylib", "rlib"]

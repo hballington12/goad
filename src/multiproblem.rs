@@ -302,7 +302,7 @@ impl MultiProblem {
     /// # Returns
     /// PyResult<()> - Success or error if computation fails
     pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
-        py.allow_threads(|| {
+        py.detach(|| {
             self.solve();
         });
         Ok(())
