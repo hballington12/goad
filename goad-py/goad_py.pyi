@@ -30,11 +30,13 @@ Example (minimal setup):
     print(f"Asymmetry parameter: {results.asymmetry}")
 """
 
-from typing import Optional, List, Dict, Tuple
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 
 class Euler:
     """Euler angles for rotations."""
+
     alpha: float
     beta: float
     gamma: float
@@ -43,38 +45,60 @@ class Euler:
     def __repr__(self) -> str: ...
 
 class EulerConvention:
-    """Euler angle conventions."""
-    XZX: 'EulerConvention'
-    XYX: 'EulerConvention'
-    YXY: 'EulerConvention'
-    YZY: 'EulerConvention'
-    ZYZ: 'EulerConvention'
-    ZXZ: 'EulerConvention'
-    XZY: 'EulerConvention'
-    XYZ: 'EulerConvention'
-    YXZ: 'EulerConvention'
-    YZX: 'EulerConvention'
-    ZYX: 'EulerConvention'
-    ZXY: 'EulerConvention'
+    """Euler angle convention for rotation order.
+
+    Specifies the order of rotations when applying Euler angles.
+    Conventions are specified as three-letter strings (case-insensitive).
+
+    Valid conventions:
+        Proper Euler angles (symmetric):
+            - XZX, XYX, YXY, YZY, ZYZ, ZXZ
+
+        Tait-Bryan angles (asymmetric):
+            - XZY, XYZ, YXZ, YZX, ZYX, ZXY
+
+    Example:
+        convention = EulerConvention('ZYZ')  # Default
+        convention = EulerConvention('xyz')  # Case-insensitive
+    """
+
+    def __init__(self, order: str) -> None:
+        """Create a new Euler angle convention.
+
+        Args:
+            order: Three-letter rotation order (case-insensitive).
+                   Valid options: 'XZX', 'XYX', 'YXY', 'YZY', 'ZYZ', 'ZXZ',
+                                 'XZY', 'XYZ', 'YXZ', 'YZX', 'ZYX', 'ZXY'
+
+        Raises:
+            ValueError: If order is not a valid Euler convention
+        """
+        ...
 
 class Scheme:
     """Orientation scheme (uniform or discrete)."""
+
     pass
 
 class Orientation:
     """Full orientation specification."""
+
     scheme: Scheme
     euler_convention: EulerConvention
 
-    def __init__(self, scheme: Scheme, euler_convention: Optional[EulerConvention] = None) -> None: ...
+    def __init__(
+        self, scheme: Scheme, euler_convention: Optional[EulerConvention] = None
+    ) -> None: ...
     def __repr__(self) -> str: ...
 
 class Geom:
     """Geometry representation."""
+
     pass
 
 class Shape:
     """Shape within geometry."""
+
     pass
 
 class Results:
@@ -82,43 +106,30 @@ class Results:
 
     @property
     def bins(self) -> List[tuple[float, float]]: ...
-
     @property
     def bins_1d(self) -> Optional[List[float]]: ...
-
     @property
     def mueller(self) -> List[List[float]]: ...
-
     @property
     def mueller_beam(self) -> List[List[float]]: ...
-
     @property
     def mueller_ext(self) -> List[List[float]]: ...
-
     @property
     def mueller_1d(self) -> List[List[float]]: ...
-
     @property
     def mueller_1d_beam(self) -> List[List[float]]: ...
-
     @property
     def mueller_1d_ext(self) -> List[List[float]]: ...
-
     @property
     def asymmetry(self) -> Optional[float]: ...
-
     @property
     def scat_cross(self) -> Optional[float]: ...
-
     @property
     def ext_cross(self) -> Optional[float]: ...
-
     @property
     def albedo(self) -> Optional[float]: ...
-
     @property
     def params(self) -> Dict[str, Optional[float]]: ...
-
     @property
     def powers(self) -> Dict[str, float]: ...
 
@@ -131,9 +142,8 @@ class BinningScheme:
     """
 
     def __init__(self, bins: List[tuple[float, float]]) -> None: ...
-
     @staticmethod
-    def simple(num_theta: int, num_phi: int) -> 'BinningScheme':
+    def simple(num_theta: int, num_phi: int) -> "BinningScheme":
         """Create a simple regular grid binning scheme.
 
         Args:
@@ -153,8 +163,8 @@ class BinningScheme:
         thetas: List[float],
         theta_spacings: List[float],
         phis: List[float],
-        phi_spacings: List[float]
-    ) -> 'BinningScheme':
+        phi_spacings: List[float],
+    ) -> "BinningScheme":
         """Create binning scheme with custom intervals.
 
         Args:
@@ -169,7 +179,7 @@ class BinningScheme:
         ...
 
     @staticmethod
-    def custom(bins: List[tuple[float, float]]) -> 'BinningScheme':
+    def custom(bins: List[tuple[float, float]]) -> "BinningScheme":
         """Create binning scheme from explicit (theta, phi) pairs.
 
         Args:
@@ -204,7 +214,7 @@ class Settings:
         max_rec: int = 10,
         max_tir: int = 10,
         scale: float = 1.0,
-        directory: str = "goad_run"
+        directory: str = "goad_run",
     ) -> None:
         """Initialize simulation settings.
 
@@ -233,25 +243,21 @@ class Settings:
 
     @property
     def euler(self) -> List[float]: ...
-
     @euler.setter
     def euler(self, value: List[float]) -> None: ...
-
     @property
     def orientation(self) -> Orientation: ...
-
     @orientation.setter
     def orientation(self, value: Orientation) -> None: ...
 
 class Problem:
     """Single orientation problem."""
 
-    def __init__(self, settings: Optional[Settings] = None, geom: Optional[Geom] = None) -> None: ...
-
+    def __init__(
+        self, settings: Optional[Settings] = None, geom: Optional[Geom] = None
+    ) -> None: ...
     def py_solve(self) -> None: ...
-
     def py_print_stats(self) -> None: ...
-
     @property
     def results(self) -> Results: ...
 
@@ -324,15 +330,14 @@ class MultiProblem:
 
 # Helper functions
 def uniform_orientation(num_orients: int) -> Scheme: ...
-
 def discrete_orientation(eulers: List[Euler]) -> Scheme: ...
-
-def create_uniform_orientation(num_orients: int, euler_convention: Optional[EulerConvention] = None) -> Orientation: ...
-
-def create_discrete_orientation(eulers: List[Euler], euler_convention: Optional[EulerConvention] = None) -> Orientation: ...
-
+def create_uniform_orientation(
+    num_orients: int, euler_convention: Optional[EulerConvention] = None
+) -> Orientation: ...
+def create_discrete_orientation(
+    eulers: List[Euler], euler_convention: Optional[EulerConvention] = None
+) -> Orientation: ...
 def sum_as_string(a: int, b: int) -> str: ...
-
 def goad_py_add() -> None: ...
 
 # Convergence Analysis Classes
@@ -350,10 +355,7 @@ class Convergable:
     tolerance: float
 
     def __init__(
-        self,
-        variable: str,
-        tolerance_type: str = 'relative',
-        tolerance: float = 0.01
+        self, variable: str, tolerance_type: str = "relative", tolerance: float = 0.01
     ) -> None:
         """Initialize convergence criterion.
 
@@ -392,7 +394,7 @@ class ConvergenceResults:
         mueller_1d: Optional[np.ndarray] = None,
         mueller_2d: Optional[np.ndarray] = None,
         convergence_history: List[Tuple[int, str, float]] = None,
-        warning: Optional[str] = None
+        warning: Optional[str] = None,
     ) -> None: ...
 
 class Convergence:
@@ -422,7 +424,7 @@ class Convergence:
         max_orientations: int = 100_000,
         min_batches: int = 10,
         mueller_1d: bool = True,
-        mueller_2d: bool = False
+        mueller_2d: bool = False,
     ) -> None:
         """Initialize convergence study.
 
