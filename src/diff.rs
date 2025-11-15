@@ -17,6 +17,21 @@ pub enum Mapping {
     ApertureDiffraction,
 }
 
+#[pymethods]
+impl Mapping {
+    #[new]
+    pub fn py_new(str: &str) -> PyResult<Self> {
+        match str.to_lowercase().as_str() {
+            "go" => Ok(Mapping::GeometricOptics),
+            "ad" => Ok(Mapping::ApertureDiffraction),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "'{}' is not a valid Mapping method. Valid options are: 'go' (Geometric Optics), 'ad' (Aperture Diffraction)",
+                str
+            ))),
+        }
+    }
+}
+
 /// Map a beam to the far-field using geometric optics. Assumes delta theta and delta phi are provided if the binning scheme is Simple. Returns a single-element vector containing the bin index and amplitude matrix.
 pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> Vec<Ampl> {
     // Use the precomputed theta and phi spacings if using Simple binning
