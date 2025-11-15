@@ -1,5 +1,3 @@
-use std::ptr::null;
-
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::result::MuellerMatrix;
@@ -228,6 +226,26 @@ impl Problem {
         }
     }
 
+    fn assign_ampls(&mut self, component: GOComponent, ampls: Vec<Ampl>) {
+        for (field, ampl) in self.result.field_2d.iter_mut().zip(ampls) {
+            match component {
+                GOComponent::Total => field.ampl_total = ampl,
+                GOComponent::Beam => field.ampl_beam = ampl,
+                GOComponent::ExtDiff => field.ampl_ext = ampl,
+            }
+        }
+    }
+
+    fn assign_muellers(&mut self, component: GOComponent, muellers: Vec<Mueller>) {
+        for (field, mueller) in self.result.field_2d.iter_mut().zip(muellers) {
+            match component {
+                GOComponent::Total => field.mueller_total = mueller,
+                GOComponent::Beam => field.mueller_beam = mueller,
+                GOComponent::ExtDiff => field.mueller_ext = mueller,
+            }
+        }
+    }
+
     pub fn solve_far_queue(&mut self, component: GOComponent) {
         let (queue, mapping, fov_factor) = match component {
             GOComponent::Beam => (
@@ -244,24 +262,23 @@ impl Problem {
                 panic!("No such beam queue exists for GOComponent: {:?}", component)
             }
         };
+
+        let map_beam_to_far_field = |beam: &Beam| -> Vec<Ampl> {
+            match mapping {
+                Mapping::GeometricOptics => {
+                    n2f_go(&self.settings.binning, &self.result.bins(), beam)
+                }
+                Mapping::ApertureDiffraction => beam.diffract(&self.result.bins(), fov_factor),
+            }
+        };
+
         // coherence:
         if self.settings.coherence {
             let zero_ampls: Vec<Ampl> =
                 self.result.field_2d.iter().map(|_| Ampl::zeros()).collect();
             let ampls = queue
                 .par_iter()
-                .map(|beam| {
-                    let ampls = match mapping {
-                        Mapping::GeometricOptics => {
-                            // TODO: convert to Beam method
-                            n2f_go(&self.settings.binning, &self.result.bins(), beam)
-                        }
-                        Mapping::ApertureDiffraction => {
-                            beam.diffract(&self.result.bins(), fov_factor)
-                        }
-                    };
-                    ampls
-                })
+                .map(|beam| map_beam_to_far_field(beam))
                 .reduce(
                     || zero_ampls.clone(),
                     |mut acc, val| {
@@ -272,25 +289,7 @@ impl Problem {
                     },
                 );
 
-            // element-wise assign to total ampl
-            match component {
-                GOComponent::Total => {
-                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
-                        ampl.ampl_total = ampls[i];
-                    }
-                }
-                GOComponent::Beam => {
-                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
-                        ampl.ampl_beam = ampls[i];
-                    }
-                }
-                GOComponent::ExtDiff => {
-                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
-                        ampl.ampl_ext = ampls[i];
-                    }
-                }
-            };
-
+            self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
         } else {
             // no coherence
@@ -303,15 +302,7 @@ impl Problem {
             let muellers = queue
                 .par_iter()
                 .map(|beam| {
-                    let ampls = match mapping {
-                        Mapping::GeometricOptics => {
-                            // TODO: convert to Beam method
-                            n2f_go(&self.settings.binning, &self.result.bins(), beam)
-                        }
-                        Mapping::ApertureDiffraction => {
-                            beam.diffract(&self.result.bins(), fov_factor)
-                        }
-                    };
+                    let ampls = map_beam_to_far_field(beam);
                     let muellers = ampls.into_iter().map(|ampl| ampl.to_mueller()).collect();
                     muellers
                 })
@@ -325,24 +316,7 @@ impl Problem {
                     },
                 );
 
-            // element-wise assign to total ampl
-            match component {
-                GOComponent::Total => {
-                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
-                        ampl.mueller_total = muellers[i];
-                    }
-                }
-                GOComponent::Beam => {
-                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
-                        ampl.mueller_beam = muellers[i];
-                    }
-                }
-                GOComponent::ExtDiff => {
-                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
-                        ampl.mueller_ext = muellers[i];
-                    }
-                }
-            };
+            self.assign_muellers(component, muellers);
         }
     }
 
