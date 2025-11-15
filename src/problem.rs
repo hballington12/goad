@@ -1,5 +1,7 @@
+use std::ptr::null;
+
 use crate::diff::n2f_go;
-use crate::field::AmplMatrix;
+use crate::field::{Ampl, AmplMatrix};
 use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
@@ -15,6 +17,7 @@ use crate::{
 use anyhow::Result;
 use nalgebra::{Complex, Point3, Vector3};
 use pyo3::prelude::*;
+use rayon::prelude::*;
 
 #[cfg(test)]
 mod tests {
@@ -228,12 +231,12 @@ impl Problem {
     pub fn solve_far_queue(&mut self, component: GOComponent) {
         let (queue, mapping, fov_factor) = match component {
             GOComponent::Beam => (
-                &mut self.out_beam_queue,
+                &self.out_beam_queue,
                 self.settings.mapping,
                 self.settings.fov_factor,
             ),
             GOComponent::ExtDiff => (
-                &mut self.ext_diff_beam_queue,
+                &self.ext_diff_beam_queue,
                 Mapping::ApertureDiffraction,
                 None,
             ),
@@ -241,42 +244,105 @@ impl Problem {
                 panic!("No such beam queue exists for GOComponent: {:?}", component)
             }
         };
-        let coherence = self.settings.coherence;
-        for beam in queue.iter() {
-            let tuples = match mapping {
-                Mapping::GeometricOptics => {
-                    // TODO: convert to Beam method
-                    n2f_go(&self.settings.binning, &self.result.bins(), beam)
+        // coherence:
+        if self.settings.coherence {
+            let zero_ampls: Vec<Ampl> =
+                self.result.field_2d.iter().map(|_| Ampl::zeros()).collect();
+            let ampls = queue
+                .par_iter()
+                .map(|beam| {
+                    let ampls = match mapping {
+                        Mapping::GeometricOptics => {
+                            // TODO: convert to Beam method
+                            n2f_go(&self.settings.binning, &self.result.bins(), beam)
+                        }
+                        Mapping::ApertureDiffraction => {
+                            beam.diffract(&self.result.bins(), fov_factor)
+                        }
+                    };
+                    ampls
+                })
+                .reduce(
+                    || zero_ampls.clone(),
+                    |mut acc, val| {
+                        for (i, ampl) in val.into_iter().enumerate() {
+                            acc[i] += ampl;
+                        }
+                        acc
+                    },
+                );
+
+            // element-wise assign to total ampl
+            match component {
+                GOComponent::Total => {
+                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
+                        ampl.ampl_total = ampls[i];
+                    }
                 }
-                Mapping::ApertureDiffraction => beam.diffract(&self.result.bins(), fov_factor),
+                GOComponent::Beam => {
+                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
+                        ampl.ampl_beam = ampls[i];
+                    }
+                }
+                GOComponent::ExtDiff => {
+                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
+                        ampl.ampl_ext = ampls[i];
+                    }
+                }
             };
 
-            for (n, ampl) in tuples {
-                if !ampl.is_valid() {
-                    continue; // skip invalid amplitudes
-                }
-                // if coherence, sum amplitudes now, reduce to mueller later
-                if coherence {
-                    let ampl_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
-                    };
-                    *ampl_target += ampl;
-                } else {
-                    // if no coherence, reduce to mueller now
-                    let mueller = ampl.to_mueller();
-                    let mueller_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
-                    };
-                    *mueller_target += mueller;
-                }
-            }
-        }
-        if coherence {
             self.ampl_to_mueller(component);
+        } else {
+            // no coherence
+            let zero_muellers: Vec<Mueller> = self
+                .result
+                .field_2d
+                .iter()
+                .map(|_| Mueller::zeros())
+                .collect();
+            let muellers = queue
+                .par_iter()
+                .map(|beam| {
+                    let ampls = match mapping {
+                        Mapping::GeometricOptics => {
+                            // TODO: convert to Beam method
+                            n2f_go(&self.settings.binning, &self.result.bins(), beam)
+                        }
+                        Mapping::ApertureDiffraction => {
+                            beam.diffract(&self.result.bins(), fov_factor)
+                        }
+                    };
+                    let muellers = ampls.into_iter().map(|ampl| ampl.to_mueller()).collect();
+                    muellers
+                })
+                .reduce(
+                    || zero_muellers.clone(),
+                    |mut acc, val| {
+                        for (i, mueller) in val.into_iter().enumerate() {
+                            acc[i] += mueller;
+                        }
+                        acc
+                    },
+                );
+
+            // element-wise assign to total ampl
+            match component {
+                GOComponent::Total => {
+                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
+                        ampl.mueller_total = muellers[i];
+                    }
+                }
+                GOComponent::Beam => {
+                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
+                        ampl.mueller_beam = muellers[i];
+                    }
+                }
+                GOComponent::ExtDiff => {
+                    for (i, ampl) in self.result.field_2d.iter_mut().enumerate() {
+                        ampl.mueller_ext = muellers[i];
+                    }
+                }
+            };
         }
     }
 
