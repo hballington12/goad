@@ -120,7 +120,7 @@ impl MultiProblem {
             let pb = m.add(ProgressBar::new(n as u64));
             pb.set_style(
                 ProgressStyle::with_template(
-                "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.green/blue}] {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
                 )
                 .unwrap()
                 .progress_chars("█▇▆▅▄▃▂▁")
