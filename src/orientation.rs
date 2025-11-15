@@ -8,6 +8,8 @@ use rand::Rng;
 use rand::SeedableRng;
 use serde::Deserialize;
 
+use crate::settings::DEFAULT_EULER_ORDER;
+
 #[pyclass]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Scheme {
@@ -271,11 +273,20 @@ pub struct Orientation {
 
 #[pymethods]
 impl Orientation {
-    #[new]
-    fn py_new(scheme: Scheme, euler_convention: Option<EulerConvention>) -> Self {
+    #[staticmethod]
+    #[pyo3(name = "uniform", signature = (num_orients, euler_convention = None))]
+    fn py_uniform(num_orients: usize, euler_convention: Option<EulerConvention>) -> Self {
         Orientation {
-            scheme,
-            euler_convention: euler_convention.unwrap_or(EulerConvention::ZYZ),
+            scheme: Scheme::Uniform { num_orients },
+            euler_convention: euler_convention.unwrap_or(DEFAULT_EULER_ORDER),
+        }
+    }
+    #[staticmethod]
+    #[pyo3(name = "discrete", signature = (eulers, euler_convention = None))]
+    fn py_discrete(eulers: Vec<Euler>, euler_convention: Option<EulerConvention>) -> Self {
+        Orientation {
+            scheme: Scheme::Discrete { eulers },
+            euler_convention: euler_convention.unwrap_or(DEFAULT_EULER_ORDER),
         }
     }
 

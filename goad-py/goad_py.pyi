@@ -75,20 +75,22 @@ class EulerConvention:
         """
         ...
 
-class Scheme:
-    """Orientation scheme (uniform or discrete)."""
-
-    pass
-
 class Orientation:
     """Full orientation specification."""
 
-    scheme: Scheme
-    euler_convention: EulerConvention
+    @staticmethod
+    def uniform(num_orients: int, euler_convention = ...) -> None
+    """
+    Create a random uniform orientation scheme with the specified number of orientations
 
-    def __init__(
-        self, scheme: Scheme, euler_convention: Optional[EulerConvention] = None
-    ) -> None: ...
+    Args:
+        num_orients: Number of orientations to generate
+        euler_convention: Optional Euler angle convention to use (default: ZYZ)
+
+    Returns:
+        List of orientations
+    """
+
     def __repr__(self) -> str: ...
 
 class Geom:

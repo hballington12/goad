@@ -497,7 +497,8 @@ impl Results {
         self.params.albedo()
     }
 
-    /// Get all parameters as a dictionary
+    /// Get all parameters as a dictionary.
+    /// To be deprecated.
     #[getter]
     pub fn get_params(&self) -> PyResult<Py<PyAny>> {
         Python::attach(|py| {

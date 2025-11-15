@@ -216,3 +216,70 @@ class MultiProblem:
 
         """
         ...
+
+    def solve(self) -> None:
+        """Solve the scattering problem."""
+        ...
+
+    def results(self) -> Results:
+        """Return the results of the scattering problem."""
+        ...
+
+class Results:
+    """GOAD scattering results."""
+
+    def bins(self) -> list[list[float]]:
+        """Return the 2d bins [[theta, phi], ...]"""
+        ...
+
+    def bins_1d(self) -> list[float]:
+        """Return the 1d bins."""
+        ...
+
+    def mueller(self) -> list[list[float]]:
+        """Return the Mueller matrix [[s11, s12, ..., s44], ...]"""
+        ...
+
+    def mueller_beam(self) -> list[list[float]]:
+        """Return the beam component Mueller matrix [[s11, s12, ..., s44], ...]"""
+        ...
+
+    def mueller_ext(self) -> list[list[float]]:
+        """Return the external diffraction Mueller matrix [[s11, s12, ..., s44], ...]"""
+        ...
+
+    def mueller_1d(self) -> list[list[float]]:
+        """Return the phi-integrated Mueller matrix [[s11, s12, ..., s44], ...]"""
+        ...
+
+    def mueller_1d_beam(self) -> list[list[float]]:
+        """Return the phi-integrated beam Mueller matrix [[s11, s12, ..., s44], ...]"""
+        ...
+
+    def mueller_1d_ext(self) -> list[list[float]]:
+        """Return the phi-integrated external diffraction Mueller matrix [[s11, s12, ..., s44], ...]"""
+        ...
+
+    def asymmetry(self) -> float:
+        """Return the asymmetry parameter."""
+        ...
+
+    def scat_cross(self) -> float:
+        """Return the scattering cross-section."""
+        ...
+
+    def ext_cross(self) -> float:
+        """Return the extinction cross-section."""
+        ...
+
+    def albedo(self) -> float:
+        """Return the single scattering albedo."""
+        ...
+
+    def powers(self) -> dict[str, float]:
+        """Return power distribution.
+
+        Keys: input, output, absorbed, trnc_ref, trnc_rec, trnc_clip,
+        trnc_energy, clip_err, trnc_area, trnc_cop, ext_diff, missing.
+        """
+        ...

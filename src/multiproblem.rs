@@ -301,6 +301,7 @@ impl MultiProblem {
     ///
     /// # Returns
     /// PyResult<()> - Success or error if computation fails
+    #[pyo3(name = "solve")]
     pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
         py.detach(|| {
             self.solve();
