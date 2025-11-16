@@ -1,0 +1,48 @@
+site_name: GOAD
+nav:
+  - Home: index.md
+  - About: about.md
+
+# site_url: tbd
+repo_url: https://github.com/hballington12/goad
+repo_name: Github
+site_author: Harry Ballington
+site_description: GOAD is a Rust/Python library for simulating geometric optics with aperture diffraction.
+
+plugins:
+  - search
+  - macros
+
+# Build directories
+theme:
+  name: material
+  locale: en
+  custom_dir: docs/source/_build/overrides
+  favicon: img/favicon.ico
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tracking
+    - navigation.sections
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.footer
+    - navigation.indexes
+    - content.tabs.link
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github

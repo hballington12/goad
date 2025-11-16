@@ -13,3 +13,4 @@ goad_run/
 **.vscode/
 goad.log
 .python-version
+site/
