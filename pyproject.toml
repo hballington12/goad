@@ -18,3 +18,4 @@ Homepage = "https://github.com/hballington12/goad"
 [tool.maturin]
 python-source = "python"
 module-name = "goad.goad"
+features = ["extension-module"]
