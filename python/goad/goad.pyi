@@ -194,13 +194,19 @@ class BinningScheme:
 
     def thetas(self) -> list[float]:
         """
-        Returns a list of theta values for each bin in the scheme.
+        Returns a list of theta values for each bin in the scheme. If the binning scheme is:
+            - Simple: The values are evenly spaced from 0 to 180 degrees.
+            - Interval: The values are evenly spaced in the intervals specified by the binning scheme, which define a rectilinear grid in spherical coordinates.
+            - Custom: The values are arbitrarily spaced in spherical coordinates.
         """
         ...
 
     def phis(self) -> list[float]:
         """
-        Returns a list of phi values for each bin in the scheme.
+        Returns a list of phi values for each bin in the scheme. If the binning scheme is:
+            - Simple: The values are evenly spaced from 0 to 360 degrees.
+            - Interval: The values are evenly spaced in the intervals specified by the binning scheme, which define a rectilinear grid in spherical coordinates.
+            - Custom: The values are arbitrarily spaced in spherical coordinates.
         """
         ...
 
