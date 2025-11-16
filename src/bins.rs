@@ -400,11 +400,7 @@ pub fn interval_bins(
 
     // Convert edges to bins
     let theta_bins = edges_to_bins(theta_edges);
-
-    let phi_bins: Vec<AngleBin> = phi_edges
-        .windows(2)
-        .map(|edges| AngleBin::new(edges[0], edges[1]))
-        .collect();
+    let phi_bins = edges_to_bins(phi_edges);
 
     let mut bins = Vec::new();
     for theta_bin in theta_bins.iter() {
