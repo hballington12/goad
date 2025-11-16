@@ -3,7 +3,6 @@ use crate::field::{Ampl, AmplMatrix};
 use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
-    bins::generate_bins,
     diff::Mapping,
     field::Field,
     geom::{Face, Geom},
@@ -128,7 +127,7 @@ impl Problem {
         });
         init_geom(&settings, &mut geom);
 
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
         let solution = Results::new_empty(&bins);
 
         let problem = Self {
@@ -184,7 +183,7 @@ impl Problem {
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
         let settings = load_config().expect("Failed to load config");
 
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
         let solution = Results::new_empty(&bins);
 
         Self {

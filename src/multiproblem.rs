@@ -1,7 +1,6 @@
 // use std::time::Instant;
 
 use crate::{
-    bins::generate_bins,
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
@@ -71,7 +70,8 @@ impl MultiProblem {
         problem::init_geom(&settings, &mut geom);
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
+
         let result = Results::new_empty(&bins);
 
         Ok(Self {
@@ -282,7 +282,7 @@ impl MultiProblem {
         problem::init_geom(&settings, &mut geom);
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
         let result = Results::new_empty(&bins);
 
         Ok(Self {

@@ -9,7 +9,11 @@ print(convention)
 
 scheme = goad.Orientation.uniform(19)
 binning = goad.BinningScheme.simple(num_theta=100, num_phi=100)
-
+binning = goad.BinningScheme.interval(
+    thetas=[0, 1, 180], theta_spacings=[0.1, 1], phis=[0, 360], phi_spacings=[2]
+)
+print(binning.thetas())
+print(binning.phis())
 
 orientation = goad.Orientation.discrete([euler, euler])
 orientation = goad.Orientation.uniform(1)

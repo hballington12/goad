@@ -171,10 +171,36 @@ class BinningScheme:
         Examples:
             Theta in steps of 1 from 0 to 90 degrees, and then in steps of 2 from 90 to 180 degrees. Phi in steps of 2 from 0 to 360 degrees.
             >>> BinningScheme.interval(thetas=[0, 90, 180], theta_spacings=[1, 2], phis=[0, 360], phi_spacings=[2])
-            BinningScheme(...)
 
         Raises:
             Internal panic if the steps do not match the split points. ie. thetas=[0,180],theta_spacings=[7] would result in an error because 180 is not divisible by 7.
+        """
+        ...
+
+    @staticmethod
+    def custom(bins: list[list[list[float]]]) -> BinningScheme:
+        """
+        Create a custom binning scheme from explicit bin edges.
+
+        Args:
+            bins: List of bins, each specified as [[theta_min, theta_max], [phi_min, phi_max]]
+
+        Examples:
+            >>> BinningScheme.custom(bins=[[[0, 90], [0, 360]], [[90, 180], [0, 360]]])
+            BinningScheme(...)
+
+        """
+        ...
+
+    def thetas(self) -> list[float]:
+        """
+        Returns a list of theta values for each bin in the scheme.
+        """
+        ...
+
+    def phis(self) -> list[float]:
+        """
+        Returns a list of phi values for each bin in the scheme.
         """
         ...
 
