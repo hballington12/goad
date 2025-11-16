@@ -1,25 +1,24 @@
 import numpy as np
 
 from goad import Results
-from goad.convergence.base import Convergable, ConvergenceTracker, Tolerance
+from goad.convergence.convergable import Convergable, ConvergenceTracker, Tolerance
 
 
 class Asymmetry(Convergable):
-    def __init__(self, tolerance: Tolerance, threshold: float) -> None:
-        super().__init__(tolerance, threshold)
+    def __init__(
+        self, tolerance: Tolerance, threshold: float, name: str = "Asymmetry"
+    ) -> None:
+        super().__init__(name, tolerance, threshold)
         self.tracker = ConvergenceTracker()
 
     def update(self, result: Results, batch_size: int) -> None:
         if result.asymmetry is None or np.isnan(result.asymmetry):
-            print("INFO: Tried to update but asymmetry parameter is None or NaN")
             return
 
         if result.scat_cross is None or np.isnan(result.scat_cross):
-            print(
-                "INFO: Tried to update but cannot weight asymmetry parameter because scat_cross is None or NaN"
-            )
             return
 
+        # this needs fixing...
         for _ in range(batch_size):  # dirty fix to sidestep varying batch sizes
             self.i += 1
             self.tracker.update(value=result.asymmetry, weight=result.scat_cross)
@@ -39,6 +38,6 @@ if __name__ == "__main__":
 
     convergence = Convergence(
         Settings(geom_path="../../../examples/data/hex.obj", quiet=True),
-        [Asymmetry(tolerance=Tolerance.RELATIVE, threshold=0.01)],
+        [Asymmetry(tolerance=Tolerance.RELATIVE, threshold=0.001)],
     )
     convergence.run()
