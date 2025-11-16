@@ -5,6 +5,7 @@ use anyhow::Result;
 use geo::{Area, TriangulateEarcut};
 use geo_types::{Coord, LineString, Polygon};
 use nalgebra::{self as na, Complex, Isometry3, Matrix4, Point3, Vector3, Vector4};
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use std::path::Path;
 use tobj::{self, Model};
@@ -1119,7 +1120,7 @@ impl Geom {
         // Log current directory only in debug builds
         #[cfg(debug_assertions)]
         match std::env::current_dir() {
-            Ok(path) => println!("Current directory: {}", path.display()),
+            Ok(_) => {}
             Err(e) => eprintln!("Error getting current directory: {}", e),
         }
 
@@ -1544,6 +1545,15 @@ impl Geom {
             .iter()
             .map(|v| (v.x, v.y, v.z))
             .collect()
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "from_file")]
+    fn py_from_file(filename: &str) -> PyResult<Self> {
+        match Self::from_file(filename) {
+            Ok(geom) => Ok(geom),
+            Err(err) => Err(PyErr::new::<PyRuntimeError, _>(err.to_string())),
+        }
     }
 }
 

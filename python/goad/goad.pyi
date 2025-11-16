@@ -87,7 +87,7 @@ class Shape:
         """
         ...
 
-class Geometry:
+class Geom:
     """
     A GOAD geometry object. Represents a collection of one or more `Shape` objects.
     """
@@ -102,6 +102,19 @@ class Geometry:
             shapes: List of GOAD shape objects.
         """
     ...
+
+    @staticmethod
+    def from_file(filename: str) -> Geom:
+        """
+        Load a new GOAD geometry object from a file.
+
+        Args:
+            filename: Path to the file containing the geometry data.
+
+        Returns:
+            A new GOAD geometry object.
+        """
+        ...
 
 class Orientation:
     """
@@ -260,12 +273,21 @@ class Settings:
         """
     ...
 
+    @property
+    def geom_path(self) -> str: ...
+    @geom_path.setter
+    def geom_path(self, value: str) -> None: ...
+    @property
+    def orientation(self) -> Orientation: ...
+    @orientation.setter
+    def orientation(self, value: Orientation) -> None: ...
+
 class MultiProblem:
     """
     A GOAD problem. Multi stands for multi-orientation problem, but you can also use it for particles in fixed orientations.
     """
 
-    def __init__(self, settings: Settings, geom: Geometry = ...) -> None:
+    def __init__(self, settings: Settings, geom: Geom = ...) -> None:
         """
         Create a new multi-orientation problem.
 
