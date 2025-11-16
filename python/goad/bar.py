@@ -9,7 +9,13 @@ print(convention)
 
 scheme = goad.Orientation.uniform(19)
 
-settings = goad.Settings(geom_path="../../examples/data/hex.obj")
+
+orientation = goad.Orientation.discrete([euler, euler])
+orientation = goad.Orientation.uniform(1)
+settings = goad.Settings(
+    geom_path="../../examples/data/hex.obj", orientation=orientation
+)
 print(settings)
 mp = goad.MultiProblem(settings)
 mp.solve()
+print(mp.results.asymmetry)

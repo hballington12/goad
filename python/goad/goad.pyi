@@ -104,6 +104,32 @@ class Geometry:
     ...
 
 class Orientation:
+    """
+    A GOAD orientation object. Represents the orientation of a `Shape` object.
+    """
+    @staticmethod
+    def uniform(
+        num_orients: int, euler_convention: EulerConvention = ...
+    ) -> Orientation:
+        """
+        A random uniform distribution of orientations with the specified number of orientations.
+
+        Args:
+            num_orients: Number of orientations.
+            euler_convention: Optional Euler convention to use for the orientations.
+        """
+
+    @staticmethod
+    def discrete(
+        eulers: list[Euler], euler_convention: EulerConvention = ...
+    ) -> Orientation:
+        """
+        A discrete distribution of orientations with the specified Euler angles.
+
+        Args:
+            eulers: List of Euler angles.
+            euler_convention: Optional Euler convention to use for the orientations.
+        """
 
 class BinningScheme:
     """
@@ -131,7 +157,7 @@ class BinningScheme:
         thetas: list[float],
         theta_spacings: list[float],
         phis: list[float],
-        phi_spacings: list[float]
+        phi_spacings: list[float],
     ) -> BinningScheme:
         """
         Create an interval binning scheme with variable spacing.
@@ -221,6 +247,7 @@ class MultiProblem:
         """Solve the scattering problem."""
         ...
 
+    @property
     def results(self) -> Results:
         """Return the results of the scattering problem."""
         ...
@@ -228,58 +255,79 @@ class MultiProblem:
 class Results:
     """GOAD scattering results."""
 
+    @property
     def bins(self) -> list[list[float]]:
         """Return the 2d bins [[theta, phi], ...]"""
         ...
 
-    def bins_1d(self) -> list[float]:
+    @property
+    def bins_1d(self) -> list[float] | None:
         """Return the 1d bins."""
         ...
 
+    @property
     def mueller(self) -> list[list[float]]:
         """Return the Mueller matrix [[s11, s12, ..., s44], ...]"""
         ...
 
+    @property
     def mueller_beam(self) -> list[list[float]]:
         """Return the beam component Mueller matrix [[s11, s12, ..., s44], ...]"""
         ...
 
+    @property
     def mueller_ext(self) -> list[list[float]]:
         """Return the external diffraction Mueller matrix [[s11, s12, ..., s44], ...]"""
         ...
 
+    @property
     def mueller_1d(self) -> list[list[float]]:
         """Return the phi-integrated Mueller matrix [[s11, s12, ..., s44], ...]"""
         ...
 
+    @property
     def mueller_1d_beam(self) -> list[list[float]]:
         """Return the phi-integrated beam Mueller matrix [[s11, s12, ..., s44], ...]"""
         ...
 
+    @property
     def mueller_1d_ext(self) -> list[list[float]]:
         """Return the phi-integrated external diffraction Mueller matrix [[s11, s12, ..., s44], ...]"""
         ...
 
-    def asymmetry(self) -> float:
+    @property
+    def asymmetry(self) -> float | None:
         """Return the asymmetry parameter."""
         ...
 
-    def scat_cross(self) -> float:
+    @property
+    def scat_cross(self) -> float | None:
         """Return the scattering cross-section."""
         ...
 
-    def ext_cross(self) -> float:
+    @property
+    def ext_cross(self) -> float | None:
         """Return the extinction cross-section."""
         ...
 
-    def albedo(self) -> float:
+    @property
+    def albedo(self) -> float | None:
         """Return the single scattering albedo."""
         ...
 
+    @property
     def powers(self) -> dict[str, float]:
-        """Return power distribution.
+        """Return list of power contributions.
 
         Keys: input, output, absorbed, trnc_ref, trnc_rec, trnc_clip,
         trnc_energy, clip_err, trnc_area, trnc_cop, ext_diff, missing.
+        """
+        ...
+
+    @property
+    def params(self) -> dict[str, float | dict[str, float]]:
+        """Return all parameters as a dictionary.
+
+        Deprecated: Use specific parameter properties instead.
         """
         ...
