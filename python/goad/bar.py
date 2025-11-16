@@ -8,6 +8,7 @@ convention = goad.EulerConvention("xyz")
 print(convention)
 
 scheme = goad.Orientation.uniform(19)
+binning = goad.BinningScheme.simple(num_theta=100, num_phi=100)
 
 
 orientation = goad.Orientation.discrete([euler, euler])

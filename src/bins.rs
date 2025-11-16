@@ -278,6 +278,23 @@ impl BinningScheme {
         }
     }
 
+    /// Returns a list of all theta bin centre values
+    fn thetas(&self) -> Vec<f32> {
+        let bins = match self.scheme {
+            Scheme::Simple { num_theta, .. } => simple_spacings(num_theta, 180.0)
+                .iter()
+                .map(|&bin| bin.center)
+                .collect(),
+            Scheme::Interval {
+                thetas,
+                theta_spacings,
+                ..
+            } => interval_spacings(&thetas, &theta_spacings),
+            Scheme::Custom { bins, .. } => bins.iter().map(|bin| bin[0]).collect(),
+        };
+        bins
+    }
+
     /// Create a custom binning scheme with explicit bin edges
     /// Each bin is specified as [[theta_min, theta_max], [phi_min, phi_max]]
     #[staticmethod]
@@ -359,28 +376,24 @@ pub fn interval_bins(
     bins
 }
 
+/// Helper function to generate evenly spaced angle bins
+fn simple_spacings(num_bins: usize, limit: f32) -> Vec<AngleBin> {
+    let dangle = limit / (num_bins as f32);
+    (0..num_bins)
+        .map(|i| {
+            let min = i as f32 * dangle;
+            let max = (i + 1) as f32 * dangle;
+            AngleBin::new(min, max)
+        })
+        .collect()
+}
+
 /// Generate theta and phi bin combinations
 pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<SolidAngleBin> {
-    // Create theta bins
-    let dtheta = 180.0 / (num_theta as f32);
-    let theta_bins: Vec<AngleBin> = (0..num_theta)
-        .map(|i| {
-            let min = i as f32 * dtheta;
-            let max = (i + 1) as f32 * dtheta;
-            AngleBin::new(min, max)
-        })
-        .collect();
+    let theta_bins = simple_spacings(num_theta, 180.0);
+    let phi_bins = simple_spacings(num_phi, 360.0);
 
-    // Create phi bins
-    let dphi = 360.0 / (num_phi as f32);
-    let phi_bins: Vec<AngleBin> = (0..num_phi)
-        .map(|i| {
-            let min = i as f32 * dphi;
-            let max = (i + 1) as f32 * dphi;
-            AngleBin::new(min, max)
-        })
-        .collect();
-
+    // meshgrid
     let mut bins = Vec::new();
     for theta_bin in theta_bins.iter() {
         for phi_bin in phi_bins.iter() {
