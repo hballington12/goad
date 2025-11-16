@@ -1,7 +1,12 @@
 site_name: GOAD
 nav:
-  - Home: index.md
-  - About: about.md
+  - index.md
+  - User guide:
+      - settings.md
+      - results.md
+      - checks.md
+      - convergence.md
+  # - About: about.md
 
 # site_url: tbd
 repo_url: https://github.com/hballington12/goad
@@ -11,10 +16,12 @@ site_description: GOAD is a Rust/Python library for simulating geometric optics 
 
 plugins:
   - search
-  - macros
+  - macros:
+      module_name: docs/source/_build/scripts/macro
 
 # Build directories
 theme:
+  logo: img/favicon.png
   name: material
   locale: en
   custom_dir: docs/source/_build/overrides
@@ -46,3 +53,13 @@ theme:
     - content.code.copy
   icon:
     repo: fontawesome/brands/github
+
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: ["docs/source/src"]
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg

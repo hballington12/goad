@@ -246,6 +246,7 @@ class Settings:
         max_rec: int = ...,
         max_tir: int = ...,
         scale: float = ...,
+        seed: int = ...,
         directory: str = ...,
         mapping: Mapping = ...,
         coherence: bool = ...,

@@ -105,6 +105,7 @@ impl Settings {
         mapping = DEFAULT_MAPPING,
         coherence = DEFAULT_COHERENCE,
         quiet = DEFAULT_QUIET,
+        seed = None,
     ))]
     fn py_new(
         geom_path: String,
@@ -125,6 +126,7 @@ impl Settings {
         mapping: Mapping,
         coherence: bool,
         quiet: bool,
+        seed: Option<u64>,
     ) -> PyResult<Self> {
         // Input validation
         if wavelength <= 0.0 {
@@ -189,7 +191,7 @@ impl Settings {
             max_rec,
             max_tir,
             binning,
-            seed: None,
+            seed,
             scale,
             distortion: None,
             geom_scale: None,

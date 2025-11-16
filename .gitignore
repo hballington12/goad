@@ -14,3 +14,4 @@ goad_run/
 goad.log
 .python-version
 site/
+uv.lock

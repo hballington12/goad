@@ -2,20 +2,25 @@
 
 Geometric Optics with Aperture Diffraction (GOAD) is a code for simulating light scattering from large particles. It approximates the near-field scattering for an incident plane wave for large particles, and then uses aperture diffraction theory to map the near-field to the far-field. It computes the Mueller matrix and integrated optical scattering parameters. The core is written in Rust, with bindings to Python.
 
+## When is GOAD applicable?
+
+You can usually use GOAD when the following conditions are met:
+
+- The overall particle size `d` is much larger than the wavelength `λ`.
+- The field of interest is in the far-field zone, ie. at a distance `r` where `r >> λ` and `r >> d`.
+
 ## Example
 
-{{code_block('home/example','example',['scan_csv','filter','group_by','collect'])}}
+{{code_block('examples/multiproblem', 'multiproblem')}}
 
-## Commands
+## Recommended Usage
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+For orientation averaging problems, it is recommended to run GOAD with the [`Convergence`](convergence.md) class.
 
-## Project layout
+## Contents
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+### User Guide
+- [Settings](settings.md)
+- [Results](results.md)
+- [Checks](checks.md)
+- [Convergence](convergence.md)
