@@ -21,7 +21,7 @@ class Convergence:
         self.max_orientations = 10000
         self.batch_size = 1  # start at 1, increase as needed
         self.sim_time = np.inf  # time per simulation
-        self.refresh_rate = 2  # refresh rate in Hz
+        self.refresh_rate = 30  # refresh rate in Hz
         self.min_orientations = 50  # stop early termination in lucky cases
         self.iterations = 0
 
@@ -73,30 +73,27 @@ class Convergence:
                 if self.iterations > self.max_orientations:
                     break
 
-            # Print completion message
-            self.display.print_completion(self.iterations, self.is_converged())
-
-    def update_batch_size(self) -> None:
-        """Update the batch size to balance performance with repsonsiveness."""
-        if np.isinf(self.sim_time):
-            return
-        optimal_batch_size = max(
-            1, int(self.batch_size / self.sim_time / self.refresh_rate)
-        )
-        #  weighted mean of current mean batch size and optimal based on last batch
-        self.batch_size = int(
-            (
-                self.batch_size * (self.iterations - self.batch_size)
-                + optimal_batch_size * self.batch_size
-            )
-            / self.iterations
-        )
-        self.goad_settings.orientation = Orientation.uniform(self.batch_size)
+    # def update_batch_size(self) -> None:
+    #     """Update the batch size to balance performance with repsonsiveness."""
+    #     if np.isinf(self.sim_time):
+    #         return
+    #     optimal_batch_size = max(
+    #         1, int(self.batch_size / self.sim_time / self.refresh_rate)
+    #     )
+    #     #  weighted mean of current mean batch size and optimal based on last batch
+    #     self.batch_size = int(
+    #         (
+    #             self.batch_size * (self.iterations - self.batch_size)
+    #             + optimal_batch_size * self.batch_size
+    #         )
+    #         / self.iterations
+    #     )
+    #     self.goad_settings.orientation = Orientation.uniform(self.batch_size)
 
     def update(self, result: Results) -> None:
         for target in self.targets:
             target.update(result, self.batch_size)
-        self.update_batch_size()
+        # self.update_batch_size()
 
     def iterate(self) -> Results:
         start = time.time()

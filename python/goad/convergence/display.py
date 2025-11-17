@@ -92,10 +92,13 @@ class ConvergenceDisplay:
             progress = self.calculate_progress(target)
             sem_info = self.format_sem_info(target)
             mean = target.mean
+            sem = target.sem
+            if sem is None:
+                sem = 0
 
             # Format mean value
             if mean is not None:
-                mean_str = f"{mean:.4f}"
+                mean_str = f"{mean:.4f} ± {sem:.4f}"
                 if target.is_converged():
                     mean_str = f"[green]{mean_str}[/green]"
             else:
@@ -128,28 +131,33 @@ class ConvergenceDisplay:
         # Status line
         orient_color = "green" if iterations >= min_orientations else "red"
         orient_text = Text(
-            f"[Orientations: {iterations}/{max_orientations}]", style=orient_color
+            f"[Orientations: {iterations} (max {max_orientations})]", style=orient_color
         )
 
-        batch_text = Text(f"[Batch Size: {batch_size}]", style="yellow")
+        # batch_text = Text(f"[Batch Size: {batch_size}]", style="yellow")
 
         if not np.isinf(sim_time):
-            time_text = Text(f"[Time/batch: {sim_time:.3f}s]", style="blue")
+            time_text = Text(f"[{sim_time:.3f} sec/orientation]", style="blue")
         else:
-            time_text = Text("[Time/batch: calculating...]", style="dim")
+            time_text = Text("[Time/orientation: calculating...]", style="dim")
 
         min_status = (
             "✓"
             if iterations >= min_orientations
-            else f"{min_orientations - iterations} left"
+            else f"{iterations}/{min_orientations}"
         )
         min_text = Text(
-            f"[Min check: {min_status}]",
+            f"[Minimum orientations check: {min_status}]",
             style="green" if iterations >= min_orientations else "orange3",
         )
 
         header = Text.assemble(
-            orient_text, " ", batch_text, " ", time_text, " ", min_text
+            # orient_text, " ", batch_text, " ", time_text, " ", min_text
+            orient_text,
+            " ",
+            time_text,
+            " ",
+            min_text,
         )
 
         separator = Text("━" * 80, style="dim")
@@ -167,17 +175,17 @@ class ConvergenceDisplay:
             separator,
         )
 
-    def print_completion(self, iterations: int, converged: bool):
-        """Print completion message."""
-        if converged:
-            self.console.print(
-                f"[green]✓ Convergence achieved after {iterations} orientations.[/green]"
-            )
-            for target in self.targets:
-                mean = target.mean
-                sem = target.sem
-                self.console.print(f"  • {target.name}: {mean:.6f} ± {sem:.6f}")
-        else:
-            self.console.print(
-                "[yellow]INFO: Reached max iterations without full convergence.[/yellow]"
-            )
+    # def print_completion(self, iterations: int, converged: bool):
+    #     """Print completion message."""
+    #     if converged:
+    #         self.console.print(
+    #             f"[green]✓ Convergence achieved after {iterations} orientations.[/green]"
+    #         )
+    #         for target in self.targets:
+    #             mean = target.mean
+    #             sem = target.sem
+    #             self.console.print(f"  • {target.name}: {mean:.6f} ± {sem:.6f}")
+    #     else:
+    #         self.console.print(
+    #             "[yellow]INFO: Reached max iterations without full convergence.[/yellow]"
+    #         )

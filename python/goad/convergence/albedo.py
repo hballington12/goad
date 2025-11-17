@@ -4,22 +4,20 @@ from goad import Results
 from goad.convergence.convergable import Convergable, ConvergenceTracker, Tolerance
 
 
-class Asymmetry(Convergable):
+class Albedo(Convergable):
     def __init__(self, tolerance: Tolerance, threshold: float) -> None:
-        super().__init__("Asymmetry", tolerance, threshold)
+        super().__init__("Single Scatt. Albedo", tolerance, threshold)
         self.tracker = ConvergenceTracker()
 
     def update(self, result: Results, batch_size: int) -> None:
-        if result.asymmetry is None or np.isnan(result.asymmetry):
-            return
-
-        if result.scat_cross is None or np.isnan(result.scat_cross):
+        if result.albedo is None or np.isnan(result.albedo):
+            # print("INFO: Tried to update but albedo is None or NaN")
             return
 
         # batch size is always 1
         for _ in range(batch_size):
             self.i += 1
-            self.tracker.update(value=result.asymmetry, weight=result.scat_cross)
+            self.tracker.update(value=result.albedo)
 
     @property
     def mean(self) -> float | None:
@@ -35,7 +33,11 @@ if __name__ == "__main__":
     from goad.convergence.base import Convergence
 
     convergence = Convergence(
-        Settings(geom_path="../../../examples/data/hex.obj", quiet=True),
-        [Asymmetry(tolerance=Tolerance.RELATIVE, threshold=0.02)],
+        Settings(
+            geom_path="../../../examples/data/hex.obj",
+            quiet=True,
+            particle_refr_index_im=0.001,
+        ),
+        [Albedo(tolerance=Tolerance.RELATIVE, threshold=0.005)],
     )
     convergence.run()

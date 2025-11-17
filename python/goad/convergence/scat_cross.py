@@ -1,20 +1,21 @@
 import numpy as np
 
 from goad import Results
-from goad.convergence.base import Convergable, ConvergenceTracker, Tolerance
+from goad.convergence.convergable import Convergable, ConvergenceTracker, Tolerance
 
 
 class ScattCross(Convergable):
     def __init__(self, tolerance: Tolerance, threshold: float) -> None:
-        super().__init__(tolerance, threshold)
+        super().__init__("Scatt. Cross Section", tolerance, threshold)
         self.tracker = ConvergenceTracker()
 
     def update(self, result: Results, batch_size: int) -> None:
         if result.scat_cross is None or np.isnan(result.scat_cross):
-            print("INFO: Tried to update but scattering cross section is None or NaN")
+            # print("INFO: Tried to update but scattering cross section is None or NaN")
             return
 
-        for _ in range(batch_size):  # dirty fix to sidestep varying batch sizes
+        # batch size is always 1
+        for _ in range(batch_size):
             self.i += 1
             self.tracker.update(value=result.scat_cross)
 
@@ -33,6 +34,6 @@ if __name__ == "__main__":
 
     convergence = Convergence(
         Settings(geom_path="../../../examples/data/hex.obj", quiet=True),
-        [ScattCross(tolerance=Tolerance.RELATIVE, threshold=0.01)],
+        [ScattCross(tolerance=Tolerance.RELATIVE, threshold=0.02)],
     )
     convergence.run()
