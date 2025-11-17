@@ -1,7 +1,6 @@
 import numpy as np
 
 from goad import Results
-from goad.convergence.asymmetry import Asymmetry
 from goad.convergence.convergable import Convergable, ConvergenceTracker, Tolerance
 
 
