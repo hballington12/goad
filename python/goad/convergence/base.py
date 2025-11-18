@@ -11,19 +11,29 @@ from goad.convergence.display import ConvergenceDisplay
 
 # A GOAD Convergence
 class Convergence:
-    def __init__(self, goad_settings: Settings, targets: list[Convergable]) -> None:
+    def __init__(
+        self,
+        goad_settings: Settings,
+        targets: list[Convergable],
+        max_orientations: int = 100000,
+        min_orientations: int = 50,
+        refresh_rate: float = 30,
+    ) -> None:
         if len(targets) == 0:
-            raise ValueError("You must provide at least one Convergable target")
+            raise ValueError("targets must be a non-empty list")
 
         self.geometry = Geom.from_file(goad_settings.geom_path)
         self.targets = targets
         # possibly add more config here later
-        self.max_orientations = 10000
+        self.max_orientations = max_orientations
         self.batch_size = 1  # start at 1, increase as needed
         self.sim_time = np.inf  # time per simulation
-        self.refresh_rate = 30  # refresh rate in Hz
-        self.min_orientations = 50  # stop early termination in lucky cases
-        self.iterations = 0
+        self.refresh_rate = refresh_rate  # refresh rate in Hz
+        self.min_orientations = (
+            min_orientations  # stop early termination in lucky cases
+        )
+        self.iterations: int = 0
+        self.results: None | Results = None
 
         goad_settings.orientation = Orientation.uniform(self.batch_size)
 
@@ -57,18 +67,18 @@ class Convergence:
                 self.iterations += self.batch_size
 
                 # Run iteration
-                result = self.iterate()
-                self.update(result)
+                self.update(self.iterate())
 
                 # Update display
-                display = self.display.build(
-                    self.iterations,
-                    self.batch_size,
-                    self.sim_time,
-                    self.min_orientations,
-                    self.max_orientations,
+                live.update(
+                    self.display.build(
+                        self.iterations,
+                        self.batch_size,
+                        self.sim_time,
+                        self.min_orientations,
+                        self.max_orientations,
+                    )
                 )
-                live.update(display)
 
                 if self.iterations > self.max_orientations:
                     break
@@ -94,6 +104,12 @@ class Convergence:
         for target in self.targets:
             target.update(result, self.batch_size)
         # self.update_batch_size()
+        self.results.inc(result, self.iterations)
+
+    @staticmethod
+    def inc_val(old: float, new: float, iterations: int) -> float:
+        delta = new - old
+        return old + delta / iterations
 
     def iterate(self) -> Results:
         start = time.time()
