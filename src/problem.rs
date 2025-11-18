@@ -1,6 +1,5 @@
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
-use crate::result::MuellerMatrix;
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     diff::Mapping,
@@ -558,15 +557,15 @@ impl Problem {
     }
 }
 
-/// Collects a 2d array as a list of lists.
-/// There is probably already a function for this in ndarray.
-pub fn collect_mueller(muellers: &[Mueller]) -> Vec<Vec<f32>> {
-    let mut mueller_list = Vec::new();
-    for mueller in muellers.iter() {
-        mueller_list.push(mueller.to_vec());
-    }
-    mueller_list
-}
+// /// Collects a 2d array as a list of lists.
+// /// There is probably already a function for this in ndarray.
+// pub fn collect_mueller(muellers: &[Mueller]) -> Vec<Vec<f32>> {
+//     let mut mueller_list = Vec::new();
+//     for mueller in muellers.iter() {
+//         mueller_list.push(mueller.to_vec());
+//     }
+//     mueller_list
+// }
 
 /// Find the position to insert the beam using binary search.
 fn get_position_by_power(value: f32, queue: &Vec<Beam>, ascending: bool) -> usize {

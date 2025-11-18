@@ -9,6 +9,8 @@ use crate::powers::Powers;
 use itertools::Itertools;
 use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
+use ndarray::Array2;
+use numpy::{IntoPyArray, PyArray2};
 use pyo3::prelude::*;
 
 /// Trait for different types of scattering bins (1D or 2D)
@@ -419,57 +421,97 @@ impl Results {
             .map(|field_1d| field_1d.iter().map(|result| result.bin.center).collect())
     }
 
-    /// Get the Mueller matrix as a list of lists
+    /// Get the Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_total).collect();
-        crate::problem::collect_mueller(&muellers)
+    pub fn get_mueller<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let muellers: Vec<f32> = self
+            .field_2d
+            .iter()
+            .flat_map(|r| r.mueller_total.to_vec())
+            .collect();
+
+        Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+            .unwrap()
+            .into_pyarray(py)
     }
 
-    /// Get the beam Mueller matrix as a list of lists
+    /// Get the beam Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller_beam(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_beam).collect();
-        crate::problem::collect_mueller(&muellers)
+    pub fn get_mueller_beam<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let muellers: Vec<f32> = self
+            .field_2d
+            .iter()
+            .flat_map(|r| r.mueller_beam.to_vec())
+            .collect();
+        Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+            .unwrap()
+            .into_pyarray(py)
     }
 
-    /// Get the external diffraction Mueller matrix as a list of lists
+    /// Get the external diffraction Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller_ext(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_ext).collect();
-        crate::problem::collect_mueller(&muellers)
+    pub fn get_mueller_ext<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let muellers: Vec<f32> = self
+            .field_2d
+            .iter()
+            .flat_map(|r| r.mueller_ext.to_vec())
+            .collect();
+        Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+            .unwrap()
+            .into_pyarray(py)
     }
 
-    /// Get the 1D Mueller matrix as a list of lists
+    /// Get the 1D Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
+    pub fn get_mueller_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
         if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_total).collect();
-            crate::problem::collect_mueller(&muellers)
+            let muellers: Vec<f32> = field_1d
+                .iter()
+                .flat_map(|r| r.mueller_total.to_vec())
+                .collect();
+            Some(
+                Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+                    .unwrap()
+                    .into_pyarray(py),
+            )
         } else {
-            Vec::new()
+            None
         }
     }
 
-    /// Get the 1D beam Mueller matrix as a list of lists
+    /// Get the 1D beam Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller_1d_beam(&self) -> Vec<Vec<f32>> {
+    pub fn get_mueller_1d_beam<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
         if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_beam).collect();
-            crate::problem::collect_mueller(&muellers)
+            let muellers: Vec<f32> = field_1d
+                .iter()
+                .flat_map(|r| r.mueller_beam.to_vec())
+                .collect();
+            Some(
+                Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+                    .unwrap()
+                    .into_pyarray(py),
+            )
         } else {
-            Vec::new()
+            None
         }
     }
 
-    /// Get the 1D external diffraction Mueller matrix as a list of lists
+    /// Get the 1D external diffraction Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller_1d_ext(&self) -> Vec<Vec<f32>> {
+    pub fn get_mueller_1d_ext<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
         if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_ext).collect();
-            crate::problem::collect_mueller(&muellers)
+            let muellers: Vec<f32> = field_1d
+                .iter()
+                .flat_map(|r| r.mueller_ext.to_vec())
+                .collect();
+            Some(
+                Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+                    .unwrap()
+                    .into_pyarray(py),
+            )
         } else {
-            Vec::new()
+            None
         }
     }
 

@@ -1,5 +1,7 @@
 """Type stubs for goad.goad module"""
 
+from numpy.typing import NDArray
+
 class Euler:
     """
     Euler angles representation. All angles in degrees.
@@ -321,33 +323,33 @@ class Results:
         ...
 
     @property
-    def mueller(self) -> list[list[float]]:
-        """Return the Mueller matrix [[s11, s12, ..., s44], ...]"""
+    def mueller(self) -> NDArray:
+        """Return the Mueller matrix as a numpy array with shape (n_bins, 16)"""
         ...
 
     @property
-    def mueller_beam(self) -> list[list[float]]:
-        """Return the beam component Mueller matrix [[s11, s12, ..., s44], ...]"""
+    def mueller_beam(self) -> NDArray:
+        """Return the beam component Mueller matrix as a numpy array with shape (n_bins, 16)"""
         ...
 
     @property
-    def mueller_ext(self) -> list[list[float]]:
-        """Return the external diffraction Mueller matrix [[s11, s12, ..., s44], ...]"""
+    def mueller_ext(self) -> NDArray:
+        """Return the external diffraction Mueller matrix as a numpy array with shape (n_bins, 16)"""
         ...
 
     @property
-    def mueller_1d(self) -> list[list[float]]:
-        """Return the phi-integrated Mueller matrix [[s11, s12, ..., s44], ...]"""
+    def mueller_1d(self) -> NDArray | None:
+        """Return the phi-integrated Mueller matrix as a numpy array with shape (n_theta, 16), or None if not computed"""
         ...
 
     @property
-    def mueller_1d_beam(self) -> list[list[float]]:
-        """Return the phi-integrated beam Mueller matrix [[s11, s12, ..., s44], ...]"""
+    def mueller_1d_beam(self) -> NDArray | None:
+        """Return the phi-integrated beam Mueller matrix as a numpy array with shape (n_theta, 16), or None if not computed"""
         ...
 
     @property
-    def mueller_1d_ext(self) -> list[list[float]]:
-        """Return the phi-integrated external diffraction Mueller matrix [[s11, s12, ..., s44], ...]"""
+    def mueller_1d_ext(self) -> NDArray | None:
+        """Return the phi-integrated external diffraction Mueller matrix as a numpy array with shape (n_theta, 16), or None if not computed"""
         ...
 
     @property

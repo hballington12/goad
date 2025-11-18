@@ -24,3 +24,9 @@ print(settings)
 mp = goad.MultiProblem(settings)
 mp.solve()
 print(mp.results.asymmetry)
+
+mueller_2d = mp.results.mueller
+mueller_1d = mp.results.mueller_1d
+
+if mueller_1d is not None:
+    print(mueller_1d[:, 0])

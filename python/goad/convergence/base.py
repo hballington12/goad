@@ -104,7 +104,11 @@ class Convergence:
         for target in self.targets:
             target.update(result, self.batch_size)
         # self.update_batch_size()
-        self.results.inc(result, self.iterations)
+        self.inc_results(result)
+
+    def inc_results(self, result: Results) -> None:
+        # logic
+        print("inc-ing")
 
     @staticmethod
     def inc_val(old: float, new: float, iterations: int) -> float:
