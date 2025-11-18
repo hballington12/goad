@@ -1,6 +1,9 @@
 use crate::result::GOComponent;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    ops::{Add, Div, Mul, Sub},
+};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Params {
@@ -8,6 +11,93 @@ pub struct Params {
     pub scat_cross: HashMap<GOComponent, f32>,
     pub ext_cross: HashMap<GOComponent, f32>,
     pub albedo: HashMap<GOComponent, f32>,
+}
+
+impl Div<f32> for Params {
+    type Output = Params;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        let mut params = Params::new();
+        if let Some(asymmetry) = self.asymmetry() {
+            params.set_asymmetry(asymmetry / rhs);
+        }
+        if let Some(scat_cross) = self.scat_cross() {
+            params.set_scat_cross(scat_cross / rhs);
+        }
+        if let Some(ext_cross) = self.ext_cross() {
+            params.set_ext_cross(ext_cross / rhs);
+        }
+        if let Some(albedo) = self.albedo() {
+            params.set_albedo(albedo / rhs);
+        }
+        params
+    }
+}
+
+impl Mul for Params {
+    type Output = Params;
+
+    fn mul(self, other: Params) -> Self::Output {
+        let mut params = Params::new();
+        if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry()) {
+            params.set_asymmetry(asymmetry * other_asymmetry);
+        }
+        if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
+            params.set_scat_cross(scatt * other_scatt);
+        }
+        if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
+            params.set_ext_cross(ext * other_ext);
+        }
+        if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
+            params.set_albedo(albedo * other_albedo);
+        }
+
+        params
+    }
+}
+
+impl Add for Params {
+    type Output = Params;
+
+    fn add(self, other: Params) -> Self::Output {
+        let mut params = Params::new();
+        if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry()) {
+            params.set_asymmetry(asymmetry + other_asymmetry);
+        }
+        if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
+            params.set_scat_cross(scatt + other_scatt);
+        }
+        if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
+            params.set_ext_cross(ext + other_ext);
+        }
+        if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
+            params.set_albedo(albedo + other_albedo);
+        }
+
+        params
+    }
+}
+
+impl Sub for Params {
+    type Output = Params;
+
+    fn sub(self, other: Params) -> Self::Output {
+        let mut params = Params::new();
+        if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry()) {
+            params.set_asymmetry(asymmetry - other_asymmetry);
+        }
+        if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
+            params.set_scat_cross(scatt - other_scatt);
+        }
+        if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
+            params.set_ext_cross(ext - other_ext);
+        }
+        if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
+            params.set_albedo(albedo - other_albedo);
+        }
+
+        params
+    }
 }
 
 impl Params {

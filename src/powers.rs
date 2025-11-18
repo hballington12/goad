@@ -1,5 +1,5 @@
-use std::{fmt, ops::*};
 use serde::Serialize;
+use std::{fmt, ops::*};
 
 #[derive(Debug, Copy, Clone, PartialEq, Serialize)]
 pub struct Powers {
@@ -32,6 +32,46 @@ impl DivAssign<f32> for Powers {
     }
 }
 
+impl Div<f32> for Powers {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self {
+        Self {
+            input: self.input / rhs,
+            output: self.output / rhs,
+            absorbed: self.absorbed / rhs,
+            trnc_ref: self.trnc_ref / rhs,
+            trnc_rec: self.trnc_rec / rhs,
+            trnc_clip: self.trnc_clip / rhs,
+            trnc_energy: self.trnc_energy / rhs,
+            clip_err: self.clip_err / rhs,
+            trnc_area: self.trnc_area / rhs,
+            trnc_cop: self.trnc_cop / rhs,
+            ext_diff: self.ext_diff / rhs,
+        }
+    }
+}
+
+impl Mul for Powers {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        Self {
+            input: self.input * other.input,
+            output: self.output * other.output,
+            absorbed: self.absorbed * other.absorbed,
+            trnc_ref: self.trnc_ref * other.trnc_ref,
+            trnc_rec: self.trnc_rec * other.trnc_rec,
+            trnc_clip: self.trnc_clip * other.trnc_clip,
+            trnc_energy: self.trnc_energy * other.trnc_energy,
+            clip_err: self.clip_err * other.clip_err,
+            trnc_area: self.trnc_area * other.trnc_area,
+            trnc_cop: self.trnc_cop * other.trnc_cop,
+            ext_diff: self.ext_diff * other.ext_diff,
+        }
+    }
+}
+
 impl Add for Powers {
     type Output = Self;
 
@@ -48,6 +88,26 @@ impl Add for Powers {
             trnc_area: self.trnc_area + other.trnc_area,
             trnc_cop: self.trnc_cop + other.trnc_cop,
             ext_diff: self.ext_diff + other.ext_diff,
+        }
+    }
+}
+
+impl Sub for Powers {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self {
+            input: self.input - other.input,
+            output: self.output - other.output,
+            absorbed: self.absorbed - other.absorbed,
+            trnc_ref: self.trnc_ref - other.trnc_ref,
+            trnc_rec: self.trnc_rec - other.trnc_rec,
+            trnc_clip: self.trnc_clip - other.trnc_clip,
+            trnc_energy: self.trnc_energy - other.trnc_energy,
+            clip_err: self.clip_err - other.clip_err,
+            trnc_area: self.trnc_area - other.trnc_area,
+            trnc_cop: self.trnc_cop - other.trnc_cop,
+            ext_diff: self.ext_diff - other.ext_diff,
         }
     }
 }

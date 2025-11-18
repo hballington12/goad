@@ -1,5 +1,9 @@
 use std::f32::consts::PI;
 use std::fmt::Debug;
+use std::ops::Add;
+use std::ops::Div;
+use std::ops::Mul;
+use std::ops::Sub;
 
 use crate::bins::AngleBin;
 use crate::bins::Scheme;
@@ -200,6 +204,70 @@ pub struct ScattResult<B: ScatteringBin> {
     pub mueller_ext: Mueller,
 }
 
+impl<B: ScatteringBin> Mul for ScattResult<B> {
+    type Output = ScattResult<B>;
+
+    fn mul(self, other: ScattResult<B>) -> Self::Output {
+        ScattResult {
+            bin: self.bin,
+            ampl_total: self.ampl_total * other.ampl_total,
+            ampl_beam: self.ampl_beam * other.ampl_beam,
+            ampl_ext: self.ampl_ext * other.ampl_ext,
+            mueller_total: self.mueller_total * other.mueller_total,
+            mueller_beam: self.mueller_beam * other.mueller_beam,
+            mueller_ext: self.mueller_ext * other.mueller_ext,
+        }
+    }
+}
+
+impl<B: ScatteringBin> Add for ScattResult<B> {
+    type Output = ScattResult<B>;
+
+    fn add(self, other: ScattResult<B>) -> Self::Output {
+        ScattResult {
+            bin: self.bin,
+            ampl_total: self.ampl_total + other.ampl_total,
+            ampl_beam: self.ampl_beam + other.ampl_beam,
+            ampl_ext: self.ampl_ext + other.ampl_ext,
+            mueller_total: self.mueller_total + other.mueller_total,
+            mueller_beam: self.mueller_beam + other.mueller_beam,
+            mueller_ext: self.mueller_ext + other.mueller_ext,
+        }
+    }
+}
+
+impl<B: ScatteringBin> Sub for ScattResult<B> {
+    type Output = ScattResult<B>;
+
+    fn sub(self, other: ScattResult<B>) -> Self::Output {
+        ScattResult {
+            bin: self.bin,
+            ampl_total: self.ampl_total - other.ampl_total,
+            ampl_beam: self.ampl_beam - other.ampl_beam,
+            ampl_ext: self.ampl_ext - other.ampl_ext,
+            mueller_total: self.mueller_total - other.mueller_total,
+            mueller_beam: self.mueller_beam - other.mueller_beam,
+            mueller_ext: self.mueller_ext - other.mueller_ext,
+        }
+    }
+}
+
+impl<B: ScatteringBin> Div<f32> for ScattResult<B> {
+    type Output = Self;
+
+    fn div(self, other: f32) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total / Complex::from(other),
+            ampl_beam: self.ampl_beam / Complex::from(other),
+            ampl_ext: self.ampl_ext / Complex::from(other),
+            mueller_total: self.mueller_total / other,
+            mueller_beam: self.mueller_beam / other,
+            mueller_ext: self.mueller_ext / other,
+        }
+    }
+}
+
 impl<B: ScatteringBin> ScattResult<B> {
     /// Creates a new empty ScattResult.
     pub fn new(bin: B) -> Self {
@@ -232,6 +300,116 @@ pub struct Results {
     pub field_1d: Option<Vec<ScattResult1D>>,
     pub powers: Powers,
     pub params: Params,
+}
+
+impl Add for Results {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a + b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(field_1d), Some(other_field_1d)) => Some(
+                field_1d
+                    .into_iter()
+                    .zip(other_field_1d)
+                    .map(|(a, b)| a + b)
+                    .collect(),
+            ),
+            (field_1d, _) => field_1d,
+        };
+        let powers = self.powers + other.powers;
+        let params = self.params + other.params;
+        Self {
+            field_2d,
+            field_1d,
+            powers,
+            params,
+        }
+    }
+}
+
+impl Mul for Results {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a * b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(field_1d), Some(other_field_1d)) => Some(
+                field_1d
+                    .into_iter()
+                    .zip(other_field_1d)
+                    .map(|(a, b)| a * b)
+                    .collect(),
+            ),
+            (field_1d, _) => field_1d,
+        };
+        let powers = self.powers * other.powers;
+        let params = self.params * other.params;
+        Self {
+            field_2d,
+            field_1d,
+            powers,
+            params,
+        }
+    }
+}
+
+impl Sub for Results {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a - b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(field_1d), Some(other_field_1d)) => Some(
+                field_1d
+                    .into_iter()
+                    .zip(other_field_1d)
+                    .map(|(a, b)| a - b)
+                    .collect(),
+            ),
+            (field_1d, _) => field_1d,
+        };
+        let powers = self.powers - other.powers;
+        let params = self.params - other.params;
+        Self {
+            field_2d,
+            field_1d,
+            powers,
+            params,
+        }
+    }
+}
+
+impl Div<f32> for Results {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self {
+        let field_1d = match self.field_1d {
+            Some(field_1d) => Some(field_1d.into_iter().map(|a| a / rhs).collect()),
+            None => None,
+        };
+        Self {
+            field_2d: self.field_2d.into_iter().map(|a| a / rhs).collect(),
+            field_1d,
+            powers: self.powers / rhs,
+            params: self.params / rhs,
+        }
+    }
 }
 
 impl Results {
