@@ -10,6 +10,7 @@ use itertools::Itertools;
 use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
 use ndarray::Array2;
+use numpy::PyArrayMethods;
 use numpy::{IntoPyArray, PyArray2};
 use pyo3::prelude::*;
 
@@ -435,6 +436,19 @@ impl Results {
             .into_pyarray(py)
     }
 
+    /// Set the Mueller matrix from a numpy array
+    #[setter]
+    pub fn set_mueller(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        // unsafe view in numpy array memory without bounds checking
+        let array_view = unsafe { array.as_array() };
+
+        for (i, field) in self.field_2d.iter_mut().enumerate() {
+            let row = array_view.row(i);
+            let slice = row.as_slice().unwrap();
+            field.mueller_total = Mueller::from_row_slice(slice);
+        }
+    }
+
     /// Get the beam Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_beam<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
@@ -448,6 +462,19 @@ impl Results {
             .into_pyarray(py)
     }
 
+    /// Set the Mueller beam matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_beam(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        // unsafe view in numpy array memory without bounds checking
+        let array_view = unsafe { array.as_array() };
+
+        for (i, field) in self.field_2d.iter_mut().enumerate() {
+            let row = array_view.row(i);
+            let slice = row.as_slice().unwrap();
+            field.mueller_beam = Mueller::from_row_slice(slice);
+        }
+    }
+
     /// Get the external diffraction Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_ext<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
@@ -459,6 +486,19 @@ impl Results {
         Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
             .unwrap()
             .into_pyarray(py)
+    }
+
+    /// Set the Mueller ext matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_ext(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        // unsafe view in numpy array memory without bounds checking
+        let array_view = unsafe { array.as_array() };
+
+        for (i, field) in self.field_2d.iter_mut().enumerate() {
+            let row = array_view.row(i);
+            let slice = row.as_slice().unwrap();
+            field.mueller_ext = Mueller::from_row_slice(slice);
+        }
     }
 
     /// Get the 1D Mueller matrix as a numpy array
@@ -476,6 +516,20 @@ impl Results {
             )
         } else {
             None
+        }
+    }
+
+    /// Set the 1D Mueller matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_1d(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        let array_view = unsafe { array.as_array() };
+
+        if let Some(ref mut field_1d) = self.field_1d {
+            for (i, field) in field_1d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_total = Mueller::from_row_slice(slice);
+            }
         }
     }
 
@@ -497,6 +551,20 @@ impl Results {
         }
     }
 
+    /// Set the 1D Mueller beam matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_1d_beam(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        let array_view = unsafe { array.as_array() };
+
+        if let Some(ref mut field_1d) = self.field_1d {
+            for (i, field) in field_1d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_beam = Mueller::from_row_slice(slice);
+            }
+        }
+    }
+
     /// Get the 1D external diffraction Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_1d_ext<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
@@ -515,10 +583,29 @@ impl Results {
         }
     }
 
+    /// Set the 1D Mueller beam matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_1d_ext(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        let array_view = unsafe { array.as_array() };
+
+        if let Some(ref mut field_1d) = self.field_1d {
+            for (i, field) in field_1d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_ext = Mueller::from_row_slice(slice);
+            }
+        }
+    }
+
     /// Get the asymmetry parameter
     #[getter]
     pub fn get_asymmetry(&self) -> Option<f32> {
         self.params.asymmetry()
+    }
+
+    #[setter]
+    pub fn set_asymmetry(&mut self, value: f32) {
+        self.params.set_asymmetry(value);
     }
 
     /// Get the scattering cross section
@@ -527,16 +614,31 @@ impl Results {
         self.params.scat_cross()
     }
 
+    #[setter]
+    pub fn set_scat_cross(&mut self, value: f32) {
+        self.params.set_scat_cross(value);
+    }
+
     /// Get the extinction cross section
     #[getter]
     pub fn get_ext_cross(&self) -> Option<f32> {
         self.params.ext_cross()
     }
 
+    #[setter]
+    pub fn set_ext_cross(&mut self, value: f32) {
+        self.params.set_ext_cross(value);
+    }
+
     /// Get the albedo
     #[getter]
     pub fn get_albedo(&self) -> Option<f32> {
         self.params.albedo()
+    }
+
+    #[setter]
+    pub fn set_albedo(&mut self, value: f32) {
+        self.params.set_albedo(value);
     }
 
     /// Get all parameters as a dictionary.
@@ -599,6 +701,46 @@ impl Results {
             dict.set_item("missing", self.powers.missing())?;
             Ok(dict.into())
         })
+    }
+
+    /// Set the powers from a dictionary
+    #[setter]
+    pub fn set_powers(&mut self, dict: &Bound<'_, pyo3::types::PyDict>) -> PyResult<()> {
+        if let Some(val) = dict.get_item("input")? {
+            self.powers.input = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("output")? {
+            self.powers.output = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("absorbed")? {
+            self.powers.absorbed = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_ref")? {
+            self.powers.trnc_ref = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_rec")? {
+            self.powers.trnc_rec = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_clip")? {
+            self.powers.trnc_clip = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_energy")? {
+            self.powers.trnc_energy = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("clip_err")? {
+            self.powers.clip_err = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_area")? {
+            self.powers.trnc_area = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_cop")? {
+            self.powers.trnc_cop = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("ext_diff")? {
+            self.powers.ext_diff = val.extract()?;
+        }
+        // Note: "missing" is computed, not stored, so we skip it
+        Ok(())
     }
 }
 

@@ -327,9 +327,19 @@ class Results:
         """Return the Mueller matrix as a numpy array with shape (n_bins, 16)"""
         ...
 
+    @mueller.setter
+    def mueller(self, value: NDArray) -> None:
+        """Set the Mueller matrix from a numpy array with shape (n_bins, 16)"""
+        ...
+
     @property
     def mueller_beam(self) -> NDArray:
         """Return the beam component Mueller matrix as a numpy array with shape (n_bins, 16)"""
+        ...
+
+    @mueller_beam.setter
+    def mueller_beam(self, value: NDArray) -> None:
+        """Set the beam component Mueller matrix from a numpy array with shape (n_bins, 16)"""
         ...
 
     @property
@@ -337,9 +347,19 @@ class Results:
         """Return the external diffraction Mueller matrix as a numpy array with shape (n_bins, 16)"""
         ...
 
+    @mueller_ext.setter
+    def mueller_ext(self, value: NDArray) -> None:
+        """Set the external diffraction Mueller matrix from a numpy array with shape (n_bins, 16)"""
+        ...
+
     @property
     def mueller_1d(self) -> NDArray | None:
         """Return the phi-integrated Mueller matrix as a numpy array with shape (n_theta, 16), or None if not computed"""
+        ...
+
+    @mueller_1d.setter
+    def mueller_1d(self, value: NDArray | None) -> None:
+        """Set the phi-integrated Mueller matrix from a numpy array with shape (n_theta, 16), or None to clear"""
         ...
 
     @property
@@ -347,9 +367,19 @@ class Results:
         """Return the phi-integrated beam Mueller matrix as a numpy array with shape (n_theta, 16), or None if not computed"""
         ...
 
+    @mueller_1d_beam.setter
+    def mueller_1d_beam(self, value: NDArray | None) -> None:
+        """Set the phi-integrated beam Mueller matrix from a numpy array with shape (n_theta, 16), or None to clear"""
+        ...
+
     @property
     def mueller_1d_ext(self) -> NDArray | None:
         """Return the phi-integrated external diffraction Mueller matrix as a numpy array with shape (n_theta, 16), or None if not computed"""
+        ...
+
+    @mueller_1d_ext.setter
+    def mueller_1d_ext(self, value: NDArray | None) -> None:
+        """Set the phi-integrated external diffraction Mueller matrix from a numpy array with shape (n_theta, 16), or None to clear"""
         ...
 
     @property
@@ -357,9 +387,19 @@ class Results:
         """Return the asymmetry parameter."""
         ...
 
+    @asymmetry.setter
+    def asymmetry(self, value: float | None) -> None:
+        """Set the asymmetry parameter."""
+        ...
+
     @property
     def scat_cross(self) -> float | None:
         """Return the scattering cross-section."""
+        ...
+
+    @scat_cross.setter
+    def scat_cross(self, value: float | None) -> None:
+        """Set the scattering cross-section."""
         ...
 
     @property
@@ -367,9 +407,19 @@ class Results:
         """Return the extinction cross-section."""
         ...
 
+    @ext_cross.setter
+    def ext_cross(self, value: float | None) -> None:
+        """Set the extinction cross-section."""
+        ...
+
     @property
     def albedo(self) -> float | None:
         """Return the single scattering albedo."""
+        ...
+
+    @albedo.setter
+    def albedo(self, value: float | None) -> None:
+        """Set the single scattering albedo."""
         ...
 
     @property
@@ -379,6 +429,11 @@ class Results:
         Keys: input, output, absorbed, trnc_ref, trnc_rec, trnc_clip,
         trnc_energy, clip_err, trnc_area, trnc_cop, ext_diff, missing.
         """
+        ...
+
+    @powers.setter
+    def powers(self, value: dict[str, float]) -> None:
+        """Set the power contributions dictionary."""
         ...
 
     @property
