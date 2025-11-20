@@ -9,7 +9,7 @@ class Asymmetry(Convergable):
         super().__init__("Asymmetry", tolerance, threshold)
         self.tracker = ConvergenceTracker()
 
-    def update(self, result: Results, batch_size: int) -> None:
+    def update(self, result: Results) -> None:
         if result.asymmetry is None or np.isnan(result.asymmetry):
             return
 
@@ -17,9 +17,8 @@ class Asymmetry(Convergable):
             return
 
         # batch size is always 1
-        for _ in range(batch_size):
-            self.i += 1
-            self.tracker.update(value=result.asymmetry, weight=result.scat_cross)
+        self.i += 1
+        self.tracker.update(value=result.asymmetry, weight=result.scat_cross)
 
     @property
     def mean(self) -> float | None:

@@ -9,15 +9,14 @@ class Albedo(Convergable):
         super().__init__("Single Scatt. Albedo", tolerance, threshold)
         self.tracker = ConvergenceTracker()
 
-    def update(self, result: Results, batch_size: int) -> None:
+    def update(self, result: Results) -> None:
         if result.albedo is None or np.isnan(result.albedo):
             # print("INFO: Tried to update but albedo is None or NaN")
             return
 
         # batch size is always 1
-        for _ in range(batch_size):
-            self.i += 1
-            self.tracker.update(value=result.albedo)
+        self.i += 1
+        self.tracker.update(value=result.albedo)
 
     @property
     def mean(self) -> float | None:

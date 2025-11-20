@@ -111,7 +111,6 @@ class ConvergenceDisplay:
     def build(
         self,
         iterations: int,
-        batch_size: int,
         sim_time: float,
         min_orientations: int,
         max_orientations: int,

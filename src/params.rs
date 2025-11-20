@@ -61,17 +61,23 @@ impl Add for Params {
 
     fn add(self, other: Params) -> Self::Output {
         let mut params = Params::new();
-        if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry()) {
-            params.set_asymmetry(asymmetry + other_asymmetry);
-        }
         if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
             params.set_scat_cross(scatt + other_scatt);
+
+            if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry())
+            {
+                // asymmetry parameters combine by scatt cross weighting
+                params.set_asymmetry(
+                    (asymmetry * scatt + other_asymmetry * other_scatt) / (scatt + other_scatt),
+                );
+            }
         }
         if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
             params.set_ext_cross(ext + other_ext);
-        }
-        if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
-            params.set_albedo(albedo + other_albedo);
+            if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
+                // albedo parameters combine by ext cross weighting
+                params.set_albedo((albedo * ext + other_albedo * other_ext) / (ext + other_ext));
+            }
         }
 
         params
@@ -83,17 +89,23 @@ impl Sub for Params {
 
     fn sub(self, other: Params) -> Self::Output {
         let mut params = Params::new();
-        if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry()) {
-            params.set_asymmetry(asymmetry - other_asymmetry);
-        }
         if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
             params.set_scat_cross(scatt - other_scatt);
+
+            if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry())
+            {
+                // asymmetry parameters combine by scatt cross weighting
+                params.set_asymmetry(
+                    (asymmetry * scatt - other_asymmetry * other_scatt) / (scatt + other_scatt),
+                );
+            }
         }
         if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
             params.set_ext_cross(ext - other_ext);
-        }
-        if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
-            params.set_albedo(albedo - other_albedo);
+            if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
+                // albedo parameters combine by ext cross weighting
+                params.set_albedo((albedo * ext - other_albedo * other_ext) / (ext + other_ext));
+            }
         }
 
         params

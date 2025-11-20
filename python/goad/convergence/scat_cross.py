@@ -9,15 +9,13 @@ class ScattCross(Convergable):
         super().__init__("Scatt. Cross Section", tolerance, threshold)
         self.tracker = ConvergenceTracker()
 
-    def update(self, result: Results, batch_size: int) -> None:
+    def update(self, result: Results) -> None:
         if result.scat_cross is None or np.isnan(result.scat_cross):
             # print("INFO: Tried to update but scattering cross section is None or NaN")
             return
 
-        # batch size is always 1
-        for _ in range(batch_size):
-            self.i += 1
-            self.tracker.update(value=result.scat_cross)
+        self.i += 1
+        self.tracker.update(value=result.scat_cross)
 
     @property
     def mean(self) -> float | None:

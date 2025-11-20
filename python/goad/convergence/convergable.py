@@ -36,7 +36,7 @@ class Convergable(ABC):
             raise ValueError(f"Unknown tolerance type: {self.tolerance}")
 
     @abstractmethod
-    def update(self, result: Results, batch_size: int) -> None:
+    def update(self, result: Results) -> None:
         pass
 
     @property
@@ -54,7 +54,7 @@ class ConvergenceTracker:
     # https://en.wikipedia.org/wiki/Monte_Carlo_method#Determining_a_sufficiently_large_n
     # modified with weights
     def __init__(self) -> None:
-        self.i = 0
+        self.i = 0  # iteration counter
         self.m = None  # weighted mean
         self.mm = None  # previous weighted mean
         self.d = None  # delta

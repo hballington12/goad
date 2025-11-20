@@ -26,16 +26,22 @@ class Convergence:
         self.targets = targets
         # possibly add more config here later
         self.max_orientations = max_orientations
-        self.batch_size = 1  # start at 1, increase as needed
         self.sim_time = np.inf  # time per simulation
         self.refresh_rate = refresh_rate  # refresh rate in Hz
         self.min_orientations = (
             min_orientations  # stop early termination in lucky cases
         )
-        self.iterations: int = 0
-        self.results: None | Results = None
+        self.i: int = 0
+        self.result_m: None | Results = None
+        self.result_mm: None | Results = None
+        self.result_d: None | Results = None
+        self.result_w: None | Results = None
+        self.result_ww: None | Results = None
+        self.result_dw: None | Results = None
+        self.result_s: None | Results = None
+        self.result_ss: None | Results = None
 
-        goad_settings.orientation = Orientation.uniform(self.batch_size)
+        goad_settings.orientation = Orientation.uniform(1)
 
         self.goad_settings = goad_settings
 
@@ -45,15 +51,11 @@ class Convergence:
         return all(target.is_converged() for target in self.targets)
 
     def run(self) -> None:
-        self.iterations = 0
+        self.i = 0
 
         # Build initial display
         initial_display = self.display.build(
-            self.iterations,
-            self.batch_size,
-            self.sim_time,
-            self.min_orientations,
-            self.max_orientations,
+            self.i, self.sim_time, self.min_orientations, self.max_orientations
         )
 
         # Start live display
@@ -63,24 +65,21 @@ class Convergence:
             refresh_per_second=self.refresh_rate,
             transient=False,
         ) as live:
-            while not self.is_converged() or self.iterations < self.min_orientations:
-                self.iterations += self.batch_size
-
+            while not self.is_converged() or self.i < self.min_orientations:
                 # Run iteration
                 self.update(self.iterate())
 
                 # Update display
                 live.update(
                     self.display.build(
-                        self.iterations,
-                        self.batch_size,
+                        self.i,
                         self.sim_time,
                         self.min_orientations,
                         self.max_orientations,
                     )
                 )
 
-                if self.iterations > self.max_orientations:
+                if self.i > self.max_orientations:
                     break
 
     # def update_batch_size(self) -> None:
@@ -102,13 +101,31 @@ class Convergence:
 
     def update(self, result: Results) -> None:
         for target in self.targets:
-            target.update(result, self.batch_size)
+            target.update(result)
         # self.update_batch_size()
         self.inc_results(result)
 
     def inc_results(self, result: Results) -> None:
         # logic
         print("inc-ing")
+        # first do just with asymmetry
+        self.i += 1
+        if self.i == 1:
+            self.result_m = result  # initliase mean
+            self.result_w = null_result(result)  # initliase weight
+            self.result_s = null_result(result)  # initliase variance
+            self.result_ss = null_result(result)  # initliase variance
+        elif self.i > 1:
+            self.result_mm = self.result_m
+            self.result_ss = self.result_s
+            self.result_d = result - self.result_mm
+            self.result_m = self.result_mm + (self.result_d / self.i)
+            self.result_s = self.result_ss + self.result_d * self.result_d * (
+                (self.i - 1) / self.i
+            )
+            self.result_ww = self.result_w
+            self.result_dw = weight - self.result_ww
+            self.result_w = self.result_ww + (self.result_dw / self.i)
 
     @staticmethod
     def inc_val(old: float, new: float, iterations: int) -> float:
@@ -123,3 +140,28 @@ class Convergence:
         mp.solve()
         self.sim_time = time.time() - start
         return mp.results
+
+
+def null_result(result: Results) -> Results:
+    """
+    Create a null Results object with all values set to zero (excluding powers).
+    """
+    null_results = result
+    null_results.albedo = 0.0
+    null_results.scat_cross = 0.0
+    null_results.ext_cross = 0.0
+    null_results.asymmetry = 0.0
+    null_results.mueller = np.zeros_like(null_results.mueller, dtype=np.float32)
+    null_results.mueller_beam = np.zeros_like(
+        null_results.mueller_beam, dtype=np.float32
+    )
+    null_results.mueller_ext = np.zeros_like(null_results.mueller_ext, dtype=np.float32)
+    null_results.mueller_1d = np.zeros_like(null_results.mueller_1d, dtype=np.float32)
+    null_results.mueller_1d_beam = np.zeros_like(
+        null_results.mueller_1d_beam, dtype=np.float32
+    )
+    null_results.mueller_1d_ext = np.zeros_like(
+        null_results.mueller_1d_ext, dtype=np.float32
+    )
+
+    return null_results

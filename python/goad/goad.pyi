@@ -312,6 +312,22 @@ class MultiProblem:
 class Results:
     """GOAD scattering results."""
 
+    def __add__(self, other: Results) -> Results:
+        """Add two Results objects element-wise."""
+        ...
+
+    def __mul__(self, other: Results) -> Results:
+        """Multiply two Results objects element-wise."""
+        ...
+
+    def __sub__(self, other: Results) -> Results:
+        """Subtract two Results objects element-wise."""
+        ...
+
+    def __truediv__(self, other: float) -> Results:
+        """Divide Results by a scalar."""
+        ...
+
     @property
     def bins(self) -> list[list[float]]:
         """Return the 2d bins [[theta, phi], ...]"""
