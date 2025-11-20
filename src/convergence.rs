@@ -11,7 +11,7 @@ use crate::{
     geom::Geom,
     orientation::{Euler, Orientations, Scheme},
     problem::{init_geom, Problem},
-    result::Results,
+    result::{GOComponent, Results},
     settings::Settings,
 };
 
@@ -114,8 +114,8 @@ impl Convergence {
             .eulers
             .par_iter()
             .try_fold(
-                || None,
-                |accum, (a, b, g)| {
+                || null_results.clone(),
+                |mut accum, (a, b, g)| {
                     let mut problem = problem_base.clone();
                     let euler = Euler::new(*a, *b, *g);
 
@@ -123,14 +123,13 @@ impl Convergence {
                         eprintln!("Error running problem (will skip this iteration): {}", err);
                     }
                     println!(
-                        "asymmetry individual is {:?}",
-                        problem.result.params.asymmetry()
+                        "asymmetry individual is {:?}, current is {:?}",
+                        problem.result.params.asymmetry(&GOComponent::Total),
+                        accum.params.asymmetry(&GOComponent::Total)
                     );
 
-                    let accum = match accum {
-                        Some(accum) => Some(accum + problem.result),
-                        None => Some(problem.result),
-                    };
+                    accum = accum + problem.result;
+                    // println!("results areis {:?}", accum);
 
                     if dummy_condition() {
                         Err(accum)
@@ -140,16 +139,15 @@ impl Convergence {
                 },
             )
             .try_reduce(
-                || None,
+                || null_results.clone(),
                 |mut accum, item| {
                     // stop on global count > 50
-                    accum = match (accum, item) {
-                        (Some(accum), Some(item)) => Some(accum + item),
-                        (None, Some(item)) => Some(item),
-                        (Some(accum), None) => Some(accum),
-                        (None, None) => None,
-                    };
-
+                    println!(
+                        "accumulating: {:?} | {:?}",
+                        accum.params.asymmetry(&GOComponent::Total),
+                        item.params.asymmetry(&GOComponent::Total)
+                    );
+                    accum = accum + item;
                     if dummy_condition() {
                         Err(accum)
                     } else {
@@ -157,8 +155,11 @@ impl Convergence {
                     }
                 },
             );
-        if let Ok(Some(result)) = result {
-            println!("finished: {:?}", result.params.asymmetry());
+        if let Ok(result) = result {
+            println!(
+                "finished: {:?}",
+                result.params.asymmetry(&GOComponent::Total)
+            );
         }
     }
 }

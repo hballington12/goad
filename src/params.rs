@@ -2,15 +2,15 @@ use crate::result::GOComponent;
 use serde::Serialize;
 use std::{
     collections::HashMap,
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Div, Sub},
 };
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Params {
-    pub asymmetry: HashMap<GOComponent, f32>,
-    pub scat_cross: HashMap<GOComponent, f32>,
-    pub ext_cross: HashMap<GOComponent, f32>,
-    pub albedo: HashMap<GOComponent, f32>,
+    asymmetry: HashMap<GOComponent, f32>,
+    scat_cross: HashMap<GOComponent, f32>,
+    ext_cross: HashMap<GOComponent, f32>,
+    albedo: HashMap<GOComponent, f32>,
 }
 
 impl Div<f32> for Params {
@@ -18,6 +18,7 @@ impl Div<f32> for Params {
 
     fn div(self, rhs: f32) -> Self::Output {
         let mut params = Params::new();
+
         if let Some(asymmetry) = self.asymmetry() {
             params.set_asymmetry(asymmetry / rhs);
         }
@@ -34,50 +35,89 @@ impl Div<f32> for Params {
     }
 }
 
-impl Mul for Params {
-    type Output = Params;
-
-    fn mul(self, other: Params) -> Self::Output {
-        let mut params = Params::new();
-        if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry()) {
-            params.set_asymmetry(asymmetry * other_asymmetry);
-        }
-        if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
-            params.set_scat_cross(scatt * other_scatt);
-        }
-        if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
-            params.set_ext_cross(ext * other_ext);
-        }
-        if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
-            params.set_albedo(albedo * other_albedo);
-        }
-
-        params
-    }
-}
-
 impl Add for Params {
     type Output = Params;
 
     fn add(self, other: Params) -> Self::Output {
         let mut params = Params::new();
-        if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
-            params.set_scat_cross(scatt + other_scatt);
-
-            if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry())
-            {
-                // asymmetry parameters combine by scatt cross weighting
-                params.set_asymmetry(
-                    (asymmetry * scatt + other_asymmetry * other_scatt) / (scatt + other_scatt),
-                );
+        match (self.scat_cross(), other.scat_cross()) {
+            (Some(scat_cross), Some(other_scat_cross)) => {
+                params.set_scat_cross(scat_cross + other_scat_cross);
+                match (self.asymmetry(), other.asymmetry()) {
+                    (Some(asymmetry), Some(other_asymmetry)) => {
+                        params.set_asymmetry(
+                            (asymmetry * scat_cross + other_asymmetry * other_scat_cross)
+                                / (scat_cross + other_scat_cross),
+                        );
+                    }
+                    (None, Some(other_asymmetry)) => {
+                        params.set_asymmetry(other_asymmetry);
+                    }
+                    (Some(asymmetry), None) => {
+                        params.set_asymmetry(asymmetry);
+                    }
+                    _ => {}
+                }
             }
+            (None, Some(other_scat_cross)) => {
+                params.set_scat_cross(other_scat_cross);
+                match (self.asymmetry(), other.asymmetry()) {
+                    (None, Some(other_asymmetry)) => {
+                        params.set_asymmetry(other_asymmetry);
+                    }
+                    _ => {}
+                }
+            }
+            (Some(scat_cross), None) => {
+                params.set_scat_cross(scat_cross);
+                match (self.asymmetry(), other.asymmetry()) {
+                    (Some(asymmetry), None) => {
+                        params.set_asymmetry(asymmetry);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         }
-        if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
-            params.set_ext_cross(ext + other_ext);
-            if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
-                // albedo parameters combine by ext cross weighting
-                params.set_albedo((albedo * ext + other_albedo * other_ext) / (ext + other_ext));
+
+        match (self.ext_cross(), other.ext_cross()) {
+            (Some(ext_cross), Some(other_ext_cross)) => {
+                params.set_ext_cross(ext_cross + other_ext_cross);
+                match (self.albedo(), other.albedo()) {
+                    (Some(albedo), Some(other_albedo)) => {
+                        params.set_albedo(
+                            (albedo * ext_cross + other_albedo * other_ext_cross)
+                                / (ext_cross + other_ext_cross),
+                        );
+                    }
+                    (None, Some(other_albedo)) => {
+                        params.set_albedo(other_albedo);
+                    }
+                    (Some(albedo), None) => {
+                        params.set_albedo(albedo);
+                    }
+                    _ => {}
+                }
             }
+            (None, Some(other_ext_cross)) => {
+                params.set_ext_cross(other_ext_cross);
+                match (self.albedo(), other.albedo()) {
+                    (None, Some(other_albedo)) => {
+                        params.set_albedo(other_albedo);
+                    }
+                    _ => {}
+                }
+            }
+            (Some(ext_cross), None) => {
+                params.set_ext_cross(ext_cross);
+                match (self.albedo(), other.albedo()) {
+                    (Some(albedo), None) => {
+                        params.set_albedo(albedo);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         }
 
         params
@@ -89,23 +129,84 @@ impl Sub for Params {
 
     fn sub(self, other: Params) -> Self::Output {
         let mut params = Params::new();
-        if let (Some(scatt), Some(other_scatt)) = (self.scat_cross(), other.scat_cross()) {
-            params.set_scat_cross(scatt - other_scatt);
-
-            if let (Some(asymmetry), Some(other_asymmetry)) = (self.asymmetry(), other.asymmetry())
-            {
-                // asymmetry parameters combine by scatt cross weighting
-                params.set_asymmetry(
-                    (asymmetry * scatt - other_asymmetry * other_scatt) / (scatt + other_scatt),
-                );
+        match (self.scat_cross(), other.scat_cross()) {
+            (Some(scat_cross), Some(other_scat_cross)) => {
+                params.set_scat_cross(scat_cross - other_scat_cross);
+                match (self.asymmetry(), other.asymmetry()) {
+                    (Some(asymmetry), Some(other_asymmetry)) => {
+                        params.set_asymmetry(
+                            (asymmetry * scat_cross - other_asymmetry * other_scat_cross)
+                                / (scat_cross + other_scat_cross),
+                        );
+                    }
+                    (None, Some(other_asymmetry)) => {
+                        params.set_asymmetry(other_asymmetry);
+                    }
+                    (Some(asymmetry), None) => {
+                        params.set_asymmetry(asymmetry);
+                    }
+                    _ => {}
+                }
             }
+            (None, Some(other_scat_cross)) => {
+                params.set_scat_cross(other_scat_cross);
+                match (self.asymmetry(), other.asymmetry()) {
+                    (None, Some(other_asymmetry)) => {
+                        params.set_asymmetry(other_asymmetry);
+                    }
+                    _ => {}
+                }
+            }
+            (Some(scat_cross), None) => {
+                params.set_scat_cross(scat_cross);
+                match (self.asymmetry(), other.asymmetry()) {
+                    (Some(asymmetry), None) => {
+                        params.set_asymmetry(asymmetry);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         }
-        if let (Some(ext), Some(other_ext)) = (self.ext_cross(), other.ext_cross()) {
-            params.set_ext_cross(ext - other_ext);
-            if let (Some(albedo), Some(other_albedo)) = (self.albedo(), other.albedo()) {
-                // albedo parameters combine by ext cross weighting
-                params.set_albedo((albedo * ext - other_albedo * other_ext) / (ext + other_ext));
+
+        match (self.ext_cross(), other.ext_cross()) {
+            (Some(ext_cross), Some(other_ext_cross)) => {
+                params.set_ext_cross(ext_cross - other_ext_cross);
+                match (self.albedo(), other.albedo()) {
+                    (Some(albedo), Some(other_albedo)) => {
+                        params.set_albedo(
+                            (albedo * ext_cross - other_albedo * other_ext_cross)
+                                / (ext_cross + other_ext_cross),
+                        );
+                    }
+                    (None, Some(other_albedo)) => {
+                        params.set_albedo(other_albedo);
+                    }
+                    (Some(albedo), None) => {
+                        params.set_albedo(albedo);
+                    }
+                    _ => {}
+                }
             }
+            (None, Some(other_ext_cross)) => {
+                params.set_ext_cross(other_ext_cross);
+                match (self.albedo(), other.albedo()) {
+                    (None, Some(other_albedo)) => {
+                        params.set_albedo(other_albedo);
+                    }
+                    _ => {}
+                }
+            }
+            (Some(ext_cross), None) => {
+                params.set_ext_cross(ext_cross);
+                match (self.albedo(), other.albedo()) {
+                    (Some(albedo), None) => {
+                        params.set_albedo(albedo);
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         }
 
         params
@@ -123,42 +224,42 @@ impl Params {
     }
 
     /// Get asymmetry for Total component (backwards compatibility)
-    pub fn asymmetry(&self) -> Option<f32> {
-        self.asymmetry.get(&GOComponent::Total).copied()
+    pub fn asymmetry(&self, component: &GOComponent) -> Option<f32> {
+        self.asymmetry.get(&component).copied()
     }
 
     /// Set asymmetry for Total component (backwards compatibility)
-    pub fn set_asymmetry(&mut self, value: f32) {
-        self.asymmetry.insert(GOComponent::Total, value);
+    pub fn set_asymmetry(&mut self, component: &GOComponent, value: f32) {
+        self.asymmetry.insert(*component, value);
     }
 
     /// Get scat_cross for Total component (backwards compatibility)
-    pub fn scat_cross(&self) -> Option<f32> {
-        self.scat_cross.get(&GOComponent::Total).copied()
+    pub fn scat_cross(&self, component: &GOComponent) -> Option<f32> {
+        self.scat_cross.get(&component).copied()
     }
 
     /// Set scat_cross for Total component (backwards compatibility)
-    pub fn set_scat_cross(&mut self, value: f32) {
-        self.scat_cross.insert(GOComponent::Total, value);
+    pub fn set_scat_cross(&mut self, component: &GOComponent, value: f32) {
+        self.scat_cross.insert(*component, value);
     }
 
     /// Get ext_cross for Total component (backwards compatibility)
-    pub fn ext_cross(&self) -> Option<f32> {
-        self.ext_cross.get(&GOComponent::Total).copied()
+    pub fn ext_cross(&self, component: &GOComponent) -> Option<f32> {
+        self.ext_cross.get(&component).copied()
     }
 
     /// Set ext_cross for Total component (backwards compatibility)
-    pub fn set_ext_cross(&mut self, value: f32) {
-        self.ext_cross.insert(GOComponent::Total, value);
+    pub fn set_ext_cross(&mut self, component: &GOComponent, value: f32) {
+        self.ext_cross.insert(*component, value);
     }
 
     /// Get albedo for Total component (backwards compatibility)
-    pub fn albedo(&self) -> Option<f32> {
-        self.albedo.get(&GOComponent::Total).copied()
+    pub fn albedo(&self, component: &GOComponent) -> Option<f32> {
+        self.albedo.get(&component).copied()
     }
 
     /// Set albedo for Total component (backwards compatibility)
-    pub fn set_albedo(&mut self, value: f32) {
-        self.albedo.insert(GOComponent::Total, value);
+    pub fn set_albedo(&mut self, component: &GOComponent, value: f32) {
+        self.albedo.insert(*component, value);
     }
 }
