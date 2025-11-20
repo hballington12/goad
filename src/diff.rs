@@ -264,11 +264,17 @@ pub fn n2f_aperture_diffraction(
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
             let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
 
+            // Initial checks for frequent cases before calculate_summand()
             if alpha.is_infinite() || beta.is_infinite() || alpha.is_nan() || beta.is_nan() {
                 continue;
             }
 
             let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, inv_denom); // Pass inv_denom
+
+            // Final check just to be sure
+            if summand.is_nan() {
+                continue;
+            }
 
             fraunhofer_sum += summand;
         }
@@ -422,7 +428,8 @@ pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Ve
     let big_ky = prop2.y;
     let big_kz = prop2.z;
 
-    let sqrt_1_minus_k2y2 = (1.0 - bvk.y.powi(2)).sqrt();
+    let one_minus_k2y2 = (1.0 - bvk.y.powi(2)).max(0.0);
+    let sqrt_1_minus_k2y2 = one_minus_k2y2.sqrt();
     let sqrt_1_minus_k2y2 = if sqrt_1_minus_k2y2.abs() < settings::DIFF_EPSILON {
         settings::DIFF_EPSILON
     } else {
@@ -435,7 +442,7 @@ pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Ve
         -bvk.y * bvk.z / sqrt_1_minus_k2y2,
     );
 
-    let frac = ((1.0 - bvk.y.powi(2)) / (1.0 - big_ky.powi(2))).sqrt();
+    let frac = (one_minus_k2y2 / (1.0 - big_ky.powi(2))).sqrt();
     let frac = if frac.abs() < settings::DIFF_EPSILON {
         settings::DIFF_EPSILON
     } else {
