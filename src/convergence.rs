@@ -122,11 +122,6 @@ impl Convergence {
                     if let Err(err) = problem.run(Some(&euler)) {
                         eprintln!("Error running problem (will skip this iteration): {}", err);
                     }
-                    println!(
-                        "asymmetry individual is {:?}, current is {:?}",
-                        problem.result.params.asymmetry(&GOComponent::Total),
-                        accum.params.asymmetry(&GOComponent::Total)
-                    );
 
                     accum = accum + problem.result;
                     // println!("results areis {:?}", accum);

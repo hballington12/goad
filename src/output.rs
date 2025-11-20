@@ -223,7 +223,7 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     writeln!(writer, "# ----------")?;
 
     // Write parameters for Total component (backwards compatible)
-    if let Some(scat) = result.params.scat_cross(&GOComponent::Total) {
+    if let Some(scat) = result.params.scatt_cross(&GOComponent::Total) {
         writeln!(writer, "Scattering Cross Section: {:.6}", scat)?;
     }
     if let Some(ext) = result.params.ext_cross(&GOComponent::Total) {
@@ -250,7 +250,7 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
             _ => continue,
         };
 
-        if let Some(scat) = result.params.scat_cross(&component) {
+        if let Some(scat) = result.params.scatt_cross(&component) {
             writeln!(writer, "{} Scattering Cross Section: {:.6}", comp_str, scat)?;
         }
         if let Some(asym) = result.params.asymmetry(&component) {
