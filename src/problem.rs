@@ -353,7 +353,6 @@ impl Problem {
         }
         self.illuminate();
         self.solve();
-        self.compute_params();
         Ok(())
     }
 

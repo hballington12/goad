@@ -38,7 +38,7 @@ use std::time::Duration;
 /// print(f"Scattering cross-section: {results.scat_cross}")
 /// ```
 #[pyclass]
-#[derive(Debug)] // Added Default derive
+#[derive(Debug)]
 pub struct MultiProblem {
     pub geom: Geom,
     pub orientations: Orientations,
