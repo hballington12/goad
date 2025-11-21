@@ -21,15 +21,17 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
-dependencies = [
-    "mkdocs>=1.6.1",
+[project.optional-dependencies]
+docs = [
     "mkdocs-macros-plugin>=1.5.0",
+    "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.0",
-    "numpy>=1.20",
     "pymdown-extensions>=10.17.1",
+]
+dependencies = [
+    "numpy>=1.20",
     "pyy>=1.1.16",
     "rich>=14.2.0",
-    "twine>=6.2.0",
 ]
 license = {text = "GPL-3.0"}
 keywords = ["goad", "light-scattering", "optics", "simulation", "scientific-computing", "physics"]
