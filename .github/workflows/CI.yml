@@ -11,7 +11,7 @@ on:
       - main
       - master
     tags:
-      - '*'
+      - "*"
   pull_request:
   workflow_dispatch:
 
@@ -43,6 +43,8 @@ jobs:
           python-version: 3.x
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          CXXFLAGS: "-std=c++11"
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
@@ -99,6 +101,8 @@ jobs:
           python-version: 3.x
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          CXXFLAGS: "-std=c++11"
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
@@ -157,6 +161,8 @@ jobs:
           architecture: ${{ matrix.platform.target }}
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          CXXFLAGS: "-std=c++11"
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
@@ -193,6 +199,8 @@ jobs:
           python-version: 3.x
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          CXXFLAGS: "-std=c++11"
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
@@ -243,7 +251,7 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: 'wheels-*/*'
+          subject-path: "wheels-*/*"
       - name: Publish to PyPI
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: PyO3/maturin-action@v1
