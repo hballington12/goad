@@ -1,5 +1,5 @@
 [project]
-name = "goad"
+name = "goad-py"
 version = "1.0.0"
 description = "Physical optics light scattering computation"
 authors = [{name = "Harry Ballington", email = "ballington@uni-wuppertal.de"}]
