@@ -20,6 +20,15 @@ Asymmetry       0.7726 ± 0.0154 ━━━━━━━━━━━━━━━�
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
+## Accessing Results
+
+A GOAD `Convergence` class uses [Welford's algorithm](https://en.wikipedia.org/wiki/Monte_Carlo_method#Determining_a_sufficiently_large_n
+) to track the mean and variance of all scattering properties across each orientation. The example below shows how to access the mean results, and their corresponding errors:
+
+{{code_block('examples/convergence', 'results')}}
+
+It is important to note that the error here is only a best-case scenario estimate. It is the estimated error due to the Monte-Carlo orientation sampling. GOAD itself is an approximate method - the error in asymmetry parameter at size 60 is typically ~1% compared to more accurate methods like the discrete dipole approximation. For this reason, it doesn't make much sense to converge beyond a relative error of 0.1%. True error decreases with size, so you might want to converge to smaller thresholds then.
+
 ## Multiple Targets
 
 It is possible to set multiple targets to converge on. The convergence will then run until all targets have converged. The following example runs until 2% error in the asymmetry parameter and 2% error in the extinction cross section for a particle with a modified imaginary part of the refractive index (see the [`Settings`](settings.md) class for full details on configuration options):

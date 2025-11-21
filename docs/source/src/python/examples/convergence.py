@@ -66,3 +66,20 @@ convergence = Convergence(
 )
 convergence.run()
 # --8<-- [end:extcross]
+
+# --8<-- [start:results]
+from goad import Settings
+from goad.convergence.asymmetry import Asymmetry
+from goad.convergence.base import Convergence
+from goad.convergence.convergable import Tolerance
+
+convergence = Convergence(
+    Settings(geom_path="../../../examples/data/hex.obj", quiet=True),
+    [Asymmetry(tolerance=Tolerance.RELATIVE, threshold=0.02)],
+)
+convergence.run()
+results = convergence.results()
+error = convergence.results_sem()
+
+print(f"Asymmetry: {results.asymmetry:.4f} +/- {error.asymmetry:.4f}")
+# --8<-- [end:results]

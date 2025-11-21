@@ -5,7 +5,6 @@ nav:
   - results.md
   - checks.md
   - convergence.md
-  # - About: about.md
 
 # site_url: tbd
 repo_url: https://github.com/hballington12/goad
@@ -23,7 +22,6 @@ theme:
   logo: img/favicon.png
   name: material
   locale: en
-  custom_dir: docs/source/_build/overrides
   favicon: img/favicon.ico
   palette:
     # Palette toggle for light mode
