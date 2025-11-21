@@ -1,8 +1,9 @@
 use crate::result::GOComponent;
+use rand_distr::num_traits::Pow;
 use serde::Serialize;
 use std::{
     collections::HashMap,
-    ops::{Add, Div, Sub},
+    ops::{Add, Div, Mul, Sub},
 };
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -31,6 +32,39 @@ impl Div<f32> for Params {
         let mut params = self.clone();
         for ((param, component), value) in self.params.iter() {
             params.set_param(*param, *component, value / rhs);
+        }
+        params
+    }
+}
+
+impl Pow<f32> for Params {
+    type Output = Params;
+    fn pow(self, rhs: f32) -> Self::Output {
+        let mut params = self.clone();
+        for (key, _) in self.params.iter() {
+            params.params.entry(*key).or_default().pow(rhs);
+        }
+        params
+    }
+}
+
+impl Mul<f32> for Params {
+    type Output = Params;
+    fn mul(self, rhs: f32) -> Self::Output {
+        let mut params = self.clone();
+        for (key, _) in self.params.iter() {
+            *params.params.entry(*key).or_default() *= rhs;
+        }
+        params
+    }
+}
+
+impl Mul<Params> for Params {
+    type Output = Params;
+    fn mul(self, other: Params) -> Self::Output {
+        let mut params = self.clone();
+        for (key, value) in other.params.iter() {
+            *params.params.entry(*key).or_default() *= value;
         }
         params
     }

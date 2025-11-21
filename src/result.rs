@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 use std::fmt::Debug;
 use std::ops::Add;
+use std::ops::AddAssign;
 use std::ops::Div;
 use std::ops::Mul;
 use std::ops::Sub;
@@ -18,6 +19,8 @@ use ndarray::Array2;
 use numpy::PyArrayMethods;
 use numpy::{IntoPyArray, PyArray2};
 use pyo3::prelude::*;
+use rand_distr::num_traits::pow;
+use rand_distr::num_traits::Pow;
 use serde::Serialize;
 
 /// Trait for different types of scattering bins (1D or 2D)
@@ -206,6 +209,38 @@ pub struct ScattResult<B: ScatteringBin> {
     pub mueller_ext: Mueller,
 }
 
+impl<B: ScatteringBin> Pow<f32> for ScattResult<B> {
+    type Output = Self;
+
+    fn pow(self, rhs: f32) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total.map(|c| c.powf(rhs)),
+            ampl_beam: self.ampl_beam.map(|c| c.powf(rhs)),
+            ampl_ext: self.ampl_ext.map(|c| c.powf(rhs)),
+            mueller_total: self.mueller_total.map(|m| m.powf(rhs)),
+            mueller_beam: self.mueller_beam.map(|m| m.powf(rhs)),
+            mueller_ext: self.mueller_ext.map(|m| m.powf(rhs)),
+        }
+    }
+}
+
+impl<B: ScatteringBin> Mul<f32> for ScattResult<B> {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total * Complex::from(rhs),
+            ampl_beam: self.ampl_beam * Complex::from(rhs),
+            ampl_ext: self.ampl_ext * Complex::from(rhs),
+            mueller_total: self.mueller_total * rhs,
+            mueller_beam: self.mueller_beam * rhs,
+            mueller_ext: self.mueller_ext * rhs,
+        }
+    }
+}
+
 impl<B: ScatteringBin> Mul for ScattResult<B> {
     type Output = ScattResult<B>;
 
@@ -302,6 +337,101 @@ pub struct Results {
     pub field_1d: Option<Vec<ScattResult1D>>,
     pub powers: Powers,
     pub params: Params,
+}
+
+impl AddAssign for Results {
+    fn add_assign(&mut self, other: Self) {
+        *self = Self {
+            field_2d: self
+                .field_2d
+                .clone()
+                .into_iter()
+                .zip(other.field_2d)
+                .map(|(a, b)| a + b)
+                .collect(),
+            field_1d: match (self.field_1d.clone(), other.field_1d) {
+                (Some(field_1d), Some(other_field_1d)) => Some(
+                    field_1d
+                        .into_iter()
+                        .zip(other_field_1d)
+                        .map(|(a, b)| a + b)
+                        .collect(),
+                ),
+                (Some(field_1d), None) => Some(field_1d),
+                (None, Some(other_field_1d)) => Some(other_field_1d),
+                (None, None) => None,
+            },
+            powers: self.powers.clone() + other.powers,
+            params: self.params.clone() + other.params,
+        };
+    }
+}
+
+impl Pow<f32> for Results {
+    type Output = Self;
+
+    fn pow(self, rhs: f32) -> Self {
+        let field_1d = match self.field_1d {
+            Some(field_1d) => Some(field_1d.into_iter().map(|a| a.pow(rhs)).collect()),
+            None => None,
+        };
+        Self {
+            field_2d: self.field_2d.into_iter().map(|a| a.pow(rhs)).collect(),
+            field_1d,
+            powers: self.powers.pow(rhs),
+            params: self.params.pow(rhs),
+        }
+    }
+}
+
+impl Mul<f32> for Results {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        let field_1d = match self.field_1d {
+            Some(field_1d) => Some(field_1d.into_iter().map(|a| a * rhs).collect()),
+            None => None,
+        };
+        Self {
+            field_2d: self.field_2d.into_iter().map(|a| a * rhs).collect(),
+            field_1d,
+            powers: self.powers * rhs,
+            params: self.params * rhs,
+        }
+    }
+}
+
+impl Mul for Results {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a * b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(field_1d), Some(other_field_1d)) => Some(
+                field_1d
+                    .into_iter()
+                    .zip(other_field_1d)
+                    .map(|(a, b)| a * b)
+                    .collect(),
+            ),
+            (Some(field_1d), None) => Some(field_1d),
+            (None, Some(other_field_1d)) => Some(other_field_1d),
+            (None, None) => None,
+        };
+        let powers = self.powers * other.powers;
+        let params = self.params * other.params;
+        Self {
+            field_2d,
+            field_1d,
+            powers,
+            params,
+        }
+    }
 }
 
 impl Add for Results {
@@ -551,6 +681,38 @@ impl Results {
 
 #[pymethods]
 impl Results {
+    fn __add__(&self, other: &Results) -> Results {
+        self.clone() + other.clone()
+    }
+
+    fn __sub__(&self, other: &Results) -> Results {
+        self.clone() - other.clone()
+    }
+
+    fn __pow__(&self, exponent: f32, _modulo: Option<u32>) -> Results {
+        self.clone().pow(exponent)
+    }
+
+    fn __mul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Results> {
+        // Try to extract as Results first
+        if let Ok(other_results) = other.extract::<Results>() {
+            return Ok(self.clone() * other_results);
+        }
+
+        // Try to extract as f32
+        if let Ok(scalar) = other.extract::<f32>() {
+            return Ok(self.clone() * scalar);
+        }
+
+        // If neither works, return an error
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "unsupported operand type(s) for *: 'Results' and the provided type",
+        ))
+    }
+
+    fn __truediv__(&self, rhs: f32) -> Results {
+        self.clone() / rhs
+    }
     /// Get the bins as a list of tuples (returns bin centers for backwards compatibility)
     #[getter]
     pub fn get_bins(&self) -> Vec<(f32, f32)> {

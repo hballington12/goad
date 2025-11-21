@@ -316,8 +316,12 @@ class Results:
         """Add two Results objects element-wise."""
         ...
 
-    def __mul__(self, other: Results) -> Results:
-        """Multiply two Results objects element-wise."""
+    def __mul__(self, other: Results | float) -> Results:
+        """Multiply Results by another Results object or a scalar."""
+        ...
+
+    def __pow__(self, exponent: float) -> Results:
+        """Raise Results to a power."""
         ...
 
     def __sub__(self, other: Results) -> Results:

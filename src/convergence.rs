@@ -5,6 +5,7 @@ use std::sync::{
 
 use anyhow::Result;
 
+use numpy::npyffi::NPY_ITER_GLOBAL_FLAGS;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
@@ -17,10 +18,12 @@ use crate::{
 
 pub struct Convergence {
     pub geom: Geom,
-    pub orientations: Orientations, // shared (maximum) orientations
-    pub settings: Settings,         // runtime settings
-    pub result: Results,            // mean result of the problems
-    pub result_var: Results,        // result variance
+    pub orientations: Orientations,  // shared (maximum) orientations
+    pub settings: Settings,          // runtime settings
+    pub result: Option<Results>,     // mean result of the problems
+    pub result_var: Option<Results>, // result variance
+    pub max_orientations: usize,
+    is_converged: bool,
 }
 
 impl Convergence {
@@ -56,8 +59,8 @@ impl Convergence {
         let orientations = Orientations::generate(&orientation_scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
 
-        let result = Results::new_empty(&bins);
-        let result_var = Results::new_empty(&bins);
+        let result = None;
+        let result_var = Some(Results::new_empty(&bins));
 
         Ok(Self {
             geom,
@@ -65,97 +68,49 @@ impl Convergence {
             settings,
             result,
             result_var,
+            max_orientations,
+            is_converged: false,
         })
     }
 
-    // 1. Update function signature to return Result (Error fix E0277)
     pub fn run(&mut self) {
-        // let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
-
-        // let bins = self.result.bins();
-
-        // self.result = self
-        //     .orientations
-        //     .eulers
-        //     .par_iter()
-        //     .try_fold(
-        //         // 2. Identity must return the raw type 'Results', not 'Ok(Results)'
-        //         || Results::new_empty(&bins),
-        //         |accum, (a, b, g)| {
-        //             let mut problem = problem_base.clone();
-        //             let euler = Euler::new(*a, *b, *g);
-
-        //             // This '?' works because the closure returns Result<Results, E>
-        //             let b: () = problem.run(Some(&euler))?;
-
-        //             Ok(accum + problem.result)
-        //         },
-        //     )
-        //     .try_reduce(
-        //         // 3. Identity for reduce must also return 'Results'
-        //         || Results::new_empty(&bins),
-        //         // 4. Inputs 'a' and 'b' are already unwrapped 'Results'.
-        //         //    No '?' needed on a or b. Return 'Ok' to satisfy signature.
-        //         |a, b| Ok(a + b),
-        //     )?; // 5. The final '?' propagates the error out of 'fn run'
-
-        let bytes = 0..22_u8;
-        let sum = bytes
-            .into_par_iter()
-            .try_fold(|| 0_u32, |a: u32, b: u8| a.checked_add(b as u32))
-            .try_reduce(|| 0, u32::checked_add); // Ok(())
-
         let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
-        let bins = &self.result.bins();
-        let null_results = Results::new_empty(bins);
+        let mut i = 0;
+        while !self.is_converged && i < self.max_orientations {
+            println!("Iteration {}", i);
+            let (alpha, beta, gamma) = self.orientations.eulers[i];
+            let mut problem = problem_base.clone();
+            if let Err(err) = problem.run(Some(&Euler::new(alpha, beta, gamma))) {
+                eprintln!("Error running problem (will skip this iteration): {}", err);
+            }
 
-        let result = self
-            .orientations
-            .eulers
-            .par_iter()
-            .try_fold(
-                || null_results.clone(),
-                |mut accum, (a, b, g)| {
-                    let mut problem = problem_base.clone();
-                    let euler = Euler::new(*a, *b, *g);
+            i += 1;
+            if i == 1 {
+                self.result = Some(problem.result);
+            } else {
+                let mm = self.result.take().unwrap(); // remove unwrap
+                let ss = self.result_var.take().unwrap();
+                let d = problem.result - mm.clone();
+                self.result = Some(mm + d.clone() / (i as f32));
+                self.result_var = Some(ss + d.clone() * d * (((i - 1) as f32) / (i as f32)));
+            }
 
-                    if let Err(err) = problem.run(Some(&euler)) {
-                        eprintln!("Error running problem (will skip this iteration): {}", err);
-                    }
+            let asymmetry = self.result.clone().unwrap().get_asymmetry().unwrap();
 
-                    accum = accum + problem.result;
-                    // println!("results areis {:?}", accum);
+            let asymmetry_var = self
+                .result_var
+                .clone()
+                .unwrap()
+                .get_asymmetry()
+                .unwrap_or_default();
+            let asymmetry_sem = (asymmetry_var / ((i - 1) as f32)).sqrt();
+            println!("asymmetry = {:?} + {:?}", asymmetry, asymmetry_sem);
 
-                    if dummy_condition() {
-                        Err(accum)
-                    } else {
-                        Ok(accum)
-                    }
-                },
-            )
-            .try_reduce(
-                || null_results.clone(),
-                |mut accum, item| {
-                    // stop on global count > 50
-                    println!(
-                        "accumulating: {:?} | {:?}",
-                        accum.params.asymmetry(&GOComponent::Total),
-                        item.params.asymmetry(&GOComponent::Total)
-                    );
-                    accum = accum + item;
-                    if dummy_condition() {
-                        Err(accum)
-                    } else {
-                        Ok(accum)
-                    }
-                },
-            );
-        if let Ok(result) = result {
-            println!(
-                "finished: {:?}",
-                result.params.asymmetry(&GOComponent::Total)
-            );
+            if i > 500 {
+                self.is_converged = true;
+            }
         }
+        println!("done.")
     }
 }
 

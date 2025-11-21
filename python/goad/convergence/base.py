@@ -32,7 +32,7 @@ class Convergence:
             min_orientations  # stop early termination in lucky cases
         )
         self.i: int = 0
-        self.result_m: None | Results = None
+        self.result: None | Results = None
         self.result_mm: None | Results = None
         self.result_d: None | Results = None
         self.result_w: None | Results = None
@@ -82,22 +82,9 @@ class Convergence:
                 if self.i > self.max_orientations:
                     break
 
-    # def update_batch_size(self) -> None:
-    #     """Update the batch size to balance performance with repsonsiveness."""
-    #     if np.isinf(self.sim_time):
-    #         return
-    #     optimal_batch_size = max(
-    #         1, int(self.batch_size / self.sim_time / self.refresh_rate)
-    #     )
-    #     #  weighted mean of current mean batch size and optimal based on last batch
-    #     self.batch_size = int(
-    #         (
-    #             self.batch_size * (self.iterations - self.batch_size)
-    #             + optimal_batch_size * self.batch_size
-    #         )
-    #         / self.iterations
-    #     )
-    #     self.goad_settings.orientation = Orientation.uniform(self.batch_size)
+            if self.result is not None:
+                print("converged")
+                print(f"asymmetry is: {self.result.asymmetry}")
 
     def update(self, result: Results) -> None:
         for target in self.targets:
@@ -106,26 +93,20 @@ class Convergence:
         self.inc_results(result)
 
     def inc_results(self, result: Results) -> None:
-        # logic
-        print("inc-ing")
-        # first do just with asymmetry
         self.i += 1
         if self.i == 1:
-            self.result_m = result  # initliase mean
-            self.result_w = null_result(result)  # initliase weight
-            self.result_s = null_result(result)  # initliase variance
-            self.result_ss = null_result(result)  # initliase variance
+            self.result = result  # initliase mean
         elif self.i > 1:
-            self.result_mm = self.result_m
+            self.result_mm = self.result
             self.result_ss = self.result_s
-            self.result_d = result - self.result_mm
-            self.result_m = self.result_mm + (self.result_d / self.i)
-            self.result_s = self.result_ss + self.result_d * self.result_d * (
-                (self.i - 1) / self.i
-            )
-            self.result_ww = self.result_w
-            self.result_dw = weight - self.result_ww
-            self.result_w = self.result_ww + (self.result_dw / self.i)
+            self.result_d = result - self.result_mm  # pyright: ignore[reportOperatorIssue]
+            self.result = self.result_mm + (self.result_d / self.i)  # pyright: ignore[reportOptionalOperand]
+            if self.i == 2:
+                self.result_s = self.result_d**2 * ((self.i - 1) / self.i)
+            else:
+                self.result_s = self.result_ss + self.result_d**2 * (  # pyright: ignore[reportOptionalOperand]
+                    (self.i - 1) / self.i
+                )
 
     @staticmethod
     def inc_val(old: float, new: float, iterations: int) -> float:
