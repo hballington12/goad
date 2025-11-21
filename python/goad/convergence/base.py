@@ -32,7 +32,7 @@ class Convergence:
             min_orientations  # stop early termination in lucky cases
         )
         self.i: int = 0
-        self.result: None | Results = None
+        self.result_m: None | Results = None
         self.result_mm: None | Results = None
         self.result_d: None | Results = None
         self.result_w: None | Results = None
@@ -46,6 +46,14 @@ class Convergence:
         self.goad_settings = goad_settings
 
         self.display = ConvergenceDisplay(self.targets)
+
+    def results(self) -> None | Results:
+        return self.result_m
+
+    def results_sem(self) -> None | Results:
+        if self.result_m is None:
+            return None
+        return self.result_m**0.5 / (self.i - 1)
 
     def is_converged(self) -> bool:
         return all(target.is_converged() for target in self.targets)
@@ -65,7 +73,11 @@ class Convergence:
             refresh_per_second=self.refresh_rate,
             transient=False,
         ) as live:
-            while not self.is_converged() or self.i < self.min_orientations:
+            while True:
+                if self.is_converged() and self.i > self.min_orientations:
+                    print(f"Converged in {self.i} iterations")
+                    break
+
                 # Run iteration
                 self.update(self.iterate())
 
@@ -80,27 +92,26 @@ class Convergence:
                 )
 
                 if self.i > self.max_orientations:
+                    print(f"Did not converge after {self.i} iterations")
                     break
 
-            if self.result is not None:
-                print("converged")
-                print(f"asymmetry is: {self.result.asymmetry}")
+            if self.result_m is not None:
+                print(f"asymmetry is: {self.result_m.asymmetry}")
 
     def update(self, result: Results) -> None:
         for target in self.targets:
             target.update(result)
-        # self.update_batch_size()
         self.inc_results(result)
 
     def inc_results(self, result: Results) -> None:
         self.i += 1
         if self.i == 1:
-            self.result = result  # initliase mean
+            self.result_m = result  # initliase mean
         elif self.i > 1:
-            self.result_mm = self.result
+            self.result_mm = self.result_m
             self.result_ss = self.result_s
             self.result_d = result - self.result_mm  # pyright: ignore[reportOperatorIssue]
-            self.result = self.result_mm + (self.result_d / self.i)  # pyright: ignore[reportOptionalOperand]
+            self.result_m = self.result_mm + (self.result_d / self.i)  # pyright: ignore[reportOptionalOperand]
             if self.i == 2:
                 self.result_s = self.result_d**2 * ((self.i - 1) / self.i)
             else:
@@ -121,28 +132,3 @@ class Convergence:
         mp.solve()
         self.sim_time = time.time() - start
         return mp.results
-
-
-def null_result(result: Results) -> Results:
-    """
-    Create a null Results object with all values set to zero (excluding powers).
-    """
-    null_results = result
-    null_results.albedo = 0.0
-    null_results.scat_cross = 0.0
-    null_results.ext_cross = 0.0
-    null_results.asymmetry = 0.0
-    null_results.mueller = np.zeros_like(null_results.mueller, dtype=np.float32)
-    null_results.mueller_beam = np.zeros_like(
-        null_results.mueller_beam, dtype=np.float32
-    )
-    null_results.mueller_ext = np.zeros_like(null_results.mueller_ext, dtype=np.float32)
-    null_results.mueller_1d = np.zeros_like(null_results.mueller_1d, dtype=np.float32)
-    null_results.mueller_1d_beam = np.zeros_like(
-        null_results.mueller_1d_beam, dtype=np.float32
-    )
-    null_results.mueller_1d_ext = np.zeros_like(
-        null_results.mueller_1d_ext, dtype=np.float32
-    )
-
-    return null_results
