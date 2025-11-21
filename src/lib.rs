@@ -13,7 +13,6 @@ pub mod beam;
 pub mod bins;
 pub mod clip;
 pub mod containment;
-pub mod convergence;
 pub mod diff;
 pub mod distortion;
 pub mod field;
