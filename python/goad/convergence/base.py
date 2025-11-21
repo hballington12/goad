@@ -102,7 +102,6 @@ class Convergence:
 
         Executes Monte Carlo simulations iteratively, updating statistics and live
         display until convergence criteria are met or `max_orientations` is reached.
-        Prints final convergence status and asymmetry parameter.
         """
         self.i = 0
 
@@ -140,9 +139,6 @@ class Convergence:
                     print(f"Did not converge after {self.i} iterations")
                     break
 
-            if self.result_m is not None:
-                print(f"asymmetry is: {self.result_m.asymmetry}")
-
     def _update(self, result: Results) -> None:
         """
         Update all convergence targets and running statistics with new results.
@@ -157,9 +153,6 @@ class Convergence:
     def _inc_results(self, result: Results) -> None:
         """
         Incrementally update mean and variance using Welford's online algorithm.
-
-        This numerically stable algorithm avoids catastrophic cancellation that
-        can occur with naive variance computation.
 
         Args:
             `result`: New `Results` object to incorporate into statistics
