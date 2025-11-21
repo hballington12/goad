@@ -11,12 +11,12 @@ class Albedo(Convergable):
 
     def update(self, result: Results) -> None:
         if result.albedo is None or np.isnan(result.albedo):
-            # print("INFO: Tried to update but albedo is None or NaN")
             return
 
-        # batch size is always 1
-        self.i += 1
-        self.tracker.update(value=result.albedo)
+        if result.ext_cross is None or np.isnan(result.ext_cross):
+            return
+
+        self.tracker.update(value=result.albedo, weight=result.ext_cross)
 
     @property
     def mean(self) -> float | None:

@@ -19,7 +19,6 @@ class Convergable(ABC):
         self.name = name
         self.tolerance = tolerance
         self.threshold = threshold
-        self.i = 0
 
     def is_converged(self) -> bool:
         mean = self.mean

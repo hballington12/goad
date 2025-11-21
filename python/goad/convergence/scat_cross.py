@@ -11,10 +11,8 @@ class ScattCross(Convergable):
 
     def update(self, result: Results) -> None:
         if result.scat_cross is None or np.isnan(result.scat_cross):
-            # print("INFO: Tried to update but scattering cross section is None or NaN")
             return
 
-        self.i += 1
         self.tracker.update(value=result.scat_cross)
 
     @property

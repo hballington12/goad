@@ -16,8 +16,6 @@ class Asymmetry(Convergable):
         if result.scat_cross is None or np.isnan(result.scat_cross):
             return
 
-        # batch size is always 1
-        self.i += 1
         self.tracker.update(value=result.asymmetry, weight=result.scat_cross)
 
     @property
