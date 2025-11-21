@@ -1,9 +1,7 @@
 use crate::diff::n2f_go;
-use crate::field::AmplMatrix;
-use crate::result::MuellerMatrix;
+use crate::field::{Ampl, AmplMatrix};
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
-    bins::generate_bins,
     diff::Mapping,
     field::Field,
     geom::{Face, Geom},
@@ -15,6 +13,7 @@ use crate::{
 use anyhow::Result;
 use nalgebra::{Complex, Point3, Vector3};
 use pyo3::prelude::*;
+use rayon::prelude::*;
 
 #[cfg(test)]
 mod tests {
@@ -127,7 +126,7 @@ impl Problem {
         });
         init_geom(&settings, &mut geom);
 
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
         let solution = Results::new_empty(&bins);
 
         let problem = Self {
@@ -183,7 +182,7 @@ impl Problem {
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
         let settings = load_config().expect("Failed to load config");
 
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
         let solution = Results::new_empty(&bins);
 
         Self {
@@ -225,15 +224,35 @@ impl Problem {
         }
     }
 
+    fn assign_ampls(&mut self, component: GOComponent, ampls: Vec<Ampl>) {
+        for (field, ampl) in self.result.field_2d.iter_mut().zip(ampls) {
+            match component {
+                GOComponent::Total => field.ampl_total = ampl,
+                GOComponent::Beam => field.ampl_beam = ampl,
+                GOComponent::ExtDiff => field.ampl_ext = ampl,
+            }
+        }
+    }
+
+    fn assign_muellers(&mut self, component: GOComponent, muellers: Vec<Mueller>) {
+        for (field, mueller) in self.result.field_2d.iter_mut().zip(muellers) {
+            match component {
+                GOComponent::Total => field.mueller_total = mueller,
+                GOComponent::Beam => field.mueller_beam = mueller,
+                GOComponent::ExtDiff => field.mueller_ext = mueller,
+            }
+        }
+    }
+
     pub fn solve_far_queue(&mut self, component: GOComponent) {
         let (queue, mapping, fov_factor) = match component {
             GOComponent::Beam => (
-                &mut self.out_beam_queue,
+                &self.out_beam_queue,
                 self.settings.mapping,
                 self.settings.fov_factor,
             ),
             GOComponent::ExtDiff => (
-                &mut self.ext_diff_beam_queue,
+                &self.ext_diff_beam_queue,
                 Mapping::ApertureDiffraction,
                 None,
             ),
@@ -241,42 +260,61 @@ impl Problem {
                 panic!("No such beam queue exists for GOComponent: {:?}", component)
             }
         };
-        let coherence = self.settings.coherence;
-        for beam in queue.iter() {
-            let tuples = match mapping {
+
+        let map_beam_to_far_field = |beam: &Beam| -> Vec<Ampl> {
+            match mapping {
                 Mapping::GeometricOptics => {
-                    // TODO: convert to Beam method
                     n2f_go(&self.settings.binning, &self.result.bins(), beam)
                 }
                 Mapping::ApertureDiffraction => beam.diffract(&self.result.bins(), fov_factor),
-            };
-
-            for (n, ampl) in tuples {
-                if !ampl.is_valid() {
-                    continue; // skip invalid amplitudes
-                }
-                // if coherence, sum amplitudes now, reduce to mueller later
-                if coherence {
-                    let ampl_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].ampl_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].ampl_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].ampl_ext,
-                    };
-                    *ampl_target += ampl;
-                } else {
-                    // if no coherence, reduce to mueller now
-                    let mueller = ampl.to_mueller();
-                    let mueller_target = match component {
-                        GOComponent::Total => &mut self.result.field_2d[n].mueller_total,
-                        GOComponent::Beam => &mut self.result.field_2d[n].mueller_beam,
-                        GOComponent::ExtDiff => &mut self.result.field_2d[n].mueller_ext,
-                    };
-                    *mueller_target += mueller;
-                }
             }
-        }
-        if coherence {
+        };
+
+        // coherence:
+        if self.settings.coherence {
+            let zero_ampls: Vec<Ampl> =
+                self.result.field_2d.iter().map(|_| Ampl::zeros()).collect();
+            let ampls = queue
+                .par_iter()
+                .map(|beam| map_beam_to_far_field(beam))
+                .reduce(
+                    || zero_ampls.clone(),
+                    |mut acc, val| {
+                        for (i, ampl) in val.into_iter().enumerate() {
+                            acc[i] += ampl;
+                        }
+                        acc
+                    },
+                );
+
+            self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
+        } else {
+            // no coherence
+            let zero_muellers: Vec<Mueller> = self
+                .result
+                .field_2d
+                .iter()
+                .map(|_| Mueller::zeros())
+                .collect();
+            let muellers = queue
+                .par_iter()
+                .map(|beam| {
+                    let ampls = map_beam_to_far_field(beam);
+                    let muellers = ampls.into_iter().map(|ampl| ampl.to_mueller()).collect();
+                    muellers
+                })
+                .reduce(
+                    || zero_muellers.clone(),
+                    |mut acc, val| {
+                        for (i, mueller) in val.into_iter().enumerate() {
+                            acc[i] += mueller;
+                        }
+                        acc
+                    },
+                );
+
+            self.assign_muellers(component, muellers);
         }
     }
 
@@ -315,7 +353,6 @@ impl Problem {
         }
         self.illuminate();
         self.solve();
-        self.compute_params();
         Ok(())
     }
 
@@ -519,15 +556,15 @@ impl Problem {
     }
 }
 
-/// Collects a 2d array as a list of lists.
-/// There is probably already a function for this in ndarray.
-pub fn collect_mueller(muellers: &[Mueller]) -> Vec<Vec<f32>> {
-    let mut mueller_list = Vec::new();
-    for mueller in muellers.iter() {
-        mueller_list.push(mueller.to_vec());
-    }
-    mueller_list
-}
+// /// Collects a 2d array as a list of lists.
+// /// There is probably already a function for this in ndarray.
+// pub fn collect_mueller(muellers: &[Mueller]) -> Vec<Vec<f32>> {
+//     let mut mueller_list = Vec::new();
+//     for mueller in muellers.iter() {
+//         mueller_list.push(mueller.to_vec());
+//     }
+//     mueller_list
+// }
 
 /// Find the position to insert the beam using binary search.
 fn get_position_by_power(value: f32, queue: &Vec<Beam>, ascending: bool) -> usize {

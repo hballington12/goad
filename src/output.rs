@@ -1,4 +1,4 @@
-use crate::result::MuellerMatrix;
+use crate::result::{GOComponent, MuellerMatrix};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -223,16 +223,16 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     writeln!(writer, "# ----------")?;
 
     // Write parameters for Total component (backwards compatible)
-    if let Some(scat) = result.params.scat_cross() {
+    if let Some(scat) = result.params.scatt_cross(&GOComponent::Total) {
         writeln!(writer, "Scattering Cross Section: {:.6}", scat)?;
     }
-    if let Some(ext) = result.params.ext_cross() {
+    if let Some(ext) = result.params.ext_cross(&GOComponent::Total) {
         writeln!(writer, "Extinction Cross Section: {:.6}", ext)?;
     }
-    if let Some(albedo) = result.params.albedo() {
+    if let Some(albedo) = result.params.albedo(&GOComponent::Total) {
         writeln!(writer, "Single Scattering Albedo: {:.6}", albedo)?;
     }
-    if let Some(asym) = result.params.asymmetry() {
+    if let Some(asym) = result.params.asymmetry(&GOComponent::Total) {
         writeln!(writer, "Asymmetry Parameter: {:.6}", asym)?;
     }
 
@@ -250,10 +250,10 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
             _ => continue,
         };
 
-        if let Some(scat) = result.params.scat_cross.get(&component) {
+        if let Some(scat) = result.params.scatt_cross(&component) {
             writeln!(writer, "{} Scattering Cross Section: {:.6}", comp_str, scat)?;
         }
-        if let Some(asym) = result.params.asymmetry.get(&component) {
+        if let Some(asym) = result.params.asymmetry(&component) {
             writeln!(writer, "{} Asymmetry Parameter: {:.6}", comp_str, asym)?;
         }
     }

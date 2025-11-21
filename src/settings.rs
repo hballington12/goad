@@ -105,6 +105,7 @@ impl Settings {
         mapping = DEFAULT_MAPPING,
         coherence = DEFAULT_COHERENCE,
         quiet = DEFAULT_QUIET,
+        seed = None,
     ))]
     fn py_new(
         geom_path: String,
@@ -125,6 +126,7 @@ impl Settings {
         mapping: Mapping,
         coherence: bool,
         quiet: bool,
+        seed: Option<u64>,
     ) -> PyResult<Self> {
         // Input validation
         if wavelength <= 0.0 {
@@ -189,7 +191,7 @@ impl Settings {
             max_rec,
             max_tir,
             binning,
-            seed: None,
+            seed,
             scale,
             distortion: None,
             geom_scale: None,
@@ -208,7 +210,7 @@ impl Settings {
 
     /// Set the euler angles
     #[setter]
-    fn set_euler(&mut self, euler: Vec<f32>) {
+    fn set_eulers(&mut self, euler: Vec<f32>) {
         self.orientation = Orientation {
             scheme: Scheme::Discrete {
                 eulers: vec![Euler::new(euler[0], euler[1], euler[2])],
@@ -219,7 +221,7 @@ impl Settings {
 
     /// Get the euler angle, assuming the orientation scheme is discrete
     #[getter]
-    fn get_euler(&self) -> Vec<f32> {
+    fn get_eulers(&self) -> Vec<f32> {
         match &self.orientation.scheme {
             Scheme::Discrete { eulers } => vec![eulers[0].alpha, eulers[0].beta, eulers[0].gamma],
             _ => vec![0.0, 0.0, 0.0],

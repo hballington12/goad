@@ -1,15 +1,26 @@
 use std::f32::consts::PI;
 use std::fmt::Debug;
+use std::ops::Add;
+use std::ops::AddAssign;
+use std::ops::Div;
+use std::ops::Mul;
+use std::ops::Sub;
 
 use crate::bins::AngleBin;
 use crate::bins::Scheme;
 use crate::bins::SolidAngleBin;
+use crate::params::Param;
 use crate::params::Params;
 use crate::powers::Powers;
 use itertools::Itertools;
 use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
+use ndarray::Array2;
+use numpy::PyArrayMethods;
+use numpy::{IntoPyArray, PyArray2};
 use pyo3::prelude::*;
+use rand_distr::num_traits::Pow;
+use serde::Serialize;
 
 /// Trait for different types of scattering bins (1D or 2D)
 pub trait ScatteringBin: Clone + Debug {
@@ -45,7 +56,7 @@ impl ScatteringBin for AngleBin {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize)]
 pub enum GOComponent {
     Total,
     Beam,
@@ -197,6 +208,102 @@ pub struct ScattResult<B: ScatteringBin> {
     pub mueller_ext: Mueller,
 }
 
+impl<B: ScatteringBin> Pow<f32> for ScattResult<B> {
+    type Output = Self;
+
+    fn pow(self, rhs: f32) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total.map(|c| c.powf(rhs)),
+            ampl_beam: self.ampl_beam.map(|c| c.powf(rhs)),
+            ampl_ext: self.ampl_ext.map(|c| c.powf(rhs)),
+            mueller_total: self.mueller_total.map(|m| m.powf(rhs)),
+            mueller_beam: self.mueller_beam.map(|m| m.powf(rhs)),
+            mueller_ext: self.mueller_ext.map(|m| m.powf(rhs)),
+        }
+    }
+}
+
+impl<B: ScatteringBin> Mul<f32> for ScattResult<B> {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total * Complex::from(rhs),
+            ampl_beam: self.ampl_beam * Complex::from(rhs),
+            ampl_ext: self.ampl_ext * Complex::from(rhs),
+            mueller_total: self.mueller_total * rhs,
+            mueller_beam: self.mueller_beam * rhs,
+            mueller_ext: self.mueller_ext * rhs,
+        }
+    }
+}
+
+impl<B: ScatteringBin> Mul for ScattResult<B> {
+    type Output = ScattResult<B>;
+
+    fn mul(self, other: ScattResult<B>) -> Self::Output {
+        ScattResult {
+            bin: self.bin,
+            ampl_total: self.ampl_total * other.ampl_total,
+            ampl_beam: self.ampl_beam * other.ampl_beam,
+            ampl_ext: self.ampl_ext * other.ampl_ext,
+            mueller_total: self.mueller_total * other.mueller_total,
+            mueller_beam: self.mueller_beam * other.mueller_beam,
+            mueller_ext: self.mueller_ext * other.mueller_ext,
+        }
+    }
+}
+
+impl<B: ScatteringBin> Add for ScattResult<B> {
+    type Output = ScattResult<B>;
+
+    fn add(self, other: ScattResult<B>) -> Self::Output {
+        ScattResult {
+            bin: self.bin,
+            ampl_total: self.ampl_total + other.ampl_total,
+            ampl_beam: self.ampl_beam + other.ampl_beam,
+            ampl_ext: self.ampl_ext + other.ampl_ext,
+            mueller_total: self.mueller_total + other.mueller_total,
+            mueller_beam: self.mueller_beam + other.mueller_beam,
+            mueller_ext: self.mueller_ext + other.mueller_ext,
+        }
+    }
+}
+
+impl<B: ScatteringBin> Sub for ScattResult<B> {
+    type Output = ScattResult<B>;
+
+    fn sub(self, other: ScattResult<B>) -> Self::Output {
+        ScattResult {
+            bin: self.bin,
+            ampl_total: self.ampl_total - other.ampl_total,
+            ampl_beam: self.ampl_beam - other.ampl_beam,
+            ampl_ext: self.ampl_ext - other.ampl_ext,
+            mueller_total: self.mueller_total - other.mueller_total,
+            mueller_beam: self.mueller_beam - other.mueller_beam,
+            mueller_ext: self.mueller_ext - other.mueller_ext,
+        }
+    }
+}
+
+impl<B: ScatteringBin> Div<f32> for ScattResult<B> {
+    type Output = Self;
+
+    fn div(self, other: f32) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total / Complex::from(other),
+            ampl_beam: self.ampl_beam / Complex::from(other),
+            ampl_ext: self.ampl_ext / Complex::from(other),
+            mueller_total: self.mueller_total / other,
+            mueller_beam: self.mueller_beam / other,
+            mueller_ext: self.mueller_ext / other,
+        }
+    }
+}
+
 impl<B: ScatteringBin> ScattResult<B> {
     /// Creates a new empty ScattResult.
     pub fn new(bin: B) -> Self {
@@ -229,6 +336,184 @@ pub struct Results {
     pub field_1d: Option<Vec<ScattResult1D>>,
     pub powers: Powers,
     pub params: Params,
+}
+
+impl AddAssign for Results {
+    fn add_assign(&mut self, other: Self) {
+        *self = Self {
+            field_2d: self
+                .field_2d
+                .clone()
+                .into_iter()
+                .zip(other.field_2d)
+                .map(|(a, b)| a + b)
+                .collect(),
+            field_1d: match (self.field_1d.clone(), other.field_1d) {
+                (Some(field_1d), Some(other_field_1d)) => Some(
+                    field_1d
+                        .into_iter()
+                        .zip(other_field_1d)
+                        .map(|(a, b)| a + b)
+                        .collect(),
+                ),
+                (Some(field_1d), None) => Some(field_1d),
+                (None, Some(other_field_1d)) => Some(other_field_1d),
+                (None, None) => None,
+            },
+            powers: self.powers.clone() + other.powers,
+            params: self.params.clone() + other.params,
+        };
+    }
+}
+
+impl Pow<f32> for Results {
+    type Output = Self;
+
+    fn pow(self, rhs: f32) -> Self {
+        let field_1d = match self.field_1d {
+            Some(field_1d) => Some(field_1d.into_iter().map(|a| a.pow(rhs)).collect()),
+            None => None,
+        };
+        Self {
+            field_2d: self.field_2d.into_iter().map(|a| a.pow(rhs)).collect(),
+            field_1d,
+            powers: self.powers.pow(rhs),
+            params: self.params.pow(rhs),
+        }
+    }
+}
+
+impl Mul<f32> for Results {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        let field_1d = match self.field_1d {
+            Some(field_1d) => Some(field_1d.into_iter().map(|a| a * rhs).collect()),
+            None => None,
+        };
+        Self {
+            field_2d: self.field_2d.into_iter().map(|a| a * rhs).collect(),
+            field_1d,
+            powers: self.powers * rhs,
+            params: self.params * rhs,
+        }
+    }
+}
+
+impl Mul for Results {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a * b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(field_1d), Some(other_field_1d)) => Some(
+                field_1d
+                    .into_iter()
+                    .zip(other_field_1d)
+                    .map(|(a, b)| a * b)
+                    .collect(),
+            ),
+            (Some(field_1d), None) => Some(field_1d),
+            (None, Some(other_field_1d)) => Some(other_field_1d),
+            (None, None) => None,
+        };
+        let powers = self.powers * other.powers;
+        let params = self.params * other.params;
+        Self {
+            field_2d,
+            field_1d,
+            powers,
+            params,
+        }
+    }
+}
+
+impl Add for Results {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a + b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(field_1d), Some(other_field_1d)) => Some(
+                field_1d
+                    .into_iter()
+                    .zip(other_field_1d)
+                    .map(|(a, b)| a + b)
+                    .collect(),
+            ),
+            (Some(field_1d), None) => Some(field_1d),
+            (None, Some(other_field_1d)) => Some(other_field_1d),
+            (None, None) => None,
+        };
+        let powers = self.powers + other.powers;
+        let params = self.params + other.params;
+        Self {
+            field_2d,
+            field_1d,
+            powers,
+            params,
+        }
+    }
+}
+
+impl Sub for Results {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a - b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(field_1d), Some(other_field_1d)) => Some(
+                field_1d
+                    .into_iter()
+                    .zip(other_field_1d)
+                    .map(|(a, b)| a - b)
+                    .collect(),
+            ),
+            (Some(field_1d), None) => Some(field_1d),
+            (None, Some(other_field_1d)) => Some(other_field_1d),
+            (None, None) => None,
+        };
+        let powers = self.powers - other.powers;
+        let params = self.params - other.params;
+        Self {
+            field_2d,
+            field_1d,
+            powers,
+            params,
+        }
+    }
+}
+
+impl Div<f32> for Results {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self {
+        let field_1d = match self.field_1d {
+            Some(field_1d) => Some(field_1d.into_iter().map(|a| a / rhs).collect()),
+            None => None,
+        };
+        Self {
+            field_2d: self.field_2d.into_iter().map(|a| a / rhs).collect(),
+            field_1d,
+            powers: self.powers / rhs,
+            params: self.params / rhs,
+        }
+    }
 }
 
 impl Results {
@@ -299,71 +584,64 @@ impl Results {
         result
     }
 
-    /// Computes the parameters of the result
+    /// Computes and sets the parameters of the result
     pub fn compute_params(&mut self, wavelength: f32) {
-        // Compute all 4 parameters for Total
-        self.compute_scat_cross(wavelength, GOComponent::Total);
-        self.compute_asymmetry(wavelength, GOComponent::Total);
-        self.compute_ext_cross(GOComponent::Total);
-        self.compute_albedo(GOComponent::Total);
-
-        // Compute scat_cross and asymmetry for Beam
-        self.compute_scat_cross(wavelength, GOComponent::Beam);
-        self.compute_asymmetry(wavelength, GOComponent::Beam);
-
-        // Compute scat_cross and asymmetry for ExtDiff
-        self.compute_scat_cross(wavelength, GOComponent::ExtDiff);
-        self.compute_asymmetry(wavelength, GOComponent::ExtDiff);
-    }
-
-    pub fn compute_asymmetry(&mut self, wavelength: f32, component: GOComponent) {
-        if let Some(field_1d) = &self.field_1d {
-            if let Some(scatt) = self.params.scat_cross.get(&component) {
-                let k = 2.0 * PI / wavelength;
-                let asymmetry =
-                    integrate_theta_weighted_component(field_1d, component, |theta, s11| {
-                        theta.sin() * theta.cos() * s11 / (scatt * k.powi(2))
-                    });
-
-                self.params.asymmetry.insert(component, asymmetry);
-            }
-        }
-    }
-
-    /// Computes the scattering cross section from the 1D Mueller matrix
-    pub fn compute_scat_cross(&mut self, wavelength: f32, component: GOComponent) {
+        // Total field
         if let Some(field_1d) = &self.field_1d {
             let k = 2.0 * PI / wavelength;
-            let scat_cross =
-                integrate_theta_weighted_component(field_1d, component, |theta, s11| {
+            let scatt_total =
+                integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
                     theta.sin() * s11 / k.powi(2)
                 });
+            let asymmetry_scatt_total =
+                integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
+                    theta.sin() * theta.cos() * s11 / k.powi(2)
+                });
 
-            self.params.scat_cross.insert(component, scat_cross);
-        }
-    }
+            self.params
+                .set_param(Param::ScatCross, GOComponent::Total, scatt_total);
+            self.params.set_param(
+                Param::AsymmetryScatt,
+                GOComponent::Total,
+                asymmetry_scatt_total,
+            );
+            let ext_total = scatt_total + self.powers.absorbed;
+            self.params
+                .set_param(Param::ExtCross, GOComponent::Total, ext_total);
 
-    /// Computes the extinction cross section from the scattering cross section and absorbed power
-    pub fn compute_ext_cross(&mut self, component: GOComponent) {
-        if let Some(scat) = self.params.scat_cross.get(&component) {
-            // For Total component, add absorbed power; for others, ext = scat (no absorption in partial components)
-            let ext = match component {
-                GOComponent::Total => scat + self.powers.absorbed,
-                GOComponent::Beam | GOComponent::ExtDiff => *scat,
-            };
-            self.params.ext_cross.insert(component, ext);
-        }
-    }
+            // Beam field
+            let scatt_beam =
+                integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
+                    theta.sin() * s11 / k.powi(2)
+                });
+            let asymmetry_scatt_beam =
+                integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
+                    theta.sin() * theta.cos() * s11 / k.powi(2)
+                });
+            self.params
+                .set_param(Param::ScatCross, GOComponent::Beam, scatt_beam);
+            self.params.set_param(
+                Param::AsymmetryScatt,
+                GOComponent::Beam,
+                asymmetry_scatt_beam,
+            );
 
-    /// Computes the albedo from the scattering and extinction cross sections
-    pub fn compute_albedo(&mut self, component: GOComponent) {
-        if let (Some(scat), Some(ext)) = (
-            self.params.scat_cross.get(&component),
-            self.params.ext_cross.get(&component),
-        ) {
-            if *ext > 0.0 {
-                self.params.albedo.insert(component, scat / ext);
-            }
+            // Ext field
+            let scatt_ext =
+                integrate_theta_weighted_component(field_1d, GOComponent::ExtDiff, |theta, s11| {
+                    theta.sin() * s11 / k.powi(2)
+                });
+            let asymmetry_scatt_ext =
+                integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
+                    theta.sin() * theta.cos() * s11 / k.powi(2)
+                });
+            self.params
+                .set_param(Param::ScatCross, GOComponent::ExtDiff, scatt_ext);
+            self.params.set_param(
+                Param::AsymmetryScatt,
+                GOComponent::ExtDiff,
+                asymmetry_scatt_ext,
+            );
         }
     }
 
@@ -378,20 +656,20 @@ impl Results {
                 GOComponent::ExtDiff => "ExtDiff",
             };
 
-            if let Some(val) = self.params.asymmetry.get(&component) {
+            if let Some(val) = self.params.asymmetry(&component) {
                 println!("{} Asymmetry: {}", comp_str, val);
             }
-            if let Some(val) = self.params.scat_cross.get(&component) {
+            if let Some(val) = self.params.scatt_cross(&component) {
                 println!("{} Scat Cross: {}", comp_str, val);
             }
-            if let Some(val) = self.params.ext_cross.get(&component) {
+            if let Some(val) = self.params.ext_cross(&component) {
                 println!("{} Ext Cross: {}", comp_str, val);
             }
-            if let Some(val) = self.params.albedo.get(&component) {
+            if let Some(val) = self.params.albedo(&component) {
                 println!("{} Albedo: {}", comp_str, val);
             }
         }
-        if let Some(val) = self.params.scat_cross.get(&GOComponent::Beam) {
+        if let Some(val) = self.params.scatt_cross(&GOComponent::Beam) {
             println!(
                 "Beam Scat Cross / Output power: {}",
                 val / self.powers.output
@@ -402,145 +680,266 @@ impl Results {
 
 #[pymethods]
 impl Results {
-    /// Get the bins as a list of tuples (returns bin centers for backwards compatibility)
+    fn __add__(&self, other: &Results) -> Results {
+        self.clone() + other.clone()
+    }
+
+    fn __sub__(&self, other: &Results) -> Results {
+        self.clone() - other.clone()
+    }
+
+    fn __pow__(&self, exponent: f32, _modulo: Option<u32>) -> Results {
+        self.clone().pow(exponent)
+    }
+
+    fn __mul__(&self, other: &Bound<'_, PyAny>) -> PyResult<Results> {
+        // Try to extract as Results first
+        if let Ok(other_results) = other.extract::<Results>() {
+            return Ok(self.clone() * other_results);
+        }
+
+        // Try to extract as f32
+        if let Ok(scalar) = other.extract::<f32>() {
+            return Ok(self.clone() * scalar);
+        }
+
+        // If neither works, return an error
+        Err(pyo3::exceptions::PyTypeError::new_err(
+            "unsupported operand type(s) for *: 'Results' and the provided type",
+        ))
+    }
+
+    fn __truediv__(&self, rhs: f32) -> Results {
+        self.clone() / rhs
+    }
+    /// Get the bins as a numpy array of shape (n_bins, 2) with columns [theta, phi]
     #[getter]
-    pub fn get_bins(&self) -> Vec<(f32, f32)> {
-        self.bins()
+    pub fn get_bins<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let bins: Vec<f32> = self
+            .bins()
             .iter()
-            .map(|bin| (bin.theta_bin.center, bin.phi_bin.center))
-            .collect()
+            .flat_map(|bin| vec![bin.theta_bin.center, bin.phi_bin.center])
+            .collect();
+
+        Array2::from_shape_vec((bins.len() / 2, 2), bins)
+            .unwrap()
+            .into_pyarray(py)
     }
 
-    /// Get the 1D bins (theta values)
+    /// Get the 1D bins (theta values) as a numpy array
     #[getter]
-    pub fn get_bins_1d(&self) -> Option<Vec<f32>> {
-        self.field_1d
-            .as_ref()
-            .map(|field_1d| field_1d.iter().map(|result| result.bin.center).collect())
+    pub fn get_bins_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
+        self.field_1d.as_ref().map(|field_1d| {
+            let bins: Vec<f32> = field_1d.iter().map(|result| result.bin.center).collect();
+            Array2::from_shape_vec((bins.len(), 1), bins)
+                .unwrap()
+                .into_pyarray(py)
+        })
     }
 
-    /// Get the Mueller matrix as a list of lists
+    /// Get the Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_total).collect();
-        crate::problem::collect_mueller(&muellers)
+    pub fn get_mueller<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let muellers: Vec<f32> = self
+            .field_2d
+            .iter()
+            .flat_map(|r| r.mueller_total.to_vec())
+            .collect();
+
+        Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+            .unwrap()
+            .into_pyarray(py)
     }
 
-    /// Get the beam Mueller matrix as a list of lists
-    #[getter]
-    pub fn get_mueller_beam(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_beam).collect();
-        crate::problem::collect_mueller(&muellers)
-    }
+    /// Set the Mueller matrix from a numpy array
+    #[setter]
+    pub fn set_mueller(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        // unsafe view in numpy array memory without bounds checking
+        let array_view = unsafe { array.as_array() };
 
-    /// Get the external diffraction Mueller matrix as a list of lists
-    #[getter]
-    pub fn get_mueller_ext(&self) -> Vec<Vec<f32>> {
-        let muellers: Vec<Mueller> = self.field_2d.iter().map(|r| r.mueller_ext).collect();
-        crate::problem::collect_mueller(&muellers)
-    }
-
-    /// Get the 1D Mueller matrix as a list of lists
-    #[getter]
-    pub fn get_mueller_1d(&self) -> Vec<Vec<f32>> {
-        if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_total).collect();
-            crate::problem::collect_mueller(&muellers)
-        } else {
-            Vec::new()
+        for (i, field) in self.field_2d.iter_mut().enumerate() {
+            let row = array_view.row(i);
+            let slice = row.as_slice().unwrap();
+            field.mueller_total = Mueller::from_row_slice(slice);
         }
     }
 
-    /// Get the 1D beam Mueller matrix as a list of lists
+    /// Get the beam Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller_1d_beam(&self) -> Vec<Vec<f32>> {
-        if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_beam).collect();
-            crate::problem::collect_mueller(&muellers)
-        } else {
-            Vec::new()
+    pub fn get_mueller_beam<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let muellers: Vec<f32> = self
+            .field_2d
+            .iter()
+            .flat_map(|r| r.mueller_beam.to_vec())
+            .collect();
+        Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+            .unwrap()
+            .into_pyarray(py)
+    }
+
+    /// Set the Mueller beam matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_beam(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        // unsafe view in numpy array memory without bounds checking
+        let array_view = unsafe { array.as_array() };
+
+        for (i, field) in self.field_2d.iter_mut().enumerate() {
+            let row = array_view.row(i);
+            let slice = row.as_slice().unwrap();
+            field.mueller_beam = Mueller::from_row_slice(slice);
         }
     }
 
-    /// Get the 1D external diffraction Mueller matrix as a list of lists
+    /// Get the external diffraction Mueller matrix as a numpy array
     #[getter]
-    pub fn get_mueller_1d_ext(&self) -> Vec<Vec<f32>> {
+    pub fn get_mueller_ext<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let muellers: Vec<f32> = self
+            .field_2d
+            .iter()
+            .flat_map(|r| r.mueller_ext.to_vec())
+            .collect();
+        Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+            .unwrap()
+            .into_pyarray(py)
+    }
+
+    /// Set the Mueller ext matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_ext(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        // unsafe view in numpy array memory without bounds checking
+        let array_view = unsafe { array.as_array() };
+
+        for (i, field) in self.field_2d.iter_mut().enumerate() {
+            let row = array_view.row(i);
+            let slice = row.as_slice().unwrap();
+            field.mueller_ext = Mueller::from_row_slice(slice);
+        }
+    }
+
+    /// Get the 1D Mueller matrix as a numpy array
+    #[getter]
+    pub fn get_mueller_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
         if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<Mueller> = field_1d.iter().map(|r| r.mueller_ext).collect();
-            crate::problem::collect_mueller(&muellers)
+            let muellers: Vec<f32> = field_1d
+                .iter()
+                .flat_map(|r| r.mueller_total.to_vec())
+                .collect();
+            Some(
+                Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+                    .unwrap()
+                    .into_pyarray(py),
+            )
         } else {
-            Vec::new()
+            None
+        }
+    }
+
+    /// Set the 1D Mueller matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_1d(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        let array_view = unsafe { array.as_array() };
+
+        if let Some(ref mut field_1d) = self.field_1d {
+            for (i, field) in field_1d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_total = Mueller::from_row_slice(slice);
+            }
+        }
+    }
+
+    /// Get the 1D beam Mueller matrix as a numpy array
+    #[getter]
+    pub fn get_mueller_1d_beam<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
+        if let Some(ref field_1d) = self.field_1d {
+            let muellers: Vec<f32> = field_1d
+                .iter()
+                .flat_map(|r| r.mueller_beam.to_vec())
+                .collect();
+            Some(
+                Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+                    .unwrap()
+                    .into_pyarray(py),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// Set the 1D Mueller beam matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_1d_beam(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        let array_view = unsafe { array.as_array() };
+
+        if let Some(ref mut field_1d) = self.field_1d {
+            for (i, field) in field_1d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_beam = Mueller::from_row_slice(slice);
+            }
+        }
+    }
+
+    /// Get the 1D external diffraction Mueller matrix as a numpy array
+    #[getter]
+    pub fn get_mueller_1d_ext<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
+        if let Some(ref field_1d) = self.field_1d {
+            let muellers: Vec<f32> = field_1d
+                .iter()
+                .flat_map(|r| r.mueller_ext.to_vec())
+                .collect();
+            Some(
+                Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+                    .unwrap()
+                    .into_pyarray(py),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// Set the 1D Mueller beam matrix from a numpy array
+    #[setter]
+    pub fn set_mueller_1d_ext(&mut self, array: &Bound<'_, PyArray2<f32>>) {
+        let array_view = unsafe { array.as_array() };
+
+        if let Some(ref mut field_1d) = self.field_1d {
+            for (i, field) in field_1d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_ext = Mueller::from_row_slice(slice);
+            }
         }
     }
 
     /// Get the asymmetry parameter
     #[getter]
     pub fn get_asymmetry(&self) -> Option<f32> {
-        self.params.asymmetry()
+        self.params.asymmetry(&GOComponent::Total)
     }
 
     /// Get the scattering cross section
     #[getter]
     pub fn get_scat_cross(&self) -> Option<f32> {
-        self.params.scat_cross()
+        self.params.scatt_cross(&GOComponent::Total)
     }
 
     /// Get the extinction cross section
     #[getter]
     pub fn get_ext_cross(&self) -> Option<f32> {
-        self.params.ext_cross()
+        self.params.ext_cross(&GOComponent::Total)
     }
 
     /// Get the albedo
     #[getter]
     pub fn get_albedo(&self) -> Option<f32> {
-        self.params.albedo()
-    }
-
-    /// Get all parameters as a dictionary
-    #[getter]
-    pub fn get_params(&self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
-            let dict = pyo3::types::PyDict::new(py);
-
-            // Add backwards-compatible top-level keys for Total component
-            dict.set_item("asymmetry", self.params.asymmetry())?;
-            dict.set_item("scat_cross", self.params.scat_cross())?;
-            dict.set_item("ext_cross", self.params.ext_cross())?;
-            dict.set_item("albedo", self.params.albedo())?;
-
-            // Add component-specific dictionaries
-            for (comp_name, component) in [
-                ("total", GOComponent::Total),
-                ("beam", GOComponent::Beam),
-                ("ext_diff", GOComponent::ExtDiff),
-            ] {
-                let comp_dict = pyo3::types::PyDict::new(py);
-
-                if let Some(val) = self.params.asymmetry.get(&component) {
-                    comp_dict.set_item("asymmetry", val)?;
-                }
-                if let Some(val) = self.params.scat_cross.get(&component) {
-                    comp_dict.set_item("scat_cross", val)?;
-                }
-                if let Some(val) = self.params.ext_cross.get(&component) {
-                    comp_dict.set_item("ext_cross", val)?;
-                }
-                if let Some(val) = self.params.albedo.get(&component) {
-                    comp_dict.set_item("albedo", val)?;
-                }
-
-                dict.set_item(comp_name, comp_dict)?;
-            }
-
-            Ok(dict.into())
-        })
+        self.params.albedo(&GOComponent::Total)
     }
 
     /// Get the powers as a dictionary
     #[getter]
-    pub fn get_powers(&self) -> PyResult<PyObject> {
-        Python::with_gil(|py| {
+    pub fn get_powers(&self) -> PyResult<Py<PyAny>> {
+        Python::attach(|py| {
             let dict = pyo3::types::PyDict::new(py);
             dict.set_item("input", self.powers.input)?;
             dict.set_item("output", self.powers.output)?;
@@ -556,6 +955,46 @@ impl Results {
             dict.set_item("missing", self.powers.missing())?;
             Ok(dict.into())
         })
+    }
+
+    /// Set the powers from a dictionary
+    #[setter]
+    pub fn set_powers(&mut self, dict: &Bound<'_, pyo3::types::PyDict>) -> PyResult<()> {
+        if let Some(val) = dict.get_item("input")? {
+            self.powers.input = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("output")? {
+            self.powers.output = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("absorbed")? {
+            self.powers.absorbed = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_ref")? {
+            self.powers.trnc_ref = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_rec")? {
+            self.powers.trnc_rec = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_clip")? {
+            self.powers.trnc_clip = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_energy")? {
+            self.powers.trnc_energy = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("clip_err")? {
+            self.powers.clip_err = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_area")? {
+            self.powers.trnc_area = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("trnc_cop")? {
+            self.powers.trnc_cop = val.extract()?;
+        }
+        if let Some(val) = dict.get_item("ext_diff")? {
+            self.powers.ext_diff = val.extract()?;
+        }
+        // Note: "missing" is computed, not stored, so we skip it
+        Ok(())
     }
 }
 

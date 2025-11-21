@@ -195,73 +195,76 @@ fn perturb_normals(
     shape: &mut crate::geom::Shape,
     seed: Option<u64>,
 ) -> Vec<Vector3<f32>> {
-    // this function is being updated with more mathematical rigour
-    // we will first compute the theta and phi angle of the normal vector
-    // then we will sample a theta and phi angle from a distribution
-    // and then we will compute the new normal vector
-
-    // Perturb the normal of each face in the shape
     let mut perturbed_normals = Vec::new();
-    for face in shape.faces.iter_mut() {
-        // first, we will compute the theta and phi angle of the normal vector
-        let normal = face.data().normal;
-        // theta is the angle between the normal and the z-axis
-        // let theta = normal.z.acos();
-        // phi is the angle between the normal and the x-axis
-        // let phi = normal.y.atan2(normal.x);
-        // now we will sample a theta and phi angle from a distribution
-        // we will use a normal distribution with mean 0 and standard deviation sigma for theta
-        // and a uniform distribution for phi from 0 to 2pi
 
-        // get the theta and phi distortion angles
+    for face in shape.faces.iter_mut() {
+        let normal = face.data().normal;
+
+        // Sample distributions
         let mut rng = if let Some(seed) = seed {
             rand::rngs::StdRng::seed_from_u64(seed)
         } else {
             rand::rngs::StdRng::from_rng(&mut rand::rng())
         };
         let norm_dist = Normal::new(0.0, sigma).unwrap();
-        let dtheta = norm_dist.sample(&mut rng);
-        let dphi = rng.random_range(0.0..std::f32::consts::PI * 2.0);
+        let dtheta = norm_dist.sample(&mut rng); // Normal distribution for polar angle
+        let dphi = rng.random_range(0.0..std::f32::consts::PI * 2.0); // Uniform for azimuth
 
-        // compute theta and phi angles for original normal
-        let theta = normal.z.acos();
-
-        // get the rotation matrix to rotate z axis to the normal vector
-        let fac = 1.0 - normal.z; // 1 - cos(theta)
-        let x = normal.x;
-        let y = normal.y;
-        let z = normal.z;
-
-        // rotation matrix using Rodrigues' rotation formula
-        let rotation_matrix = Matrix3::new(
-            1.0 + fac * (-y * y),
-            fac * (-y * x),
-            x * theta.sin(),
-            fac * (-y * x),
-            1.0 + fac * (-x * x),
-            y * theta.sin(),
-            -x * theta.sin(),
-            -y * theta.sin(),
-            z, // z == cos(theta)
-        );
-
-        // // assert that rotating the z axis to the normal vector gives the normal vector
-        // let rotated_z = rotation_matrix * Vector3::z();
-        // assert!(
-        //     (rotated_z - normal).norm() < 1e-6,
-        //     "Rotation matrix is incorrect"
-        // );
-
-        // rotate the perturbation vector to the normal vector
-        let perturbation = Vector3::new(
+        // Create the perturbation in the local frame where normal is z-axis
+        // This represents a small rotation by dtheta in a random direction dphi
+        let perturbed_local = Vector3::new(
             dtheta.sin() * dphi.cos(),
             dtheta.sin() * dphi.sin(),
             dtheta.cos(),
         );
-        let new_normal = rotation_matrix * perturbation;
 
-        perturbed_normals.push(new_normal);
+        // Now we need to rotate this from the frame where z-axis is up
+        // to the frame where 'normal' is up
+
+        // Special case: if normal is already close to z-axis
+        if (normal.z.abs() - 1.0).abs() < 1e-6 {
+            // Already aligned (or opposite), just use the perturbation directly
+            let new_normal = if normal.z > 0.0 {
+                perturbed_local
+            } else {
+                Vector3::new(perturbed_local.x, perturbed_local.y, -perturbed_local.z)
+            };
+            perturbed_normals.push(new_normal.normalize());
+            continue;
+        }
+
+        // General case: build rotation matrix to rotate z-axis to normal
+        // Rotation axis is perpendicular to both z and normal
+        let z_axis = Vector3::z();
+        let rotation_axis = z_axis.cross(&normal).normalize();
+        let angle = normal.z.acos();
+
+        // Rodrigues rotation formula
+        let cos_a = angle.cos();
+        let sin_a = angle.sin();
+        let one_minus_cos = 1.0 - cos_a;
+
+        let ux = rotation_axis.x;
+        let uy = rotation_axis.y;
+        let uz = rotation_axis.z;
+
+        let rotation_matrix = Matrix3::new(
+            cos_a + ux * ux * one_minus_cos,
+            ux * uy * one_minus_cos - uz * sin_a,
+            ux * uz * one_minus_cos + uy * sin_a,
+            uy * ux * one_minus_cos + uz * sin_a,
+            cos_a + uy * uy * one_minus_cos,
+            uy * uz * one_minus_cos - ux * sin_a,
+            uz * ux * one_minus_cos - uy * sin_a,
+            uz * uy * one_minus_cos + ux * sin_a,
+            cos_a + uz * uz * one_minus_cos,
+        );
+
+        // Apply rotation to get perturbed normal in world coordinates
+        let new_normal = rotation_matrix * perturbed_local;
+        perturbed_normals.push(new_normal.normalize());
     }
+
     perturbed_normals
 }
 

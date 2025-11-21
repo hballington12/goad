@@ -219,6 +219,22 @@ impl Scheme {
             delta_phi,
         }
     }
+
+    /// Generate the bins for this scheme.
+    pub fn generate(&self) -> Vec<SolidAngleBin> {
+        match self {
+            Scheme::Simple {
+                num_theta, num_phi, ..
+            } => simple_bins(*num_theta, *num_phi),
+            Scheme::Interval {
+                thetas,
+                theta_spacings,
+                phis,
+                phi_spacings,
+            } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
+            Scheme::Custom { bins, .. } => custom_bins(bins),
+        }
+    }
 }
 
 /// Angular binning scheme for scattering calculations.
@@ -244,12 +260,12 @@ impl BinningScheme {
     /// Create a simple binning scheme with uniform theta and phi spacing
     #[staticmethod]
     fn simple(num_theta: usize, num_phi: usize) -> PyResult<Self> {
-        if num_theta == 0 {
+        if num_theta <= 0 {
             return Err(pyo3::exceptions::PyValueError::new_err(
                 "num_theta must be greater than 0",
             ));
         }
-        if num_phi == 0 {
+        if num_phi <= 0 {
             return Err(pyo3::exceptions::PyValueError::new_err(
                 "num_phi must be greater than 0",
             ));
@@ -285,6 +301,50 @@ impl BinningScheme {
         BinningScheme {
             scheme: Scheme::Custom { bins, file: None },
         }
+    }
+
+    /// Returns a list of all theta bin centre values
+    fn thetas(&self) -> Vec<f32> {
+        let bins = match &self.scheme {
+            Scheme::Simple { num_theta, .. } => simple_spacings(*num_theta, 180.0)
+                .iter()
+                .map(|&bin| bin.center)
+                .collect(),
+            Scheme::Interval {
+                thetas,
+                theta_spacings,
+                ..
+            } => edges_to_bins(interval_spacings(&thetas, &theta_spacings))
+                .iter()
+                .map(|bin| bin.center)
+                .collect(),
+            Scheme::Custom { bins, .. } => custom_bins(&bins)
+                .iter()
+                .map(|bin| bin.theta_bin.center)
+                .collect(),
+        };
+        bins
+    }
+
+    /// Returns a list of all phi bin centre values
+    fn phis(&self) -> Vec<f32> {
+        let bins = match &self.scheme {
+            Scheme::Simple { num_phi, .. } => simple_spacings(*num_phi, 360.0)
+                .iter()
+                .map(|&bin| bin.center)
+                .collect(),
+            Scheme::Interval {
+                phis, phi_spacings, ..
+            } => edges_to_bins(interval_spacings(&phis, &phi_spacings))
+                .iter()
+                .map(|bin| bin.center)
+                .collect(),
+            Scheme::Custom { bins, .. } => custom_bins(&bins)
+                .iter()
+                .map(|bin| bin.phi_bin.center)
+                .collect(),
+        };
+        bins
     }
 }
 
@@ -339,15 +399,8 @@ pub fn interval_bins(
     let phi_edges = interval_spacings(phi_splits, phi_spacing);
 
     // Convert edges to bins
-    let theta_bins: Vec<AngleBin> = theta_edges
-        .windows(2)
-        .map(|edges| AngleBin::new(edges[0], edges[1]))
-        .collect();
-
-    let phi_bins: Vec<AngleBin> = phi_edges
-        .windows(2)
-        .map(|edges| AngleBin::new(edges[0], edges[1]))
-        .collect();
+    let theta_bins = edges_to_bins(theta_edges);
+    let phi_bins = edges_to_bins(phi_edges);
 
     let mut bins = Vec::new();
     for theta_bin in theta_bins.iter() {
@@ -359,28 +412,32 @@ pub fn interval_bins(
     bins
 }
 
+fn edges_to_bins(edges: Vec<f32>) -> Vec<AngleBin> {
+    let bins: Vec<AngleBin> = edges
+        .windows(2)
+        .map(|edges| AngleBin::new(edges[0], edges[1]))
+        .collect();
+    bins
+}
+
+/// Helper function to generate evenly spaced angle bins
+fn simple_spacings(num_bins: usize, limit: f32) -> Vec<AngleBin> {
+    let dangle = limit / (num_bins as f32);
+    (0..num_bins)
+        .map(|i| {
+            let min = i as f32 * dangle;
+            let max = (i + 1) as f32 * dangle;
+            AngleBin::new(min, max)
+        })
+        .collect()
+}
+
 /// Generate theta and phi bin combinations
 pub fn simple_bins(num_theta: usize, num_phi: usize) -> Vec<SolidAngleBin> {
-    // Create theta bins
-    let dtheta = 180.0 / (num_theta as f32);
-    let theta_bins: Vec<AngleBin> = (0..num_theta)
-        .map(|i| {
-            let min = i as f32 * dtheta;
-            let max = (i + 1) as f32 * dtheta;
-            AngleBin::new(min, max)
-        })
-        .collect();
+    let theta_bins = simple_spacings(num_theta, 180.0);
+    let phi_bins = simple_spacings(num_phi, 360.0);
 
-    // Create phi bins
-    let dphi = 360.0 / (num_phi as f32);
-    let phi_bins: Vec<AngleBin> = (0..num_phi)
-        .map(|i| {
-            let min = i as f32 * dphi;
-            let max = (i + 1) as f32 * dphi;
-            AngleBin::new(min, max)
-        })
-        .collect();
-
+    // meshgrid
     let mut bins = Vec::new();
     for theta_bin in theta_bins.iter() {
         for phi_bin in phi_bins.iter() {
@@ -404,20 +461,20 @@ pub fn custom_bins(bin_specs: &[[[f32; 2]; 2]]) -> Vec<SolidAngleBin> {
         .collect()
 }
 
-pub fn generate_bins(bin_type: &Scheme) -> Vec<SolidAngleBin> {
-    match bin_type {
-        Scheme::Simple {
-            num_theta, num_phi, ..
-        } => simple_bins(*num_theta, *num_phi),
-        Scheme::Interval {
-            thetas,
-            theta_spacings,
-            phis,
-            phi_spacings,
-        } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
-        Scheme::Custom { bins, .. } => custom_bins(bins),
-    }
-}
+// pub fn generate_bins(bin_type: &Scheme) -> Vec<SolidAngleBin> {
+//     match bin_type {
+//         Scheme::Simple {
+//             num_theta, num_phi, ..
+//         } => simple_bins(*num_theta, *num_phi),
+//         Scheme::Interval {
+//             thetas,
+//             theta_spacings,
+//             phis,
+//             phi_spacings,
+//         } => interval_bins(theta_spacings, thetas, phi_spacings, phis),
+//         Scheme::Custom { bins, .. } => custom_bins(bins),
+//     }
+// }
 
 /// Gets the index of a theta-phi bin, assuming a `Simple` binning scheme, given an input theta and phi.
 pub fn get_n_simple(

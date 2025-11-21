@@ -1,15 +1,17 @@
-use clap::Subcommand;
 use nalgebra::Matrix3;
+use serde::Serialize;
 use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
 use pyo3::prelude::*;
 use rand::Rng;
 use rand::SeedableRng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+
+use crate::settings::DEFAULT_EULER_ORDER;
 
 #[pyclass]
-#[derive(Subcommand, Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Scheme {
     /// Solve the problem by averaging over a uniform distribution of angles.
     /// Example: `uniform 100`
@@ -21,7 +23,7 @@ pub enum Scheme {
 
 /// Euler angle order for the discrete orientation scheme.
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Copy)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum EulerConvention {
     XZX,
     XYX,
@@ -37,8 +39,33 @@ pub enum EulerConvention {
     ZXY,
 }
 
+#[pymethods]
+impl EulerConvention {
+    #[new]
+    fn py_new(str: &str) -> PyResult<Self> {
+        match str.to_lowercase().as_str() {
+            "xzx" => Ok(EulerConvention::XZX),
+            "xyx" => Ok(EulerConvention::XYX),
+            "yxy" => Ok(EulerConvention::YXY),
+            "yzy" => Ok(EulerConvention::YZY),
+            "zyz" => Ok(EulerConvention::ZYZ),
+            "zxz" => Ok(EulerConvention::ZXZ),
+            "xzy" => Ok(EulerConvention::XZY),
+            "xyz" => Ok(EulerConvention::XYZ),
+            "yxz" => Ok(EulerConvention::YXZ),
+            "yzx" => Ok(EulerConvention::YZX),
+            "zyx" => Ok(EulerConvention::ZYX),
+            "zxy" => Ok(EulerConvention::ZXY),
+            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "'{}' is not a valid Euler convention. Valid options are: 'XZX', 'XYX', 'YXY', 'YZY', 'ZYZ', 'ZXZ', 'XZY', 'XYZ', 'YXZ', 'YZX', 'ZYX', 'ZXY'",
+                str
+            ))),
+        }
+    }
+}
+
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Euler {
     #[pyo3(get, set)]
     pub alpha: f32,
@@ -236,7 +263,7 @@ impl Euler {
 }
 
 #[pyclass]
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Orientation {
     #[pyo3(get, set)]
     pub scheme: Scheme,
@@ -246,11 +273,20 @@ pub struct Orientation {
 
 #[pymethods]
 impl Orientation {
-    #[new]
-    fn py_new(scheme: Scheme, euler_convention: Option<EulerConvention>) -> Self {
+    #[staticmethod]
+    #[pyo3(name = "uniform", signature = (num_orients, euler_convention = None))]
+    fn py_uniform(num_orients: usize, euler_convention: Option<EulerConvention>) -> Self {
         Orientation {
-            scheme,
-            euler_convention: euler_convention.unwrap_or(EulerConvention::ZYZ),
+            scheme: Scheme::Uniform { num_orients },
+            euler_convention: euler_convention.unwrap_or(DEFAULT_EULER_ORDER),
+        }
+    }
+    #[staticmethod]
+    #[pyo3(name = "discrete", signature = (eulers, euler_convention = None))]
+    fn py_discrete(eulers: Vec<Euler>, euler_convention: Option<EulerConvention>) -> Self {
+        Orientation {
+            scheme: Scheme::Discrete { eulers },
+            euler_convention: euler_convention.unwrap_or(DEFAULT_EULER_ORDER),
         }
     }
 

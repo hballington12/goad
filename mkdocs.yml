@@ -1,0 +1,62 @@
+site_name: GOAD
+nav:
+  - index.md
+  - settings.md
+  - results.md
+  - checks.md
+  - convergence.md
+
+site_url: https://hballington12.github.io/goad/
+repo_url: https://github.com/hballington12/goad
+repo_name: Github
+site_author: Harry Ballington
+site_description: GOAD is a Rust/Python library for simulating geometric optics with aperture diffraction.
+
+plugins:
+  - search
+  - macros:
+      module_name: docs/source/_build/scripts/macro
+
+# Build directories
+theme:
+  logo: img/favicon.png
+  name: material
+  locale: en
+  favicon: img/favicon.ico
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tracking
+    - navigation.sections
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.footer
+    - navigation.indexes
+    - content.tabs.link
+    - content.code.copy
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - pymdownx.snippets:
+      base_path: ["docs/source/src"]
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg

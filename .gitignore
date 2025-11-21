@@ -12,3 +12,6 @@ goad-py/.env
 goad_run/
 **.vscode/
 goad.log
+.python-version
+site/
+uv.lock

@@ -1,7 +1,6 @@
 // use std::time::Instant;
 
 use crate::{
-    bins::generate_bins,
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
@@ -39,7 +38,7 @@ use std::time::Duration;
 /// print(f"Scattering cross-section: {results.scat_cross}")
 /// ```
 #[pyclass]
-#[derive(Debug)] // Added Default derive
+#[derive(Debug)]
 pub struct MultiProblem {
     pub geom: Geom,
     pub orientations: Orientations,
@@ -71,7 +70,8 @@ impl MultiProblem {
         problem::init_geom(&settings, &mut geom);
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
+
         let result = Results::new_empty(&bins);
 
         Ok(Self {
@@ -120,7 +120,7 @@ impl MultiProblem {
             let pb = m.add(ProgressBar::new(n as u64));
             pb.set_style(
                 ProgressStyle::with_template(
-                "{spinner:.green} [{elapsed_precise}] {bar:40.green/blue} {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
+                "{spinner:.green} [{elapsed_precise}] [{bar:40.green/blue}] {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
                 )
                 .unwrap()
                 .progress_chars("█▇▆▅▄▃▂▁")
@@ -282,7 +282,7 @@ impl MultiProblem {
         problem::init_geom(&settings, &mut geom);
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = generate_bins(&settings.binning.scheme);
+        let bins = &settings.binning.scheme.generate();
         let result = Results::new_empty(&bins);
 
         Ok(Self {
@@ -301,8 +301,9 @@ impl MultiProblem {
     ///
     /// # Returns
     /// PyResult<()> - Success or error if computation fails
+    #[pyo3(name = "solve")]
     pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
-        py.allow_threads(|| {
+        py.detach(|| {
             self.solve();
         });
         Ok(())

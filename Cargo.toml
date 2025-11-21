@@ -16,8 +16,10 @@
     indicatif = "0.17.9"
     itertools = "0.14.0"
     nalgebra = { version = "0.33.2", features = ["serde"] }
+    ndarray = "0.15"
     num-complex = { version = "0.4.6", features = ["serde"] }
-    pyo3 = "0.24.1"
+    numpy = "0.27.0"
+    pyo3 = { version = "0.27.1"}
     rand = "0.9.0"
     rand_distr = "0.5.1"
     rayon = "1.10.0"
@@ -28,15 +30,9 @@
 
 [features]
 default = []
+extension-module = ["pyo3/extension-module"]
 visualization = []
 
-[workspace]
-members = [
-    "goad-py",
-]
-
-[profile.release]
-opt-level = "z"     # Optimize for size
-lto = true          # Enable Link Time Optimization
-codegen-units = 1   # Reduce parallel codegen units to improve optimization
-strip = true        # Strip symbols from binary
+[lib]
+name = "goad"
+crate-type = ["rlib", "cdylib"]

@@ -24,6 +24,7 @@ pub mod output;
 pub mod params;
 pub mod powers;
 pub mod problem;
+pub mod python;
 pub mod result;
 pub mod settings;
 pub mod snell;

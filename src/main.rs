@@ -1,8 +1,10 @@
 //! > **Geometric Optics with Aperture Diffraction**
 //!
 
-use goad::multiproblem::MultiProblem;
-use goad::settings::{self};
+use goad::{
+    multiproblem::MultiProblem,
+    settings::{self},
+};
 
 fn main() {
     let settings = settings::load_config().unwrap();
