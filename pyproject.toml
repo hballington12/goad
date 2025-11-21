@@ -34,7 +34,6 @@ docs = [
     "mkdocs-macros-plugin>=1.5.0",
     "pymdown-extensions>=10.17.1",
 ]
-license = {text = "GPL-3.0"}
 keywords = ["goad", "light-scattering", "optics", "simulation", "scientific-computing", "physics"]
 
 [build-system]
