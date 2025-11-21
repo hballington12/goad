@@ -55,11 +55,6 @@ class Convergence:
         self.result_m: None | Results = None
         self.result_mm: None | Results = None
         self.result_d: None | Results = None
-        self.result_w: None | Results = None
-        self.result_ww: None | Results = None
-        self.result_dw: None | Results = None
-        self.result_s: None | Results = None
-        self.result_ss: None | Results = None
 
         goad_settings.orientation = Orientation.uniform(1)
 
@@ -75,17 +70,6 @@ class Convergence:
             Mean `Results` object, or `None` if no iterations completed
         """
         return self.result_m
-
-    def results_sem(self) -> None | Results:
-        """
-        Return the standard error of the mean (SEM) for the results.
-
-        Returns:
-            SEM as a `Results` object, or `None` if insufficient iterations
-        """
-        if self.result_s is None:
-            return None
-        return self.result_s**0.5 / (self.i - 1)
 
     def _is_converged(self) -> bool:
         """
@@ -135,10 +119,6 @@ class Convergence:
                     )
                 )
 
-                # temporary print statement
-                if self.results_sem() is not None:
-                    print(f"self.sem (base.py): {self.results_sem().asymmetry}")
-
                 if self.i > self.max_orientations:
                     print(f"Did not converge after {self.i} iterations")
                     break
@@ -166,16 +146,8 @@ class Convergence:
             self.result_m = result  # initliase mean
         elif self.i > 1:
             self.result_mm = self.result_m
-            self.result_ss = self.result_s
             self.result_d = result - self.result_mm  # pyright: ignore[reportOperatorIssue]
             self.result_m = self.result_mm + (self.result_d / self.i)  # pyright: ignore[reportOptionalOperand]
-            if self.i == 2:
-                self.result_s = self.result_d**2 * ((self.i - 1) / self.i)
-            else:
-                print(f"base.py: {self.result_s.asymmetry}")
-                self.result_s = self.result_ss + self.result_d**2 * (  # pyright: ignore[reportOptionalOperand]
-                    (self.i - 1) / self.i
-                )
 
     def _iterate(self) -> Results:
         """
@@ -194,21 +166,3 @@ class Convergence:
         mp.solve()
         self.sim_time = time.time() - start
         return mp.results
-
-
-if __name__ == "__main__":
-    from goad import Settings
-    from goad.convergence.asymmetry import Asymmetry
-    from goad.convergence.base import Convergence
-    from goad.convergence.convergable import Tolerance
-
-    convergence = Convergence(
-        Settings(geom_path="../../../examples/data/hex.obj", quiet=True),
-        [Asymmetry(tolerance=Tolerance.RELATIVE, threshold=0.04)],
-    )
-    convergence.run()
-    results = convergence.results()
-    error = convergence.results_sem()
-
-    print(f"Asymmetry: {results.scat_cross:.4f} +/- {error.scat_cross:.4f}")
-    print(f"Asymmetry: {results.asymmetry:.4f} +/- {error.asymmetry:.4f}")

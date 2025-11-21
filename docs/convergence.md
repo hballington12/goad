@@ -8,7 +8,7 @@ When computing orientation averaged scattering, it's not usually known beforehan
 
 which produces the following output:
 
-```bash
+```console
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 GOAD: [Convergence]  ▰▱▱▱▱▱▱
 
@@ -26,6 +26,44 @@ A GOAD `Convergence` class uses [Welford's algorithm](https://en.wikipedia.org/w
 ) to track the mean and variance of all scattering properties across each orientation. The example below shows how to access the mean results, and their corresponding errors:
 
 {{code_block('examples/convergence', 'results')}}
+
+which produces the following output:
+
+```console
+python convergence.py
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GOAD: [Convergence]  ▰▱▱▱▱▱▱
+
+[Orientations: 576 (max 100000)] [0.018 sec/orientation] [Minimum orientations check: ✓]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Asymmetry       0.8338 ± 0.0083 ━━━━━━━━━━━━━━━━━━━━━━━━━ 100% [SEM: 1.00% / 1.00%]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Asymmetry: 0.8338
+Scattering Cross Section: 172.7278
+Extinction Cross Section: 207.7922
+Absorption Cross Section: 35.0644
+Single Scattering Albdeo: 0.8313
+Theta bins:
+[[5.000e-02]
+ [1.500e-01]
+ [2.500e-01]
+ ...
+ [1.798e+02]
+ [1.799e+02]
+ [1.799e+02]]
+[Theta, Phi] bins:
+[[5.000e-02 3.750e+00]
+ [5.000e-02 1.125e+01]
+ [5.000e-02 1.875e+01]
+ ...
+ [1.799e+02 3.412e+02]
+ [1.799e+02 3.488e+02]
+ [1.799e+02 3.562e+02]]
+Mueller matrix S11: [3.696e+07 3.667e+07 3.612e+07 ... 3.594e+03 3.607e+03 3.614e+03]
+Mueller matrix S12: [ 17.73   -6.18  -12.768 ...   5.655   2.052   0.259]
+```
 
 It is important to note that the error here is only a best-case scenario estimate. It is the estimated error due to the Monte-Carlo orientation sampling. GOAD itself is an approximate method - the error in asymmetry parameter at size 60 is typically ~1% compared to more accurate methods like the discrete dipole approximation. For this reason, it doesn't make much sense to converge beyond a relative error of 0.1%. True error decreases with size, so you might want to converge to smaller thresholds then.
 

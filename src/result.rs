@@ -19,7 +19,6 @@ use ndarray::Array2;
 use numpy::PyArrayMethods;
 use numpy::{IntoPyArray, PyArray2};
 use pyo3::prelude::*;
-use rand_distr::num_traits::pow;
 use rand_distr::num_traits::Pow;
 use serde::Serialize;
 
@@ -713,21 +712,29 @@ impl Results {
     fn __truediv__(&self, rhs: f32) -> Results {
         self.clone() / rhs
     }
-    /// Get the bins as a list of tuples (returns bin centers for backwards compatibility)
+    /// Get the bins as a numpy array of shape (n_bins, 2) with columns [theta, phi]
     #[getter]
-    pub fn get_bins(&self) -> Vec<(f32, f32)> {
-        self.bins()
+    pub fn get_bins<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
+        let bins: Vec<f32> = self
+            .bins()
             .iter()
-            .map(|bin| (bin.theta_bin.center, bin.phi_bin.center))
-            .collect()
+            .flat_map(|bin| vec![bin.theta_bin.center, bin.phi_bin.center])
+            .collect();
+
+        Array2::from_shape_vec((bins.len() / 2, 2), bins)
+            .unwrap()
+            .into_pyarray(py)
     }
 
-    /// Get the 1D bins (theta values)
+    /// Get the 1D bins (theta values) as a numpy array
     #[getter]
-    pub fn get_bins_1d(&self) -> Option<Vec<f32>> {
-        self.field_1d
-            .as_ref()
-            .map(|field_1d| field_1d.iter().map(|result| result.bin.center).collect())
+    pub fn get_bins_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
+        self.field_1d.as_ref().map(|field_1d| {
+            let bins: Vec<f32> = field_1d.iter().map(|result| result.bin.center).collect();
+            Array2::from_shape_vec((bins.len(), 1), bins)
+                .unwrap()
+                .into_pyarray(py)
+        })
     }
 
     /// Get the Mueller matrix as a numpy array

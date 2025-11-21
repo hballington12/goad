@@ -22,19 +22,3 @@ class ScattCross(Convergable):
     @property
     def sem(self) -> float | None:
         return self.tracker.sem
-
-
-if __name__ == "__main__":
-    from goad import Settings
-    from goad.convergence.base import Convergence
-    from goad.convergence.convergable import Tolerance
-
-    convergence = Convergence(
-        Settings(geom_path="../../../examples/data/hex.obj", quiet=True),
-        [ScattCross(tolerance=Tolerance.RELATIVE, threshold=0.04)],
-    )
-    convergence.run()
-    results = convergence.results()
-    error = convergence.results_sem()
-
-    print(f"Asymmetry: {results.scat_cross:.4f} +/- {error.scat_cross:.4f}")

@@ -17,7 +17,6 @@ pub enum Param {
     AsymmetryScatt, // asymmetry multiplied by scatt cross
     ScatCross,
     ExtCross,
-    AlbedoExt, // albedo multiplied by ext cross
 }
 
 impl Params {
@@ -113,11 +112,11 @@ impl Params {
     }
 
     pub fn albedo(&self, component: &GOComponent) -> Option<f32> {
-        if let (Some(albedo_ext), Some(ext_cross)) = (
-            self.params.get(&(Param::AlbedoExt, *component)),
+        if let (Some(scatt_cross), Some(ext_cross)) = (
+            self.params.get(&(Param::ScatCross, *component)),
             self.params.get(&(Param::ExtCross, *component)),
         ) {
-            Some(albedo_ext / ext_cross)
+            Some(scatt_cross / ext_cross)
         } else {
             None
         }
