@@ -29,6 +29,7 @@ dependencies = [
     "pymdown-extensions>=10.17.1",
     "pyy>=1.1.16",
     "rich>=14.2.0",
+    "twine>=6.2.0",
 ]
 license = {text = "GPL-3.0"}
 keywords = ["goad", "light-scattering", "optics", "simulation", "scientific-computing", "physics"]
