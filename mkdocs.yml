@@ -1,11 +1,10 @@
 site_name: GOAD
 nav:
   - index.md
-  - User guide:
-      - settings.md
-      - results.md
-      - checks.md
-      - convergence.md
+  - settings.md
+  - results.md
+  - checks.md
+  - convergence.md
   # - About: about.md
 
 # site_url: tbd
