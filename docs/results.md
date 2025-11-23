@@ -84,15 +84,15 @@ Track energy conservation throughout the simulation:
 
 The power dictionary contains:
 
-- `input`: Incident beam power
-- `output`: Total scattered power
+- `input`: Incident beam power ie. the mean geometrical cross section
+- `output`: Total near-field output power, the sum of scattering and absorption
 - `absorbed`: Power absorbed by the particle
-- `trnc_ref`: Power lost to reflection truncation
-- `trnc_rec`: Power lost to recursion limit
-- `trnc_clip`: Power lost to clipping
-- `trnc_energy`: Power lost to energy cutoff
-- `trnc_area`: Power lost to area threshold
-- `trnc_cop`: Power lost to coplanar threshold
+- `trnc_ref`: Power lost due to max total internal reflections reached
+- `trnc_rec`: Power lost due to max recursions reached
+- `trnc_clip`: Power lost during beam clipping
+- `trnc_energy`: Power lost due to minimum energy cutoff
+- `trnc_area`: Power lost due to minimum area cutoff
+- `trnc_cop`: Power lost due to total cutoff power threshold
 - `clip_err`: Error from clipping algorithm
 - `ext_diff`: External diffraction power
 - `missing`: Total unaccounted power

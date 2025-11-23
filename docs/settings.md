@@ -4,11 +4,13 @@ The `Settings` object configures a GOAD simulation. It controls physical paramet
 
 ## Basic Usage
 
-At minimum, you must specify the path to a geometry file:
+At a minimum, you must specify the path to a geometry file or directory containing geometry files:
 
 {{code_block('examples/settings', 'basic')}}
 
 The geometry defines the units of the problem. If your geometry file is in microns, then you should also specify the wavelength in microns. All faces in the geometry must be planar and have some non-zero area. GOAD will return with an error if there are faces with zero area (ie. extremely thin triangles), since it needs to compute normals of each face by a cross product of 2 non-colinear edge vectors. You can make geometries in the open-source [Blender](https://www.blender.org/) software, or use some example geometries straight from Python [here](https://github.com/hballington12/bpy-geometries).
+
+If you specify a directory, GOAD will attempt to load all files with the `.obj` extension in the directory. It will then choose geometries at random for each orientation in the simulation. See [Orientation Distribution](#orientation-distribution) for more details.
 
 ## Physical Parameters
 
