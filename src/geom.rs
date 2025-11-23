@@ -1128,24 +1128,32 @@ pub struct Geom {
 
 impl Geom {
     pub fn load(filename: &str) -> Result<Vec<Self>> {
-        // Log current directory only in debug builds
-        #[cfg(debug_assertions)]
-        match std::env::current_dir() {
-            Ok(_) => {}
-            Err(e) => eprintln!("Error getting current directory: {}", e),
-        }
-
         let path = Path::new(filename);
-        let resolved_filename = if path.is_absolute() {
-            filename.to_string()
+        let resolved_path = if path.is_absolute() {
+            path.to_path_buf()
         } else {
-            std::env::current_dir()
-                .map(|p| p.join(path).display().to_string())
-                .map_err(|e| anyhow::anyhow!("Could not resolve path: {}", e))?
+            std::env::current_dir()?.join(path)
         };
 
         let mut geoms = vec![];
-        geoms.push(load_geom(&resolved_filename)?);
+
+        if resolved_path.is_dir() {
+            // Load all .obj files from directory
+            for entry in std::fs::read_dir(&resolved_path)? {
+                let entry = entry?;
+                if entry.path().extension() == Some(std::ffi::OsStr::new("obj")) {
+                    geoms.push(load_geom(&entry.path().display().to_string())?);
+                }
+            }
+        } else if resolved_path.is_file() {
+            // Load single file
+            geoms.push(load_geom(&resolved_path.display().to_string())?);
+        } else {
+            return Err(anyhow::anyhow!(
+                "Path is neither a file nor directory: {}",
+                filename
+            ));
+        }
 
         Ok(geoms)
     }
