@@ -11,7 +11,7 @@ use crate::{
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use nalgebra::Complex;
 use pyo3::prelude::*;
-use rand::{random_range, rngs::ThreadRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 use std::time::Duration;
 
