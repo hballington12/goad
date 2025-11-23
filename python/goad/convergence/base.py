@@ -42,7 +42,7 @@ class Convergence:
         if len(targets) == 0:
             raise ValueError("targets must be a non-empty list")
 
-        self.geometry = Geom.from_file(goad_settings.geom_path)
+        self.geometries = Geom.from_file(goad_settings.geom_path)
         self.targets = targets
         # possibly add more config here later
         self.max_orientations = max_orientations
@@ -59,6 +59,7 @@ class Convergence:
         goad_settings.orientation = Orientation.uniform(1)
 
         self.goad_settings = goad_settings
+        self.goad_settings.seed = None
 
         self.display = ConvergenceDisplay(self.targets)
 
@@ -161,7 +162,7 @@ class Convergence:
         """
         start = time.time()
         mp = MultiProblem(
-            self.goad_settings, geom=self.geometry
+            self.goad_settings, geoms=self.geometries
         )  # using cached geometry
         mp.solve()
         self.sim_time = time.time() - start

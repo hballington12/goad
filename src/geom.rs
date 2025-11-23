@@ -1564,8 +1564,8 @@ impl Geom {
 
     #[staticmethod]
     #[pyo3(name = "from_file")]
-    fn py_from_file(filename: &str) -> PyResult<Self> {
-        match load_geom(&filename.to_string()) {
+    fn py_from_file(filename: &str) -> PyResult<Vec<Self>> {
+        match Geom::load(&filename.to_string()) {
             Ok(geom) => Ok(geom),
             Err(err) => Err(PyErr::new::<PyRuntimeError, _>(err.to_string())),
         }

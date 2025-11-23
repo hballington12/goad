@@ -13,7 +13,6 @@ class ExtCross(Convergable):
         if result.ext_cross is None or np.isnan(result.ext_cross):
             return
 
-        self.i += 1
         self.tracker.update(value=result.ext_cross)
 
     @property

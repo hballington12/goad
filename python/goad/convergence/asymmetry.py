@@ -17,7 +17,6 @@ class Asymmetry(Convergable):
             return
 
         self.tracker.update(value=result.asymmetry, weight=result.scat_cross)
-        # print(f"self.sem: {self.sem}")
 
     @property
     def mean(self) -> float | None:

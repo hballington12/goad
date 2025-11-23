@@ -106,15 +106,15 @@ class Geom:
     ...
 
     @staticmethod
-    def from_file(filename: str) -> Geom:
+    def from_file(filename: str) -> list[Geom]:
         """
-        Load a new GOAD geometry object from a file.
+        Load a one or more GOAD geometry objects from a file or directory.
 
         Args:
-            filename: Path to the file containing the geometry data.
+            filename: Path to the file or containing the geometry data.
 
         Returns:
-            A new GOAD geometry object.
+            A list of GOAD geometry objects.
         """
         ...
 
@@ -276,26 +276,179 @@ class Settings:
     ...
 
     @property
-    def geom_path(self) -> str: ...
-    @geom_path.setter
-    def geom_path(self, value: str) -> None: ...
+    def eulers(self) -> list[float]:
+        """Get the euler angle, assuming the orientation scheme is discrete"""
+        ...
+    @eulers.setter
+    def eulers(self, value: list[float]) -> None:
+        """Set the euler angles"""
+        ...
+
     @property
-    def orientation(self) -> Orientation: ...
+    def orientation(self) -> Orientation:
+        """Get the full orientation object"""
+        ...
     @orientation.setter
-    def orientation(self, value: Orientation) -> None: ...
+    def orientation(self, value: Orientation) -> None:
+        """Set the full orientation object"""
+        ...
+
+    @property
+    def geom_path(self) -> str:
+        """Get the geometry file path"""
+        ...
+    @geom_path.setter
+    def geom_path(self, value: str) -> None:
+        """Set the geometry file path"""
+        ...
+
+    @property
+    def wavelength(self) -> float:
+        """Get the wavelength"""
+        ...
+    @wavelength.setter
+    def wavelength(self, value: float) -> None:
+        """Set the wavelength"""
+        ...
+
+    @property
+    def particle_refr_index_re(self) -> float:
+        """Get the particle refractive index (real part)"""
+        ...
+    @particle_refr_index_re.setter
+    def particle_refr_index_re(self, value: float) -> None:
+        """Set the particle refractive index (real part)"""
+        ...
+
+    @property
+    def particle_refr_index_im(self) -> float:
+        """Get the particle refractive index (imaginary part)"""
+        ...
+    @particle_refr_index_im.setter
+    def particle_refr_index_im(self, value: float) -> None:
+        """Set the particle refractive index (imaginary part)"""
+        ...
+
+    @property
+    def medium_refr_index_re(self) -> float:
+        """Get the medium refractive index (real part)"""
+        ...
+    @medium_refr_index_re.setter
+    def medium_refr_index_re(self, value: float) -> None:
+        """Set the medium refractive index (real part)"""
+        ...
+
+    @property
+    def medium_refr_index_im(self) -> float:
+        """Get the medium refractive index (imaginary part)"""
+        ...
+    @medium_refr_index_im.setter
+    def medium_refr_index_im(self, value: float) -> None:
+        """Set the medium refractive index (imaginary part)"""
+        ...
+
+    @property
+    def beam_power_threshold(self) -> float:
+        """Get the beam power threshold"""
+        ...
+    @beam_power_threshold.setter
+    def beam_power_threshold(self, value: float) -> None:
+        """Set the beam power threshold"""
+        ...
+
+    @property
+    def cutoff(self) -> float:
+        """Get the cutoff"""
+        ...
+    @cutoff.setter
+    def cutoff(self, value: float) -> None:
+        """Set the cutoff"""
+        ...
+
+    @property
+    def max_rec(self) -> int:
+        """Get the max recursion depth"""
+        ...
+    @max_rec.setter
+    def max_rec(self, value: int) -> None:
+        """Set the max recursion depth"""
+        ...
+
+    @property
+    def max_tir(self) -> int:
+        """Get the max TIR bounces"""
+        ...
+    @max_tir.setter
+    def max_tir(self, value: int) -> None:
+        """Set the max TIR bounces"""
+        ...
+
+    @property
+    def binning(self) -> BinningScheme:
+        """Get the binning scheme"""
+        ...
+    @binning.setter
+    def binning(self, value: BinningScheme) -> None:
+        """Set the binning scheme"""
+        ...
+
+    @property
+    def geom_scale(self) -> list[float] | None:
+        """Get the per-axis geometry scaling [x, y, z]"""
+        ...
+    @geom_scale.setter
+    def geom_scale(self, value: list[float] | None) -> None:
+        """Set the per-axis geometry scaling [x, y, z]"""
+        ...
+
+    @property
+    def seed(self) -> int | None:
+        """Get the seed for random number generation"""
+        ...
+    @seed.setter
+    def seed(self, value: int | None) -> None:
+        """Set the seed for random number generation"""
+        ...
+
+    @property
+    def distortion(self) -> float | None:
+        """Get the distortion factor"""
+        ...
+    @distortion.setter
+    def distortion(self, value: float | None) -> None:
+        """Set the distortion factor"""
+        ...
+
+    @property
+    def fov_factor(self) -> float | None:
+        """Get the field of view factor"""
+        ...
+    @fov_factor.setter
+    def fov_factor(self, value: float | None) -> None:
+        """Set the field of view factor"""
+        ...
+
+    @property
+    def quiet(self) -> bool:
+        """Get quiet mode (suppress progress bars)"""
+        ...
+    @quiet.setter
+    def quiet(self, value: bool) -> None:
+        """Set quiet mode (suppress progress bars)"""
+        ...
 
 class MultiProblem:
     """
     A GOAD problem. Multi stands for multi-orientation problem, but you can also use it for particles in fixed orientations.
     """
 
-    def __init__(self, settings: Settings, geom: Geom = ...) -> None:
+    def __init__(self, settings: Settings, geoms: list[Geom] = ...) -> None:
         """
         Create a new multi-orientation problem.
 
         Args:
             settings: A GOAD settings object.
-            geom: An optional GOAD geometry object.
+            geom: An optional list of GOAD geometry objects.
 
         """
         ...
