@@ -11,6 +11,7 @@ use crate::{
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use nalgebra::Complex;
 use pyo3::prelude::*;
+use rand::{random_range, rngs::ThreadRng, Rng, SeedableRng};
 use rayon::prelude::*;
 use std::time::Duration;
 
@@ -40,7 +41,7 @@ use std::time::Duration;
 #[pyclass]
 #[derive(Debug)]
 pub struct MultiProblem {
-    pub geom: Geom,
+    pub geoms: Vec<Geom>,
     pub orientations: Orientations,
     pub settings: Settings, // runtime settings
     pub result: Results,    // averaged result of the problems
@@ -49,13 +50,13 @@ pub struct MultiProblem {
 impl MultiProblem {
     /// Creates a new `MultiProblem` from optional `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
-    /// If geom not provided, loads from file using settings.geom_name.
-    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> anyhow::Result<Self> {
+    /// If geoms not provided, load from file
+    pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
         let settings = settings
             .unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
-        let mut geom = match geom {
+        let mut geoms = match geoms {
             Some(g) => g,
-            None => Geom::from_file(&settings.geom_name).map_err(|e| {
+            None => Geom::load(&settings.geom_name).map_err(|e| {
                 anyhow::anyhow!(
                     "Failed to load geometry file '{}': {}\n\
                     Hint: This may be caused by degenerate faces (zero cross product), \
@@ -67,15 +68,15 @@ impl MultiProblem {
             })?,
         };
 
-        problem::init_geom(&settings, &mut geom);
-
+        for geom in geoms.iter_mut() {
+            problem::init_geom(&settings, geom);
+        }
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
-
         let result = Results::new_empty(&bins);
 
         Ok(Self {
-            geom,
+            geoms,
             orientations,
             settings,
             result,
@@ -149,8 +150,14 @@ impl MultiProblem {
             )
         };
 
-        // init a base problem that can be reset
-        let problem_base = Problem::new(Some(self.geom.clone()), Some(self.settings.clone()));
+        // init a set of base problems that can be reset
+        let problems_base: Vec<Problem> = self
+            .geoms
+            .iter()
+            .map(|geom| Problem::new(Some(geom.clone()), Some(self.settings.clone())))
+            .collect();
+        let num_problems = problems_base.iter().len();
+        // let problem_base = Problem::new(Some(self.geoms.clone()), Some(self.settings.clone()));
 
         // Phase 2: Main computation
         status_pb.set_message("Running orientation averaging...");
@@ -162,7 +169,14 @@ impl MultiProblem {
             .eulers
             .par_iter()
             .map(|(a, b, g)| {
-                let mut problem = problem_base.clone();
+                let mut rng = if let Some(seed) = self.settings.seed {
+                    rand::rngs::StdRng::seed_from_u64(seed)
+                } else {
+                    rand::rngs::StdRng::from_rng(&mut rand::rng())
+                };
+                let problem_idx = rng.random_range(0..num_problems);
+                // choose a random problem from the base set
+                let mut problem = problems_base[problem_idx].clone();
                 let euler = Euler::new(*a, *b, *g);
 
                 if let Err(err) = problem.run(Some(&euler)) {
@@ -263,12 +277,12 @@ impl MultiProblem {
 #[pymethods]
 impl MultiProblem {
     #[new]
-    #[pyo3(signature = (settings, geom = None))]
-    fn py_new(settings: Settings, geom: Option<Geom>) -> PyResult<Self> {
-        // Load geometry from file if not provided
-        let mut geom = match geom {
+    #[pyo3(signature = (settings, geoms = None))]
+    fn py_new(settings: Settings, geoms: Option<Vec<Geom>>) -> PyResult<Self> {
+        // Load geometries from file if not provided
+        let mut geoms = match geoms {
             Some(g) => g,
-            None => Geom::from_file(&settings.geom_name).map_err(|e| {
+            None => Geom::load(&settings.geom_name).map_err(|e| {
                 pyo3::exceptions::PyValueError::new_err(format!(
                     "Failed to load geometry file '{}': {}\n\
                     Hint: This may be caused by degenerate faces (zero cross product), \
@@ -279,14 +293,15 @@ impl MultiProblem {
             })?,
         };
 
-        problem::init_geom(&settings, &mut geom);
-
+        for geom in geoms.iter_mut() {
+            problem::init_geom(&settings, geom);
+        }
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
         let result = Results::new_empty(&bins);
 
         Ok(Self {
-            geom,
+            geoms,
             orientations,
             settings,
             result,

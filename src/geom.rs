@@ -19,7 +19,9 @@ mod tests {
 
     #[test]
     fn earcut_xy() {
-        let mut geom = Geom::from_file("./examples/data/plane_xy.obj").unwrap();
+        let geoms = Geom::load("./examples/data/plane_xy.obj").unwrap();
+
+        let mut geom = geoms[0].clone();
 
         let face = geom.shapes[0].faces.remove(0);
         assert_eq!(face.data().exterior.len(), 4);
@@ -33,7 +35,8 @@ mod tests {
 
     #[test]
     fn earcut_zy() {
-        let mut geom = Geom::from_file("./examples/data/plane_yz.obj").unwrap();
+        let geoms = Geom::load("./examples/data/plane_yz.obj").unwrap();
+        let mut geom = geoms[0].clone();
 
         let face = geom.shapes[0].faces.remove(0);
         assert_eq!(face.data().exterior.len(), 4);
@@ -47,7 +50,8 @@ mod tests {
 
     #[test]
     fn rescale_hex() {
-        let mut geom = Geom::from_file("./examples/data/hex2.obj").unwrap();
+        let geoms = Geom::load("./examples/data/hex2.obj").unwrap();
+        let mut geom = geoms[0].clone();
         let x_dim = geom.shapes[0].aabb.as_ref().unwrap().max.x
             - geom.shapes[0].aabb.as_ref().unwrap().min.x;
 
@@ -60,19 +64,22 @@ mod tests {
 
     #[test]
     fn test_com() {
-        let geom = Geom::from_file("./examples/data/hex.obj").unwrap();
+        let geoms = Geom::load("./examples/data/hex.obj").unwrap();
+        let geom = geoms[0].clone();
         let com = geom.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
         assert!(geom.is_centered());
 
-        let geom = Geom::from_file("./examples/data/multiple2.obj").unwrap();
+        let geoms = Geom::load("./examples/data/multiple2.obj").unwrap();
+        let geom = geoms[0].clone();
         let com = geom.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
         assert!(geom.is_centered());
 
-        let geom = Geom::from_file("./examples/data/multiple3.obj").unwrap();
+        let geoms = Geom::load("./examples/data/multiple3.obj").unwrap();
+        let geom = geoms[0].clone();
         let com = geom.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() - 5.0 < 1e-6);
@@ -90,7 +97,7 @@ mod tests {
 
     #[test]
     fn load_hex_shape() {
-        let shape = &Geom::from_file("./examples/data/hex.obj").unwrap().shapes[0];
+        let shape = &Geom::load("./examples/data/hex.obj").unwrap()[0].shapes[0];
         assert_eq!(shape.num_faces, 8);
         assert_eq!(shape.num_vertices, 12);
         match &shape.faces[0] {
@@ -112,7 +119,8 @@ mod tests {
             }
         }
 
-        let geom = Geom::from_file("./examples/data/hex.obj").unwrap();
+        let geoms = Geom::load("./examples/data/hex.obj").unwrap();
+        let geom = geoms[0].clone();
         assert_eq!(geom.num_shapes, 1);
         assert_eq!(geom.shapes[0].num_faces, 8);
         assert_eq!(geom.shapes[0].num_vertices, 12);
@@ -138,7 +146,9 @@ mod tests {
 
     #[test]
     fn load_multiple_geom() {
-        let geom = Geom::from_file("./examples/data/multiple.obj").unwrap();
+        let geoms = Geom::load("./examples/data/multiple.obj").unwrap();
+        let geom = geoms[0].clone();
+
         assert_eq!(geom.num_shapes, 2);
         assert_eq!(geom.shapes[0].num_faces, 8);
         assert_eq!(geom.shapes[0].num_vertices, 12);
@@ -165,7 +175,7 @@ mod tests {
 
     #[test]
     fn polygon_clip() {
-        let shape = &Geom::from_file("./examples/data/hex2.obj").unwrap().shapes[0];
+        let shape = &Geom::load("./examples/data/hex2.obj").unwrap()[0].shapes[0];
 
         let face1 = &shape.faces[4];
         let face2 = &shape.faces[7];
@@ -211,7 +221,8 @@ mod tests {
 
     #[test]
     fn shape_within() {
-        let geom = &Geom::from_file("./examples/data/cubes.obj").unwrap();
+        let geoms = &Geom::load("./examples/data/cubes.obj").unwrap();
+        let geom = geoms[0].clone();
 
         assert_eq!(geom.num_shapes, 6);
         assert!(geom.shapes[1].is_within(&geom, Some(0)));
@@ -1116,7 +1127,7 @@ pub struct Geom {
 }
 
 impl Geom {
-    pub fn from_file(filename: &str) -> Result<Self> {
+    pub fn load(filename: &str) -> Result<Vec<Self>> {
         // Log current directory only in debug builds
         #[cfg(debug_assertions)]
         match std::env::current_dir() {
@@ -1133,48 +1144,10 @@ impl Geom {
                 .map_err(|e| anyhow::anyhow!("Could not resolve path: {}", e))?
         };
 
-        let (models, _) = tobj::load_obj(&resolved_filename, &tobj::LoadOptions::default())
-            .map_err(|e| anyhow::anyhow!("Failed to load OBJ file '{}': {}", filename, e))?;
+        let mut geoms = vec![];
+        geoms.push(load_geom(&resolved_filename)?);
 
-        if models.is_empty() {
-            return Err(anyhow::anyhow!("No models found in OBJ file"));
-        }
-
-        let shapes = Self::shapes_from_models(models)?;
-
-        // Create containment graph
-        let mut containment_graph = ContainmentGraph::new(shapes.len());
-
-        // Ensure all shapes have valid IDs upfront
-        let shapes_with_ids: Vec<_> = shapes
-            .iter()
-            .filter_map(|shape| {
-                shape
-                    .id
-                    .map(|id| (id, shape))
-                    .or_else(|| panic!("Shape cannot be added to containment graph without an id"))
-            })
-            .collect();
-
-        // Iterate over distinct pairs of shapes
-        for (id_a, a) in &shapes_with_ids {
-            for (id_b, b) in &shapes_with_ids {
-                if id_a != id_b && a.contains(b) {
-                    containment_graph.set_parent(*id_b, *id_a);
-                }
-            }
-        }
-
-        let geom = Self {
-            num_shapes: shapes.len(),
-            shapes,
-            containment_graph,
-        };
-
-        // Validate the loaded geometry
-        geom.validate()?;
-
-        Ok(geom)
+        Ok(geoms)
     }
 
     fn shapes_from_models(models: Vec<Model>) -> Result<Vec<Shape>> {
@@ -1502,6 +1475,40 @@ impl Geom {
     }
 }
 
+/// Load a single geometry
+pub fn load_geom(resolved_filename: &String) -> Result<Geom, anyhow::Error> {
+    let (models, _) = tobj::load_obj(&resolved_filename, &tobj::LoadOptions::default())
+        .map_err(|e| anyhow::anyhow!("Failed to load OBJ file '{}': {}", resolved_filename, e))?;
+    if models.is_empty() {
+        return Err(anyhow::anyhow!("No models found in OBJ file"));
+    }
+    let shapes = Geom::shapes_from_models(models)?;
+    let mut containment_graph = ContainmentGraph::new(shapes.len());
+    let shapes_with_ids: Vec<_> = shapes
+        .iter()
+        .filter_map(|shape| {
+            shape
+                .id
+                .map(|id| (id, shape))
+                .or_else(|| panic!("Shape cannot be added to containment graph without an id"))
+        })
+        .collect();
+    for (id_a, a) in &shapes_with_ids {
+        for (id_b, b) in &shapes_with_ids {
+            if id_a != id_b && a.contains(b) {
+                containment_graph.set_parent(*id_b, *id_a);
+            }
+        }
+    }
+    let geom = Geom {
+        num_shapes: shapes.len(),
+        shapes,
+        containment_graph,
+    };
+    geom.validate()?;
+    Ok(geom)
+}
+
 /// Python bindings for the `Geom` struct.
 #[pymethods]
 impl Geom {
@@ -1550,7 +1557,7 @@ impl Geom {
     #[staticmethod]
     #[pyo3(name = "from_file")]
     fn py_from_file(filename: &str) -> PyResult<Self> {
-        match Self::from_file(filename) {
+        match load_geom(&filename.to_string()) {
             Ok(geom) => Ok(geom),
             Err(err) => Err(PyErr::new::<PyRuntimeError, _>(err.to_string())),
         }

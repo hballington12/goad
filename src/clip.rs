@@ -21,7 +21,8 @@ mod tests {
     #[test]
     #[should_panic]
     fn concave_clip() {
-        let mut geom = Geom::from_file("./examples/data/concave1.obj").unwrap();
+        let geoms = Geom::load("./examples/data/concave1.obj").unwrap();
+        let mut geom = geoms[0].clone();
 
         let clip_index = 4; // the index of the face to be used as the clip
         let projection = Vector3::new(-0.3, 0.0, -1.0);

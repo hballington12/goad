@@ -1,5 +1,6 @@
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
+use crate::geom::load_geom;
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     diff::Mapping,
@@ -23,7 +24,8 @@ mod tests {
 
     #[test]
     fn cube_inside_ico() {
-        let mut geom = Geom::from_file("./examples/data/cube_inside_ico.obj").unwrap();
+        let geoms = Geom::load("./examples/data/cube_inside_ico.obj").unwrap();
+        let mut geom = geoms[0].clone();
         geom.shapes[0].refr_index = Complex {
             // modify the refractive index of the outer shape
             re: 2.0,
@@ -121,9 +123,8 @@ impl Problem {
     /// If geom not provided, loads from file using settings.geom_name.
     pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
         let settings = settings.unwrap_or_else(|| load_config().expect("Failed to load config"));
-        let mut geom = geom.unwrap_or_else(|| {
-            Geom::from_file(&settings.geom_name).expect("Failed to load geometry")
-        });
+        let mut geom = geom
+            .unwrap_or_else(|| load_geom(&settings.geom_name).expect("Failed to load geometry"));
         init_geom(&settings, &mut geom);
 
         let bins = &settings.binning.scheme.generate();
