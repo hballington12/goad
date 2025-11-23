@@ -1,10 +1,10 @@
 [project]
 name = "goad-py"
-version = "1.0.2"
+version = "1.0.3"
 description = "Physical optics light scattering computation"
 authors = [{name = "Harry Ballington", email = "ballington@uni-wuppertal.de"}]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
