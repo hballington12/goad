@@ -1,6 +1,6 @@
 use crate::containment::{ContainmentGraph, AABB};
 use crate::orientation::*;
-use crate::settings;
+use crate::settings::{self, CENTERED_GEOMETRY_TOLERANCE};
 use anyhow::Result;
 use geo::{Area, TriangulateEarcut};
 use geo_types::{Coord, LineString, Polygon};
@@ -69,14 +69,14 @@ mod tests {
         let com = geom.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
-        assert!(geom.is_centered());
+        assert!(geom.is_centered().is_ok());
 
         let geoms = Geom::load("./examples/data/multiple2.obj").unwrap();
         let geom = geoms[0].clone();
         let com = geom.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
-        assert!(geom.is_centered());
+        assert!(geom.is_centered().is_ok());
 
         let geoms = Geom::load("./examples/data/multiple3.obj").unwrap();
         let geom = geoms[0].clone();
@@ -85,14 +85,14 @@ mod tests {
         assert!(com.coords.norm() - 5.0 < 1e-6);
         assert!(com.y.abs() - 5.0 < 1e-6);
         assert!(com.z.abs() < 1e-6);
-        assert!(!geom.is_centered());
+        assert!(geom.is_centered().is_err());
 
         let mut recentred = geom.clone();
         recentred.recentre();
         let com = recentred.centre_of_mass();
         println!("{:?}", com);
         assert!(com.coords.norm() < 1e-6);
-        assert!(recentred.is_centered());
+        assert!(recentred.is_centered().is_ok());
     }
 
     #[test]
@@ -1295,15 +1295,23 @@ impl Geom {
         }
     }
 
-    pub fn is_centered(&self) -> bool {
-        self.centre_of_mass().coords.norm() < 1e-6
+    pub fn is_centered(&self) -> Result<f32> {
+        let val = self.centre_of_mass().coords.norm();
+        if val < CENTERED_GEOMETRY_TOLERANCE {
+            Ok(val)
+        } else {
+            Err(anyhow::anyhow!("Geometry is not centered: {}", val))
+        }
     }
 
     /// Rotates the geometry by the Euler angles alpha, beta, and gamma (in degrees)
     /// Uses Mishchenko's Euler rotation matrix convention.
     pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
-        if !self.is_centered() {
-            println!("Warning: Geometry is not centered. Rotation may not be accurate.");
+        if let Err(err) = self.is_centered() {
+            println!(
+                "Warning: Geometry is not centered. Rotation may not be accurate. offset: {}",
+                err
+            );
         }
 
         let rotation = euler.rotation_matrix(convention);

@@ -262,7 +262,7 @@ impl Problem {
             }
         };
 
-        let map_beam_to_far_field = |beam: &Beam| -> Vec<Ampl> {
+        let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
                 Mapping::GeometricOptics => {
                     n2f_go(&self.settings.binning, &self.result.bins(), beam)
@@ -273,47 +273,61 @@ impl Problem {
 
         // coherence:
         if self.settings.coherence {
-            let zero_ampls: Vec<Ampl> =
-                self.result.field_2d.iter().map(|_| Ampl::zeros()).collect();
+            let zero_ampls: Vec<(usize, Ampl)> = self
+                .result
+                .field_2d
+                .iter()
+                .map(|_| Ampl::zeros())
+                .into_iter()
+                .enumerate()
+                .collect();
             let ampls = queue
                 .par_iter()
                 .map(|beam| map_beam_to_far_field(beam))
                 .reduce(
                     || zero_ampls.clone(),
                     |mut acc, val| {
-                        for (i, ampl) in val.into_iter().enumerate() {
-                            acc[i] += ampl;
+                        for (i, ampl) in val.into_iter() {
+                            acc[i].1 += ampl;
                         }
                         acc
                     },
-                );
+                )
+                .into_iter()
+                .map(|x| x.1)
+                .collect();
 
             self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
         } else {
             // no coherence
-            let zero_muellers: Vec<Mueller> = self
+            let zero_muellers: Vec<(usize, Mueller)> = self
                 .result
                 .field_2d
                 .iter()
                 .map(|_| Mueller::zeros())
+                .into_iter()
+                .enumerate()
                 .collect();
             let muellers = queue
                 .par_iter()
                 .map(|beam| {
                     let ampls = map_beam_to_far_field(beam);
-                    let muellers = ampls.into_iter().map(|ampl| ampl.to_mueller()).collect();
+                    let muellers = ampls.into_iter().map(|x| (x.0, x.1.to_mueller())).collect();
                     muellers
                 })
                 .reduce(
                     || zero_muellers.clone(),
                     |mut acc, val| {
-                        for (i, mueller) in val.into_iter().enumerate() {
-                            acc[i] += mueller;
+                        for (i, mueller) in val.into_iter() {
+                            acc[i].1 += mueller;
                         }
                         acc
                     },
-                );
+                )
+                .into_iter()
+                .map(|x| x.1)
+                .collect();
 
             self.assign_muellers(component, muellers);
         }

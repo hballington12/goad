@@ -33,7 +33,7 @@ impl Mapping {
 }
 
 /// Map a beam to the far-field using geometric optics. Assumes delta theta and delta phi are provided if the binning scheme is Simple. Returns a single-element vector containing the bin index and amplitude matrix.
-pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> Vec<Ampl> {
+pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> Vec<(usize, Ampl)> {
     // Use the precomputed theta and phi spacings if using Simple binning
     let (delta_theta, delta_phi) = match binning.scheme {
         Scheme::Simple {
@@ -92,7 +92,7 @@ pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> V
         * Complex::new(scale_factor, 0.0) // amplitude scaling factor
         * phase_correction; // reference phase correction
 
-    vec![ampl]
+    vec![(n, ampl)]
 }
 
 /// Mapping from near to far field using aperture diffraction theory.

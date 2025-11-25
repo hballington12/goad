@@ -1,14 +1,29 @@
 use crate::result::GOComponent;
 use rand_distr::num_traits::Pow;
+use serde::ser::{SerializeMap, Serializer};
 use serde::Serialize;
 use std::{
     collections::HashMap,
     ops::{Add, Div, Mul, Sub},
 };
 
-#[derive(Debug, PartialEq, Clone, Serialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Params {
     params: HashMap<(Param, GOComponent), f32>,
+}
+
+impl Serialize for Params {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.params.len()))?;
+        for ((param, component), value) in &self.params {
+            let key = format!("{:?}_{:?}", param, component);
+            map.serialize_entry(&key, value)?;
+        }
+        map.end()
+    }
 }
 
 // all params must add linearly eg. asymmetry must be multiplied by scatt cross

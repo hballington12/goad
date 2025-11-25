@@ -524,7 +524,7 @@ impl Beam {
         2.0 * PI / self.wavelength
     }
 
-    pub fn diffract(&self, bins: &[SolidAngleBin], fov_factor: Option<f32>) -> Vec<Ampl> {
+    pub fn diffract(&self, bins: &[SolidAngleBin], fov_factor: Option<f32>) -> Vec<(usize, Ampl)> {
         match &self.face {
             Face::Simple(face) => {
                 let verts = &face.exterior;
@@ -540,6 +540,9 @@ impl Beam {
                     self.wavenumber(),
                     fov_factor,
                 )
+                .into_iter()
+                .enumerate()
+                .collect()
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");
