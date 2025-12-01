@@ -977,7 +977,13 @@ impl Shape {
             let usize_indices: Vec<usize> = face_indices.iter().map(|&i| i as usize).collect();
 
             let face_vertices: Vec<_> = usize_indices.iter().map(|&i| shape.vertices[i]).collect();
-            shape.add_face(Face::new_simple(face_vertices, id, Some(usize_indices))?);
+            match Face::new_simple(face_vertices, id, Some(usize_indices)) {
+                Ok(face) => shape.add_face(face),
+                Err(err) => println!(
+                    "warn: skipping face (possibly degenerate) with error: {}",
+                    err
+                ),
+            }
 
             next_face = end;
         }
