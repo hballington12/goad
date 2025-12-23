@@ -314,7 +314,7 @@ impl Convergence {
         F: FnMut() -> bool,
     {
         if self.targets.is_empty() {
-            eprintln!("Warning: No convergence targets set. Use add_target() before solving.");
+            eprintln!("Warning: No convergence targets set. Use add_target() before solving. Convergence will not run.");
             return;
         }
 
