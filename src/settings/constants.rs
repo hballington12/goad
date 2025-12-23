@@ -67,6 +67,8 @@ pub const DEFAULT_MAPPING: Mapping = Mapping::ApertureDiffraction;
 pub const DEFAULT_COHERENCE: bool = true;
 /// Default quiet mode (false = show progress bars)
 pub const DEFAULT_QUIET: bool = false;
+/// Minimum orientations before checking convergence (for stable SEM estimates)
+pub const MIN_ORIENTATIONS: usize = 10;
 
 // =================
 // Default Functions

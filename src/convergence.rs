@@ -138,12 +138,12 @@ impl<T: Convergeable> ConvergenceTracker<T> {
 
 /// A convergence target for a specific parameter.
 #[derive(Clone, Debug)]
-pub struct ConvergenceTarget {
+pub struct ParamConvergenceTarget {
     pub param: Param,
     pub relative_error: f32,
 }
 
-impl ConvergenceTarget {
+impl ParamConvergenceTarget {
     pub fn new(param: Param, relative_error: f32) -> Self {
         Self {
             param,
@@ -165,8 +165,7 @@ struct OrientationTask {
 /// - Master thread owns the Injector and performs live reduction
 /// - Worker threads steal tasks and send results back via channel
 /// - Convergence checked after each result (currently: 100 orientations)
-/// Minimum number of orientations before checking convergence targets.
-const MIN_ORIENTATIONS: usize = 10;
+use crate::settings::constants::MIN_ORIENTATIONS;
 
 #[pyclass]
 #[derive(Debug)]
@@ -177,7 +176,7 @@ pub struct Convergence {
     pub result: Results,
     pub error: Results, // tracks orientation averaging error
     pub max_orientations: usize,
-    pub targets: Vec<ConvergenceTarget>,
+    pub targets: Vec<ParamConvergenceTarget>,
     tracker: ConvergenceTracker<Results>,
 }
 
@@ -226,7 +225,7 @@ impl Convergence {
     /// Solver will terminate when ALL targets are satisfied.
     pub fn add_target(&mut self, param: Param, relative_error: f32) {
         self.targets
-            .push(ConvergenceTarget::new(param, relative_error));
+            .push(ParamConvergenceTarget::new(param, relative_error));
     }
 
     /// Clear all convergence targets.
@@ -300,10 +299,21 @@ impl Convergence {
     /// Termination: stops when all convergence targets are satisfied,
     /// or when max_orientations is reached (whichever comes first).
     pub fn solve(&mut self) {
+        if self.targets.is_empty() {
+            eprintln!("Warning: No convergence targets set. Use add_target() before solving.");
+            return;
+        }
+
         let num_workers = std::thread::available_parallelism()
             .map(|p| p.get())
-            .unwrap_or(4)
-            .saturating_sub(1) // reserve 1 for master
+            .unwrap_or_else(|e| {
+                eprintln!(
+                    "Warning: Could not determine available parallelism ({}), defaulting to 4",
+                    e
+                );
+                4
+            })
+            .saturating_sub(1) // reserve 1 for master thread doing reduction
             .max(1);
 
         let n = self.orientations.num_orientations;
