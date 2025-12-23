@@ -228,3 +228,41 @@ fn test_convergence_with_target() {
         relative_sem
     );
 }
+
+/// Benchmark: compare 100 orientations Convergence vs MultiProblem timing
+#[test]
+fn benchmark_convergence_vs_multiproblem() {
+    use std::time::Instant;
+
+    let mut settings = settings::load_default_config().unwrap();
+    settings.orientation = Orientation {
+        scheme: OrientScheme::Uniform { num_orients: 100 },
+        euler_convention: EulerConvention::ZYZ,
+    };
+    settings.seed = Some(42);
+    settings.quiet = true;
+
+    // Time MultiProblem
+    let start_mp = Instant::now();
+    let mut multiproblem =
+        MultiProblem::new(None, Some(settings.clone())).expect("Failed to create MultiProblem");
+    multiproblem.solve();
+    let elapsed_mp = start_mp.elapsed();
+
+    // Time Convergence
+    let start_conv = Instant::now();
+    let mut convergence =
+        Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
+    convergence.add_target(Param::Asymmetry, 0.001); // tight target to run all 100
+    convergence.max_orientations = 100;
+    convergence.solve().unwrap();
+    let elapsed_conv = start_conv.elapsed();
+
+    println!("\n=== Benchmark: 100 orientations ===");
+    println!("MultiProblem: {:.2}s", elapsed_mp.as_secs_f64());
+    println!("Convergence:  {:.2}s", elapsed_conv.as_secs_f64());
+    println!(
+        "Ratio (Conv/MP): {:.2}x",
+        elapsed_conv.as_secs_f64() / elapsed_mp.as_secs_f64()
+    );
+}
