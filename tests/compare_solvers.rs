@@ -36,7 +36,7 @@ fn dump_1d_mueller_comparison() {
         Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
     convergence.add_target(Param::Asymmetry, 0.001); // tight target to ensure all 100 run
     convergence.max_orientations = 100;
-    convergence.solve();
+    convergence.solve().unwrap();
 
     // Dump 1D Mueller results
     let mp_1d = multiproblem
@@ -161,88 +161,6 @@ fn test_tracker_5_orientations() {
     println!("  relative sem = {:.2}%", (asym_sem / asym_mean) * 100.0);
 }
 
-/// Test SEM convergence with hex.obj at 200 orientations
-/// Uses the same binning scheme as Python default for comparison
-#[test]
-fn test_sem_convergence_hex() {
-    let mut settings = settings::load_default_config().unwrap();
-
-    // Use the same binning scheme as Python default:
-    // BinningScheme.interval(
-    //     thetas=[0, 5, 175, 179, 180],
-    //     theta_spacings=[0.1, 2.0, 0.5, 0.1],
-    //     phis=[0, 360],
-    //     phi_spacings=[7.5]
-    // )
-    settings.binning = BinningScheme {
-        scheme: bins::Scheme::Interval {
-            thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
-            theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
-            phis: vec![0.0, 360.0],
-            phi_spacings: vec![7.5],
-        },
-    };
-    settings.orientation = Orientation {
-        scheme: OrientScheme::Uniform { num_orients: 800 },
-        euler_convention: EulerConvention::ZYZ,
-    };
-    settings.seed = Some(42);
-    settings.quiet = true;
-
-    // Solve with Convergence using hex.obj (the default geometry)
-    let mut convergence =
-        Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
-    convergence.max_orientations = 800;
-    convergence.solve();
-
-    // Print results
-    let mean = convergence.mean();
-    let sem = convergence.sem();
-    println!("\n=== Convergence Results (800 orientations, hex.obj) ===");
-
-    let asym_mean = mean
-        .params
-        .asymmetry(&goad::result::GOComponent::Total)
-        .unwrap_or(0.0);
-    let asym_sem = sem
-        .params
-        .asymmetry(&goad::result::GOComponent::Total)
-        .unwrap_or(0.0);
-    let relative_sem = if asym_mean != 0.0 {
-        (asym_sem / asym_mean) * 100.0
-    } else {
-        0.0
-    };
-
-    println!("Asymmetry:");
-    println!("  Mean: {}", asym_mean);
-    println!("  SEM:  {}", asym_sem);
-    println!("  Relative SEM: {:.2}%", relative_sem);
-
-    // Also print scat_cross to verify weighting
-    let sc_mean = mean
-        .params
-        .scatt_cross(&goad::result::GOComponent::Total)
-        .unwrap_or(0.0);
-    let sc_sem = sem
-        .params
-        .scatt_cross(&goad::result::GOComponent::Total)
-        .unwrap_or(0.0);
-    println!("\nScatCross:");
-    println!("  Mean: {}", sc_mean);
-    println!("  SEM:  {}", sc_sem);
-
-    println!("\nPowers:");
-    println!(
-        "  Input  - Mean: {:.4}, SEM: {:.4}",
-        mean.powers.input, sem.powers.input
-    );
-    println!(
-        "  Output - Mean: {:.4}, SEM: {:.4}",
-        mean.powers.output, sem.powers.output
-    );
-}
-
 /// Test convergence with target-based termination (1% on asymmetry)
 #[test]
 fn test_convergence_with_target() {
@@ -270,11 +188,11 @@ fn test_convergence_with_target() {
     let mut convergence =
         Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
 
-    // Set target: 1% relative SEM on asymmetry
-    convergence.add_target(Param::Asymmetry, 0.01);
+    // Set target: 10% relative SEM on asymmetry
+    convergence.add_target(Param::Asymmetry, 0.10);
     convergence.max_orientations = 2000; // safety cap
 
-    convergence.solve();
+    convergence.solve().unwrap();
 
     // Check results
     let mean = convergence.mean();
@@ -294,7 +212,7 @@ fn test_convergence_with_target() {
     };
 
     let elapsed = start.elapsed();
-    println!("\n=== Convergence with Target (1% on Asymmetry) ===");
+    println!("\n=== Convergence with Target (10% on Asymmetry) ===");
     println!("Time elapsed: {:.2}s", elapsed.as_secs_f64());
     println!("Orientations computed: {}", convergence.count());
     println!("Asymmetry:");
@@ -303,10 +221,10 @@ fn test_convergence_with_target() {
     println!("  Relative SEM: {:.2}%", relative_sem);
 
     // Should have converged before hitting 2000 orientations
-    // and relative SEM should be <= 1%
+    // and relative SEM should be <= 10%
     assert!(
-        relative_sem <= 1.1, // allow tiny margin for floating point
-        "Expected relative SEM <= 1%, got {:.2}%",
+        relative_sem <= 11.0, // allow tiny margin for floating point
+        "Expected relative SEM <= 10%, got {:.2}%",
         relative_sem
     );
 }

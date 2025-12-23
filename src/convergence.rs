@@ -280,8 +280,8 @@ impl Convergence {
     }
 
     /// Solves using work-stealing parallelism (non-interruptible version).
-    pub fn solve(&mut self) {
-        self.solve_with_interrupt(|| false);
+    pub fn solve(&mut self) -> anyhow::Result<()> {
+        self.solve_with_interrupt(|| false)
     }
 
     /// Regenerates the orientations for the problem.
@@ -309,13 +309,12 @@ impl Convergence {
     ///
     /// The optional `check_interrupt` closure is called periodically to allow
     /// signal handling (e.g., Ctrl-C from Python). Return `true` to interrupt.
-    pub fn solve_with_interrupt<F>(&mut self, mut check_interrupt: F)
+    pub fn solve_with_interrupt<F>(&mut self, mut check_interrupt: F) -> anyhow::Result<()>
     where
         F: FnMut() -> bool,
     {
         if self.targets.is_empty() {
-            eprintln!("Warning: No convergence targets set. Use add_target() before solving. Convergence will not run.");
-            return;
+            anyhow::bail!("No convergence targets set. Use add_target() before solving.");
         }
 
         let num_workers = std::thread::available_parallelism()
@@ -470,6 +469,8 @@ impl Convergence {
             "Power ratio: {:.3} | Results ready",
             mean.powers.output / mean.powers.input.max(1e-10)
         ));
+
+        Ok(())
     }
 
     /// Worker loop: steal tasks, compute, send results.
@@ -584,8 +585,8 @@ impl Convergence {
     /// Periodically checks for Python signals (Ctrl-C) and interrupts if needed.
     #[pyo3(name = "solve")]
     pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
-        self.solve_with_interrupt(|| py.check_signals().is_err());
-        Ok(())
+        self.solve_with_interrupt(|| py.check_signals().is_err())
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     /// Access the current mean results (live during solve).

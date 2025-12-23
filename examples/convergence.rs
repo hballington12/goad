@@ -25,7 +25,7 @@ fn main() {
     convergence.max_orientations = 2000;
 
     // Solve - will terminate when target is reached or max_orientations hit
-    convergence.solve();
+    convergence.solve().unwrap();
 
     // Print results (using mean() and sem() methods)
     let mean = convergence.mean();

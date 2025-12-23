@@ -49,7 +49,7 @@ fn convergence_vs_multiproblem_identical() {
         Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
     convergence.add_target(Param::Asymmetry, 0.001); // tight target to ensure all 4 run
     convergence.max_orientations = 4; // match the 4 discrete orientations
-    convergence.solve();
+    convergence.solve().unwrap();
 
     // Compare results
     let mp_result: Vec<Vec<f32>> = multiproblem
