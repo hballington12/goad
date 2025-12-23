@@ -173,8 +173,6 @@ pub struct Convergence {
     pub geoms: Vec<Geom>,
     pub orientations: Orientations,
     pub settings: Settings,
-    pub result: Results,
-    pub error: Results, // tracks orientation averaging error
     pub max_orientations: usize,
     pub targets: Vec<ParamConvergenceTarget>,
     tracker: ConvergenceTracker<Results>,
@@ -206,18 +204,15 @@ impl Convergence {
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
-        let result = Results::new_empty(bins);
-        let error = Results::new_empty(bins);
+        let template = Results::new_empty(bins);
 
         Ok(Self {
             geoms,
             orientations,
             settings,
-            result,
-            error: error.clone(),
             max_orientations: 100_000, // safety cap
             targets: Vec::new(),
-            tracker: ConvergenceTracker::new(&error),
+            tracker: ConvergenceTracker::new(&template),
         })
     }
 
@@ -236,6 +231,16 @@ impl Convergence {
     /// Get the number of orientations computed so far.
     pub fn count(&self) -> usize {
         self.tracker.count()
+    }
+
+    /// Get the current mean results (live during solve).
+    pub fn mean(&self) -> Results {
+        self.tracker.mean()
+    }
+
+    /// Get the current standard error of the mean (live during solve).
+    pub fn sem(&self) -> Results {
+        self.tracker.sem()
     }
 
     /// Check if all convergence targets are satisfied.
@@ -287,11 +292,9 @@ impl Convergence {
 
     /// Resets the solver to its initial state.
     pub fn reset(&mut self) {
-        let bins: Vec<_> = self.result.field_2d.iter().map(|f| f.bin).collect();
-        self.result = Results::new_empty(&bins);
-        let error = Results::new_empty(&bins);
-        self.tracker = ConvergenceTracker::new(&error);
-        self.error = error;
+        let bins = self.settings.binning.scheme.generate();
+        let template = Results::new_empty(&bins);
+        self.tracker = ConvergenceTracker::new(&template);
         self.regenerate_orientations();
     }
 
@@ -451,10 +454,6 @@ impl Convergence {
                 }
             }
 
-            // Extract mean and SEM from tracker
-            self.result = self.tracker.mean();
-            self.error = self.tracker.sem();
-
             if converged {
                 status_pb.set_message(format!(
                     "Converged after {} orientations",
@@ -463,20 +462,13 @@ impl Convergence {
             }
         });
 
-        // Post-processing
         pb.finish_with_message("Orientations complete");
-        status_pb.set_message("Post-processing results...");
-
-        info_pb.set_message("Computing 1D integrated Mueller matrices...");
-        self.result.mueller_to_1d(&self.settings.binning.scheme);
-
-        info_pb.set_message("Computing scattering parameters...");
-        let _ = self.result.compute_params(self.settings.wavelength);
-
         status_pb.finish_with_message("✓ Computation complete");
+
+        let mean = self.tracker.mean();
         info_pb.finish_with_message(format!(
-            "Power ratio: {:.3} | Results ready for output",
-            self.result.powers.output / self.result.powers.input.max(1e-10)
+            "Power ratio: {:.3} | Results ready",
+            mean.powers.output / mean.powers.input.max(1e-10)
         ));
     }
 
@@ -576,18 +568,15 @@ impl Convergence {
 
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
-        let result = Results::new_empty(bins);
-        let error = Results::new_empty(bins);
+        let template = Results::new_empty(bins);
 
         Ok(Self {
             geoms,
             orientations,
             settings,
-            result,
-            error: error.clone(),
             max_orientations: 100_000,
             targets: Vec::new(),
-            tracker: ConvergenceTracker::new(&error),
+            tracker: ConvergenceTracker::new(&template),
         })
     }
 
@@ -599,16 +588,16 @@ impl Convergence {
         Ok(())
     }
 
-    /// Access the orientation-averaged simulation results.
+    /// Access the current mean results (live during solve).
     #[getter]
-    pub fn get_results(&self) -> Results {
-        self.result.clone()
+    pub fn get_mean(&self) -> Results {
+        self.tracker.mean()
     }
 
-    /// Access the orientation averaging error.
+    /// Access the current standard error of the mean (live during solve).
     #[getter]
-    pub fn get_error(&self) -> Results {
-        self.error.clone()
+    pub fn get_sem(&self) -> Results {
+        self.tracker.sem()
     }
 
     /// Get the number of orientations.

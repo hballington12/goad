@@ -27,17 +27,11 @@ fn main() {
     // Solve - will terminate when target is reached or max_orientations hit
     convergence.solve();
 
-    // Print results
-    let asym = convergence
-        .result
-        .params
-        .asymmetry(&GOComponent::Total)
-        .unwrap_or(0.0);
-    let asym_sem = convergence
-        .error
-        .params
-        .asymmetry(&GOComponent::Total)
-        .unwrap_or(0.0);
+    // Print results (using mean() and sem() methods)
+    let mean = convergence.mean();
+    let sem = convergence.sem();
+    let asym = mean.params.asymmetry(&GOComponent::Total).unwrap_or(0.0);
+    let asym_sem = sem.params.asymmetry(&GOComponent::Total).unwrap_or(0.0);
     let relative_sem = (asym_sem / asym.abs()) * 100.0;
 
     println!("Orientations computed: {}", convergence.count());

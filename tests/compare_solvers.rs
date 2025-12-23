@@ -34,6 +34,7 @@ fn dump_1d_mueller_comparison() {
     // Solve with Convergence
     let mut convergence =
         Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
+    convergence.add_target(Param::Asymmetry, 0.001); // tight target to ensure all 100 run
     convergence.max_orientations = 100;
     convergence.solve();
 
@@ -43,7 +44,8 @@ fn dump_1d_mueller_comparison() {
         .field_1d
         .as_ref()
         .expect("No 1D results");
-    let conv_1d = convergence.result.field_1d.as_ref().expect("No 1D results");
+    let conv_mean = convergence.mean();
+    let conv_1d = conv_mean.field_1d.as_ref().expect("No 1D results");
 
     let mut mp_file = File::create("multiproblem_1d.dat").unwrap();
     let mut conv_file = File::create("convergence_1d.dat").unwrap();
@@ -62,49 +64,35 @@ fn dump_1d_mueller_comparison() {
 
     println!("Wrote multiproblem_1d.dat and convergence_1d.dat");
 
-    // Print SEM values from convergence error field
+    // Print SEM values from convergence sem() method
+    let sem = convergence.sem();
     println!("\n=== Convergence SEM Values ===");
     println!("Powers SEM:");
-    println!("  Input:    {}", convergence.error.powers.input);
-    println!("  Output:   {}", convergence.error.powers.output);
-    println!("  Absorbed: {}", convergence.error.powers.absorbed);
+    println!("  Input:    {}", sem.powers.input);
+    println!("  Output:   {}", sem.powers.output);
+    println!("  Absorbed: {}", sem.powers.absorbed);
 
     println!("\nParams SEM:");
-    if let Some(asym) = convergence
-        .error
-        .params
-        .asymmetry(&goad::result::GOComponent::Total)
-    {
+    if let Some(asym) = sem.params.asymmetry(&goad::result::GOComponent::Total) {
         println!("  Asymmetry: {}", asym);
     }
-    if let Some(albedo) = convergence
-        .error
-        .params
-        .albedo(&goad::result::GOComponent::Total)
-    {
+    if let Some(albedo) = sem.params.albedo(&goad::result::GOComponent::Total) {
         println!("  Albedo: {}", albedo);
     }
 
     // Also print the mean values for comparison
+    let mean = convergence.mean();
     println!("\n=== Convergence Mean Values ===");
     println!("Powers Mean:");
-    println!("  Input:    {}", convergence.result.powers.input);
-    println!("  Output:   {}", convergence.result.powers.output);
-    println!("  Absorbed: {}", convergence.result.powers.absorbed);
+    println!("  Input:    {}", mean.powers.input);
+    println!("  Output:   {}", mean.powers.output);
+    println!("  Absorbed: {}", mean.powers.absorbed);
 
     println!("\nParams Mean:");
-    if let Some(asym) = convergence
-        .result
-        .params
-        .asymmetry(&goad::result::GOComponent::Total)
-    {
+    if let Some(asym) = mean.params.asymmetry(&goad::result::GOComponent::Total) {
         println!("  Asymmetry: {}", asym);
     }
-    if let Some(albedo) = convergence
-        .result
-        .params
-        .albedo(&goad::result::GOComponent::Total)
-    {
+    if let Some(albedo) = mean.params.albedo(&goad::result::GOComponent::Total) {
         println!("  Albedo: {}", albedo);
     }
 }
@@ -208,15 +196,15 @@ fn test_sem_convergence_hex() {
     convergence.solve();
 
     // Print results
+    let mean = convergence.mean();
+    let sem = convergence.sem();
     println!("\n=== Convergence Results (800 orientations, hex.obj) ===");
 
-    let asym_mean = convergence
-        .result
+    let asym_mean = mean
         .params
         .asymmetry(&goad::result::GOComponent::Total)
         .unwrap_or(0.0);
-    let asym_sem = convergence
-        .error
+    let asym_sem = sem
         .params
         .asymmetry(&goad::result::GOComponent::Total)
         .unwrap_or(0.0);
@@ -232,13 +220,11 @@ fn test_sem_convergence_hex() {
     println!("  Relative SEM: {:.2}%", relative_sem);
 
     // Also print scat_cross to verify weighting
-    let sc_mean = convergence
-        .result
+    let sc_mean = mean
         .params
         .scatt_cross(&goad::result::GOComponent::Total)
         .unwrap_or(0.0);
-    let sc_sem = convergence
-        .error
+    let sc_sem = sem
         .params
         .scatt_cross(&goad::result::GOComponent::Total)
         .unwrap_or(0.0);
@@ -249,11 +235,11 @@ fn test_sem_convergence_hex() {
     println!("\nPowers:");
     println!(
         "  Input  - Mean: {:.4}, SEM: {:.4}",
-        convergence.result.powers.input, convergence.error.powers.input
+        mean.powers.input, sem.powers.input
     );
     println!(
         "  Output - Mean: {:.4}, SEM: {:.4}",
-        convergence.result.powers.output, convergence.error.powers.output
+        mean.powers.output, sem.powers.output
     );
 }
 
@@ -291,13 +277,13 @@ fn test_convergence_with_target() {
     convergence.solve();
 
     // Check results
-    let asym_mean = convergence
-        .result
+    let mean = convergence.mean();
+    let sem = convergence.sem();
+    let asym_mean = mean
         .params
         .asymmetry(&goad::result::GOComponent::Total)
         .unwrap_or(0.0);
-    let asym_sem = convergence
-        .error
+    let asym_sem = sem
         .params
         .asymmetry(&goad::result::GOComponent::Total)
         .unwrap_or(0.0);

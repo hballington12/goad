@@ -3,6 +3,7 @@ use goad::{
     convergence::Convergence,
     multiproblem::MultiProblem,
     orientation::{Euler, EulerConvention, Orientation, Scheme as OrientScheme},
+    params::Param,
     result::MuellerMatrix,
     settings,
 };
@@ -46,6 +47,7 @@ fn convergence_vs_multiproblem_identical() {
     // Solve with Convergence (set target to match orientation count)
     let mut convergence =
         Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
+    convergence.add_target(Param::Asymmetry, 0.001); // tight target to ensure all 4 run
     convergence.max_orientations = 4; // match the 4 discrete orientations
     convergence.solve();
 
@@ -58,7 +60,7 @@ fn convergence_vs_multiproblem_identical() {
         .collect();
 
     let conv_result: Vec<Vec<f32>> = convergence
-        .result
+        .mean()
         .field_2d
         .iter()
         .map(|m| m.mueller_total.to_vec())
