@@ -25,6 +25,73 @@ mod tests {
     use nalgebra::Complex;
 
     #[test]
+    fn backscatter_params_computed() {
+        // Use default config
+        let settings =
+            crate::settings::load_default_config().expect("Failed to load default config");
+        let geoms = Geom::load("./examples/data/hex.obj").expect("load geom");
+        let mut geom = geoms[0].clone();
+        init_geom(&settings, &mut geom);
+
+        let mut problem = Problem::new(Some(geom), Some(settings));
+        let euler = crate::orientation::Euler::new(30.0, 30.0, 0.0);
+        problem.run(Some(&euler)).expect("run");
+
+        let result = &problem.result;
+
+        // Check that field_bs is populated
+        assert!(
+            result.field_bs.is_some(),
+            "field_bs should be Some after solve"
+        );
+
+        let bs = result.field_bs.as_ref().unwrap();
+        // S11 should be positive for any scattering
+        assert!(
+            bs.mueller_total[(0, 0)] > 0.0,
+            "Total S11 should be positive"
+        );
+
+        // Check that backscatter params are computed
+        assert!(
+            result
+                .params
+                .backscatter_cross(&GOComponent::Total)
+                .is_some(),
+            "BackscatterCross should be computed"
+        );
+        assert!(
+            result.params.lidar_ratio(&GOComponent::Total).is_some(),
+            "LidarRatio should be computed"
+        );
+        assert!(
+            result
+                .params
+                .depolarization_ratio(&GOComponent::Total)
+                .is_some(),
+            "DepolarizationRatio should be computed"
+        );
+
+        // Sanity checks on values
+        let bs_cross = result
+            .params
+            .backscatter_cross(&GOComponent::Total)
+            .unwrap();
+        let lidar = result.params.lidar_ratio(&GOComponent::Total).unwrap();
+        let depol = result
+            .params
+            .depolarization_ratio(&GOComponent::Total)
+            .unwrap();
+
+        assert!(bs_cross > 0.0, "BackscatterCross should be positive");
+        assert!(lidar > 0.0, "LidarRatio should be positive");
+        assert!(
+            depol >= 0.0 && depol <= 1.0,
+            "DepolarizationRatio should be in [0, 1]"
+        );
+    }
+
+    #[test]
     fn cube_inside_ico() {
         let geoms = Geom::load("./examples/data/cube_inside_ico.obj").unwrap();
         let mut geom = geoms[0].clone();
@@ -283,7 +350,7 @@ impl Problem {
                 .into_iter()
                 .enumerate()
                 .collect();
-            let ampls = queue
+            let ampls: Vec<Ampl> = queue
                 .par_iter()
                 .map(|beam| map_beam_to_far_field(beam))
                 .reduce(
@@ -299,8 +366,40 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
+            // Backscatter: accumulate coherently (as Ampl), only for diffraction
+            // Compute before mutable borrow of self
+            let bs_mueller = if mapping == Mapping::ApertureDiffraction {
+                if let Some(ref field_bs) = self.result.field_bs {
+                    let bs_bin = field_bs.bin;
+                    let bs_bins = [bs_bin];
+                    let mut bs_ampl = Ampl::zeros();
+                    for beam in queue.iter() {
+                        let ampls = beam.diffract(&bs_bins, fov_factor);
+                        if !ampls.is_empty() {
+                            bs_ampl += ampls[0].1;
+                        }
+                    }
+                    Some(bs_ampl.to_mueller())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
+
+            // Apply backscatter result
+            if let Some(mueller) = bs_mueller {
+                if let Some(ref mut field_bs) = self.result.field_bs {
+                    match component {
+                        GOComponent::Beam => field_bs.mueller_beam = mueller,
+                        GOComponent::ExtDiff => field_bs.mueller_ext = mueller,
+                        GOComponent::Total => {}
+                    }
+                }
+            }
         } else {
             // no coherence
             let zero_muellers: Vec<(usize, Mueller)> = self
@@ -311,7 +410,7 @@ impl Problem {
                 .into_iter()
                 .enumerate()
                 .collect();
-            let muellers = queue
+            let muellers: Vec<Mueller> = queue
                 .par_iter()
                 .map(|beam| {
                     let ampls = map_beam_to_far_field(beam);
@@ -331,63 +430,57 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
+            // Backscatter: accumulate incoherently (as Mueller), only for diffraction
+            // Compute before mutable borrow of self
+            let bs_mueller = if mapping == Mapping::ApertureDiffraction {
+                if let Some(ref field_bs) = self.result.field_bs {
+                    let bs_bin = field_bs.bin;
+                    let bs_bins = [bs_bin];
+                    let mut bs_mueller = Mueller::zeros();
+                    for beam in queue.iter() {
+                        let ampls = beam.diffract(&bs_bins, fov_factor);
+                        if !ampls.is_empty() {
+                            bs_mueller += ampls[0].1.to_mueller();
+                        }
+                    }
+                    Some(bs_mueller)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             self.assign_muellers(component, muellers);
+
+            // Apply backscatter result
+            if let Some(mueller) = bs_mueller {
+                if let Some(ref mut field_bs) = self.result.field_bs {
+                    match component {
+                        GOComponent::Beam => field_bs.mueller_beam = mueller,
+                        GOComponent::ExtDiff => field_bs.mueller_ext = mueller,
+                        GOComponent::Total => {}
+                    }
+                }
+            }
         }
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
     pub fn solve_far(&mut self) {
+        // Initialize field_bs with backscatter bin
+        let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
+        self.result.field_bs = Some(ScattResult2D::new(bs_bin));
+
         self.solve_far_queue(GOComponent::ExtDiff);
         self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
-        self.solve_backscatter();
+
+        // Combine backscatter components
+        if let Some(ref mut field_bs) = self.result.field_bs {
+            field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
+        }
     }
-
-    /// Computes backscatter by querying diffraction at theta=180° for all components.
-    fn solve_backscatter(&mut self) {
-        // Create a backscatter bin at theta=180°, phi=0° with zero width
-        let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
-        let bs_bins = [bs_bin];
-
-        // Initialize field_bs
-        let mut field_bs = ScattResult2D::new(bs_bin);
-
-        // Query backscatter for ExtDiff component (aperture diffraction)
-        let ext_mueller: Mueller = self
-            .ext_diff_beam_queue
-            .par_iter()
-            .map(|beam| {
-                let ampls = beam.diffract(&bs_bins, None);
-                if ampls.is_empty() {
-                    Mueller::zeros()
-                } else {
-                    ampls[0].1.to_mueller()
-                }
-            })
-            .reduce(Mueller::zeros, |acc, m| acc + m);
-        field_bs.mueller_ext = ext_mueller;
-
-        // Query backscatter for Beam component (using diffraction regardless of mapping setting)
-        let beam_mueller: Mueller = self
-            .out_beam_queue
-            .par_iter()
-            .map(|beam| {
-                let ampls = beam.diffract(&bs_bins, self.settings.fov_factor);
-                if ampls.is_empty() {
-                    Mueller::zeros()
-                } else {
-                    ampls[0].1.to_mueller()
-                }
-            })
-            .reduce(Mueller::zeros, |acc, m| acc + m);
-        field_bs.mueller_beam = beam_mueller;
-
-        // Combine for total
-        field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
-
-        self.result.field_bs = Some(field_bs);
-    }
-
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self) {
         self.solve_near();
