@@ -1,6 +1,8 @@
+use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
+use crate::result::ScattResult2D;
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     diff::Mapping,
@@ -338,6 +340,52 @@ impl Problem {
         self.solve_far_queue(GOComponent::ExtDiff);
         self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
+        self.solve_backscatter();
+    }
+
+    /// Computes backscatter by querying diffraction at theta=180° for all components.
+    fn solve_backscatter(&mut self) {
+        // Create a backscatter bin at theta=180°, phi=0° with zero width
+        let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
+        let bs_bins = [bs_bin];
+
+        // Initialize field_bs
+        let mut field_bs = ScattResult2D::new(bs_bin);
+
+        // Query backscatter for ExtDiff component (aperture diffraction)
+        let ext_mueller: Mueller = self
+            .ext_diff_beam_queue
+            .par_iter()
+            .map(|beam| {
+                let ampls = beam.diffract(&bs_bins, None);
+                if ampls.is_empty() {
+                    Mueller::zeros()
+                } else {
+                    ampls[0].1.to_mueller()
+                }
+            })
+            .reduce(Mueller::zeros, |acc, m| acc + m);
+        field_bs.mueller_ext = ext_mueller;
+
+        // Query backscatter for Beam component (using diffraction regardless of mapping setting)
+        let beam_mueller: Mueller = self
+            .out_beam_queue
+            .par_iter()
+            .map(|beam| {
+                let ampls = beam.diffract(&bs_bins, self.settings.fov_factor);
+                if ampls.is_empty() {
+                    Mueller::zeros()
+                } else {
+                    ampls[0].1.to_mueller()
+                }
+            })
+            .reduce(Mueller::zeros, |acc, m| acc + m);
+        field_bs.mueller_beam = beam_mueller;
+
+        // Combine for total
+        field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
+
+        self.result.field_bs = Some(field_bs);
     }
 
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices

@@ -869,6 +869,31 @@ impl Results {
                 asymmetry_scatt_ext / scatt_ext,
             );
         }
+
+        // Backscatter params (if field_bs is available)
+        if let Some(ref field_bs) = self.field_bs {
+            let k = 2.0 * PI / wavelength;
+
+            // BackscatterCross = S11 * 4π / k²
+            for (component, mueller) in [
+                (GOComponent::Total, field_bs.mueller_total),
+                (GOComponent::Beam, field_bs.mueller_beam),
+                (GOComponent::ExtDiff, field_bs.mueller_ext),
+            ] {
+                let s11 = mueller[(0, 0)];
+                let bs_cross = s11 * 4.0 * PI / k.powi(2);
+                self.params
+                    .set_param(Param::BackscatterCross, component, bs_cross);
+
+                // LidarRatio = ExtCross / BackscatterCross
+                if let Some(ext_cross) = self.params.ext_cross(&component) {
+                    if bs_cross > 1e-10 {
+                        self.params
+                            .set_param(Param::LidarRatio, component, ext_cross / bs_cross);
+                    }
+                }
+            }
+        }
     }
 
     /// Returns a weighted version of Results for convergence tracking.
