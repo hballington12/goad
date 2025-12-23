@@ -57,8 +57,8 @@ impl Pow<f32> for Params {
     type Output = Params;
     fn pow(self, rhs: f32) -> Self::Output {
         let mut params = self.clone();
-        for (key, _) in self.params.iter() {
-            params.params.entry(*key).or_default().pow(rhs);
+        for (key, value) in self.params.iter() {
+            params.set_param(key.0, key.1, value.powf(rhs));
         }
         params
     }
@@ -131,6 +131,53 @@ impl Params {
 
     pub fn ext_cross(&self, component: &GOComponent) -> Option<f32> {
         self.params.get(&(Param::ExtCross, *component)).copied()
+    }
+
+    /// Returns a weighted version of Params for convergence tracking.
+    /// - asymmetry becomes asymmetry * scat_cross
+    /// - albedo becomes albedo * ext_cross
+    /// - scat_cross and ext_cross stay the same
+    pub fn to_weighted(&self) -> Self {
+        let mut result = self.clone();
+        for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
+            // Asymmetry weighted by ScatCross
+            if let (Some(asym), Some(sc)) =
+                (self.asymmetry(&component), self.scatt_cross(&component))
+            {
+                result.set_param(Param::Asymmetry, component, asym * sc);
+            }
+            // Albedo weighted by ExtCross
+            if let (Some(alb), Some(ec)) = (self.albedo(&component), self.ext_cross(&component)) {
+                result.set_param(Param::Albedo, component, alb * ec);
+            }
+        }
+        result
+    }
+
+    /// Returns a Params struct containing the weights for each field.
+    /// - asymmetry slot contains scat_cross
+    /// - albedo slot contains ext_cross
+    /// - scat_cross and ext_cross slots contain 1.0
+    pub fn weights(&self) -> Self {
+        let mut result = Params::new();
+        for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
+            // Asymmetry weight is ScatCross
+            if let Some(sc) = self.scatt_cross(&component) {
+                result.set_param(Param::Asymmetry, component, sc);
+            }
+            // Albedo weight is ExtCross
+            if let Some(ec) = self.ext_cross(&component) {
+                result.set_param(Param::Albedo, component, ec);
+            }
+            // ScatCross and ExtCross weights are 1.0
+            if self.scatt_cross(&component).is_some() {
+                result.set_param(Param::ScatCross, component, 1.0);
+            }
+            if self.ext_cross(&component).is_some() {
+                result.set_param(Param::ExtCross, component, 1.0);
+            }
+        }
+        result
     }
 }
 
@@ -215,15 +262,37 @@ impl Convergeable for Params {
         self.clone() * other.clone()
     }
 
+    fn div_elem(&self, other: &Self) -> Self {
+        let mut result = self.clone();
+        for (key, value) in other.params.iter() {
+            if let Some(self_val) = result.params.get_mut(key) {
+                *self_val /= value;
+            }
+        }
+        result
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        self.clone() + other.clone()
+    }
+
     fn sub_elem(&self, other: &Self) -> Self {
         self.clone() - other.clone()
     }
 
     fn scale(&self, scalar: f32) -> Self {
-        self.clone() / (1.0 / scalar) // use existing Div impl
+        self.clone() * scalar
     }
 
     fn sqrt_elem(&self) -> Self {
         self.clone().pow(0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        self.to_weighted()
+    }
+
+    fn weights(&self) -> Self {
+        self.weights()
     }
 }

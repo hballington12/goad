@@ -189,6 +189,23 @@ impl Powers {
         }
     }
 
+    /// Returns a Powers struct with all fields set to 1.0 (for weights)
+    pub fn ones() -> Self {
+        Self {
+            input: 1.0,
+            output: 1.0,
+            absorbed: 1.0,
+            trnc_ref: 1.0,
+            trnc_rec: 1.0,
+            trnc_clip: 1.0,
+            trnc_energy: 1.0,
+            clip_err: 1.0,
+            trnc_area: 1.0,
+            trnc_cop: 1.0,
+            ext_diff: 1.0,
+        }
+    }
+
     /// Returns the power unaccounted for.
     pub fn missing(&self) -> f32 {
         self.input
@@ -237,6 +254,26 @@ impl Convergeable for Powers {
         *self * *other
     }
 
+    fn div_elem(&self, other: &Self) -> Self {
+        Self {
+            input: self.input / other.input,
+            output: self.output / other.output,
+            absorbed: self.absorbed / other.absorbed,
+            trnc_ref: self.trnc_ref / other.trnc_ref,
+            trnc_rec: self.trnc_rec / other.trnc_rec,
+            trnc_clip: self.trnc_clip / other.trnc_clip,
+            trnc_energy: self.trnc_energy / other.trnc_energy,
+            clip_err: self.clip_err / other.clip_err,
+            trnc_area: self.trnc_area / other.trnc_area,
+            trnc_cop: self.trnc_cop / other.trnc_cop,
+            ext_diff: self.ext_diff / other.ext_diff,
+        }
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        *self + *other
+    }
+
     fn sub_elem(&self, other: &Self) -> Self {
         *self - *other
     }
@@ -247,5 +284,15 @@ impl Convergeable for Powers {
 
     fn sqrt_elem(&self) -> Self {
         self.pow(0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        // Powers don't need special weighting
+        self.clone()
+    }
+
+    fn weights(&self) -> Self {
+        // All weights are 1.0 for powers
+        Powers::ones()
     }
 }

@@ -305,6 +305,22 @@ impl<B: ScatteringBin> Div<f32> for ScattResult<B> {
     }
 }
 
+impl<B: ScatteringBin> Div for ScattResult<B> {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total.component_div(&other.ampl_total),
+            ampl_beam: self.ampl_beam.component_div(&other.ampl_beam),
+            ampl_ext: self.ampl_ext.component_div(&other.ampl_ext),
+            mueller_total: self.mueller_total.component_div(&other.mueller_total),
+            mueller_beam: self.mueller_beam.component_div(&other.mueller_beam),
+            mueller_ext: self.mueller_ext.component_div(&other.mueller_ext),
+        }
+    }
+}
+
 impl<B: ScatteringBin> ScattResult<B> {
     /// Creates a new empty ScattResult.
     pub fn new(bin: B) -> Self {
@@ -316,6 +332,19 @@ impl<B: ScatteringBin> ScattResult<B> {
             mueller_total: Mueller::zeros(),
             mueller_beam: Mueller::zeros(),
             mueller_ext: Mueller::zeros(),
+        }
+    }
+
+    /// Returns a ScattResult with all values set to 1.0 (for weights)
+    pub fn ones_like(&self) -> Self {
+        Self {
+            bin: self.bin.clone(),
+            ampl_total: Ampl::from_element(Complex::new(1.0, 0.0)),
+            ampl_beam: Ampl::from_element(Complex::new(1.0, 0.0)),
+            ampl_ext: Ampl::from_element(Complex::new(1.0, 0.0)),
+            mueller_total: Mueller::from_element(1.0),
+            mueller_beam: Mueller::from_element(1.0),
+            mueller_ext: Mueller::from_element(1.0),
         }
     }
 }
@@ -335,6 +364,14 @@ impl<B: ScatteringBin> Convergeable for ScattResult<B> {
         self.clone() * other.clone()
     }
 
+    fn div_elem(&self, other: &Self) -> Self {
+        self.clone() / other.clone()
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        self.clone() + other.clone()
+    }
+
     fn sub_elem(&self, other: &Self) -> Self {
         self.clone() - other.clone()
     }
@@ -345,6 +382,16 @@ impl<B: ScatteringBin> Convergeable for ScattResult<B> {
 
     fn sqrt_elem(&self) -> Self {
         self.clone().pow(0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        // ScattResult doesn't need special weighting
+        self.clone()
+    }
+
+    fn weights(&self) -> Self {
+        // All weights are 1.0
+        self.ones_like()
     }
 }
 
@@ -545,6 +592,31 @@ impl Div<f32> for Results {
     }
 }
 
+impl Div for Results {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a / b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(f1), Some(f2)) => Some(f1.into_iter().zip(f2).map(|(a, b)| a / b).collect()),
+            (Some(f1), None) => Some(f1),
+            (None, Some(_)) => None,
+            (None, None) => None,
+        };
+        Self {
+            field_2d,
+            field_1d,
+            powers: self.powers.div_elem(&other.powers),
+            params: self.params.div_elem(&other.params),
+        }
+    }
+}
+
 impl Convergeable for Results {
     fn zero_like(&self) -> Self {
         Results::new_empty(&self.bins())
@@ -584,6 +656,14 @@ impl Convergeable for Results {
         self.clone() * other.clone()
     }
 
+    fn div_elem(&self, other: &Self) -> Self {
+        self.clone() / other.clone()
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        self.clone() + other.clone()
+    }
+
     fn sub_elem(&self, other: &Self) -> Self {
         self.clone() - other.clone()
     }
@@ -594,6 +674,14 @@ impl Convergeable for Results {
 
     fn sqrt_elem(&self) -> Self {
         self.clone().pow(0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        Results::to_weighted(self)
+    }
+
+    fn weights(&self) -> Self {
+        Results::weights(self)
     }
 }
 
@@ -730,6 +818,36 @@ impl Results {
                 asymmetry_scatt_ext / scatt_ext,
             );
         }
+    }
+
+    /// Returns a weighted version of Results for convergence tracking.
+    /// - asymmetry becomes asymmetry * scat_cross
+    /// - albedo becomes albedo * ext_cross
+    /// - powers and other params stay the same (weight = 1)
+    pub fn to_weighted(&self) -> Self {
+        let mut result = self.clone();
+        result.params = self.params.to_weighted();
+        result
+    }
+
+    /// Returns a Results struct containing the weights for each field.
+    /// - asymmetry slot contains scat_cross
+    /// - albedo slot contains ext_cross
+    /// - powers fields are all 1.0
+    /// - scat_cross and ext_cross slots contain 1.0
+    pub fn weights(&self) -> Self {
+        let mut result = self.clone();
+        // Powers: all weights are 1.0
+        result.powers = Powers::ones();
+        // Params: get appropriate weights
+        result.params = self.params.weights();
+        // Fields: weights are 1.0 (use existing structure but with 1.0 values)
+        result.field_2d = self.field_2d.iter().map(|f| f.ones_like()).collect();
+        result.field_1d = self
+            .field_1d
+            .as_ref()
+            .map(|f| f.iter().map(|x| x.ones_like()).collect());
+        result
     }
 
     pub fn print(&self) {

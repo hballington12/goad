@@ -107,3 +107,74 @@ fn dump_1d_mueller_comparison() {
         println!("  Albedo: {}", albedo);
     }
 }
+
+/// Test SEM convergence with hex.obj at 3 orientations (for debugging)
+#[test]
+fn test_sem_convergence_hex() {
+    let mut settings = settings::load_default_config().unwrap();
+
+    settings.binning = BinningScheme {
+        scheme: bins::Scheme::new_simple(37, 37),
+    };
+    settings.orientation = Orientation {
+        scheme: OrientScheme::Uniform { num_orients: 3 },
+        euler_convention: EulerConvention::ZYZ,
+    };
+    settings.seed = Some(42);
+    settings.quiet = true;
+
+    // Solve with Convergence using hex.obj (the default geometry)
+    let mut convergence =
+        Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
+    convergence.convergence_target = 3;
+    convergence.solve();
+
+    // Print results
+    println!("\n=== Convergence Results (3 orientations, hex.obj) ===");
+
+    let asym_mean = convergence
+        .result
+        .params
+        .asymmetry(&goad::result::GOComponent::Total)
+        .unwrap_or(0.0);
+    let asym_sem = convergence
+        .error
+        .params
+        .asymmetry(&goad::result::GOComponent::Total)
+        .unwrap_or(0.0);
+    let relative_sem = if asym_mean != 0.0 {
+        (asym_sem / asym_mean) * 100.0
+    } else {
+        0.0
+    };
+
+    println!("Asymmetry:");
+    println!("  Mean: {}", asym_mean);
+    println!("  SEM:  {}", asym_sem);
+    println!("  Relative SEM: {:.2}%", relative_sem);
+
+    // Also print scat_cross to verify weighting
+    let sc_mean = convergence
+        .result
+        .params
+        .scatt_cross(&goad::result::GOComponent::Total)
+        .unwrap_or(0.0);
+    let sc_sem = convergence
+        .error
+        .params
+        .scatt_cross(&goad::result::GOComponent::Total)
+        .unwrap_or(0.0);
+    println!("\nScatCross:");
+    println!("  Mean: {}", sc_mean);
+    println!("  SEM:  {}", sc_sem);
+
+    println!("\nPowers:");
+    println!(
+        "  Input  - Mean: {:.4}, SEM: {:.4}",
+        convergence.result.powers.input, convergence.error.powers.input
+    );
+    println!(
+        "  Output - Mean: {:.4}, SEM: {:.4}",
+        convergence.result.powers.output, convergence.error.powers.output
+    );
+}
