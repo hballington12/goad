@@ -274,6 +274,11 @@ impl Convergence {
         })
     }
 
+    /// Solves using work-stealing parallelism (non-interruptible version).
+    pub fn solve(&mut self) {
+        self.solve_with_interrupt(|| false);
+    }
+
     /// Regenerates the orientations for the problem.
     pub fn regenerate_orientations(&mut self) {
         self.orientations =
@@ -298,7 +303,13 @@ impl Convergence {
     ///
     /// Termination: stops when all convergence targets are satisfied,
     /// or when max_orientations is reached (whichever comes first).
-    pub fn solve(&mut self) {
+    ///
+    /// The optional `check_interrupt` closure is called periodically to allow
+    /// signal handling (e.g., Ctrl-C from Python). Return `true` to interrupt.
+    pub fn solve_with_interrupt<F>(&mut self, mut check_interrupt: F)
+    where
+        F: FnMut() -> bool,
+    {
         if self.targets.is_empty() {
             eprintln!("Warning: No convergence targets set. Use add_target() before solving.");
             return;
@@ -405,9 +416,11 @@ impl Convergence {
             // Master reduction loop with convergence tracking
             status_pb.set_message("Running orientation averaging...");
             let mut converged = false;
+            let mut interrupted = false;
 
-            while self.tracker.count() < max_target && !converged {
-                match rx.recv() {
+            while self.tracker.count() < max_target && !converged && !interrupted {
+                // Use timeout so we can periodically check for interrupts
+                match rx.recv_timeout(Duration::from_millis(100)) {
                     Ok(result) => {
                         self.tracker.update(&result);
                         pb.inc(1);
@@ -424,7 +437,14 @@ impl Convergence {
                             }
                         }
                     }
-                    Err(_) => {
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                        // Check for interrupt (e.g., Ctrl-C from Python)
+                        if check_interrupt() {
+                            interrupted = true;
+                            status_pb.set_message("Interrupted by user");
+                        }
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                         // Channel closed, no more results coming
                         break;
                     }
@@ -572,11 +592,10 @@ impl Convergence {
     }
 
     /// Solve the multi-orientation scattering problem using work-stealing.
+    /// Periodically checks for Python signals (Ctrl-C) and interrupts if needed.
     #[pyo3(name = "solve")]
     pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
-        py.detach(|| {
-            self.solve();
-        });
+        self.solve_with_interrupt(|| py.check_signals().is_err());
         Ok(())
     }
 
