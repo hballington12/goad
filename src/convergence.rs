@@ -36,6 +36,7 @@ pub struct Convergence {
     pub orientations: Orientations,
     pub settings: Settings,
     pub result: Results,
+    pub error: Results, // tracks orientation averaging error
     pub convergence_target: usize,
 }
 
@@ -66,12 +67,14 @@ impl Convergence {
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
         let result = Results::new_empty(bins);
+        let error = Results::new_empty(bins);
 
         Ok(Self {
             geoms,
             orientations,
             settings,
             result,
+            error,
             convergence_target: 100, // dummy convergence: stop after 100 orientations
         })
     }
@@ -84,14 +87,9 @@ impl Convergence {
 
     /// Resets the solver to its initial state.
     pub fn reset(&mut self) {
-        self.result = Results::new_empty(
-            &self
-                .result
-                .field_2d
-                .iter()
-                .map(|f| f.bin)
-                .collect::<Vec<_>>(),
-        );
+        let bins: Vec<_> = self.result.field_2d.iter().map(|f| f.bin).collect();
+        self.result = Results::new_empty(&bins);
+        self.error = Results::new_empty(&bins);
         self.regenerate_orientations();
     }
 
@@ -168,14 +166,11 @@ impl Convergence {
             // Master reduction loop
             status_pb.set_message("Running orientation averaging...");
             let mut completed = 0;
-            let bins = self.result.bins();
 
             while completed < target {
                 match rx.recv() {
                     Ok(result) => {
-                        let current =
-                            std::mem::replace(&mut self.result, Results::new_empty(&bins));
-                        self.result = Self::reduce_results_static(current, result);
+                        self.result += result;
                         completed += 1;
                         pb.inc(1);
                     }
@@ -279,19 +274,6 @@ impl Convergence {
         }
     }
 
-    /// Combines two Results objects by adding their fields.
-    fn reduce_results_static(mut acc: Results, item: Results) -> Results {
-        acc.powers += item.powers;
-
-        for (a, i) in acc.field_2d.iter_mut().zip(item.field_2d.into_iter()) {
-            a.mueller_total += i.mueller_total;
-            a.mueller_beam += i.mueller_beam;
-            a.mueller_ext += i.mueller_ext;
-        }
-
-        acc
-    }
-
     /// Normalizes the results by dividing by the number of orientations.
     fn normalize_results(&mut self, num_orientations: f32) {
         self.result.powers /= num_orientations;
@@ -334,12 +316,14 @@ impl Convergence {
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
         let result = Results::new_empty(bins);
+        let error = Results::new_empty(bins);
 
         Ok(Self {
             geoms,
             orientations,
             settings,
             result,
+            error,
             convergence_target: 100,
         })
     }
@@ -357,6 +341,12 @@ impl Convergence {
     #[getter]
     pub fn get_results(&self) -> Results {
         self.result.clone()
+    }
+
+    /// Access the orientation averaging error.
+    #[getter]
+    pub fn get_error(&self) -> Results {
+        self.error.clone()
     }
 
     /// Get the number of orientations.
