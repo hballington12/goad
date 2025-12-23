@@ -8,7 +8,7 @@ use crossbeam_deque::{Injector, Steal};
 
 use crate::{
     geom::Geom,
-    orientation::{Euler, OrientationSampler, UniformSampler},
+    orientation::{Euler, OrientationSampler, Scheme as OrientScheme},
     params::Param,
     problem::{self, Problem},
     result::{GOComponent, Results},
@@ -162,6 +162,127 @@ struct OrientationTask {
     problem_idx: usize,
 }
 
+/// Progress display for convergence solver.
+struct ConvergenceProgress {
+    title_pb: ProgressBar,
+    info_pb: ProgressBar,
+    target_pbs: Vec<ProgressBar>,
+    start_time: std::time::Instant,
+    max_target: usize,
+}
+
+impl ConvergenceProgress {
+    fn new(num_targets: usize, max_target: usize) -> Self {
+        let m = MultiProgress::new();
+
+        let title_pb = m.add(ProgressBar::new_spinner());
+        title_pb.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.cyan} GOAD: [Convergence]  [Elapsed: {elapsed}]  {msg}  [{prefix}]",
+            )
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+        );
+        title_pb.set_message("[Status: \x1b[33mINITIALISING\x1b[0m]");
+        title_pb.set_prefix(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+        title_pb.enable_steady_tick(Duration::from_millis(100));
+
+        let info_pb = m.add(ProgressBar::new_spinner());
+        info_pb.set_style(ProgressStyle::with_template("  {msg}").unwrap());
+
+        let target_pbs: Vec<ProgressBar> = (0..num_targets)
+            .map(|_| {
+                let pb = m.add(ProgressBar::new(100));
+                pb.set_style(
+                    ProgressStyle::with_template("  {msg} [{bar:20.green/dim}] {pos:>3}%")
+                        .unwrap()
+                        .progress_chars("█▓░"),
+                );
+                pb
+            })
+            .collect();
+
+        Self {
+            title_pb,
+            info_pb,
+            target_pbs,
+            start_time: std::time::Instant::now(),
+            max_target,
+        }
+    }
+
+    fn set_running(&self) {
+        self.title_pb
+            .set_message("[Status: \x1b[32mRUNNING\x1b[0m]");
+    }
+
+    fn set_finalising(&self) {
+        self.title_pb
+            .set_message("[Status: \x1b[33mFINALISING\x1b[0m]");
+    }
+
+    fn update_info(&self, count: usize) {
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        let sec_per_orient = if count > 0 {
+            elapsed / count as f64
+        } else {
+            0.0
+        };
+        let min_color = if count >= MIN_ORIENTATIONS {
+            "\x1b[32m" // green
+        } else {
+            "\x1b[31m" // red
+        };
+        self.info_pb.set_message(format!(
+            "[Orientations: {} ({}{}{}|{})] [{:.3} sec/orientation]",
+            count, min_color, MIN_ORIENTATIONS, "\x1b[0m", self.max_target, sec_per_orient
+        ));
+        self.title_pb
+            .set_prefix(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+    }
+
+    fn update_target(
+        &self,
+        index: usize,
+        param: Param,
+        mean_val: f32,
+        sem_val: f32,
+        target_rel_sem: f32,
+    ) {
+        let current_rel_sem = if mean_val.abs() > 1e-10 {
+            sem_val / mean_val.abs()
+        } else {
+            0.0
+        };
+
+        // Progress with sqrt scaling, capped at 100%
+        let progress = if current_rel_sem > 1e-10 {
+            ((target_rel_sem / current_rel_sem).sqrt()).min(1.0)
+        } else {
+            1.0
+        };
+
+        let param_name = format!("{:?}", param);
+        self.target_pbs[index].set_message(format!(
+            "{:<9} {:>10.4e} ± {:<10.4e} [{:>5.2}% / {:>5.2}%]",
+            param_name,
+            mean_val,
+            sem_val,
+            current_rel_sem * 100.0,
+            target_rel_sem * 100.0
+        ));
+        self.target_pbs[index].set_position((progress * 100.0) as u64);
+    }
+
+    fn finish(&self) {
+        self.title_pb.finish_and_clear();
+        for pb in &self.target_pbs {
+            pb.finish_and_clear();
+        }
+        self.info_pb.finish_and_clear();
+    }
+}
+
 /// Work-stealing based multi-orientation solver with convergence support.
 ///
 /// Uses crossbeam-deque for work distribution:
@@ -213,7 +334,7 @@ pub struct Convergence {
     pub max_orientations: usize,
     pub targets: Vec<ParamConvergenceTarget>,
     tracker: ConvergenceTracker<Results>,
-    sampler: UniformSampler,
+    sampler: OrientationSampler,
 }
 
 impl Convergence {
@@ -242,7 +363,12 @@ impl Convergence {
 
         let bins = &settings.binning.scheme.generate();
         let template = Results::new_empty(bins);
-        let sampler = UniformSampler::new(settings.seed);
+
+        // Create sampler based on orientation scheme
+        let sampler = match &settings.orientation.scheme {
+            OrientScheme::Discrete { eulers } => OrientationSampler::discrete(eulers.clone()),
+            _ => OrientationSampler::uniform(settings.seed),
+        };
 
         Ok(Self {
             geoms,
@@ -369,38 +495,7 @@ impl Convergence {
         let max_target = self.max_orientations;
 
         // Progress display
-        let m = MultiProgress::new();
-        let title_pb = m.add(ProgressBar::new_spinner());
-        title_pb.set_style(
-            ProgressStyle::with_template(
-                "{spinner:.cyan} GOAD: [Convergence]  [Elapsed: {elapsed}]  {msg}  [{prefix}]",
-            )
-            .unwrap()
-            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
-        );
-        title_pb.set_message("[Status: \x1b[33mINITIALISING\x1b[0m]");
-        title_pb.set_prefix(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
-        title_pb.enable_steady_tick(Duration::from_millis(100));
-
-        let info_pb = m.add(ProgressBar::new_spinner());
-        info_pb.set_style(ProgressStyle::with_template("  {msg}").unwrap());
-
-        // Create progress bars for each target
-        let target_pbs: Vec<ProgressBar> = self
-            .targets
-            .iter()
-            .map(|_| {
-                let pb = m.add(ProgressBar::new(100));
-                pb.set_style(
-                    ProgressStyle::with_template("  {msg} [{bar:20.green/dim}] {pos:>3}%")
-                        .unwrap()
-                        .progress_chars("█▓░"),
-                );
-                pb
-            })
-            .collect();
-
-        let start_time = std::time::Instant::now();
+        let progress = ConvergenceProgress::new(self.targets.len(), max_target);
 
         // Prepare base problems (cloned per worker later)
         let problems_base: Vec<Problem> = self
@@ -466,8 +561,7 @@ impl Convergence {
             let mut converged = false;
             let mut interrupted = false;
 
-            // Set status to RUNNING
-            title_pb.set_message("[Status: \x1b[32mRUNNING\x1b[0m]");
+            progress.set_running();
 
             while tracker.count() < max_target && !converged && !interrupted {
                 // Use timeout so we can periodically check for interrupts
@@ -475,29 +569,8 @@ impl Convergence {
                     Ok(result) => {
                         tracker.update(&result);
 
-                        // Update info bar
                         let count = tracker.count();
-                        let elapsed = start_time.elapsed().as_secs_f64();
-                        let sec_per_orient = if count > 0 {
-                            elapsed / count as f64
-                        } else {
-                            0.0
-                        };
-                        let min_color = if count >= MIN_ORIENTATIONS {
-                            "\x1b[32m" // green
-                        } else {
-                            "\x1b[31m" // red
-                        };
-                        info_pb.set_message(format!(
-                            "[Orientations: {} ({}{}{}|{})] [{:.3} sec/orientation]",
-                            count,
-                            min_color,
-                            MIN_ORIENTATIONS,
-                            "\x1b[0m",
-                            max_target,
-                            sec_per_orient
-                        ));
-                        title_pb.set_prefix(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+                        progress.update_info(count);
 
                         // Update per-target progress bars
                         if count >= MIN_ORIENTATIONS {
@@ -521,27 +594,13 @@ impl Convergence {
                                 };
 
                                 if let (Some(m), Some(s)) = (mean_val, sem_val) {
-                                    let current_rel_sem =
-                                        if m.abs() > 1e-10 { s / m.abs() } else { 0.0 };
-                                    let target_rel_sem = target.relative_error;
-
-                                    // Progress with sqrt scaling, capped at 100%
-                                    let progress = if current_rel_sem > 1e-10 {
-                                        ((target_rel_sem / current_rel_sem).sqrt()).min(1.0)
-                                    } else {
-                                        1.0
-                                    };
-
-                                    let param_name = format!("{:?}", target.param);
-                                    target_pbs[i].set_message(format!(
-                                        "{:<9} {:>10.4e} ± {:<10.4e} [{:>5.2}% / {:>5.2}%]",
-                                        param_name,
+                                    progress.update_target(
+                                        i,
+                                        target.param.clone(),
                                         m,
                                         s,
-                                        current_rel_sem * 100.0,
-                                        target_rel_sem * 100.0
-                                    ));
-                                    target_pbs[i].set_position((progress * 100.0) as u64);
+                                        target.relative_error,
+                                    );
                                 }
                             }
                         }
@@ -578,15 +637,10 @@ impl Convergence {
 
             // Signal workers to exit and set status to FINALISING
             done.store(true, Ordering::Relaxed);
-            title_pb.set_message("[Status: \x1b[33mFINALISING\x1b[0m]");
+            progress.set_finalising();
         });
 
-        // Finish progress bars
-        title_pb.finish_and_clear();
-        for pb in &target_pbs {
-            pb.finish_and_clear();
-        }
-        info_pb.finish_and_clear();
+        progress.finish();
 
         // Print final status
         if self.is_converged() {
@@ -664,7 +718,12 @@ impl Convergence {
 
         let bins = &settings.binning.scheme.generate();
         let template = Results::new_empty(bins);
-        let sampler = UniformSampler::new(settings.seed);
+
+        // Create sampler based on orientation scheme
+        let sampler = match &settings.orientation.scheme {
+            OrientScheme::Discrete { eulers } => OrientationSampler::discrete(eulers.clone()),
+            _ => OrientationSampler::uniform(settings.seed),
+        };
 
         Ok(Self {
             geoms,

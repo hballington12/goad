@@ -1,3 +1,10 @@
+//! Integration tests for comparing Convergence vs MultiProblem solvers.
+//!
+//! NOTE: Always run these tests in release mode for realistic performance:
+//!   cargo test --release -p goad --test compare_solvers
+//!
+//! Debug mode is ~10-20x slower and will cause timeouts.
+
 use goad::{
     bins::{self, BinningScheme},
     convergence::Convergence,
