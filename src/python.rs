@@ -79,6 +79,9 @@ fn _goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Mapping enum
     m.add_class::<Mapping>()?;
 
+    // Param enum (for convergence targets)
+    m.add_class::<crate::params::Param>()?;
+
     // Helper functions for orientations
     m.add_function(wrap_pyfunction!(uniform_orientation, m)?)?;
     m.add_function(wrap_pyfunction!(discrete_orientation, m)?)?;

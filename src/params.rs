@@ -28,6 +28,7 @@ impl Serialize for Params {
 }
 
 // Params are stored as raw values. Weighted averaging is handled by Convergeable trait.
+#[pyo3::pyclass(eq, eq_int)]
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize)]
 pub enum Param {
     Asymmetry, // raw asymmetry parameter g

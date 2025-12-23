@@ -46,7 +46,7 @@ fn convergence_vs_multiproblem_identical() {
     // Solve with Convergence (set target to match orientation count)
     let mut convergence =
         Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
-    convergence.convergence_target = 4; // match the 4 discrete orientations
+    convergence.max_orientations = 4; // match the 4 discrete orientations
     convergence.solve();
 
     // Compare results
