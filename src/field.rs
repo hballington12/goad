@@ -11,6 +11,7 @@ use nalgebra::{Complex, Matrix2, RealField, Vector3};
 mod tests {
 
     use super::*;
+    use crate::settings;
 
     #[test]
     fn identity_ampl() {

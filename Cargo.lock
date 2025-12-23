@@ -526,6 +526,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "crossbeam-deque",
  "geo",
  "geo-clipper",
  "geo-types",
