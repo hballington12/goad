@@ -11,10 +11,90 @@ use crate::{
     settings::Settings,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use nalgebra::Complex;
 use pyo3::prelude::*;
 use rand::{Rng, SeedableRng};
 use std::time::Duration;
+
+/// Trait for types that can be tracked for convergence.
+/// Provides operations needed for online mean/variance computation.
+pub trait Convergeable: Clone + Sized {
+    /// Create a zero/empty version with the same structure
+    fn zero_like(&self) -> Self;
+
+    /// Weighted addition: combines self (with weight w1) and other (with weight w2).
+    /// For simple quantities: (self * w1 + other * w2) / (w1 + w2)
+    /// For derived quantities like asymmetry: uses appropriate weighting (e.g., by ScatCross)
+    fn weighted_add(&self, other: &Self, self_weight: f32, other_weight: f32) -> Self;
+
+    /// Element-wise multiplication (for computing x²)
+    fn mul_elem(&self, other: &Self) -> Self;
+
+    /// Element-wise subtraction
+    fn sub_elem(&self, other: &Self) -> Self;
+
+    /// Scale by a scalar
+    fn scale(&self, scalar: f32) -> Self;
+
+    /// Element-wise square root (for SEM computation)
+    fn sqrt_elem(&self) -> Self;
+}
+
+/// Tracks running statistics for convergence using Welford's online algorithm.
+/// Computes mean and standard error of the mean (SEM) incrementally.
+pub struct ConvergenceTracker<T: Convergeable> {
+    count: usize,
+    sum: T,    // running weighted sum
+    sum_sq: T, // running sum of squares (for variance)
+}
+
+impl<T: Convergeable> ConvergenceTracker<T> {
+    /// Create a new tracker using a template for structure
+    pub fn new(template: &T) -> Self {
+        Self {
+            count: 0,
+            sum: template.zero_like(),
+            sum_sq: template.zero_like(),
+        }
+    }
+
+    /// Update with a new value
+    pub fn update(&mut self, value: &T) {
+        if self.count == 0 {
+            self.sum = value.clone();
+            self.sum_sq = value.mul_elem(value);
+        } else {
+            self.sum = self.sum.weighted_add(value, self.count as f32, 1.0);
+            let value_sq = value.mul_elem(value);
+            self.sum_sq = self.sum_sq.weighted_add(&value_sq, self.count as f32, 1.0);
+        }
+        self.count += 1;
+    }
+
+    /// Get the current count
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    /// Get the running mean
+    pub fn mean(&self) -> T {
+        self.sum.clone()
+    }
+
+    /// Get the variance: Var = E[X²] - E[X]²
+    pub fn variance(&self) -> T {
+        let mean = self.mean();
+        let mean_sq = mean.mul_elem(&mean);
+        self.sum_sq.sub_elem(&mean_sq)
+    }
+
+    /// Get the standard error of the mean: SEM = sqrt(Var / n)
+    pub fn sem(&self) -> T {
+        if self.count < 2 {
+            return self.sum.zero_like();
+        }
+        self.variance().scale(1.0 / self.count as f32).sqrt_elem()
+    }
+}
 
 /// A task representing a single orientation to be computed.
 #[derive(Clone)]
@@ -163,15 +243,14 @@ impl Convergence {
             // Drop the original sender so rx knows when all workers are done
             drop(tx);
 
-            // Master reduction loop
+            // Master reduction loop with convergence tracking
             status_pb.set_message("Running orientation averaging...");
-            let mut completed = 0;
+            let mut tracker = ConvergenceTracker::new(&self.result);
 
-            while completed < target {
+            while tracker.count() < target {
                 match rx.recv() {
                     Ok(result) => {
-                        self.result += result;
-                        completed += 1;
+                        tracker.update(&result);
                         pb.inc(1);
                     }
                     Err(_) => {
@@ -180,15 +259,15 @@ impl Convergence {
                     }
                 }
             }
+
+            // Extract mean and SEM from tracker
+            self.result = tracker.mean();
+            self.error = tracker.sem();
         });
 
         // Post-processing
         pb.finish_with_message("Orientations complete");
         status_pb.set_message("Post-processing results...");
-
-        let actual_count = pb.position() as f32;
-        info_pb.set_message(format!("Normalizing by {} orientations...", actual_count));
-        self.normalize_results(actual_count);
 
         info_pb.set_message("Computing 1D integrated Mueller matrices...");
         self.result.mueller_to_1d(&self.settings.binning.scheme);
@@ -271,22 +350,6 @@ impl Convergence {
                 ProgressBar::hidden(),
                 ProgressBar::hidden(),
             )
-        }
-    }
-
-    /// Normalizes the results by dividing by the number of orientations.
-    fn normalize_results(&mut self, num_orientations: f32) {
-        self.result.powers /= num_orientations;
-
-        for field in self.result.field_2d.iter_mut() {
-            let div_c = Complex::from(num_orientations);
-            field.ampl_total /= div_c;
-            field.ampl_beam /= div_c;
-            field.ampl_ext /= div_c;
-
-            field.mueller_total /= num_orientations;
-            field.mueller_beam /= num_orientations;
-            field.mueller_ext /= num_orientations;
         }
     }
 }

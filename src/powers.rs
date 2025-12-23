@@ -1,3 +1,4 @@
+use crate::convergence::Convergeable;
 use rand_distr::num_traits::Pow;
 use serde::Serialize;
 use std::{fmt, ops::*};
@@ -218,5 +219,33 @@ impl fmt::Display for Powers {
         writeln!(f, "  Trunc. Cop:       {:.6}", self.trnc_cop)?;
         writeln!(f, "  Other:            {:.6}", self.missing())?;
         writeln!(f, "  External Diff:    {:.6}", self.ext_diff)
+    }
+}
+
+impl Convergeable for Powers {
+    fn zero_like(&self) -> Self {
+        Powers::new()
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        // Simple weighted average by count for all power fields
+        let total = w1 + w2;
+        (*self * w1 + *other * w2) / total
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        *self * *other
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        *self - *other
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        *self * scalar
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        self.pow(0.5)
     }
 }

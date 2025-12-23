@@ -9,6 +9,7 @@ use std::ops::Sub;
 use crate::bins::AngleBin;
 use crate::bins::Scheme;
 use crate::bins::SolidAngleBin;
+use crate::convergence::Convergeable;
 use crate::params::Param;
 use crate::params::Params;
 use crate::powers::Powers;
@@ -319,6 +320,34 @@ impl<B: ScatteringBin> ScattResult<B> {
     }
 }
 
+impl<B: ScatteringBin> Convergeable for ScattResult<B> {
+    fn zero_like(&self) -> Self {
+        ScattResult::new(self.bin.clone())
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        // Simple weighted average by count
+        let total = w1 + w2;
+        (self.clone() * w1 + other.clone() * w2) / total
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        self.clone() * other.clone()
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        self.clone() - other.clone()
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self.clone() * scalar
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        self.clone().pow(0.5)
+    }
+}
+
 /// Type alias for 2D scattering results (full solid angle)
 pub type ScattResult2D = ScattResult<SolidAngleBin>;
 
@@ -516,6 +545,58 @@ impl Div<f32> for Results {
     }
 }
 
+impl Convergeable for Results {
+    fn zero_like(&self) -> Self {
+        Results::new_empty(&self.bins())
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        // Combine field_2d
+        let field_2d: Vec<ScattResult2D> = self
+            .field_2d
+            .iter()
+            .zip(other.field_2d.iter())
+            .map(|(a, b)| a.weighted_add(b, w1, w2))
+            .collect();
+
+        // Combine field_1d if both present
+        let field_1d = match (&self.field_1d, &other.field_1d) {
+            (Some(f1), Some(f2)) => Some(
+                f1.iter()
+                    .zip(f2.iter())
+                    .map(|(a, b)| a.weighted_add(b, w1, w2))
+                    .collect(),
+            ),
+            (Some(f1), None) => Some(f1.clone()),
+            (None, Some(f2)) => Some(f2.clone()),
+            (None, None) => None,
+        };
+
+        Self {
+            field_2d,
+            field_1d,
+            powers: self.powers.weighted_add(&other.powers, w1, w2),
+            params: self.params.weighted_add(&other.params, w1, w2),
+        }
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        self.clone() * other.clone()
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        self.clone() - other.clone()
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self.clone() * scalar
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        self.clone().pow(0.5)
+    }
+}
+
 impl Results {
     /// Returns an owned vector of solid angle bins
     pub fn bins(&self) -> Vec<SolidAngleBin> {
@@ -589,6 +670,8 @@ impl Results {
         // Total field
         if let Some(field_1d) = &self.field_1d {
             let k = 2.0 * PI / wavelength;
+
+            // Total field
             let scatt_total =
                 integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
                     theta.sin() * s11 / k.powi(2)
@@ -597,17 +680,19 @@ impl Results {
                 integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
                     theta.sin() * theta.cos() * s11 / k.powi(2)
                 });
+            let ext_total = scatt_total + self.powers.absorbed;
 
             self.params
                 .set_param(Param::ScatCross, GOComponent::Total, scatt_total);
-            self.params.set_param(
-                Param::AsymmetryScatt,
-                GOComponent::Total,
-                asymmetry_scatt_total,
-            );
-            let ext_total = scatt_total + self.powers.absorbed;
             self.params
                 .set_param(Param::ExtCross, GOComponent::Total, ext_total);
+            self.params.set_param(
+                Param::Asymmetry,
+                GOComponent::Total,
+                asymmetry_scatt_total / scatt_total,
+            );
+            self.params
+                .set_param(Param::Albedo, GOComponent::Total, scatt_total / ext_total);
 
             // Beam field
             let scatt_beam =
@@ -618,12 +703,13 @@ impl Results {
                 integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
                     theta.sin() * theta.cos() * s11 / k.powi(2)
                 });
+
             self.params
                 .set_param(Param::ScatCross, GOComponent::Beam, scatt_beam);
             self.params.set_param(
-                Param::AsymmetryScatt,
+                Param::Asymmetry,
                 GOComponent::Beam,
-                asymmetry_scatt_beam,
+                asymmetry_scatt_beam / scatt_beam,
             );
 
             // Ext field
@@ -632,15 +718,16 @@ impl Results {
                     theta.sin() * s11 / k.powi(2)
                 });
             let asymmetry_scatt_ext =
-                integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
+                integrate_theta_weighted_component(field_1d, GOComponent::ExtDiff, |theta, s11| {
                     theta.sin() * theta.cos() * s11 / k.powi(2)
                 });
+
             self.params
                 .set_param(Param::ScatCross, GOComponent::ExtDiff, scatt_ext);
             self.params.set_param(
-                Param::AsymmetryScatt,
+                Param::Asymmetry,
                 GOComponent::ExtDiff,
-                asymmetry_scatt_ext,
+                asymmetry_scatt_ext / scatt_ext,
             );
         }
     }

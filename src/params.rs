@@ -1,3 +1,4 @@
+use crate::convergence::Convergeable;
 use crate::result::GOComponent;
 use rand_distr::num_traits::Pow;
 use serde::ser::{SerializeMap, Serializer};
@@ -26,10 +27,11 @@ impl Serialize for Params {
     }
 }
 
-// all params must add linearly eg. asymmetry must be multiplied by scatt cross
+// Params are stored as raw values. Weighted averaging is handled by Convergeable trait.
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize)]
 pub enum Param {
-    AsymmetryScatt, // asymmetry multiplied by scatt cross
+    Asymmetry, // raw asymmetry parameter g
+    Albedo,    // raw single scattering albedo
     ScatCross,
     ExtCross,
 }
@@ -116,25 +118,11 @@ impl Params {
     }
 
     pub fn asymmetry(&self, component: &GOComponent) -> Option<f32> {
-        if let (Some(asymmetry), Some(scatt_cross)) = (
-            self.params.get(&(Param::AsymmetryScatt, *component)),
-            self.params.get(&(Param::ScatCross, *component)),
-        ) {
-            Some(asymmetry / scatt_cross)
-        } else {
-            None
-        }
+        self.params.get(&(Param::Asymmetry, *component)).copied()
     }
 
     pub fn albedo(&self, component: &GOComponent) -> Option<f32> {
-        if let (Some(scatt_cross), Some(ext_cross)) = (
-            self.params.get(&(Param::ScatCross, *component)),
-            self.params.get(&(Param::ExtCross, *component)),
-        ) {
-            Some(scatt_cross / ext_cross)
-        } else {
-            None
-        }
+        self.params.get(&(Param::Albedo, *component)).copied()
     }
 
     pub fn scatt_cross(&self, component: &GOComponent) -> Option<f32> {
@@ -143,5 +131,99 @@ impl Params {
 
     pub fn ext_cross(&self, component: &GOComponent) -> Option<f32> {
         self.params.get(&(Param::ExtCross, *component)).copied()
+    }
+}
+
+impl Convergeable for Params {
+    fn zero_like(&self) -> Self {
+        Params::new()
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        let mut result = Params::new();
+        let total_weight = w1 + w2;
+
+        for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
+            // ScatCross: simple weighted average by count
+            if let (Some(s1), Some(s2)) =
+                (self.scatt_cross(&component), other.scatt_cross(&component))
+            {
+                result.set_param(
+                    Param::ScatCross,
+                    component,
+                    (s1 * w1 + s2 * w2) / total_weight,
+                );
+            } else if let Some(s1) = self.scatt_cross(&component) {
+                result.set_param(Param::ScatCross, component, s1);
+            } else if let Some(s2) = other.scatt_cross(&component) {
+                result.set_param(Param::ScatCross, component, s2);
+            }
+
+            // ExtCross: simple weighted average by count
+            if let (Some(e1), Some(e2)) = (self.ext_cross(&component), other.ext_cross(&component))
+            {
+                result.set_param(
+                    Param::ExtCross,
+                    component,
+                    (e1 * w1 + e2 * w2) / total_weight,
+                );
+            } else if let Some(e1) = self.ext_cross(&component) {
+                result.set_param(Param::ExtCross, component, e1);
+            } else if let Some(e2) = other.ext_cross(&component) {
+                result.set_param(Param::ExtCross, component, e2);
+            }
+
+            // Asymmetry: weighted by ScatCross
+            if let (Some(g1), Some(g2), Some(sc1), Some(sc2)) = (
+                self.asymmetry(&component),
+                other.asymmetry(&component),
+                self.scatt_cross(&component),
+                other.scatt_cross(&component),
+            ) {
+                let weight1 = sc1 * w1;
+                let weight2 = sc2 * w2;
+                let new_g = (g1 * weight1 + g2 * weight2) / (weight1 + weight2);
+                result.set_param(Param::Asymmetry, component, new_g);
+            } else if let Some(g1) = self.asymmetry(&component) {
+                result.set_param(Param::Asymmetry, component, g1);
+            } else if let Some(g2) = other.asymmetry(&component) {
+                result.set_param(Param::Asymmetry, component, g2);
+            }
+
+            // Albedo: weighted by ExtCross
+            if let (Some(a1), Some(a2), Some(ec1), Some(ec2)) = (
+                self.albedo(&component),
+                other.albedo(&component),
+                self.ext_cross(&component),
+                other.ext_cross(&component),
+            ) {
+                let weight1 = ec1 * w1;
+                let weight2 = ec2 * w2;
+                let new_a = (a1 * weight1 + a2 * weight2) / (weight1 + weight2);
+                result.set_param(Param::Albedo, component, new_a);
+            } else if let Some(a1) = self.albedo(&component) {
+                result.set_param(Param::Albedo, component, a1);
+            } else if let Some(a2) = other.albedo(&component) {
+                result.set_param(Param::Albedo, component, a2);
+            }
+        }
+
+        result
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        self.clone() * other.clone()
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        self.clone() - other.clone()
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self.clone() / (1.0 / scalar) // use existing Div impl
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        self.clone().pow(0.5)
     }
 }
