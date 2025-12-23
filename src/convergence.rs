@@ -312,12 +312,18 @@ fn is_converged_check(
             Param::Albedo => mean.params.albedo(&GOComponent::Total),
             Param::ScatCross => mean.params.scatt_cross(&GOComponent::Total),
             Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
+            Param::BackscatterCross => mean.params.backscatter_cross(&GOComponent::Total),
+            Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
+            Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
         };
         let sem_val = match t.param {
             Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
             Param::Albedo => sem.params.albedo(&GOComponent::Total),
             Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
             Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
+            Param::BackscatterCross => sem.params.backscatter_cross(&GOComponent::Total),
+            Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
+            Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
         };
 
         match (mean_val, sem_val) {
@@ -428,12 +434,18 @@ impl Convergence {
                 Param::Albedo => mean.params.albedo(&GOComponent::Total),
                 Param::ScatCross => mean.params.scatt_cross(&GOComponent::Total),
                 Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
+                Param::BackscatterCross => mean.params.backscatter_cross(&GOComponent::Total),
+                Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
+                Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
             };
             let sem_val = match t.param {
                 Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
                 Param::Albedo => sem.params.albedo(&GOComponent::Total),
                 Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
                 Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
+                Param::BackscatterCross => sem.params.backscatter_cross(&GOComponent::Total),
+                Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
+                Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
             };
 
             match (mean_val, sem_val) {
@@ -585,12 +597,30 @@ impl Convergence {
                                         mean.params.scatt_cross(&GOComponent::Total)
                                     }
                                     Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
+                                    Param::BackscatterCross => {
+                                        mean.params.backscatter_cross(&GOComponent::Total)
+                                    }
+                                    Param::LidarRatio => {
+                                        mean.params.lidar_ratio(&GOComponent::Total)
+                                    }
+                                    Param::DepolarizationRatio => {
+                                        mean.params.depolarization_ratio(&GOComponent::Total)
+                                    }
                                 };
                                 let sem_val = match target.param {
                                     Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
                                     Param::Albedo => sem.params.albedo(&GOComponent::Total),
                                     Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
                                     Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
+                                    Param::BackscatterCross => {
+                                        sem.params.backscatter_cross(&GOComponent::Total)
+                                    }
+                                    Param::LidarRatio => {
+                                        sem.params.lidar_ratio(&GOComponent::Total)
+                                    }
+                                    Param::DepolarizationRatio => {
+                                        sem.params.depolarization_ratio(&GOComponent::Total)
+                                    }
                                 };
 
                                 if let (Some(m), Some(s)) = (mean_val, sem_val) {

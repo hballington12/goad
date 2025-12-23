@@ -410,6 +410,7 @@ pub type ScattResult1D = ScattResult<AngleBin>;
 pub struct Results {
     pub field_2d: Vec<ScattResult2D>,
     pub field_1d: Option<Vec<ScattResult1D>>,
+    pub field_bs: Option<ScattResult2D>,
     pub powers: Powers,
     pub params: Params,
 }
@@ -436,6 +437,12 @@ impl AddAssign for Results {
                 (None, Some(other_field_1d)) => Some(other_field_1d),
                 (None, None) => None,
             },
+            field_bs: match (self.field_bs.clone(), other.field_bs) {
+                (Some(a), Some(b)) => Some(a + b),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
             powers: self.powers.clone() + other.powers,
             params: self.params.clone() + other.params,
         };
@@ -450,9 +457,11 @@ impl Pow<f32> for Results {
             Some(field_1d) => Some(field_1d.into_iter().map(|a| a.pow(rhs)).collect()),
             None => None,
         };
+        let field_bs = self.field_bs.map(|bs| bs.pow(rhs));
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a.pow(rhs)).collect(),
             field_1d,
+            field_bs,
             powers: self.powers.pow(rhs),
             params: self.params.pow(rhs),
         }
@@ -467,9 +476,11 @@ impl Mul<f32> for Results {
             Some(field_1d) => Some(field_1d.into_iter().map(|a| a * rhs).collect()),
             None => None,
         };
+        let field_bs = self.field_bs.map(|bs| bs * rhs);
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a * rhs).collect(),
             field_1d,
+            field_bs,
             powers: self.powers * rhs,
             params: self.params * rhs,
         }
@@ -498,11 +509,18 @@ impl Mul for Results {
             (None, Some(other_field_1d)) => Some(other_field_1d),
             (None, None) => None,
         };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a * b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
         let powers = self.powers * other.powers;
         let params = self.params * other.params;
         Self {
             field_2d,
             field_1d,
+            field_bs,
             powers,
             params,
         }
@@ -531,11 +549,18 @@ impl Add for Results {
             (None, Some(other_field_1d)) => Some(other_field_1d),
             (None, None) => None,
         };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a + b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
         let powers = self.powers + other.powers;
         let params = self.params + other.params;
         Self {
             field_2d,
             field_1d,
+            field_bs,
             powers,
             params,
         }
@@ -564,11 +589,18 @@ impl Sub for Results {
             (None, Some(other_field_1d)) => Some(other_field_1d),
             (None, None) => None,
         };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a - b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
         let powers = self.powers - other.powers;
         let params = self.params - other.params;
         Self {
             field_2d,
             field_1d,
+            field_bs,
             powers,
             params,
         }
@@ -583,9 +615,11 @@ impl Div<f32> for Results {
             Some(field_1d) => Some(field_1d.into_iter().map(|a| a / rhs).collect()),
             None => None,
         };
+        let field_bs = self.field_bs.map(|bs| bs / rhs);
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a / rhs).collect(),
             field_1d,
+            field_bs,
             powers: self.powers / rhs,
             params: self.params / rhs,
         }
@@ -608,9 +642,16 @@ impl Div for Results {
             (None, Some(_)) => None,
             (None, None) => None,
         };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a / b),
+            (Some(a), None) => Some(a),
+            (None, Some(_)) => None,
+            (None, None) => None,
+        };
         Self {
             field_2d,
             field_1d,
+            field_bs,
             powers: self.powers.div_elem(&other.powers),
             params: self.params.div_elem(&other.params),
         }
@@ -644,9 +685,18 @@ impl Convergeable for Results {
             (None, None) => None,
         };
 
+        // Combine field_bs if both present
+        let field_bs = match (&self.field_bs, &other.field_bs) {
+            (Some(a), Some(b)) => Some(a.weighted_add(b, w1, w2)),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(b.clone()),
+            (None, None) => None,
+        };
+
         Self {
             field_2d,
             field_1d,
+            field_bs,
             powers: self.powers.weighted_add(&other.powers, w1, w2),
             params: self.params.weighted_add(&other.params, w1, w2),
         }
@@ -698,8 +748,9 @@ impl Results {
         let field = bins.iter().map(|&bin| ScattResult2D::new(bin)).collect();
         Self {
             field_2d: field,
-            powers: Powers::new(),
             field_1d: None,
+            field_bs: None,
+            powers: Powers::new(),
             params: Params::new(),
         }
     }
@@ -847,6 +898,7 @@ impl Results {
             .field_1d
             .as_ref()
             .map(|f| f.iter().map(|x| x.ones_like()).collect());
+        result.field_bs = self.field_bs.as_ref().map(|f| f.ones_like());
         result
     }
 

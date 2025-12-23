@@ -231,6 +231,17 @@ impl MultiProblem {
             a.mueller_ext += i.mueller_ext;
         }
 
+        // Add backscatter field if present
+        match (&mut acc.field_bs, item.field_bs) {
+            (Some(a), Some(i)) => {
+                a.mueller_total += i.mueller_total;
+                a.mueller_beam += i.mueller_beam;
+                a.mueller_ext += i.mueller_ext;
+            }
+            (None, Some(i)) => acc.field_bs = Some(i),
+            _ => {}
+        }
+
         acc
     }
 
@@ -250,6 +261,17 @@ impl MultiProblem {
             field.mueller_total /= num_orientations;
             field.mueller_beam /= num_orientations;
             field.mueller_ext /= num_orientations;
+        }
+
+        // Normalize backscatter field if present
+        if let Some(ref mut field_bs) = self.result.field_bs {
+            let div_c = Complex::from(num_orientations);
+            field_bs.ampl_total /= div_c;
+            field_bs.ampl_beam /= div_c;
+            field_bs.ampl_ext /= div_c;
+            field_bs.mueller_total /= num_orientations;
+            field_bs.mueller_beam /= num_orientations;
+            field_bs.mueller_ext /= num_orientations;
         }
     }
 

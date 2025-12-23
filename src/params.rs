@@ -31,10 +31,13 @@ impl Serialize for Params {
 #[pyo3::pyclass(eq, eq_int)]
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize)]
 pub enum Param {
-    Asymmetry, // raw asymmetry parameter g
-    Albedo,    // raw single scattering albedo
-    ScatCross,
-    ExtCross,
+    Asymmetry,           // raw asymmetry parameter g
+    Albedo,              // raw single scattering albedo
+    ScatCross,           // scattering cross section
+    ExtCross,            // extinction cross section
+    BackscatterCross,    // backscatter (differential) cross section
+    LidarRatio,          // extinction / backscatter cross section
+    DepolarizationRatio, // linear depolarization ratio at backscatter
 }
 
 impl Params {
@@ -134,10 +137,28 @@ impl Params {
         self.params.get(&(Param::ExtCross, *component)).copied()
     }
 
+    pub fn backscatter_cross(&self, component: &GOComponent) -> Option<f32> {
+        self.params
+            .get(&(Param::BackscatterCross, *component))
+            .copied()
+    }
+
+    pub fn lidar_ratio(&self, component: &GOComponent) -> Option<f32> {
+        self.params.get(&(Param::LidarRatio, *component)).copied()
+    }
+
+    pub fn depolarization_ratio(&self, component: &GOComponent) -> Option<f32> {
+        self.params
+            .get(&(Param::DepolarizationRatio, *component))
+            .copied()
+    }
+
     /// Returns a weighted version of Params for convergence tracking.
     /// - asymmetry becomes asymmetry * scat_cross
     /// - albedo becomes albedo * ext_cross
-    /// - scat_cross and ext_cross stay the same
+    /// - lidar_ratio becomes lidar_ratio * ext_cross
+    /// - depolarization_ratio becomes depolarization_ratio * backscatter_cross
+    /// - scat_cross, ext_cross, backscatter_cross stay the same (weight = 1)
     pub fn to_weighted(&self) -> Self {
         let mut result = self.clone();
         for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
@@ -151,6 +172,18 @@ impl Params {
             if let (Some(alb), Some(ec)) = (self.albedo(&component), self.ext_cross(&component)) {
                 result.set_param(Param::Albedo, component, alb * ec);
             }
+            // LidarRatio weighted by ExtCross
+            if let (Some(lr), Some(ec)) = (self.lidar_ratio(&component), self.ext_cross(&component))
+            {
+                result.set_param(Param::LidarRatio, component, lr * ec);
+            }
+            // DepolarizationRatio weighted by BackscatterCross
+            if let (Some(dr), Some(bs)) = (
+                self.depolarization_ratio(&component),
+                self.backscatter_cross(&component),
+            ) {
+                result.set_param(Param::DepolarizationRatio, component, dr * bs);
+            }
         }
         result
     }
@@ -158,7 +191,9 @@ impl Params {
     /// Returns a Params struct containing the weights for each field.
     /// - asymmetry slot contains scat_cross
     /// - albedo slot contains ext_cross
-    /// - scat_cross and ext_cross slots contain 1.0
+    /// - lidar_ratio slot contains ext_cross
+    /// - depolarization_ratio slot contains backscatter_cross
+    /// - scat_cross, ext_cross, backscatter_cross slots contain 1.0
     pub fn weights(&self) -> Self {
         let mut result = Params::new();
         for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
@@ -170,12 +205,27 @@ impl Params {
             if let Some(ec) = self.ext_cross(&component) {
                 result.set_param(Param::Albedo, component, ec);
             }
-            // ScatCross and ExtCross weights are 1.0
+            // LidarRatio weight is ExtCross
+            if let Some(ec) = self.ext_cross(&component) {
+                if self.lidar_ratio(&component).is_some() {
+                    result.set_param(Param::LidarRatio, component, ec);
+                }
+            }
+            // DepolarizationRatio weight is BackscatterCross
+            if let Some(bs) = self.backscatter_cross(&component) {
+                if self.depolarization_ratio(&component).is_some() {
+                    result.set_param(Param::DepolarizationRatio, component, bs);
+                }
+            }
+            // ScatCross, ExtCross, BackscatterCross weights are 1.0
             if self.scatt_cross(&component).is_some() {
                 result.set_param(Param::ScatCross, component, 1.0);
             }
             if self.ext_cross(&component).is_some() {
                 result.set_param(Param::ExtCross, component, 1.0);
+            }
+            if self.backscatter_cross(&component).is_some() {
+                result.set_param(Param::BackscatterCross, component, 1.0);
             }
         }
         result
@@ -253,6 +303,56 @@ impl Convergeable for Params {
                 result.set_param(Param::Albedo, component, a1);
             } else if let Some(a2) = other.albedo(&component) {
                 result.set_param(Param::Albedo, component, a2);
+            }
+
+            // BackscatterCross: simple weighted average by count
+            if let (Some(b1), Some(b2)) = (
+                self.backscatter_cross(&component),
+                other.backscatter_cross(&component),
+            ) {
+                result.set_param(
+                    Param::BackscatterCross,
+                    component,
+                    (b1 * w1 + b2 * w2) / total_weight,
+                );
+            } else if let Some(b1) = self.backscatter_cross(&component) {
+                result.set_param(Param::BackscatterCross, component, b1);
+            } else if let Some(b2) = other.backscatter_cross(&component) {
+                result.set_param(Param::BackscatterCross, component, b2);
+            }
+
+            // LidarRatio: weighted by ExtCross
+            if let (Some(lr1), Some(lr2), Some(ec1), Some(ec2)) = (
+                self.lidar_ratio(&component),
+                other.lidar_ratio(&component),
+                self.ext_cross(&component),
+                other.ext_cross(&component),
+            ) {
+                let weight1 = ec1 * w1;
+                let weight2 = ec2 * w2;
+                let new_lr = (lr1 * weight1 + lr2 * weight2) / (weight1 + weight2);
+                result.set_param(Param::LidarRatio, component, new_lr);
+            } else if let Some(lr1) = self.lidar_ratio(&component) {
+                result.set_param(Param::LidarRatio, component, lr1);
+            } else if let Some(lr2) = other.lidar_ratio(&component) {
+                result.set_param(Param::LidarRatio, component, lr2);
+            }
+
+            // DepolarizationRatio: weighted by BackscatterCross
+            if let (Some(dr1), Some(dr2), Some(bs1), Some(bs2)) = (
+                self.depolarization_ratio(&component),
+                other.depolarization_ratio(&component),
+                self.backscatter_cross(&component),
+                other.backscatter_cross(&component),
+            ) {
+                let weight1 = bs1 * w1;
+                let weight2 = bs2 * w2;
+                let new_dr = (dr1 * weight1 + dr2 * weight2) / (weight1 + weight2);
+                result.set_param(Param::DepolarizationRatio, component, new_dr);
+            } else if let Some(dr1) = self.depolarization_ratio(&component) {
+                result.set_param(Param::DepolarizationRatio, component, dr1);
+            } else if let Some(dr2) = other.depolarization_ratio(&component) {
+                result.set_param(Param::DepolarizationRatio, component, dr2);
             }
         }
 
