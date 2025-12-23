@@ -1,5 +1,6 @@
 use crate::{
     bins::BinningScheme,
+    convergence::Convergence,
     diff::Mapping,
     geom::Geom,
     geom::Shape,
@@ -81,6 +82,9 @@ fn _goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Param enum (for convergence targets)
     m.add_class::<crate::params::Param>()?;
+
+    // Convergence solver
+    m.add_class::<Convergence>()?;
 
     // Helper functions for orientations
     m.add_function(wrap_pyfunction!(uniform_orientation, m)?)?;

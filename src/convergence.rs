@@ -1,4 +1,6 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::Arc;
 use std::thread;
 
 use chrono::Local;
@@ -6,7 +8,7 @@ use crossbeam_deque::{Injector, Steal};
 
 use crate::{
     geom::Geom,
-    orientation::{Euler, Orientations},
+    orientation::{Euler, OrientationSampler, UniformSampler},
     params::Param,
     problem::{self, Problem},
     result::{GOComponent, Results},
@@ -168,15 +170,50 @@ struct OrientationTask {
 /// - Convergence checked after each result (currently: 100 orientations)
 use crate::settings::constants::MIN_ORIENTATIONS;
 
+/// Check if all convergence targets are satisfied (standalone version for disjoint borrows).
+fn is_converged_check(
+    tracker: &ConvergenceTracker<Results>,
+    targets: &[ParamConvergenceTarget],
+) -> bool {
+    if tracker.count() < MIN_ORIENTATIONS {
+        return false;
+    }
+    if targets.is_empty() {
+        return false;
+    }
+
+    let mean = tracker.mean();
+    let sem = tracker.sem();
+
+    targets.iter().all(|t| {
+        let mean_val = match t.param {
+            Param::Asymmetry => mean.params.asymmetry(&GOComponent::Total),
+            Param::Albedo => mean.params.albedo(&GOComponent::Total),
+            Param::ScatCross => mean.params.scatt_cross(&GOComponent::Total),
+            Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
+        };
+        let sem_val = match t.param {
+            Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
+            Param::Albedo => sem.params.albedo(&GOComponent::Total),
+            Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
+            Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
+        };
+
+        match (mean_val, sem_val) {
+            (Some(m), Some(s)) if m.abs() > 1e-10 => (s / m.abs()) < t.relative_error,
+            _ => false,
+        }
+    })
+}
+
 #[pyclass]
-#[derive(Debug)]
 pub struct Convergence {
     pub geoms: Vec<Geom>,
-    pub orientations: Orientations,
     pub settings: Settings,
     pub max_orientations: usize,
     pub targets: Vec<ParamConvergenceTarget>,
     tracker: ConvergenceTracker<Results>,
+    sampler: UniformSampler,
 }
 
 impl Convergence {
@@ -203,17 +240,17 @@ impl Convergence {
             problem::init_geom(&settings, geom);
         }
 
-        let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
         let template = Results::new_empty(bins);
+        let sampler = UniformSampler::new(settings.seed);
 
         Ok(Self {
             geoms,
-            orientations,
             settings,
             max_orientations: 100_000, // safety cap
             targets: Vec::new(),
             tracker: ConvergenceTracker::new(&template),
+            sampler,
         })
     }
 
@@ -285,10 +322,9 @@ impl Convergence {
         self.solve_with_interrupt(|| false)
     }
 
-    /// Regenerates the orientations for the problem.
-    pub fn regenerate_orientations(&mut self) {
-        self.orientations =
-            Orientations::generate(&self.settings.orientation.scheme, self.settings.seed);
+    /// Resets the sampler to its initial state.
+    pub fn reset_sampler(&mut self) {
+        self.sampler.reset();
     }
 
     /// Resets the solver to its initial state.
@@ -296,7 +332,7 @@ impl Convergence {
         let bins = self.settings.binning.scheme.generate();
         let template = Results::new_empty(&bins);
         self.tracker = ConvergenceTracker::new(&template);
-        self.regenerate_orientations();
+        self.reset_sampler();
     }
 
     /// Solves using work-stealing parallelism.
@@ -330,8 +366,7 @@ impl Convergence {
             .saturating_sub(1) // reserve 1 for master thread doing reduction
             .max(1);
 
-        let n = self.orientations.num_orientations;
-        let max_target = self.max_orientations.min(n);
+        let max_target = self.max_orientations;
 
         // Progress display
         let m = MultiProgress::new();
@@ -385,37 +420,31 @@ impl Convergence {
             rand::rngs::StdRng::from_rng(&mut rand::rng())
         };
 
-        // Clone eulers to avoid borrow conflict with self.tracker
-        let eulers: Vec<_> = self.orientations.eulers.clone();
-        let mut euler_idx = 0;
-        let mut tasks_pushed = 0;
+        // Disjoint borrows of self fields to avoid borrow conflicts in thread::scope
+        let sampler = &mut self.sampler;
+        let tracker = &mut self.tracker;
+        let targets = &self.targets;
 
-        // Helper to create and push a task
-        let push_task = |euler_idx: &mut usize, rng: &mut rand::rngs::StdRng| -> bool {
-            if *euler_idx < eulers.len() {
-                let (a, b, g) = eulers[*euler_idx];
-                let task = OrientationTask {
-                    euler: Euler::new(a, b, g),
-                    problem_idx: rng.random_range(0..num_problems),
-                };
-                injector.push(task);
-                *euler_idx += 1;
-                true
-            } else {
-                false
-            }
-        };
+        let mut tasks_pushed = 0;
 
         // Initial fill: 2 tasks per worker
         let buffer_size = (num_workers * 2).min(max_target);
         for _ in 0..buffer_size {
-            if push_task(&mut euler_idx, &mut rng) {
+            if let Some(euler) = sampler.next() {
+                let task = OrientationTask {
+                    euler,
+                    problem_idx: rng.random_range(0..num_problems),
+                };
+                injector.push(task);
                 tasks_pushed += 1;
             }
         }
 
         // Channel for results: workers send, master receives
         let (tx, rx): (Sender<Results>, Receiver<Results>) = mpsc::channel();
+
+        // Shutdown flag for workers
+        let done = Arc::new(AtomicBool::new(false));
 
         let injector_ref = &injector;
         let problems_ref = &problems_base;
@@ -424,8 +453,9 @@ impl Convergence {
             // Spawn workers
             for _ in 0..num_workers {
                 let tx = tx.clone();
+                let done = Arc::clone(&done);
                 s.spawn(move || {
-                    Self::worker_loop(injector_ref, problems_ref, tx);
+                    Self::worker_loop(injector_ref, problems_ref, tx, &done);
                 });
             }
 
@@ -439,14 +469,14 @@ impl Convergence {
             // Set status to RUNNING
             title_pb.set_message("[Status: \x1b[32mRUNNING\x1b[0m]");
 
-            while self.tracker.count() < max_target && !converged && !interrupted {
+            while tracker.count() < max_target && !converged && !interrupted {
                 // Use timeout so we can periodically check for interrupts
                 match rx.recv_timeout(Duration::from_millis(100)) {
                     Ok(result) => {
-                        self.tracker.update(&result);
+                        tracker.update(&result);
 
                         // Update info bar
-                        let count = self.tracker.count();
+                        let count = tracker.count();
                         let elapsed = start_time.elapsed().as_secs_f64();
                         let sec_per_orient = if count > 0 {
                             elapsed / count as f64
@@ -471,10 +501,10 @@ impl Convergence {
 
                         // Update per-target progress bars
                         if count >= MIN_ORIENTATIONS {
-                            let mean = self.tracker.mean();
-                            let sem = self.tracker.sem();
+                            let mean = tracker.mean();
+                            let sem = tracker.sem();
 
-                            for (i, target) in self.targets.iter().enumerate() {
+                            for (i, target) in targets.iter().enumerate() {
                                 let mean_val = match target.param {
                                     Param::Asymmetry => mean.params.asymmetry(&GOComponent::Total),
                                     Param::Albedo => mean.params.albedo(&GOComponent::Total),
@@ -517,13 +547,18 @@ impl Convergence {
                         }
 
                         // Check convergence periodically (every orientation after minimum)
-                        if self.tracker.count() >= MIN_ORIENTATIONS {
-                            converged = self.is_converged();
+                        if tracker.count() >= MIN_ORIENTATIONS {
+                            converged = is_converged_check(tracker, targets);
                         }
 
                         // Replenish task queue if not converged and more orientations available
                         if !converged && tasks_pushed < max_target {
-                            if push_task(&mut euler_idx, &mut rng) {
+                            if let Some(euler) = sampler.next() {
+                                let task = OrientationTask {
+                                    euler,
+                                    problem_idx: rng.random_range(0..num_problems),
+                                };
+                                injector.push(task);
                                 tasks_pushed += 1;
                             }
                         }
@@ -541,7 +576,8 @@ impl Convergence {
                 }
             }
 
-            // Set status to FINALISING while waiting for workers to finish
+            // Signal workers to exit and set status to FINALISING
+            done.store(true, Ordering::Relaxed);
             title_pb.set_message("[Status: \x1b[33mFINALISING\x1b[0m]");
         });
 
@@ -570,6 +606,7 @@ impl Convergence {
         injector: &Injector<OrientationTask>,
         problems_base: &[Problem],
         tx: Sender<Results>,
+        done: &AtomicBool,
     ) {
         loop {
             // Try to steal a task
@@ -587,8 +624,12 @@ impl Convergence {
                     let _ = tx.send(problem.result);
                 }
                 Steal::Empty => {
-                    // No more work, exit
-                    break;
+                    // Check if we should exit
+                    if done.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    // Otherwise wait for more work
+                    std::hint::spin_loop();
                 }
                 Steal::Retry => {
                     // Contention, try again
@@ -621,17 +662,17 @@ impl Convergence {
             problem::init_geom(&settings, geom);
         }
 
-        let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let bins = &settings.binning.scheme.generate();
         let template = Results::new_empty(bins);
+        let sampler = UniformSampler::new(settings.seed);
 
         Ok(Self {
             geoms,
-            orientations,
             settings,
             max_orientations: 100_000,
             targets: Vec::new(),
             tracker: ConvergenceTracker::new(&template),
+            sampler,
         })
     }
 
@@ -655,13 +696,12 @@ impl Convergence {
         self.tracker.sem()
     }
 
-    /// Get the number of orientations.
+    /// Get the max orientations (safety cap).
     #[getter]
-    pub fn get_num_orientations(&self) -> usize {
-        self.orientations.num_orientations
+    pub fn get_count(&self) -> usize {
+        self.tracker.count()
     }
 
-    /// Get the max orientations (safety cap).
     #[getter]
     pub fn get_max_orientations(&self) -> usize {
         self.max_orientations
@@ -692,9 +732,9 @@ impl Convergence {
         Ok(())
     }
 
-    /// Regenerate orientations (useful for random schemes).
-    pub fn py_regenerate_orientations(&mut self) -> PyResult<()> {
-        self.regenerate_orientations();
+    /// Reset the orientation sampler (for reproducibility).
+    pub fn py_reset_sampler(&mut self) -> PyResult<()> {
+        self.reset_sampler();
         Ok(())
     }
 }

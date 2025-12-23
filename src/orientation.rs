@@ -298,6 +298,77 @@ impl Orientation {
     }
 }
 
+/// Trait for orientation samplers that generate orientations on demand.
+pub trait OrientationSampler {
+    /// Get the next orientation. Returns None if exhausted (for discrete samplers).
+    fn next(&mut self) -> Option<Euler>;
+
+    /// Reset the sampler to its initial state (for reproducibility).
+    fn reset(&mut self);
+}
+
+/// Sampler that generates uniform random orientations on demand.
+pub struct UniformSampler {
+    rng: rand::rngs::StdRng,
+    seed: Option<u64>,
+}
+
+impl UniformSampler {
+    pub fn new(seed: Option<u64>) -> Self {
+        let rng = if let Some(seed) = seed {
+            rand::rngs::StdRng::seed_from_u64(seed)
+        } else {
+            rand::rngs::StdRng::from_rng(&mut rand::rng())
+        };
+        Self { rng, seed }
+    }
+}
+
+impl OrientationSampler for UniformSampler {
+    fn next(&mut self) -> Option<Euler> {
+        let alpha = self.rng.random_range(0.0..1.0) as f32 * 360.0;
+        let beta = (1.0 - self.rng.random_range(0.0..1.0) as f32 * 2.0).acos() * 180.0 / PI;
+        let gamma = self.rng.random_range(0.0..1.0) as f32 * 360.0;
+        Some(Euler::new(alpha, beta, gamma))
+    }
+
+    fn reset(&mut self) {
+        self.rng = if let Some(seed) = self.seed {
+            rand::rngs::StdRng::seed_from_u64(seed)
+        } else {
+            rand::rngs::StdRng::from_rng(&mut rand::rng())
+        };
+    }
+}
+
+/// Sampler that iterates over a discrete set of orientations.
+pub struct DiscreteSampler {
+    eulers: Vec<Euler>,
+    index: usize,
+}
+
+impl DiscreteSampler {
+    pub fn new(eulers: Vec<Euler>) -> Self {
+        Self { eulers, index: 0 }
+    }
+}
+
+impl OrientationSampler for DiscreteSampler {
+    fn next(&mut self) -> Option<Euler> {
+        if self.index < self.eulers.len() {
+            let euler = self.eulers[self.index].clone();
+            self.index += 1;
+            Some(euler)
+        } else {
+            None
+        }
+    }
+
+    fn reset(&mut self) {
+        self.index = 0;
+    }
+}
+
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles
 /// or a distribution.
 #[derive(Debug, Clone, PartialEq)]
