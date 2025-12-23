@@ -219,8 +219,8 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
     writeln!(writer, "# ======================")?;
 
     // Write parameters section
-    writeln!(writer, "\n# Parameters")?;
-    writeln!(writer, "# ----------")?;
+    writeln!(writer, "\n# Optical Parameters")?;
+    writeln!(writer, "# ------------------")?;
 
     // Write parameters for Total component (backwards compatible)
     if let Some(scat) = result.params.scatt_cross(&GOComponent::Total) {
@@ -236,7 +236,10 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
         writeln!(writer, "Asymmetry Parameter: {:.6}", asym)?;
     }
 
-    // Backscatter parameters
+    // Backscatter parameters section
+    writeln!(writer, "\n# Backscatter Parameters")?;
+    writeln!(writer, "# ----------------------")?;
+
     if let Some(bs_cross) = result.params.backscatter_cross(&GOComponent::Total) {
         writeln!(writer, "Backscatter Cross Section: {:.6e}", bs_cross)?;
     }
@@ -244,7 +247,7 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
         writeln!(writer, "Lidar Ratio: {:.6}", lidar)?;
     }
     if let Some(depol) = result.params.depolarization_ratio(&GOComponent::Total) {
-        writeln!(writer, "Depolarization Ratio: {:.6}", depol)?;
+        writeln!(writer, "Backscatter Depolarization Ratio: {:.6}", depol)?;
     }
 
     // Write component-specific parameters
@@ -261,24 +264,21 @@ pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
             _ => continue,
         };
 
+        writeln!(writer, "\n# {} Component", comp_str)?;
         if let Some(scat) = result.params.scatt_cross(&component) {
-            writeln!(writer, "{} Scattering Cross Section: {:.6}", comp_str, scat)?;
+            writeln!(writer, "  Scattering Cross Section: {:.6}", scat)?;
         }
         if let Some(asym) = result.params.asymmetry(&component) {
-            writeln!(writer, "{} Asymmetry Parameter: {:.6}", comp_str, asym)?;
+            writeln!(writer, "  Asymmetry Parameter: {:.6}", asym)?;
         }
         if let Some(bs_cross) = result.params.backscatter_cross(&component) {
-            writeln!(
-                writer,
-                "{} Backscatter Cross Section: {:.6e}",
-                comp_str, bs_cross
-            )?;
+            writeln!(writer, "  Backscatter Cross Section: {:.6e}", bs_cross)?;
         }
         if let Some(lidar) = result.params.lidar_ratio(&component) {
-            writeln!(writer, "{} Lidar Ratio: {:.6}", comp_str, lidar)?;
+            writeln!(writer, "  Lidar Ratio: {:.6}", lidar)?;
         }
         if let Some(depol) = result.params.depolarization_ratio(&component) {
-            writeln!(writer, "{} Depolarization Ratio: {:.6}", comp_str, depol)?;
+            writeln!(writer, "  Backscatter Depolarization Ratio: {:.6}", depol)?;
         }
     }
 
