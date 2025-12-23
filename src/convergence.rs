@@ -1,6 +1,7 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
+use chrono::Local;
 use crossbeam_deque::{Injector, Steal};
 
 use crate::{
@@ -332,9 +333,39 @@ impl Convergence {
         let n = self.orientations.num_orientations;
         let max_target = self.max_orientations.min(n);
 
-        // Progress bars
-        let (status_pb, pb, info_pb) = self.setup_progress_bars(max_target);
-        status_pb.set_message("Initializing work-stealing solver...");
+        // Progress display
+        let m = MultiProgress::new();
+        let title_pb = m.add(ProgressBar::new_spinner());
+        title_pb.set_style(
+            ProgressStyle::with_template(
+                "{spinner:.cyan} GOAD: [Convergence]  [Elapsed: {elapsed}]  {msg}  [{prefix}]",
+            )
+            .unwrap()
+            .tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+        );
+        title_pb.set_message("[Status: \x1b[33mINITIALISING\x1b[0m]");
+        title_pb.set_prefix(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+        title_pb.enable_steady_tick(Duration::from_millis(100));
+
+        let info_pb = m.add(ProgressBar::new_spinner());
+        info_pb.set_style(ProgressStyle::with_template("  {msg}").unwrap());
+
+        // Create progress bars for each target
+        let target_pbs: Vec<ProgressBar> = self
+            .targets
+            .iter()
+            .map(|_| {
+                let pb = m.add(ProgressBar::new(100));
+                pb.set_style(
+                    ProgressStyle::with_template("  {msg} [{bar:20.green/dim}] {pos:>3}%")
+                        .unwrap()
+                        .progress_chars("█▓░"),
+                );
+                pb
+            })
+            .collect();
+
+        let start_time = std::time::Instant::now();
 
         // Prepare base problems (cloned per worker later)
         let problems_base: Vec<Problem> = self
@@ -386,20 +417,6 @@ impl Convergence {
         // Channel for results: workers send, master receives
         let (tx, rx): (Sender<Results>, Receiver<Results>) = mpsc::channel();
 
-        // Spawn worker threads
-        status_pb.set_message("Spawning worker threads...");
-        let targets_desc = if self.targets.is_empty() {
-            format!("Max: {} orientations", max_target)
-        } else {
-            let t_strs: Vec<_> = self
-                .targets
-                .iter()
-                .map(|t| format!("{:?}<{:.1}%", t.param, t.relative_error * 100.0))
-                .collect();
-            format!("Targets: {} | Max: {}", t_strs.join(", "), max_target)
-        };
-        info_pb.set_message(format!("Workers: {} | {}", num_workers, targets_desc));
-
         let injector_ref = &injector;
         let problems_ref = &problems_base;
 
@@ -416,16 +433,88 @@ impl Convergence {
             drop(tx);
 
             // Master reduction loop with convergence tracking
-            status_pb.set_message("Running orientation averaging...");
             let mut converged = false;
             let mut interrupted = false;
+
+            // Set status to RUNNING
+            title_pb.set_message("[Status: \x1b[32mRUNNING\x1b[0m]");
 
             while self.tracker.count() < max_target && !converged && !interrupted {
                 // Use timeout so we can periodically check for interrupts
                 match rx.recv_timeout(Duration::from_millis(100)) {
                     Ok(result) => {
                         self.tracker.update(&result);
-                        pb.inc(1);
+
+                        // Update info bar
+                        let count = self.tracker.count();
+                        let elapsed = start_time.elapsed().as_secs_f64();
+                        let sec_per_orient = if count > 0 {
+                            elapsed / count as f64
+                        } else {
+                            0.0
+                        };
+                        let min_color = if count >= MIN_ORIENTATIONS {
+                            "\x1b[32m" // green
+                        } else {
+                            "\x1b[31m" // red
+                        };
+                        info_pb.set_message(format!(
+                            "[Orientations: {} ({}{}{}|{})] [{:.3} sec/orientation]",
+                            count,
+                            min_color,
+                            MIN_ORIENTATIONS,
+                            "\x1b[0m",
+                            max_target,
+                            sec_per_orient
+                        ));
+                        title_pb.set_prefix(Local::now().format("%Y-%m-%d %H:%M:%S").to_string());
+
+                        // Update per-target progress bars
+                        if count >= MIN_ORIENTATIONS {
+                            let mean = self.tracker.mean();
+                            let sem = self.tracker.sem();
+
+                            for (i, target) in self.targets.iter().enumerate() {
+                                let mean_val = match target.param {
+                                    Param::Asymmetry => mean.params.asymmetry(&GOComponent::Total),
+                                    Param::Albedo => mean.params.albedo(&GOComponent::Total),
+                                    Param::ScatCross => {
+                                        mean.params.scatt_cross(&GOComponent::Total)
+                                    }
+                                    Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
+                                };
+                                let sem_val = match target.param {
+                                    Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
+                                    Param::Albedo => sem.params.albedo(&GOComponent::Total),
+                                    Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
+                                    Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
+                                };
+
+                                if let (Some(m), Some(s)) = (mean_val, sem_val) {
+                                    let current_rel_sem =
+                                        if m.abs() > 1e-10 { s / m.abs() } else { 0.0 };
+                                    let target_rel_sem = target.relative_error;
+
+                                    // Progress with sqrt scaling, capped at 100%
+                                    let progress = if current_rel_sem > 1e-10 {
+                                        ((target_rel_sem / current_rel_sem).sqrt()).min(1.0)
+                                    } else {
+                                        1.0
+                                    };
+
+                                    let param_name = format!("{:?}", target.param);
+                                    target_pbs[i].set_message(format!(
+                                        "{:<9} {:>10.4e} ± {:<10.4e} [{:>5.2}% / {:>5.2}%]",
+                                        param_name,
+                                        m,
+                                        s,
+                                        current_rel_sem * 100.0,
+                                        target_rel_sem * 100.0
+                                    ));
+                                    target_pbs[i].set_position((progress * 100.0) as u64);
+                                }
+                            }
+                        }
 
                         // Check convergence periodically (every orientation after minimum)
                         if self.tracker.count() >= MIN_ORIENTATIONS {
@@ -443,7 +532,6 @@ impl Convergence {
                         // Check for interrupt (e.g., Ctrl-C from Python)
                         if check_interrupt() {
                             interrupted = true;
-                            status_pb.set_message("Interrupted by user");
                         }
                     }
                     Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
@@ -453,22 +541,26 @@ impl Convergence {
                 }
             }
 
-            if converged {
-                status_pb.set_message(format!(
-                    "Converged after {} orientations",
-                    self.tracker.count()
-                ));
-            }
+            // Set status to FINALISING while waiting for workers to finish
+            title_pb.set_message("[Status: \x1b[33mFINALISING\x1b[0m]");
         });
 
-        pb.finish_with_message("Orientations complete");
-        status_pb.finish_with_message("✓ Computation complete");
+        // Finish progress bars
+        title_pb.finish_and_clear();
+        for pb in &target_pbs {
+            pb.finish_and_clear();
+        }
+        info_pb.finish_and_clear();
 
-        let mean = self.tracker.mean();
-        info_pb.finish_with_message(format!(
-            "Power ratio: {:.3} | Results ready",
-            mean.powers.output / mean.powers.input.max(1e-10)
-        ));
+        // Print final status
+        if self.is_converged() {
+            println!("Converged after {} orientations", self.tracker.count());
+        } else {
+            println!(
+                "Completed {} orientations (max reached or interrupted)",
+                self.tracker.count()
+            );
+        }
 
         Ok(())
     }
@@ -503,44 +595,6 @@ impl Convergence {
                     std::hint::spin_loop();
                 }
             }
-        }
-    }
-
-    /// Sets up progress bars for the solve.
-    fn setup_progress_bars(&self, target: usize) -> (ProgressBar, ProgressBar, ProgressBar) {
-        if !self.settings.quiet {
-            let m = MultiProgress::new();
-
-            let status_pb = m.add(ProgressBar::new_spinner());
-            status_pb
-                .set_style(ProgressStyle::with_template("{spinner:.cyan} Status: {msg}").unwrap());
-            status_pb.enable_steady_tick(Duration::from_millis(100));
-
-            let pb = m.add(ProgressBar::new(target as u64));
-            pb.set_style(
-                ProgressStyle::with_template(
-                    "{spinner:.green} [{elapsed_precise}] [{bar:40.green/blue}] {pos:>5}/{len:5} {msg} | ETA: {eta_precise}",
-                )
-                .unwrap()
-                .progress_chars("█▇▆▅▄▃▂▁"),
-            );
-            pb.set_message("Computing orientations");
-
-            let info_pb = m.add(ProgressBar::new_spinner());
-            info_pb.set_style(ProgressStyle::with_template("{msg}").unwrap());
-            info_pb.enable_steady_tick(Duration::from_millis(500));
-            info_pb.set_message(format!(
-                "Geometry: {} | Target: {} orientations",
-                self.settings.geom_name, target
-            ));
-
-            (status_pb, pb, info_pb)
-        } else {
-            (
-                ProgressBar::hidden(),
-                ProgressBar::hidden(),
-                ProgressBar::hidden(),
-            )
         }
     }
 }

@@ -19,10 +19,12 @@ fn main() {
     let mut convergence = Convergence::new(None, Some(settings)).unwrap();
 
     // Set convergence target: 1% relative SEM on asymmetry parameter
-    convergence.add_target(Param::Asymmetry, 0.01);
+    convergence.add_target(Param::Asymmetry, 0.03);
+    convergence.add_target(Param::Asymmetry, 0.02);
+    convergence.add_target(Param::ScatCross, 0.02);
 
     // Optionally set max orientations as safety cap (default is 100k)
-    convergence.max_orientations = 2000;
+    convergence.max_orientations = 500;
 
     // Solve - will terminate when target is reached or max_orientations hit
     convergence.solve().unwrap();
