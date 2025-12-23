@@ -69,6 +69,25 @@ Albedo is of course just equal to 1 for non-absorbing particles, so it is not a 
 
 {{code_block('examples/convergence', 'extcross')}}
 
+### Backscatter Properties
+
+For lidar applications, you may want to converge on backscatter properties. These are computed at exactly θ=180° using aperture diffraction. Note that backscatter properties tend to be more variable than integrated quantities, so a more lenient convergence threshold (e.g., 5%) is recommended:
+
+```python
+from goad import Convergence, Param, Settings
+
+settings = Settings(geom_path="hexcol_2x30")
+conv = Convergence(settings)
+conv.add_target(Param.LidarRatio, 0.05)  # 5% relative error
+conv.add_target(Param.DepolarizationRatio, 0.05)
+conv.solve()
+
+mean = conv.mean
+print(f"Lidar Ratio: {mean.params.lidar_ratio}")
+print(f"Depolarization Ratio: {mean.params.depolarization_ratio}")
+print(f"Backscatter Cross Section: {mean.params.backscatter_cross}")
+```
+
 ## Convergable Parameters
 
 The following table lists the current convergable parameters and some recommendations for starting values:
@@ -79,6 +98,9 @@ The following table lists the current convergable parameters and some recommenda
 | `Param.ScatCross` | `0.01` | Scattering cross section, the integrated scattering |
 | `Param.ExtCross` | `0.01` | Extinction cross section, the integrated scattering + absorption |
 | `Param.Albedo` | `0.01` | Single scattering albedo, the ratio of scattering cross section to extinction cross section |
+| `Param.BackscatterCross` | `0.05` | Backscatter cross section at θ=180°, computed via aperture diffraction |
+| `Param.LidarRatio` | `0.05` | Lidar ratio, the ratio of extinction to backscatter cross section |
+| `Param.DepolarizationRatio` | `0.05` | Linear depolarization ratio at backscatter, (S11-S22)/(S11+S22) |
 
 ## Python API Reference
 
