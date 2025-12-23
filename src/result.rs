@@ -875,12 +875,14 @@ impl Results {
             let k = 2.0 * PI / wavelength;
 
             // BackscatterCross = S11 * 4π / k²
+            // DepolarizationRatio = (S11 - S22) / (S11 + S22)
             for (component, mueller) in [
                 (GOComponent::Total, field_bs.mueller_total),
                 (GOComponent::Beam, field_bs.mueller_beam),
                 (GOComponent::ExtDiff, field_bs.mueller_ext),
             ] {
                 let s11 = mueller[(0, 0)];
+                let s22 = mueller[(1, 1)];
                 let bs_cross = s11 * 4.0 * PI / k.powi(2);
                 self.params
                     .set_param(Param::BackscatterCross, component, bs_cross);
@@ -891,6 +893,16 @@ impl Results {
                         self.params
                             .set_param(Param::LidarRatio, component, ext_cross / bs_cross);
                     }
+                }
+
+                // DepolarizationRatio = (S11 - S22) / (S11 + S22)
+                let s11_plus_s22 = s11 + s22;
+                if s11_plus_s22.abs() > 1e-10 {
+                    let depol = (s11 - s22) / s11_plus_s22;
+                    self.params
+                        .set_param(Param::DepolarizationRatio, component, depol);
+                    self.params
+                        .set_param(Param::BackscatterS11S22, component, s11_plus_s22);
                 }
             }
         }

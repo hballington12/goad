@@ -315,6 +315,7 @@ fn is_converged_check(
             Param::BackscatterCross => mean.params.backscatter_cross(&GOComponent::Total),
             Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
             Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
+            Param::BackscatterS11S22 => mean.params.backscatter_s11s22(&GOComponent::Total),
         };
         let sem_val = match t.param {
             Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
@@ -324,6 +325,7 @@ fn is_converged_check(
             Param::BackscatterCross => sem.params.backscatter_cross(&GOComponent::Total),
             Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
             Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
+            Param::BackscatterS11S22 => sem.params.backscatter_s11s22(&GOComponent::Total),
         };
 
         match (mean_val, sem_val) {
@@ -437,6 +439,7 @@ impl Convergence {
                 Param::BackscatterCross => mean.params.backscatter_cross(&GOComponent::Total),
                 Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
                 Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
+                Param::BackscatterS11S22 => mean.params.backscatter_s11s22(&GOComponent::Total),
             };
             let sem_val = match t.param {
                 Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
@@ -446,6 +449,7 @@ impl Convergence {
                 Param::BackscatterCross => sem.params.backscatter_cross(&GOComponent::Total),
                 Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
                 Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
+                Param::BackscatterS11S22 => sem.params.backscatter_s11s22(&GOComponent::Total),
             };
 
             match (mean_val, sem_val) {
@@ -606,6 +610,9 @@ impl Convergence {
                                     Param::DepolarizationRatio => {
                                         mean.params.depolarization_ratio(&GOComponent::Total)
                                     }
+                                    Param::BackscatterS11S22 => {
+                                        mean.params.backscatter_s11s22(&GOComponent::Total)
+                                    }
                                 };
                                 let sem_val = match target.param {
                                     Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
@@ -620,6 +627,9 @@ impl Convergence {
                                     }
                                     Param::DepolarizationRatio => {
                                         sem.params.depolarization_ratio(&GOComponent::Total)
+                                    }
+                                    Param::BackscatterS11S22 => {
+                                        sem.params.backscatter_s11s22(&GOComponent::Total)
                                     }
                                 };
 

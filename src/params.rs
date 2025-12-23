@@ -38,6 +38,7 @@ pub enum Param {
     BackscatterCross,    // backscatter (differential) cross section
     LidarRatio,          // extinction / backscatter cross section
     DepolarizationRatio, // linear depolarization ratio at backscatter
+    BackscatterS11S22,   // S11 + S22 at backscatter (for DepolarizationRatio weighting)
 }
 
 impl Params {
@@ -153,6 +154,12 @@ impl Params {
             .copied()
     }
 
+    pub fn backscatter_s11s22(&self, component: &GOComponent) -> Option<f32> {
+        self.params
+            .get(&(Param::BackscatterS11S22, *component))
+            .copied()
+    }
+
     /// Returns a weighted version of Params for convergence tracking.
     /// - asymmetry becomes asymmetry * scat_cross
     /// - albedo becomes albedo * ext_cross
@@ -177,12 +184,12 @@ impl Params {
             {
                 result.set_param(Param::LidarRatio, component, lr * ec);
             }
-            // DepolarizationRatio weighted by BackscatterCross
-            if let (Some(dr), Some(bs)) = (
+            // DepolarizationRatio weighted by S11+S22
+            if let (Some(dr), Some(s11s22)) = (
                 self.depolarization_ratio(&component),
-                self.backscatter_cross(&component),
+                self.backscatter_s11s22(&component),
             ) {
-                result.set_param(Param::DepolarizationRatio, component, dr * bs);
+                result.set_param(Param::DepolarizationRatio, component, dr * s11s22);
             }
         }
         result
@@ -211,13 +218,13 @@ impl Params {
                     result.set_param(Param::LidarRatio, component, ec);
                 }
             }
-            // DepolarizationRatio weight is BackscatterCross
-            if let Some(bs) = self.backscatter_cross(&component) {
+            // DepolarizationRatio weight is S11+S22
+            if let Some(s11s22) = self.backscatter_s11s22(&component) {
                 if self.depolarization_ratio(&component).is_some() {
-                    result.set_param(Param::DepolarizationRatio, component, bs);
+                    result.set_param(Param::DepolarizationRatio, component, s11s22);
                 }
             }
-            // ScatCross, ExtCross, BackscatterCross weights are 1.0
+            // ScatCross, ExtCross, BackscatterCross, BackscatterS11S22 weights are 1.0
             if self.scatt_cross(&component).is_some() {
                 result.set_param(Param::ScatCross, component, 1.0);
             }
@@ -226,6 +233,9 @@ impl Params {
             }
             if self.backscatter_cross(&component).is_some() {
                 result.set_param(Param::BackscatterCross, component, 1.0);
+            }
+            if self.backscatter_s11s22(&component).is_some() {
+                result.set_param(Param::BackscatterS11S22, component, 1.0);
             }
         }
         result
@@ -338,21 +348,37 @@ impl Convergeable for Params {
                 result.set_param(Param::LidarRatio, component, lr2);
             }
 
-            // DepolarizationRatio: weighted by BackscatterCross
-            if let (Some(dr1), Some(dr2), Some(bs1), Some(bs2)) = (
+            // DepolarizationRatio: weighted by S11+S22
+            if let (Some(dr1), Some(dr2), Some(s1), Some(s2)) = (
                 self.depolarization_ratio(&component),
                 other.depolarization_ratio(&component),
-                self.backscatter_cross(&component),
-                other.backscatter_cross(&component),
+                self.backscatter_s11s22(&component),
+                other.backscatter_s11s22(&component),
             ) {
-                let weight1 = bs1 * w1;
-                let weight2 = bs2 * w2;
+                let weight1 = s1 * w1;
+                let weight2 = s2 * w2;
                 let new_dr = (dr1 * weight1 + dr2 * weight2) / (weight1 + weight2);
                 result.set_param(Param::DepolarizationRatio, component, new_dr);
             } else if let Some(dr1) = self.depolarization_ratio(&component) {
                 result.set_param(Param::DepolarizationRatio, component, dr1);
             } else if let Some(dr2) = other.depolarization_ratio(&component) {
                 result.set_param(Param::DepolarizationRatio, component, dr2);
+            }
+
+            // BackscatterS11S22: simple weighted average by count
+            if let (Some(s1), Some(s2)) = (
+                self.backscatter_s11s22(&component),
+                other.backscatter_s11s22(&component),
+            ) {
+                result.set_param(
+                    Param::BackscatterS11S22,
+                    component,
+                    (s1 * w1 + s2 * w2) / total_weight,
+                );
+            } else if let Some(s1) = self.backscatter_s11s22(&component) {
+                result.set_param(Param::BackscatterS11S22, component, s1);
+            } else if let Some(s2) = other.backscatter_s11s22(&component) {
+                result.set_param(Param::BackscatterS11S22, component, s2);
             }
         }
 
