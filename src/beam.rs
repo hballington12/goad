@@ -190,6 +190,7 @@ impl Beam {
             let e_perp = self.get_e_perp(&normal);
             let mut field = self.field.new_from_e_perp(&e_perp);
             let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.field.prop()); // z-distance
+            println!("initial distance: {}", dist);
             let wavenumber = self.wavenumber();
             field.wind(dist * wavenumber * n1.re); // increment phase
             let dist_sqrt = dist.abs().sqrt(); // TODO: improve this

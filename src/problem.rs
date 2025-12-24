@@ -387,6 +387,25 @@ impl Problem {
                 None
             };
 
+            // Forward scatter: only for ExtDiff component (optical theorem)
+            // We only want external diffraction, not the geometric optics beam component
+            let fs_ampl = if mapping == Mapping::ApertureDiffraction
+                && component == GOComponent::ExtDiff
+            {
+                let fs_bin = SolidAngleBin::new(AngleBin::new(0.0, 0.0), AngleBin::new(0.0, 0.0));
+                let fs_bins = [fs_bin];
+                let mut fs_ampl = Ampl::zeros();
+                for beam in queue.iter() {
+                    let ampls = beam.diffract(&fs_bins, fov_factor);
+                    if !ampls.is_empty() {
+                        fs_ampl += ampls[0].1;
+                    }
+                }
+                Some(fs_ampl)
+            } else {
+                None
+            };
+
             self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
 
@@ -398,6 +417,13 @@ impl Problem {
                         GOComponent::ExtDiff => field_bs.mueller_ext = mueller,
                         GOComponent::Total => {}
                     }
+                }
+            }
+
+            // Apply forward scatter result (accumulate amplitudes)
+            if let Some(ampl) = fs_ampl {
+                if let Some(ref mut field_fs) = self.result.field_fs {
+                    *field_fs += ampl;
                 }
             }
         } else {
@@ -451,6 +477,25 @@ impl Problem {
                 None
             };
 
+            // Forward scatter: only for ExtDiff component (optical theorem)
+            // We only want external diffraction, not the geometric optics beam component
+            let fs_ampl = if mapping == Mapping::ApertureDiffraction
+                && component == GOComponent::ExtDiff
+            {
+                let fs_bin = SolidAngleBin::new(AngleBin::new(0.0, 0.0), AngleBin::new(0.0, 0.0));
+                let fs_bins = [fs_bin];
+                let mut fs_ampl = Ampl::zeros();
+                for beam in queue.iter() {
+                    let ampls = beam.diffract(&fs_bins, fov_factor);
+                    if !ampls.is_empty() {
+                        fs_ampl += ampls[0].1;
+                    }
+                }
+                Some(fs_ampl)
+            } else {
+                None
+            };
+
             self.assign_muellers(component, muellers);
 
             // Apply backscatter result
@@ -463,6 +508,13 @@ impl Problem {
                     }
                 }
             }
+
+            // Apply forward scatter result (accumulate amplitudes)
+            if let Some(ampl) = fs_ampl {
+                if let Some(ref mut field_fs) = self.result.field_fs {
+                    *field_fs += ampl;
+                }
+            }
         }
     }
 
@@ -472,8 +524,11 @@ impl Problem {
         let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
         self.result.field_bs = Some(ScattResult2D::new(bs_bin));
 
+        // Initialize field_fs for forward scatter (optical theorem)
+        self.result.field_fs = Some(Ampl::zeros());
+
         self.solve_far_queue(GOComponent::ExtDiff);
-        self.solve_far_queue(GOComponent::Beam);
+        // self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
 
         // Combine backscatter components
@@ -758,10 +813,11 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
     let mut field = Field::new_identity(Vector3::x(), -Vector3::z()).unwrap();
 
     // propagate field backwards so its as if the beam comes from z=0
-    let dist = bounds.1[2];
+    let dist = bounds.1[2] * FAC;
     let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
     let arg = -dist * wavenumber * medium_refractive_index.re;
     field.wind(arg);
+    println!("initial offset distance (scaled) is: {}", dist);
 
     let beam = Beam::new_from_field(clip, medium_refractive_index, field, wavelength);
     beam

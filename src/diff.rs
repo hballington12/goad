@@ -98,7 +98,7 @@ pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> V
 /// Mapping from near to far field using aperture diffraction theory.
 pub fn n2f_aperture_diffraction(
     verts: &[Point3<f32>],
-    mut ampl: Matrix2<Complex<f32>>,
+    mut ampl: Ampl,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
     bins: &[SolidAngleBin],
@@ -219,6 +219,15 @@ pub fn n2f_aperture_diffraction(
         let path_difference = k_obs.dot(&r_offset);
         let bvsk = path_difference * wavenumber;
 
+        if cos_theta > 0.99999 {
+            println!(
+                "hello from forward scattering, theta = {}",
+                bin.theta_bin.center
+            );
+            println!("path dif is {}", path_difference);
+            println!("full ampl is: {}", ampl)
+        }
+
         // Apply filtering based on field of view if specified
         if fov_factor.is_some() && k.dot(&prop2) < cos_fov {
             continue;
@@ -228,10 +237,26 @@ pub fn n2f_aperture_diffraction(
 
         let (karczewski, rot4, prerotation) = get_rotations(rot3, prop2, sin_phi, cos_phi, k);
 
+        let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
+
+        // in direct forwards, ampl_temp is diagonal for external diffraction
         let ampl_temp = rot4.map(Complex::from)
             * karczewski.map(Complex::from)
             * ampl
+            * exp_factor
             * prerotation.map(Complex::from);
+
+        if cos_theta > 0.99999 {
+            println!(
+                "ampl_temp[(0,0)] phase: {:.2}°",
+                ampl_temp[(0, 0)].arg().to_degrees()
+            );
+            println!(
+                "ampl_temp[(1,1)] phase: {:.2}°",
+                ampl_temp[(1, 1)].arg().to_degrees()
+            );
+            println!("ampl is {}", ampl_temp)
+        }
 
         *ampl_far_field = ampl_temp;
 
@@ -269,7 +294,7 @@ pub fn n2f_aperture_diffraction(
                 continue;
             }
 
-            let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, inv_denom); // Pass inv_denom
+            let summand = calculate_summand(delta, omega1, omega2, alpha, beta, inv_denom); // Pass inv_denom
 
             // Final check just to be sure
             if summand.is_nan() {
@@ -530,7 +555,7 @@ pub fn calculate_alpha_beta(delta1: f32, delta2: f32, kxx: f32, kyy: f32) -> (f3
 
 #[inline]
 pub fn calculate_summand(
-    bvsk: f32,
+    // bvsk: f32,
     delta: f32,
     omega1: f32,
     omega2: f32,
@@ -545,9 +570,10 @@ pub fn calculate_summand(
     let sumim = alpha * (cos_delta - cos_delta_omega1) - beta * (cos_delta - cos_delta_omega2);
     let sumre = -alpha * (sin_delta - sin_delta_omega1) + beta * (sin_delta - sin_delta_omega2);
 
-    let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
+    // let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
 
-    exp_factor * Complex::new(sumre, sumim) * inv_denom // Multiply by inverse denominator
+    // exp_factor * Complex::new(sumre, sumim) * inv_denom // Multiply by inverse denominator
+    Complex::new(sumre, sumim) * inv_denom // Multiply by inverse denominator
 }
 
 /// Returns the reference phase correction for accounting for how far the beam must travel to reach a point on the scattering sphere in the far-field.
