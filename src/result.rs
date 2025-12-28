@@ -961,12 +961,13 @@ impl Results {
         // Optical theorem: ExtCross = (2π/k) * Im[S_11 + S_22] at θ=0°
         // This is experimental - compare with integrated ExtCross
         if let Some(ref field_fs) = self.field_fs {
-            println!("wavelength is: {:?}", wavelength);
             let k = 2.0 * PI / wavelength;
-            let s11 = field_fs[(0, 0)];
-            let s22 = field_fs[(1, 1)];
-            let ext_cross_optical = (PI / k.powi(2)) * (s11.im + s22.im);
-            // Print for comparison (temporary)
+            let s2 = field_fs[(0, 0)];
+            let s3 = field_fs[(0, 1)];
+            let s4 = field_fs[(1, 0)];
+            let s1 = field_fs[(1, 1)];
+            let ext_cross_optical = (4.0 * PI / k.powi(1)) * (s2.im + s1.im);
+            // + self.powers.input; // must add incident power to account for going from beam total -> difference field
             if let Some(ext_integrated) = self.params.ext_cross(&GOComponent::Total) {
                 eprintln!(
                     "Optical theorem ExtCross: {:.6} vs Integrated: {:.6} (ratio: {:.4})",
@@ -977,16 +978,28 @@ impl Results {
             }
             // Print phase of amplitude elements
             eprintln!(
-                "Forward scatter S11: {:+.4} {:+.4}i (phase: {:.2}°)",
-                s11.re,
-                s11.im,
-                s11.arg().to_degrees()
+                "Forward scatter s2: {:+.4} {:+.4}i (phase: {:.2}°)",
+                s2.re,
+                s2.im,
+                s2.arg().to_degrees()
             );
             eprintln!(
-                "Forward scatter S22: {:+.4} {:+.4}i (phase: {:.2}°)",
-                s22.re,
-                s22.im,
-                s22.arg().to_degrees()
+                "Forward scatter s1: {:+.4} {:+.4}i (phase: {:.2}°)",
+                s1.re,
+                s1.im,
+                s1.arg().to_degrees()
+            );
+            eprintln!(
+                "Forward scatter s3: {:+.4} {:+.4}i (phase: {:.2}°)",
+                s3.re,
+                s3.im,
+                s3.arg().to_degrees()
+            );
+            eprintln!(
+                "Forward scatter s4: {:+.4} {:+.4}i (phase: {:.2}°)",
+                s4.re,
+                s4.im,
+                s4.arg().to_degrees()
             );
         }
     }

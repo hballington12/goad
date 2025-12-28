@@ -205,6 +205,13 @@ pub fn n2f_aperture_diffraction(
         // Compute sin and cos values for current theta and phi bin centers
         let (sin_theta, cos_theta) = bin.theta_bin.center.to_radians().sin_cos();
         let (sin_phi, cos_phi) = bin.phi_bin.center.to_radians().sin_cos();
+        println!("theta: {}", bin.theta_bin.center);
+        println!("phi: {}", bin.phi_bin.center);
+        println!("sin_theta: {}", sin_theta);
+        println!("cos_theta: {}", cos_theta);
+        println!("sin_phi: {}", sin_phi);
+        println!("cos_phi: {}", cos_phi);
+        println!("rot3: {}", rot3);
 
         // Calculate observation direction in original frame
         let k_obs = Vector3::new(sin_theta * cos_phi, sin_theta * sin_phi, -cos_theta);
@@ -219,15 +226,6 @@ pub fn n2f_aperture_diffraction(
         let path_difference = k_obs.dot(&r_offset);
         let bvsk = path_difference * wavenumber;
 
-        if cos_theta > 0.99999 {
-            println!(
-                "hello from forward scattering, theta = {}",
-                bin.theta_bin.center
-            );
-            println!("path dif is {}", path_difference);
-            println!("full ampl is: {}", ampl)
-        }
-
         // Apply filtering based on field of view if specified
         if fov_factor.is_some() && k.dot(&prop2) < cos_fov {
             continue;
@@ -239,6 +237,18 @@ pub fn n2f_aperture_diffraction(
 
         let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
 
+        // Debug prints for forward scattering (theta ~ 0)
+        if sin_theta.abs() < 0.01 {
+            println!("--- Forward scattering debug ---");
+            println!("k (rotated obs dir): {}", k);
+            println!("prop2: {}", prop2);
+            println!("karczewski:\n{}", karczewski);
+            println!("rot4:\n{}", rot4);
+            println!("prerotation:\n{}", prerotation);
+            println!("exp_factor: {}", exp_factor);
+            println!("input ampl:\n{}", ampl);
+        }
+
         // in direct forwards, ampl_temp is diagonal for external diffraction
         let ampl_temp = rot4.map(Complex::from)
             * karczewski.map(Complex::from)
@@ -246,16 +256,9 @@ pub fn n2f_aperture_diffraction(
             * exp_factor
             * prerotation.map(Complex::from);
 
-        if cos_theta > 0.99999 {
-            println!(
-                "ampl_temp[(0,0)] phase: {:.2}°",
-                ampl_temp[(0, 0)].arg().to_degrees()
-            );
-            println!(
-                "ampl_temp[(1,1)] phase: {:.2}°",
-                ampl_temp[(1, 1)].arg().to_degrees()
-            );
-            println!("ampl is {}", ampl_temp)
+        if sin_theta.abs() < 0.01 {
+            println!("ampl_temp (before Fraunhofer):\n{}", ampl_temp);
+            println!("--- End forward scattering debug ---");
         }
 
         *ampl_far_field = ampl_temp;

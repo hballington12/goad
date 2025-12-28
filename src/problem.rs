@@ -331,6 +331,8 @@ impl Problem {
             }
         };
 
+        println!("num beams in queue: {}", queue.len());
+
         let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
                 Mapping::GeometricOptics => {
@@ -340,65 +342,76 @@ impl Problem {
             }
         };
 
-        // coherence:
+        // // coherence:
         if self.settings.coherence {
-            let zero_ampls: Vec<(usize, Ampl)> = self
-                .result
-                .field_2d
-                .iter()
-                .map(|_| Ampl::zeros())
-                .into_iter()
-                .enumerate()
-                .collect();
-            let ampls: Vec<Ampl> = queue
-                .par_iter()
-                .map(|beam| map_beam_to_far_field(beam))
-                .reduce(
-                    || zero_ampls.clone(),
-                    |mut acc, val| {
-                        for (i, ampl) in val.into_iter() {
-                            acc[i].1 += ampl;
-                        }
-                        acc
-                    },
-                )
-                .into_iter()
-                .map(|x| x.1)
-                .collect();
+            //     let zero_ampls: Vec<(usize, Ampl)> = self
+            //         .result
+            //         .field_2d
+            //         .iter()
+            //         .map(|_| Ampl::zeros())
+            //         .into_iter()
+            //         .enumerate()
+            //         .collect();
+            //     let ampls: Vec<Ampl> = queue
+            //         .par_iter()
+            //         .map(|beam| map_beam_to_far_field(beam))
+            //         .reduce(
+            //             || zero_ampls.clone(),
+            //             |mut acc, val| {
+            //                 for (i, ampl) in val.into_iter() {
+            //                     acc[i].1 += ampl;
+            //                 }
+            //                 acc
+            //             },
+            //         )
+            //         .into_iter()
+            //         .map(|x| x.1)
+            //         .collect();
 
-            // Backscatter: accumulate coherently (as Ampl), only for diffraction
-            // Compute before mutable borrow of self
-            let bs_mueller = if mapping == Mapping::ApertureDiffraction {
-                if let Some(ref field_bs) = self.result.field_bs {
-                    let bs_bin = field_bs.bin;
-                    let bs_bins = [bs_bin];
-                    let mut bs_ampl = Ampl::zeros();
-                    for beam in queue.iter() {
-                        let ampls = beam.diffract(&bs_bins, fov_factor);
-                        if !ampls.is_empty() {
-                            bs_ampl += ampls[0].1;
-                        }
-                    }
-                    Some(bs_ampl.to_mueller())
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
+            // // Backscatter: accumulate coherently (as Ampl), only for diffraction
+            // // Compute before mutable borrow of self
+            // let bs_mueller = if mapping == Mapping::ApertureDiffraction {
+            //     if let Some(ref field_bs) = self.result.field_bs {
+            //         let bs_bin = field_bs.bin;
+            //         let bs_bins = [bs_bin];
+            //         let mut bs_ampl = Ampl::zeros();
+            //         for beam in queue.iter() {
+            //             let ampls = beam.diffract(&bs_bins, fov_factor);
+            //             if !ampls.is_empty() {
+            //                 bs_ampl += ampls[0].1;
+            //             }
+            //         }
+            //         Some(bs_ampl.to_mueller())
+            //     } else {
+            //         None
+            //     }
+            // } else {
+            //     None
+            // };
 
             // Forward scatter: only for ExtDiff component (optical theorem)
             // We only want external diffraction, not the geometric optics beam component
-            let fs_ampl = if mapping == Mapping::ApertureDiffraction
-                && component == GOComponent::ExtDiff
-            {
+            println!("hello ");
+            let fs_ampl = if mapping == Mapping::ApertureDiffraction {
                 let fs_bin = SolidAngleBin::new(AngleBin::new(0.0, 0.0), AngleBin::new(0.0, 0.0));
                 let fs_bins = [fs_bin];
                 let mut fs_ampl = Ampl::zeros();
-                for beam in queue.iter() {
+                for (i, beam) in queue.iter().enumerate() {
+                    if i != 0 {
+                        continue;
+                    }
+                    println!("hello from beam into fs");
+                    println!(
+                        "beam to be diffracted has intensity: {}",
+                        beam.field.intensity()
+                    );
+                    println!("the diffracting ampl is: {}", beam.field.ampl());
                     let ampls = beam.diffract(&fs_bins, fov_factor);
                     if !ampls.is_empty() {
-                        fs_ampl += ampls[0].1;
+                        let ampl = ampls[0].1;
+                        println!("the forward diffracted ampl is: {}", ampl);
+                        println!("forward ampl intensity is: {}", ampl.norm());
+                        fs_ampl += ampl;
                     }
                 }
                 Some(fs_ampl)
@@ -406,19 +419,19 @@ impl Problem {
                 None
             };
 
-            self.assign_ampls(component, ampls);
+            // self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
 
-            // Apply backscatter result
-            if let Some(mueller) = bs_mueller {
-                if let Some(ref mut field_bs) = self.result.field_bs {
-                    match component {
-                        GOComponent::Beam => field_bs.mueller_beam = mueller,
-                        GOComponent::ExtDiff => field_bs.mueller_ext = mueller,
-                        GOComponent::Total => {}
-                    }
-                }
-            }
+            // // Apply backscatter result
+            // if let Some(mueller) = bs_mueller {
+            //     if let Some(ref mut field_bs) = self.result.field_bs {
+            //         match component {
+            //             GOComponent::Beam => field_bs.mueller_beam = mueller,
+            //             GOComponent::ExtDiff => field_bs.mueller_ext = mueller,
+            //             GOComponent::Total => {}
+            //         }
+            //     }
+            // }
 
             // Apply forward scatter result (accumulate amplitudes)
             if let Some(ampl) = fs_ampl {
@@ -486,6 +499,7 @@ impl Problem {
                 let fs_bins = [fs_bin];
                 let mut fs_ampl = Ampl::zeros();
                 for beam in queue.iter() {
+                    println!("the phase of the beam is: {}", beam.field.phase());
                     let ampls = beam.diffract(&fs_bins, fov_factor);
                     if !ampls.is_empty() {
                         fs_ampl += ampls[0].1;
@@ -516,6 +530,15 @@ impl Problem {
                 }
             }
         }
+        // // subtract incident field contribution to forward scattering
+        // if let Some(ref mut field_fs) = self.result.field_fs {
+        //     let fwd_correction = Ampl::identity()
+        //         * Complex::new(
+        //             0.0,
+        //             -self.result.powers.input / (self.settings.wavelength * 2.0),
+        //         );
+        //     *field_fs += fwd_correction;
+        // }
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
@@ -817,7 +840,6 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
     let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
     let arg = -dist * wavenumber * medium_refractive_index.re;
     field.wind(arg);
-    println!("initial offset distance (scaled) is: {}", dist);
 
     let beam = Beam::new_from_field(clip, medium_refractive_index, field, wavelength);
     beam
