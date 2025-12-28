@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use clap::ValueEnum;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
 use pyo3::prelude::*;
@@ -8,6 +9,55 @@ use crate::beam::Beam;
 use crate::bins::{get_n_linear_search, get_n_simple, BinningScheme, Scheme, SolidAngleBin};
 use crate::field::{Ampl, Field};
 use crate::{geom, settings};
+
+/// Tolerance for planarity check - maximum allowed deviation from the aperture plane
+const PLANARITY_TOLERANCE: f32 = 1e-4;
+
+/// Check if a set of vertices are coplanar.
+/// Returns Ok(()) if planar, Err with details if not.
+pub fn check_planarity(verts: &[Point3<f32>]) -> Result<()> {
+    if verts.len() < 3 {
+        return Err(anyhow!(
+            "Aperture must have at least 3 vertices, got {}",
+            verts.len()
+        ));
+    }
+
+    if verts.len() == 3 {
+        // Three points are always coplanar
+        return Ok(());
+    }
+
+    // Compute normal from first three vertices
+    let v0 = verts[1] - verts[0];
+    let v1 = verts[2] - verts[0];
+    let normal = v0.cross(&v1);
+
+    if normal.norm() < settings::VEC_LENGTH_THRESHOLD {
+        return Err(anyhow!(
+            "First three vertices are collinear, cannot determine plane"
+        ));
+    }
+
+    let normal = normal.normalize();
+
+    // Check all remaining vertices lie in the plane
+    for (i, vert) in verts.iter().enumerate().skip(3) {
+        let v = vert - verts[0];
+        let distance = v.dot(&normal).abs();
+
+        if distance > PLANARITY_TOLERANCE {
+            return Err(anyhow!(
+                "Aperture is non-planar: vertex {} deviates from plane by {:.6} (tolerance: {:.6})",
+                i,
+                distance,
+                PLANARITY_TOLERANCE
+            ));
+        }
+    }
+
+    Ok(())
+}
 
 /// Enum representing different mapping methods from near to far field.
 #[pyclass]
@@ -96,6 +146,9 @@ pub fn n2f_go(binning: &BinningScheme, bins: &[SolidAngleBin], beam: &Beam) -> V
 }
 
 /// Mapping from near to far field using aperture diffraction theory.
+///
+/// # Errors
+/// Returns an empty vector if the aperture is non-planar.
 pub fn n2f_aperture_diffraction(
     verts: &[Point3<f32>],
     mut ampl: Ampl,
@@ -107,7 +160,13 @@ pub fn n2f_aperture_diffraction(
 ) -> Vec<Matrix2<Complex<f32>>> {
     // Translate to aperture system, rotate, and transform propagation and auxiliary vectors.
     let (center_of_mass, relative_vertices, rot3, prop2) =
-        init_diff(verts, &mut ampl, prop, vk7, wavenumber);
+        match init_diff(verts, &mut ampl, prop, vk7, wavenumber) {
+            Ok(result) => result,
+            Err(e) => {
+                eprintln!("n2f_aperture_diffraction: {}", e);
+                return vec![Matrix2::<Complex<f32>>::zeros(); bins.len()];
+            }
+        };
 
     // --- Optimizations Start ---
     // Pre-calculate transformed vertices and related quantities outside the main loop
@@ -205,13 +264,6 @@ pub fn n2f_aperture_diffraction(
         // Compute sin and cos values for current theta and phi bin centers
         let (sin_theta, cos_theta) = bin.theta_bin.center.to_radians().sin_cos();
         let (sin_phi, cos_phi) = bin.phi_bin.center.to_radians().sin_cos();
-        println!("theta: {}", bin.theta_bin.center);
-        println!("phi: {}", bin.phi_bin.center);
-        println!("sin_theta: {}", sin_theta);
-        println!("cos_theta: {}", cos_theta);
-        println!("sin_phi: {}", sin_phi);
-        println!("cos_phi: {}", cos_phi);
-        println!("rot3: {}", rot3);
 
         // Calculate observation direction in original frame
         let k_obs = Vector3::new(sin_theta * cos_phi, sin_theta * sin_phi, -cos_theta);
@@ -237,23 +289,16 @@ pub fn n2f_aperture_diffraction(
 
         let exp_factor = Complex::cis(bvsk); // Use cis for complex exponential
 
-        // Debug prints for forward scattering (theta ~ 0)
+        // Debug hook for forward scattering (theta ~ 0)
         if sin_theta.abs() < 0.01 {
-            println!("--- Forward scattering debug ---");
-            println!("k (rotated obs dir): {}", k);
-            println!("prop2: {}", prop2);
-            println!("karczewski:\n{}", karczewski);
-            println!("rot4:\n{}", rot4);
-            println!("prerotation:\n{}", prerotation);
-            println!("exp_factor: {}", exp_factor);
-            println!("input ampl:\n{}", ampl);
+            // debug prints here
         }
 
         // in direct forwards, ampl_temp is diagonal for external diffraction
         let ampl_temp = rot4.map(Complex::from)
             * karczewski.map(Complex::from)
             * ampl
-            * exp_factor
+            // * exp_factor
             * prerotation.map(Complex::from);
 
         if sin_theta.abs() < 0.01 {
@@ -336,13 +381,64 @@ fn get_rotations(
     (karczewski, rot4, prerotation)
 }
 
-fn init_diff(
+/// Tolerance for prop direction check - how close to parallel with aperture is allowed
+const PROP_DIRECTION_TOLERANCE: f32 = 0.1;
+
+/// Initialize diffraction calculation by transforming aperture to standard frame.
+/// Returns Result containing (center_of_mass, relative_vertices, rot3, prop2) where:
+/// - rot3: combined rotation matrix that maps lab frame -> aperture frame
+/// - prop2: propagation direction in aperture frame (should have +z, lie in xz plane)
+///
+/// # Errors
+/// Returns an error if:
+/// - The aperture vertices are non-planar
+/// - The propagation direction is nearly parallel to the aperture (not pointing into it)
+pub fn init_diff(
     verts: &[Point3<f32>],
     ampl: &mut Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
     vk7: Vector3<f32>,
     wavenumber: f32,
-) -> (Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>) {
+) -> Result<(Point3<f32>, Vec<Vector3<f32>>, Matrix3<f32>, Vector3<f32>)> {
+    // Check that the aperture is planar
+    check_planarity(verts)?;
+
+    // Compute aperture normal to validate prop direction
+    let v0: Vector3<f32> = verts[1] - verts[0];
+    let v1: Vector3<f32> = verts[2] - verts[0];
+    let normal = v0.cross(&v1).normalize();
+
+    // Check that prop has a significant component into or out of the aperture
+    // (i.e., prop is not nearly parallel to the aperture plane)
+    let prop_dot_normal = prop.dot(&normal).abs();
+    if prop_dot_normal < PROP_DIRECTION_TOLERANCE {
+        return Err(anyhow!(
+            "Propagation direction is nearly parallel to aperture plane (|prop · normal| = {:.4} < {})",
+            prop_dot_normal,
+            PROP_DIRECTION_TOLERANCE
+        ));
+    }
+
+    // Check that e_perp (vk7) is perpendicular to prop
+    let perp_dot_prop = vk7.dot(&prop).abs();
+    if perp_dot_prop > PROP_DIRECTION_TOLERANCE {
+        return Err(anyhow!(
+            "e_perp is not perpendicular to propagation direction (|e_perp · prop| = {:.4} > {})",
+            perp_dot_prop,
+            PROP_DIRECTION_TOLERANCE
+        ));
+    }
+
+    // Check that e_perp (vk7) is perpendicular to face normal
+    let perp_dot_normal = vk7.dot(&normal).abs();
+    if perp_dot_normal > PROP_DIRECTION_TOLERANCE {
+        return Err(anyhow!(
+            "e_perp is not perpendicular to face normal (|e_perp · normal| = {:.4} > {})",
+            perp_dot_normal,
+            PROP_DIRECTION_TOLERANCE
+        ));
+    }
+
     let prop = (prop
         + Vector3::new(
             settings::PROP_PERTURBATION,
@@ -357,97 +453,111 @@ fn init_diff(
 
     let relative_vertices = geom::translate(verts, &center_of_mass);
 
-    let rot1 = get_rotation_matrix2(&relative_vertices);
+    // Use the new rotation function that accounts for prop direction
+    // Step 1: Rotate aperture into xy plane (normal along ±z)
+    let rot1 = get_rotation_matrix_for_aperture(&relative_vertices, prop);
     let prop1 = rot1 * prop;
     let perp1 = rot1 * vk7;
-    let rot2 = calculate_rotation_matrix(prop1);
-    let rot3 = rot2 * rot1;
+
+    // Step 2: Rotate around z-axis to put e_perp along ±y axis
+    // Since e_perp is perpendicular to both prop and face normal, and face normal is now along z,
+    // e_perp lies in the xy plane. Rotating around z aligns it with y.
+    let rot2 = calculate_rotation_to_align_perp_with_y(perp1);
+    let rot_combined = rot2 * rot1;
 
     let prop2 = rot2 * prop1;
     let perp2 = rot2 * perp1;
+
+    println!(
+        "init_diff vk7 (lab e_perp): ({:.3},{:.3},{:.3})",
+        vk7.x, vk7.y, vk7.z
+    );
     let e_par2 = perp2.cross(&prop2).normalize();
+    println!(
+        "init_diff prop2 (aperture): ({:.3},{:.3},{:.3})",
+        prop2.x, prop2.y, prop2.z
+    );
+    println!(
+        "init_diff e_par2 (aperture): ({:.3},{:.3},{:.3})",
+        e_par2.x, e_par2.y, e_par2.z
+    );
+    println!(
+        "init_diff perp2 (aperture e_perp): ({:.3},{:.3},{:.3})",
+        perp2.x, perp2.y, perp2.z
+    );
 
     if e_par2.z > settings::COLINEAR_THRESHOLD {
         *ampl = -*ampl;
     }
-    (center_of_mass, relative_vertices, rot3, prop2)
+    Ok((center_of_mass, relative_vertices, rot_combined, prop2))
 }
 
+/// Compute a rotation matrix that transforms the aperture plane into the xy plane,
+/// ensuring the propagation direction ends up with a +z component.
+///
+/// The approach:
+/// 1. Compute the aperture normal from vertices using cross product
+/// 2. Determine target based on prop direction (prop should end up with +z)
+/// 3. Compute a rotation that aligns the normal appropriately
+///
+/// Uses Rodrigues' rotation formula to find the rotation matrix.
+pub fn get_rotation_matrix_for_aperture(
+    verts: &Vec<Vector3<f32>>,
+    prop: Vector3<f32>,
+) -> Matrix3<f32> {
+    // Compute aperture normal from first three vertices
+    let v0 = verts[1] - verts[0];
+    let v1 = verts[2] - verts[0];
+    let normal = v0.cross(&v1).normalize();
+
+    // We want prop to end up pointing towards +z after rotation.
+    // Convention: both normal and prop point outward from the face.
+    // So prop · normal > 0 means they point in the same hemisphere.
+    // To make prop point towards +z, we align normal with +z when prop · normal > 0.
+    let target = if prop.dot(&normal) > 0.0 {
+        // prop and normal point in same direction (both outward) - align normal with +z
+        Vector3::new(0.0, 0.0, 1.0)
+    } else {
+        // prop points opposite to normal - align normal with -z
+        Vector3::new(0.0, 0.0, -1.0)
+    };
+
+    // If normal is already aligned with target, handle specially
+    let dot = normal.dot(&target);
+
+    if dot > 1.0 - settings::COLINEAR_THRESHOLD {
+        // Normal already aligned with target, no rotation needed
+        return Matrix3::identity();
+    }
+
+    if dot < -1.0 + settings::COLINEAR_THRESHOLD {
+        // Normal points opposite to target, rotate 180° around x-axis
+        return Matrix3::new(1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, -1.0);
+    }
+
+    // General case: use Rodrigues' rotation formula
+    // Rotation axis is the cross product of normal and target
+    let axis = normal.cross(&target).normalize();
+
+    // Rotation angle from dot product
+    let cos_angle = dot;
+    let sin_angle = (1.0 - cos_angle * cos_angle).sqrt();
+
+    // Rodrigues' formula: R = I + sin(θ)K + (1-cos(θ))K²
+    // where K is the skew-symmetric cross-product matrix of the axis
+    let k = Matrix3::new(
+        0.0, -axis.z, axis.y, axis.z, 0.0, -axis.x, -axis.y, axis.x, 0.0,
+    );
+
+    let k_squared = k * k;
+
+    Matrix3::identity() + k * sin_angle + k_squared * (1.0 - cos_angle)
+}
+
+/// Legacy wrapper - use get_rotation_matrix_for_aperture instead
 pub fn get_rotation_matrix2(verts: &Vec<Vector3<f32>>) -> Matrix3<f32> {
-    let a1 = verts[0];
-    let b1 = verts[1];
-
-    let theta1 = if a1.y.abs() > settings::COLINEAR_THRESHOLD {
-        (a1[0] / a1[1]).atan()
-    } else {
-        PI / 4.0
-    };
-
-    let rot1 = Matrix3::new(
-        theta1.cos(),
-        -theta1.sin(),
-        0.0,
-        theta1.sin(),
-        theta1.cos(),
-        0.0,
-        0.0,
-        0.0,
-        1.0,
-    );
-
-    let a2 = rot1 * a1;
-    let b2 = rot1 * b1;
-
-    let theta2 = if a2.y.abs() > settings::COLINEAR_THRESHOLD {
-        -(a2[2] / a2[1]).atan()
-    } else {
-        -PI / 4.0
-    };
-
-    let rot2 = Matrix3::new(
-        1.0,
-        0.0,
-        0.0,
-        0.0,
-        theta2.cos(),
-        -theta2.sin(),
-        0.0,
-        theta2.sin(),
-        theta2.cos(),
-    );
-
-    let a3 = rot2 * a2;
-    let b3 = rot2 * b2;
-
-    let theta3 = if b3.x.abs() > settings::COLINEAR_THRESHOLD {
-        (b3[2] / b3[0]).atan()
-    } else {
-        PI / 4.0
-    };
-
-    let rot3 = Matrix3::new(
-        theta3.cos(),
-        0.0,
-        theta3.sin(),
-        0.0,
-        1.0,
-        0.0,
-        -theta3.sin(),
-        0.0,
-        theta3.cos(),
-    );
-
-    let a4 = rot3 * a3;
-    let b4 = rot3 * b3;
-
-    let rot = if a4[0] * b4[1] - a4[1] * b4[0] > 0.0 {
-        let rot4 = Matrix3::new(-1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0);
-        rot4 * rot3 * rot2 * rot1
-    } else {
-        rot3 * rot2 * rot1
-    };
-
-    rot
+    // Default behavior: assume prop points in -z direction
+    get_rotation_matrix_for_aperture(verts, Vector3::new(0.0, 0.0, -1.0))
 }
 
 #[inline]
@@ -498,6 +608,27 @@ pub fn karczewski(prop2: &Vector3<f32>, bvk: &Vector3<f32>) -> (Matrix2<f32>, Ve
 pub fn calculate_rotation_matrix(prop1: Vector3<f32>) -> Matrix3<f32> {
     let angle = -prop1.y.atan2(prop1.x);
     let (sin_angle, cos_angle) = angle.sin_cos();
+
+    Matrix3::new(
+        cos_angle, -sin_angle, 0.0, sin_angle, cos_angle, 0.0, 0.0, 0.0, 1.0,
+    )
+}
+
+/// Calculate a rotation matrix around the z-axis to align e_perp with +y axis.
+///
+/// Precondition: e_perp must be perpendicular to both prop and face normal.
+/// After rot1 puts the face normal along z, e_perp will lie in the xy plane (z ≈ 0).
+/// This function rotates around z to put e_perp along +y.
+#[inline]
+pub fn calculate_rotation_to_align_perp_with_y(perp: Vector3<f32>) -> Matrix3<f32> {
+    // perp is in xy plane (z ≈ 0), we want to rotate it to align with +y
+    // Current angle of perp in xy plane: atan2(y, x)
+    // To put perp along +y, we rotate by (π/2 - current_angle)
+    let current_angle = perp.y.atan2(perp.x);
+    let target_angle = std::f32::consts::FRAC_PI_2; // π/2 = +y direction
+    let rotation_angle = target_angle - current_angle;
+
+    let (sin_angle, cos_angle) = rotation_angle.sin_cos();
 
     Matrix3::new(
         cos_angle, -sin_angle, 0.0, sin_angle, cos_angle, 0.0, 0.0, 0.0, 1.0,

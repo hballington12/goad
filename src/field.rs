@@ -365,7 +365,7 @@ impl Field {
         let evo2 = prop.cross(&e_perp_in).normalize();
         let dot2 = e_perp_out.dot(&evo2);
 
-        let result = Matrix2::new(dot1, -dot2, dot2.clone(), dot1.clone());
+        let result = Matrix2::new(dot1, dot2.clone(), -dot2, dot1.clone());
         let det = result.determinant();
 
         result / det.abs().sqrt()

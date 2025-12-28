@@ -87,8 +87,10 @@ impl Beam {
     fn get_e_perp(&self, normal: &Vector3<f32>) -> Vector3<f32> {
         let dot = normal.dot(&self.field.prop());
         let e_perp = if dot.abs() > 1.0 - settings::COLINEAR_THRESHOLD {
+            println!("get_e_perp: colinear branch");
             -self.field.e_perp()
         } else {
+            println!("get_e_perp: normal x prop branch");
             normal.cross(&self.field.prop()).normalize() // new e_perp
         };
         if dot > 0.0 {
@@ -188,10 +190,99 @@ impl Beam {
             let theta_i = normal.dot(&self.field.prop()).abs().acos();
             let n2 = self.get_n2(geom, face, normal, medium_refr_index);
             let e_perp = self.get_e_perp(&normal);
+
+            // Debug hook for top face (normal pointing mostly +z, facing incident beam)
+            if normal.z > 0.98 {
+                println!(
+                    "top face normal: ({:.3},{:.3},{:.3})",
+                    normal.x, normal.y, normal.z
+                );
+                let a = self.field.ampl();
+                println!("top face (before) ampl: [({:.3},{:.3}),({:.3},{:.3});({:.3},{:.3}),({:.3},{:.3})]",
+                    a[(0,0)].re, a[(0,0)].im, a[(0,1)].re, a[(0,1)].im,
+                    a[(1,0)].re, a[(1,0)].im, a[(1,1)].re, a[(1,1)].im);
+                println!(
+                    "top face (before) e_perp: ({:.3},{:.3},{:.3})",
+                    self.field.e_perp().x,
+                    self.field.e_perp().y,
+                    self.field.e_perp().z
+                );
+                println!(
+                    "top face (before) e_par: ({:.3},{:.3},{:.3})",
+                    self.field.e_par().x,
+                    self.field.e_par().y,
+                    self.field.e_par().z
+                );
+                // Physical E field: E = S2*e_par + S4*e_perp for E_par_inc=1, E_perp_inc=0
+                //                   E = S3*e_par + S1*e_perp for E_par_inc=0, E_perp_inc=1
+                // For unpolarized (E_par=1, E_perp=1): E = (S2+S3)*e_par + (S4+S1)*e_perp
+                let e_phys_par = (a[(0, 0)] + a[(0, 1)]).re * self.field.e_par();
+                let e_phys_perp = (a[(1, 0)] + a[(1, 1)]).re * self.field.e_perp();
+                let e_phys = e_phys_par + e_phys_perp;
+                println!(
+                    "top face (before) E_phys: ({:.3},{:.3},{:.3})",
+                    e_phys.x, e_phys.y, e_phys.z
+                );
+            }
+
+            // Debug: print the rotation matrix before applying
+            if normal.z > 0.9 {
+                let rot = self.field.get_rotation_matrix(&e_perp);
+                println!("top face rot_matrix: [({:.3},{:.3}),({:.3},{:.3});({:.3},{:.3}),({:.3},{:.3})]",
+                    rot[(0,0)].re, rot[(0,0)].im, rot[(0,1)].re, rot[(0,1)].im,
+                    rot[(1,0)].re, rot[(1,0)].im, rot[(1,1)].re, rot[(1,1)].im);
+                println!(
+                    "top face new_e_perp: ({:.3},{:.3},{:.3})",
+                    e_perp.x, e_perp.y, e_perp.z
+                );
+                // Compute new_e_par = prop x new_e_perp
+                let new_e_par = self.field.prop().cross(&e_perp).normalize();
+                println!(
+                    "top face new_e_par: ({:.3},{:.3},{:.3})",
+                    new_e_par.x, new_e_par.y, new_e_par.z
+                );
+                // Check dot products between old and new basis
+                let old_eperp = self.field.e_perp();
+                let old_epar = self.field.e_par();
+                println!("dot(old_eperp, new_eperp): {:.3}", old_eperp.dot(&e_perp));
+                println!("dot(old_eperp, new_epar): {:.3}", old_eperp.dot(&new_e_par));
+                println!("dot(old_epar, new_eperp): {:.3}", old_epar.dot(&e_perp));
+                println!("dot(old_epar, new_epar): {:.3}", old_epar.dot(&new_e_par));
+            }
+
             let mut field = self.field.new_from_e_perp(&e_perp);
+
+            // Debug hook for top face (after rotation)
+            if normal.z > 0.9 {
+                let a = field.ampl();
+                println!("top face (after) ampl: [({:.3},{:.3}),({:.3},{:.3});({:.3},{:.3}),({:.3},{:.3})]",
+                    a[(0,0)].re, a[(0,0)].im, a[(0,1)].re, a[(0,1)].im,
+                    a[(1,0)].re, a[(1,0)].im, a[(1,1)].re, a[(1,1)].im);
+                println!(
+                    "top face (after) e_perp: ({:.3},{:.3},{:.3})",
+                    field.e_perp().x,
+                    field.e_perp().y,
+                    field.e_perp().z
+                );
+                println!(
+                    "top face (after) e_par: ({:.3},{:.3},{:.3})",
+                    field.e_par().x,
+                    field.e_par().y,
+                    field.e_par().z
+                );
+                // Physical E field for unpolarized (E_par=1, E_perp=1)
+                let e_phys_par = (a[(0, 0)] + a[(0, 1)]).re * field.e_par();
+                let e_phys_perp = (a[(1, 0)] + a[(1, 1)]).re * field.e_perp();
+                let e_phys = e_phys_par + e_phys_perp;
+                println!(
+                    "top face (after) E_phys: ({:.3},{:.3},{:.3})",
+                    e_phys.x, e_phys.y, e_phys.z
+                );
+            }
+
             let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.field.prop()); // z-distance
             let wavenumber = self.wavenumber();
-            field.wind(dist * wavenumber * n1.re); // increment phase
+            // field.wind(dist * wavenumber * n1.re); // increment phase
             let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
             let absorbed_intensity =
                 field.intensity() * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
@@ -201,16 +292,18 @@ impl Beam {
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
             if self.variant == BeamVariant::Initial {
-                let external_diff = Beam::new(
-                    face.clone(),
-                    n1,
-                    self.rec_count + 1,
-                    self.tir_count,
-                    field.clone(),
-                    BeamVariant::ExternalDiff,
-                    self.wavelength,
-                );
-                outputs.push(external_diff);
+                if let Ok(flipped_face) = face.flipped() {
+                    let external_diff = Beam::new(
+                        flipped_face,
+                        n1,
+                        self.rec_count + 1,
+                        self.tir_count,
+                        field.clone(),
+                        BeamVariant::ExternalDiff,
+                        self.wavelength,
+                    );
+                    outputs.push(external_diff);
+                }
             }
 
             // untracked energy leaks can occur here if the amplitude matrix contains NaN values

@@ -331,8 +331,6 @@ impl Problem {
             }
         };
 
-        println!("num beams in queue: {}", queue.len());
-
         let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
                 Mapping::GeometricOptics => {
@@ -391,7 +389,6 @@ impl Problem {
 
             // Forward scatter: only for ExtDiff component (optical theorem)
             // We only want external diffraction, not the geometric optics beam component
-            println!("hello ");
             let fs_ampl = if mapping == Mapping::ApertureDiffraction {
                 let fs_bin = SolidAngleBin::new(AngleBin::new(0.0, 0.0), AngleBin::new(0.0, 0.0));
                 let fs_bins = [fs_bin];
@@ -400,17 +397,11 @@ impl Problem {
                     if i != 0 {
                         continue;
                     }
-                    println!("hello from beam into fs");
-                    println!(
-                        "beam to be diffracted has intensity: {}",
-                        beam.field.intensity()
-                    );
-                    println!("the diffracting ampl is: {}", beam.field.ampl());
+                    // Debug hook for external diffraction beam
+                    // debug prints here
                     let ampls = beam.diffract(&fs_bins, fov_factor);
                     if !ampls.is_empty() {
                         let ampl = ampls[0].1;
-                        println!("the forward diffracted ampl is: {}", ampl);
-                        println!("forward ampl intensity is: {}", ampl.norm());
                         fs_ampl += ampl;
                     }
                 }
@@ -499,7 +490,8 @@ impl Problem {
                 let fs_bins = [fs_bin];
                 let mut fs_ampl = Ampl::zeros();
                 for beam in queue.iter() {
-                    println!("the phase of the beam is: {}", beam.field.phase());
+                    // Debug hook
+                    // debug prints here
                     let ampls = beam.diffract(&fs_bins, fov_factor);
                     if !ampls.is_empty() {
                         fs_ampl += ampls[0].1;
@@ -839,9 +831,34 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
     let dist = bounds.1[2] * FAC;
     let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
     let arg = -dist * wavenumber * medium_refractive_index.re;
-    field.wind(arg);
+    // field.wind(arg);
 
     let beam = Beam::new_from_field(clip, medium_refractive_index, field, wavelength);
+    // Debug hook for initial beam
+    let a = beam.field.ampl();
+    println!(
+        "inc beam ampl: [({:.3},{:.3}),({:.3},{:.3});({:.3},{:.3}),({:.3},{:.3})]",
+        a[(0, 0)].re,
+        a[(0, 0)].im,
+        a[(0, 1)].re,
+        a[(0, 1)].im,
+        a[(1, 0)].re,
+        a[(1, 0)].im,
+        a[(1, 1)].re,
+        a[(1, 1)].im
+    );
+    println!(
+        "inc beam e_perp: ({:.3},{:.3},{:.3})",
+        beam.field.e_perp().x,
+        beam.field.e_perp().y,
+        beam.field.e_perp().z
+    );
+    println!(
+        "inc beam e_par: ({:.3},{:.3},{:.3})",
+        beam.field.e_par().x,
+        beam.field.e_par().y,
+        beam.field.e_par().z
+    );
     beam
 }
 
