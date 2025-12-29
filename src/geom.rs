@@ -463,14 +463,16 @@ impl FaceData {
 
     /// Returns a new FaceData with reversed vertex order and flipped normal.
     pub fn flipped(&self) -> Result<Self> {
-        let mut reversed_verts = self.exterior.clone();
-        reversed_verts.reverse();
+        // let mut reversed_verts = self.exterior.clone();
+        let vertices = self.exterior.clone();
+        // reversed_verts.reverse();
         let reversed_indices = self.exterior_indices.as_ref().map(|indices| {
             let mut rev = indices.clone();
             rev.reverse();
             rev
         });
-        let mut flipped = FaceData::new(reversed_verts, self.shape_id, reversed_indices)?;
+        let indices = self.exterior_indices.clone();
+        let mut flipped = FaceData::new(vertices, self.shape_id, reversed_indices)?;
         flipped.area = self.area;
         Ok(flipped)
     }

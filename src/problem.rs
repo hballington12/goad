@@ -353,6 +353,7 @@ impl Problem {
                 .collect();
             let ampls: Vec<Ampl> = queue
                 .par_iter()
+                .take(1) // TODO: remove!
                 .map(|beam| map_beam_to_far_field(beam))
                 .reduce(
                     || zero_ampls.clone(),
