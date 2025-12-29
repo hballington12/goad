@@ -1,3 +1,5 @@
+use nalgebra::Vector3;
+
 use super::{MuellerComponentConfig, OutputConfig};
 use crate::{diff::Mapping, orientation::EulerConvention};
 use std::path::PathBuf;
@@ -11,7 +13,7 @@ pub const VERTEX_MERGE_DISTANCE: f32 = 0.001;
 /// Scaling factor for integer coordinates during clipping.
 pub const CLIP_TOLERANCE: f32 = 1e16;
 /// Minimum absolute value of the dot product of two vectors to be considered colinear.
-pub const COLINEAR_THRESHOLD: f32 = 0.001;
+pub const COLINEAR_THRESHOLD: f32 = 0.0001;
 /// Minimum vector length (in geometry units) to be considered non-degenerate.
 pub const VEC_LENGTH_THRESHOLD: f32 = 0.001;
 /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
@@ -78,6 +80,10 @@ pub const MIN_ORIENTATIONS: usize = 10;
 
 pub fn default_scale_factor() -> f32 {
     1.0
+}
+
+pub fn default_e_perp() -> Vector3<f32> {
+    Vector3::x()
 }
 
 pub fn default_geom_scale() -> Option<Vec<f32>> {

@@ -643,13 +643,27 @@ impl Beam {
         })
     }
 
-    pub fn diffract(&self, bins: &[SolidAngleBin], fov_factor: Option<f32>) -> Vec<(usize, Ampl)> {
+    pub fn diffract(
+        &self,
+        bins: &[SolidAngleBin],
+        fov_factor: Option<f32>,
+        // incidence_beam: Option<&IncidentBeam>,
+    ) -> Vec<(usize, Ampl)> {
         match &self.face {
             Face::Simple(face) => {
                 // TODO: remove match statement
+                // use the reference if given, else use the beam as reference
+                // let reference = match incidence_beam {
+                //     Some(beam) => beam,
+                //     None => &IncidentBeam {
+                //         e_perp: self.field.e_perp(),
+                //         prop: self.field.prop(),
+                //     },
+                // };
                 let result = diff2::n2f_aperture_diffraction(
                     &self,
                     bins,
+                    // reference,
                     &IncidentBeam {
                         e_perp: Vector3::x(), // to match basic_initial_beam
                         prop: -Vector3::z(),

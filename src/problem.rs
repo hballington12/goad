@@ -376,10 +376,10 @@ impl Problem {
                     let bs_bins = [bs_bin];
                     let mut bs_ampl = Ampl::zeros();
                     for beam in queue.iter() {
-                        let ampls = beam.diffract(&bs_bins, fov_factor);
-                        if !ampls.is_empty() {
-                            bs_ampl += ampls[0].1;
-                        }
+                        // let ampls = beam.diffract(&bs_bins, fov_factor);
+                        // if !ampls.is_empty() {
+                        //     bs_ampl += ampls[0].1;
+                        // }
                     }
                     Some(bs_ampl.to_mueller())
                 } else {
@@ -401,11 +401,11 @@ impl Problem {
                     }
                     // Debug hook for external diffraction beam
                     // debug prints here
-                    let ampls = beam.diffract(&fs_bins, fov_factor);
-                    if !ampls.is_empty() {
-                        let ampl = ampls[0].1;
-                        fs_ampl += ampl;
-                    }
+                    // let ampls = beam.diffract(&fs_bins, fov_factor);
+                    // if !ampls.is_empty() {
+                    //     let ampl = ampls[0].1;
+                    //     fs_ampl += ampl;
+                    // }
                 }
                 Some(fs_ampl)
             } else {

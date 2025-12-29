@@ -1,7 +1,8 @@
 //! Reimplemented near-to-far field aperture diffraction.
 
 use anyhow::Result;
-use nalgebra::{Complex, Matrix3, Matrix4, Point3, Vector3};
+use nalgebra::{Complex, Matrix3, Matrix4, Point3, Vector2, Vector3};
+use num_complex::ComplexFloat;
 
 use crate::beam::Beam;
 use crate::bins::SolidAngleBin;
@@ -479,6 +480,7 @@ pub fn n2f_aperture_diffraction(
     incident: &IncidentBeam,
     fov_factor: Option<f32>,
 ) -> Result<Vec<(usize, Ampl)>> {
+    println!("n2f entry ampl: {}", beam.field.ampl());
     let verts = &beam.face.data().exterior;
 
     // Apply small perturbation to prop to reduce numerical errors (matches original diff.rs)
@@ -495,6 +497,11 @@ pub fn n2f_aperture_diffraction(
         let e_perp = beam.field.e_perp();
         let normal = beam.face.data().normal;
 
+        assert!(
+            beam.field.prop().dot(&beam.face.data().normal) > 0.0,
+            "prop should be pointing away from the face but the dot product with face normal is {}",
+            beam.field.prop().dot(&beam.face.data().normal)
+        );
         assert_face_simple(&beam.face);
         assert_face_planar(verts);
         assert_clockwise_winding(verts, prop);
@@ -596,26 +603,65 @@ pub fn n2f_aperture_diffraction(
         let ampl_far_field = &mut ampl_cs[index];
 
         // Compute Karczewski polarisation matrix and scattering plane normal
-        let (karczewski_matrix, m) = karczewski(&prop_aperture, &k);
+        let (karczewski_matrix, karczewski_e_perp) = karczewski(&prop_aperture, &k);
 
         // Precompute sin/cos phi for rotation matrices
         let (sin_phi, cos_phi) = bin.phi.center.to_radians().sin_cos();
 
         // rot4: rotation from Karczewski scattering plane to aperture system scattering plane
         // hc is the vector perpendicular to the scattering plane, rotated into aperture system
-        let hc = rot3 * Vector3::new(sin_phi, -cos_phi, 0.0);
+        let scattering_e_perp = Vector3::new(-sin_phi, cos_phi, 0.0);
+        let hc = rot3 * scattering_e_perp;
         // evo2 is perpendicular to both k and m (in the scattering plane)
-        let evo2 = k.cross(&m);
-        let rot4 = Matrix2::new(hc.dot(&m), -hc.dot(&evo2), hc.dot(&evo2), hc.dot(&m));
+        // let evo2 = k.cross(&karczewski_e_perp);
+        // let rot4 = Matrix2::new(
+        //     hc.dot(&karczewski_e_perp),
+        //     -hc.dot(&evo2),
+        //     hc.dot(&evo2),
+        //     hc.dot(&karczewski_e_perp),
+        // );
+        let rot4 = crate::field::Field::rotation_matrix(karczewski_e_perp, hc, k);
 
         // prerotation: rotation of initial incidence reference frame
         // Uses the incident beam's e_perp and prop to define the reference frame
-        let prerotation = crate::field::Field::rotation_matrix(
-            incident.e_perp,
-            Vector3::new(-sin_phi, cos_phi, 0.0),
-            incident.prop,
-        )
-        .transpose();
+        let prerotation =
+            crate::field::Field::rotation_matrix(incident.e_perp, scattering_e_perp, incident.prop)
+                .transpose();
+
+        if (bin.theta.center - 30.0).abs() < 0.2 && (bin.phi.center - 60.0).abs() < 1.01 {
+            println!(
+                "debug output for theta: {}, and phi: {}",
+                bin.theta.center, bin.phi.center
+            );
+            println!("the incident field e perp vector is {}", incident.e_perp);
+            println!("the scattering unit vector in lab system is: {}", k_obs);
+            let e_perp = Vector3::new(-sin_phi, cos_phi, 0.0);
+            println!(
+                "this means that the perpendicular to scattering plane is {}",
+                e_perp
+            );
+            println!("the prerotation matrix is therefore {}", prerotation);
+            let inc_ampl = prerotation * Matrix2::identity();
+            println!(
+                "which after rotating would have the initial amplitude matrix as: {}",
+                inc_ampl
+            );
+            println!(
+                "which is equivalrent to a {} degree clockwise rotation",
+                inc_ampl[(0, 1)].asin().to_degrees()
+            );
+            println!("for an unpolarised light source, the initial E vector is obvious in the lab system. in the scattering plane, it is the rotated amplitude matrix projected onto the scattering basis vectors:");
+            let e_par = e_perp.cross(&Vector3::z());
+            let e_perp_plane = inc_ampl[(0, 0)] * e_par + inc_ampl[(0, 1)] * e_perp;
+            let e_par_plane = inc_ampl[(1, 0)] * e_par + inc_ampl[(1, 1)] * e_perp;
+            println!("this gives E_perp as {}", e_perp_plane);
+            println!("and E_par as {}", e_par);
+            println!(
+                "so that the total physical field is {} (should be close to [1,1]",
+                Vector2::new(e_perp_plane.norm(), e_par_plane.norm())
+            );
+            println!("assuming that's in order, the next thing to check would be the polarisation matrix ie. karczewski matrix");
+        }
 
         // Compute amplitude: rot4 * karczewski * ampl * prerotation
         let ampl_temp = rot4.map(Complex::from)
