@@ -9,6 +9,7 @@ use crate::{
     bins::SolidAngleBin,
     clip::Clipping,
     diff,
+    diff2::{self, IncidentBeam},
     field::{Ampl, Field},
     fresnel,
     geom::{Face, Geom},
@@ -645,22 +646,18 @@ impl Beam {
     pub fn diffract(&self, bins: &[SolidAngleBin], fov_factor: Option<f32>) -> Vec<(usize, Ampl)> {
         match &self.face {
             Face::Simple(face) => {
-                let verts = &face.exterior;
-                let ampl = self.field.ampl();
-                let prop = self.field.prop();
-                let vk7 = self.field.e_perp();
-                diff::n2f_aperture_diffraction(
-                    verts,
-                    ampl,
-                    prop,
-                    vk7,
+                // TODO: remove match statement
+                let result = diff2::n2f_aperture_diffraction(
+                    &self,
                     bins,
-                    self.wavenumber(),
+                    &IncidentBeam {
+                        e_perp: Vector3::x(), // to match basic_initial_beam
+                        prop: -Vector3::z(),
+                    },
                     fov_factor,
                 )
-                .into_iter()
-                .enumerate()
-                .collect()
+                .unwrap_or_default();
+                result.into_iter().collect()
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");

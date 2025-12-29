@@ -544,7 +544,7 @@ impl Problem {
         self.result.field_fs = Some(Ampl::zeros());
 
         self.solve_far_queue(GOComponent::ExtDiff);
-        self.solve_far_queue(GOComponent::Beam);
+        // self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
 
         // Combine backscatter components
