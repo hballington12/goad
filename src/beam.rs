@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 
 use geo::Coord;
 
-use nalgebra::{Complex, Matrix2, Point3, Vector3};
+use nalgebra::{Complex, Matrix2, Matrix4, Point3, Vector3};
 
 use crate::{
     bins::SolidAngleBin,
@@ -87,10 +87,8 @@ impl Beam {
     fn get_e_perp(&self, normal: &Vector3<f32>) -> Vector3<f32> {
         let dot = normal.dot(&self.field.prop());
         let e_perp = if dot.abs() > 1.0 - settings::COLINEAR_THRESHOLD {
-            println!("get_e_perp: colinear branch");
             -self.field.e_perp()
         } else {
-            println!("get_e_perp: normal x prop branch");
             normal.cross(&self.field.prop()).normalize() // new e_perp
         };
         if dot > 0.0 {
@@ -282,7 +280,7 @@ impl Beam {
 
             let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.field.prop()); // z-distance
             let wavenumber = self.wavenumber();
-            // field.wind(dist * wavenumber * n1.re); // increment phase
+            field.wind(dist * wavenumber * n1.re); // increment phase
             let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
             let absorbed_intensity =
                 field.intensity() * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
@@ -615,6 +613,33 @@ impl Beam {
 
     pub fn wavenumber(&self) -> f32 {
         2.0 * PI / self.wavelength
+    }
+
+    /// Returns a new Beam with the given 4x4 transformation matrix applied.
+    /// The transformation is applied to the face (vertices, normal, midpoint)
+    /// and the field (prop and e_perp vectors are rotated by the upper-left 3x3).
+    pub fn transformed(&self, transform: &Matrix4<f32>) -> Result<Self> {
+        // Clone and transform the face
+        let mut new_face = self.face.clone();
+        new_face.transform(transform)?;
+
+        // Extract the 3x3 rotation part from the 4x4 matrix
+        let rot3 = transform.fixed_view::<3, 3>(0, 0).into_owned();
+
+        // Rotate the field
+        let new_field = self.field.rotated(&rot3);
+
+        Ok(Self {
+            face: new_face,
+            refr_index: self.refr_index,
+            rec_count: self.rec_count,
+            tir_count: self.tir_count,
+            field: new_field,
+            absorbed_power: self.absorbed_power,
+            clipping_area: self.clipping_area,
+            variant: self.variant.clone(),
+            wavelength: self.wavelength,
+        })
     }
 
     pub fn diffract(&self, bins: &[SolidAngleBin], fov_factor: Option<f32>) -> Vec<(usize, Ampl)> {

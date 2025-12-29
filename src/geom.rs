@@ -1623,7 +1623,10 @@ pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
     )
 }
 
-pub fn translate(verts: &[Point3<f32>], center_of_mass: &Point3<f32>) -> Vec<Vector3<f32>> {
+pub fn negative_translate(
+    verts: &[Point3<f32>],
+    center_of_mass: &Point3<f32>,
+) -> Vec<Vector3<f32>> {
     verts
         .iter()
         .map(|point| point.coords - center_of_mass.coords)

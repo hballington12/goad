@@ -1,22 +1,37 @@
+use nalgebra::Vector3;
 use pyo3::prelude::*;
 use serde::{Deserialize, Deserializer, Serialize};
 
 /// Represents a solid angle bin with theta and phi bins
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct SolidAngleBin {
-    pub theta_bin: AngleBin,
-    pub phi_bin: AngleBin,
+    pub theta: AngleBin,
+    pub phi: AngleBin,
 }
 
 impl SolidAngleBin {
     /// Create a new bin from theta and phi bins
     pub fn new(theta_bin: AngleBin, phi_bin: AngleBin) -> Self {
-        SolidAngleBin { theta_bin, phi_bin }
+        SolidAngleBin {
+            theta: theta_bin,
+            phi: phi_bin,
+        }
     }
+
     pub fn solid_angle(&self) -> f32 {
-        2.0 * (self.theta_bin.center).to_radians().sin().abs()
-            * (0.5 * self.theta_bin.width()).to_radians().sin()
-            * self.phi_bin.width().to_radians()
+        2.0 * (self.theta.center).to_radians().sin().abs()
+            * (0.5 * self.theta.width()).to_radians().sin()
+            * self.phi.width().to_radians()
+    }
+
+    /// Returns the unit observation vector for this bin's center direction.
+    ///
+    /// Uses the inverted z-axis convention where z → -z, converting from
+    /// spherical (theta, phi) to Cartesian coordinates.
+    pub fn unit_vector(&self) -> Vector3<f32> {
+        let (sin_theta, cos_theta) = self.theta.center.to_radians().sin_cos();
+        let (sin_phi, cos_phi) = self.phi.center.to_radians().sin_cos();
+        Vector3::new(sin_theta * cos_phi, sin_theta * sin_phi, -cos_theta)
     }
 }
 
@@ -82,11 +97,11 @@ mod tests {
         // Check that we have the right number of bins
         assert_eq!(result.len(), 9);
         // Check first bin centers
-        assert_eq!(result[0].phi_bin.center, 60.0);
-        assert_eq!(result[0].phi_bin.center, 60.0);
+        assert_eq!(result[0].phi.center, 60.0);
+        assert_eq!(result[0].phi.center, 60.0);
         // Check bin edges for first theta bin
-        assert_eq!(result[0].theta_bin.min, 0.0);
-        assert_eq!(result[0].theta_bin.max, 60.0);
+        assert_eq!(result[0].theta.min, 0.0);
+        assert_eq!(result[0].theta.max, 60.0);
     }
 }
 
@@ -320,7 +335,7 @@ impl BinningScheme {
                 .collect(),
             Scheme::Custom { bins, .. } => custom_bins(&bins)
                 .iter()
-                .map(|bin| bin.theta_bin.center)
+                .map(|bin| bin.theta.center)
                 .collect(),
         };
         bins
@@ -341,7 +356,7 @@ impl BinningScheme {
                 .collect(),
             Scheme::Custom { bins, .. } => custom_bins(&bins)
                 .iter()
-                .map(|bin| bin.phi_bin.center)
+                .map(|bin| bin.phi.center)
                 .collect(),
         };
         bins
@@ -495,10 +510,10 @@ pub fn get_n_linear_search(bins: &[SolidAngleBin], theta: f32, phi: f32) -> Opti
     // Find the corresponding bin in the bins array
     let mut bin_idx = None;
     for (i, bin) in bins.iter().enumerate() {
-        if theta >= bin.theta_bin.min
-            && theta < bin.theta_bin.max
-            && phi >= bin.phi_bin.min
-            && phi < bin.phi_bin.max
+        if theta >= bin.theta.min
+            && theta < bin.theta.max
+            && phi >= bin.phi.min
+            && phi < bin.phi.max
         {
             bin_idx = Some(i);
             break;

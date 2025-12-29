@@ -15,6 +15,7 @@ pub mod clip;
 pub mod containment;
 pub mod convergence;
 pub mod diff;
+pub mod diff2;
 pub mod distortion;
 pub mod field;
 pub mod fresnel;

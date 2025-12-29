@@ -5,7 +5,7 @@ use crate::settings;
 use anyhow::Result;
 use std::fmt::Debug;
 
-use nalgebra::{Complex, Matrix2, RealField, Vector3};
+use nalgebra::{Complex, Matrix2, Matrix3, RealField, Vector3};
 
 #[cfg(test)]
 mod tests {
@@ -273,6 +273,21 @@ impl Field {
         field.set_e_perp(e_perp);
         field.matmul(&rot);
         field
+    }
+
+    /// Returns a new Field with prop and e_perp rotated by the given 3x3 rotation matrix.
+    /// The amplitude and phase remain unchanged since they represent the relationship
+    /// between polarization components, which is preserved under coordinate rotation.
+    pub fn rotated(&self, rot: &Matrix3<f32>) -> Self {
+        let new_prop = (rot * self.prop).normalize();
+        let new_e_perp = (rot * self.e_perp).normalize();
+
+        Self {
+            prop: new_prop,
+            e_perp: new_e_perp,
+            ampl: self.ampl,
+            phase: self.phase,
+        }
     }
 
     /// Creates a new unit electric field with the given input perpendicular

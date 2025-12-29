@@ -166,7 +166,7 @@ pub fn write_mueller(
     // Iterate over the array and write data to the file
     for (index, mueller) in muellers.iter().enumerate() {
         let bin = bins[index];
-        write!(writer, "{} {} ", bin.theta_bin.center, bin.phi_bin.center)?;
+        write!(writer, "{} {} ", bin.theta.center, bin.phi.center)?;
         for element in mueller.to_vec().into_iter() {
             write!(writer, "{} ", element)?;
         }

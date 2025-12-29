@@ -39,11 +39,11 @@ pub trait ScatteringBin: Clone + Debug {
 
 impl ScatteringBin for SolidAngleBin {
     fn theta_center(&self) -> f32 {
-        self.theta_bin.center
+        self.theta.center
     }
 
     fn theta_bin(&self) -> &AngleBin {
-        &self.theta_bin
+        &self.theta
     }
 }
 
@@ -819,7 +819,7 @@ impl Results {
         let theta_groups: Vec<Vec<&ScattResult2D>> = self
             .field_2d
             .iter()
-            .chunk_by(|result| result.bin.theta_bin)
+            .chunk_by(|result| result.bin.theta)
             .into_iter()
             .map(|(_, group)| group.collect())
             .collect();
@@ -838,12 +838,12 @@ impl Results {
     /// Weighted by phi bin width in radians
     fn integrate_over_phi(phi_group: Vec<&ScattResult2D>) -> ScattResult1D {
         // All results in group have same theta bin
-        let theta_bin = phi_group[0].bin.theta_bin;
+        let theta_bin = phi_group[0].bin.theta;
         let mut result = ScattResult1D::new(theta_bin);
 
         for phi_result in phi_group {
             // Convert phi width to radians to match theta integration units
-            let phi_width_rad = phi_result.bin.phi_bin.width().to_radians();
+            let phi_width_rad = phi_result.bin.phi.width().to_radians();
 
             // Integrate Mueller (weighted by phi bin width in radians)
             result.mueller_total += phi_result.mueller_total * phi_width_rad;
@@ -1110,7 +1110,7 @@ impl Results {
         let bins: Vec<f32> = self
             .bins()
             .iter()
-            .flat_map(|bin| vec![bin.theta_bin.center, bin.phi_bin.center])
+            .flat_map(|bin| vec![bin.theta.center, bin.phi.center])
             .collect();
 
         Array2::from_shape_vec((bins.len() / 2, 2), bins)
