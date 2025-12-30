@@ -967,8 +967,7 @@ impl Results {
             let s3 = field_fs[(0, 1)];
             let s4 = field_fs[(1, 0)];
             let s1 = field_fs[(1, 1)];
-            let ext_cross_optical = (1.0 * PI / k.powi(2)) * (s2.im + s1.im);
-            // + self.powers.input; // must add incident power to account for going from beam total -> difference field
+            let ext_cross_optical = (4.0 * PI / k.powi(2)) * (s2.im); // using imaginary part (diffraction convention is positive i prefactor)
             if let Some(ext_integrated) = self.params.ext_cross(&GOComponent::Total) {
                 eprintln!(
                     "Optical theorem ExtCross: {:.6} vs Integrated: {:.6} (ratio: {:.4})",

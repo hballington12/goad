@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
@@ -519,14 +521,17 @@ impl Problem {
                 }
             }
         }
-        // // subtract incident field contribution to forward scattering
-        // if let Some(ref mut field_fs) = self.result.field_fs {
-        //     let fwd_correction = Ampl::identity()
-        //         * Complex::new(
-        //             0.0,
-        //             -self.result.powers.input / (self.settings.wavelength * 2.0),
-        //         );
-        //     *field_fs += fwd_correction;
+        // subtract incident field contribution to forward scattering
+        // if component == GOComponent::Beam {
+        //     if let Some(ref mut field_fs) = self.result.field_fs {
+        //         let wavenumber = 2.0 * PI / self.settings.wavelength;
+        //         let fwd_correction = Ampl::identity()
+        //             * Complex::new(
+        //                 0.0,
+        //                 wavenumber.powi(2) * self.result.powers.input / (2.0 * PI),
+        //             );
+        //         *field_fs += fwd_correction;
+        //     }
         // }
     }
 
@@ -540,7 +545,7 @@ impl Problem {
         self.result.field_fs = Some(Ampl::zeros());
 
         self.solve_far_queue(GOComponent::ExtDiff);
-        // self.solve_far_queue(GOComponent::Beam);
+        self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
 
         // Combine backscatter components
