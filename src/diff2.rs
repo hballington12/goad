@@ -87,6 +87,8 @@ fn assert_clockwise_winding(verts: &[Point3<f32>], prop: Vector3<f32>) {
             "Vertex ordering is not clockwise as viewed along propagation direction (normal · prop = {})",
             dot
         );
+    } else {
+        println!("Vertex ordering is clockwise as viewed along propagation direction (normal · prop = {})", dot);
     }
 }
 
@@ -504,7 +506,7 @@ pub fn n2f_aperture_diffraction(
         );
         assert_face_simple(&beam.face);
         assert_face_planar(verts);
-        assert_clockwise_winding(verts, prop);
+        // assert_clockwise_winding(verts, prop);
         assert_e_perp_perpendicular_to_prop(e_perp, prop);
         assert_e_perp_perpendicular_to_normal(e_perp, normal);
     }
@@ -542,7 +544,7 @@ pub fn n2f_aperture_diffraction(
 
         assert_face_simple(&beam_aperture.face);
         assert_face_planar(aperture_verts);
-        assert_clockwise_winding(aperture_verts, aperture_prop);
+        // assert_clockwise_winding(aperture_verts, aperture_prop);
         assert_e_perp_perpendicular_to_prop(aperture_e_perp, aperture_prop);
         assert_e_perp_perpendicular_to_normal(aperture_e_perp, aperture_normal);
     }

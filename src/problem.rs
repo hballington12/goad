@@ -353,7 +353,6 @@ impl Problem {
                 .collect();
             let ampls: Vec<Ampl> = queue
                 .par_iter()
-                .take(1) // TODO: remove!
                 .map(|beam| map_beam_to_far_field(beam))
                 .reduce(
                     || zero_ampls.clone(),
@@ -545,7 +544,7 @@ impl Problem {
         self.result.field_fs = Some(Ampl::zeros());
 
         self.solve_far_queue(GOComponent::ExtDiff);
-        // self.solve_far_queue(GOComponent::Beam);
+        self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
 
         // Combine backscatter components
