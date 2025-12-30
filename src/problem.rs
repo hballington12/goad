@@ -836,29 +836,6 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
     let beam = Beam::new_from_field(clip, medium_refractive_index, field, wavelength);
     // Debug hook for initial beam
     let a = beam.field.ampl();
-    println!(
-        "inc beam ampl: [({:.3},{:.3}),({:.3},{:.3});({:.3},{:.3}),({:.3},{:.3})]",
-        a[(0, 0)].re,
-        a[(0, 0)].im,
-        a[(0, 1)].re,
-        a[(0, 1)].im,
-        a[(1, 0)].re,
-        a[(1, 0)].im,
-        a[(1, 1)].re,
-        a[(1, 1)].im
-    );
-    println!(
-        "inc beam e_perp: ({:.3},{:.3},{:.3})",
-        beam.field.e_perp().x,
-        beam.field.e_perp().y,
-        beam.field.e_perp().z
-    );
-    println!(
-        "inc beam e_par: ({:.3},{:.3},{:.3})",
-        beam.field.e_par().x,
-        beam.field.e_par().y,
-        beam.field.e_par().z
-    );
     beam
 }
 
