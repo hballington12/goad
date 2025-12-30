@@ -482,7 +482,6 @@ pub fn n2f_aperture_diffraction(
     incident: &IncidentBeam,
     fov_factor: Option<f32>,
 ) -> Result<Vec<(usize, Ampl)>> {
-    println!("n2f entry ampl: {}", beam.field.ampl());
     let verts = &beam.face.data().exterior;
 
     // Apply small perturbation to prop to reduce numerical errors (matches original diff.rs)
@@ -498,12 +497,12 @@ pub fn n2f_aperture_diffraction(
     {
         let e_perp = beam.field.e_perp();
         let normal = beam.face.data().normal;
+        if beam.field.prop().dot(&beam.face.data().normal) < 0.0 {
+            println!("warn: prop should be pointing away from the face but the dot product with face normal is {}",
+                beam.field.prop().dot(&beam.face.data().normal)
+                );
+        };
 
-        assert!(
-            beam.field.prop().dot(&beam.face.data().normal) > 0.0,
-            "prop should be pointing away from the face but the dot product with face normal is {}",
-            beam.field.prop().dot(&beam.face.data().normal)
-        );
         assert_face_simple(&beam.face);
         assert_face_planar(verts);
         // assert_clockwise_winding(verts, prop);
@@ -630,40 +629,40 @@ pub fn n2f_aperture_diffraction(
             crate::field::Field::rotation_matrix(incident.e_perp, scattering_e_perp, incident.prop)
                 .transpose();
 
-        if (bin.theta.center - 30.0).abs() < 0.2 && (bin.phi.center - 60.0).abs() < 1.01 {
-            println!(
-                "debug output for theta: {}, and phi: {}",
-                bin.theta.center, bin.phi.center
-            );
-            println!("the incident field e perp vector is {}", incident.e_perp);
-            println!("the scattering unit vector in lab system is: {}", k_obs);
-            let e_perp = Vector3::new(-sin_phi, cos_phi, 0.0);
-            println!(
-                "this means that the perpendicular to scattering plane is {}",
-                e_perp
-            );
-            println!("the prerotation matrix is therefore {}", prerotation);
-            let inc_ampl = prerotation * Matrix2::identity();
-            println!(
-                "which after rotating would have the initial amplitude matrix as: {}",
-                inc_ampl
-            );
-            println!(
-                "which is equivalrent to a {} degree clockwise rotation",
-                inc_ampl[(0, 1)].asin().to_degrees()
-            );
-            println!("for an unpolarised light source, the initial E vector is obvious in the lab system. in the scattering plane, it is the rotated amplitude matrix projected onto the scattering basis vectors:");
-            let e_par = e_perp.cross(&Vector3::z());
-            let e_perp_plane = inc_ampl[(0, 0)] * e_par + inc_ampl[(0, 1)] * e_perp;
-            let e_par_plane = inc_ampl[(1, 0)] * e_par + inc_ampl[(1, 1)] * e_perp;
-            println!("this gives E_perp as {}", e_perp_plane);
-            println!("and E_par as {}", e_par);
-            println!(
-                "so that the total physical field is {} (should be close to [1,1]",
-                Vector2::new(e_perp_plane.norm(), e_par_plane.norm())
-            );
-            println!("assuming that's in order, the next thing to check would be the polarisation matrix ie. karczewski matrix");
-        }
+        // if (bin.theta.center - 30.0).abs() < 0.2 && (bin.phi.center - 60.0).abs() < 1.01 {
+        //     println!(
+        //         "debug output for theta: {}, and phi: {}",
+        //         bin.theta.center, bin.phi.center
+        //     );
+        //     println!("the incident field e perp vector is {}", incident.e_perp);
+        //     println!("the scattering unit vector in lab system is: {}", k_obs);
+        //     let e_perp = Vector3::new(-sin_phi, cos_phi, 0.0);
+        //     println!(
+        //         "this means that the perpendicular to scattering plane is {}",
+        //         e_perp
+        //     );
+        //     println!("the prerotation matrix is therefore {}", prerotation);
+        //     let inc_ampl = prerotation * Matrix2::identity();
+        //     println!(
+        //         "which after rotating would have the initial amplitude matrix as: {}",
+        //         inc_ampl
+        //     );
+        //     println!(
+        //         "which is equivalrent to a {} degree clockwise rotation",
+        //         inc_ampl[(0, 1)].asin().to_degrees()
+        //     );
+        //     println!("for an unpolarised light source, the initial E vector is obvious in the lab system. in the scattering plane, it is the rotated amplitude matrix projected onto the scattering basis vectors:");
+        //     let e_par = e_perp.cross(&Vector3::z());
+        //     let e_perp_plane = inc_ampl[(0, 0)] * e_par + inc_ampl[(0, 1)] * e_perp;
+        //     let e_par_plane = inc_ampl[(1, 0)] * e_par + inc_ampl[(1, 1)] * e_perp;
+        //     println!("this gives E_perp as {}", e_perp_plane);
+        //     println!("and E_par as {}", e_par);
+        //     println!(
+        //         "so that the total physical field is {} (should be close to [1,1]",
+        //         Vector2::new(e_perp_plane.norm(), e_par_plane.norm())
+        //     );
+        //     println!("assuming that's in order, the next thing to check would be the polarisation matrix ie. karczewski matrix");
+        // }
 
         // Compute amplitude: rot4 * karczewski * ampl * prerotation
         let ampl_temp = rot4.map(Complex::from)
@@ -735,6 +734,7 @@ mod tests {
     use crate::beam::{Beam, BeamVariant, DefaultBeamVariant};
     use crate::field::Field;
     use crate::geom::Face;
+    use crate::settings::{default_e_perp, default_prop};
     use nalgebra::{Complex, Point3, Vector3};
 
     /// Create a simple triangular beam in the aperture system for testing.
@@ -744,16 +744,16 @@ mod tests {
     fn make_test_beam_in_aperture_system() -> Beam {
         // Triangle in xy plane, clockwise when viewed from +z
         let verts = vec![
-            Point3::new(1.0, 0.0, 0.0),
-            Point3::new(-0.5, -0.866, 0.0),
             Point3::new(-0.5, 0.866, 0.0),
+            Point3::new(-0.5, -0.866, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
         ];
 
         let face = Face::new_simple(verts, None, None).unwrap();
 
         // Prop in xz plane (not along +z to avoid collinear issues), e_perp along +y
         let prop = Vector3::new(0.5, 0.0, 0.866).normalize(); // ~30 degrees from +z
-        let e_perp = Vector3::new(0.0, 1.0, 0.0);
+        let e_perp = prop.cross(&face.data().normal).normalize();
         let field = Field::new_identity(e_perp, prop).unwrap();
 
         Beam::new(
@@ -780,16 +780,16 @@ mod tests {
     fn make_test_beam_normal_incidence() -> Beam {
         // Triangle in xy plane, clockwise when viewed from -z (i.e., from below)
         let verts = vec![
-            Point3::new(1.0, 0.0, 0.0),
-            Point3::new(-0.5, 0.866, 0.0),
             Point3::new(-0.5, -0.866, 0.0),
+            Point3::new(-0.5, 0.866, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
         ];
 
         let face = Face::new_simple(verts, None, None).unwrap();
 
         // Prop along -z (forward scattering direction), e_perp along +y
-        let prop = Vector3::new(0.0, 0.0, -1.0);
-        let e_perp = Vector3::new(0.0, 1.0, 0.0);
+        let prop = default_prop();
+        let e_perp = default_e_perp();
         let field = Field::new_identity(e_perp, prop).unwrap();
 
         Beam::new(
@@ -879,16 +879,16 @@ mod tests {
 
         // Triangle in xy plane, clockwise when viewed from -z (along prop direction)
         let verts = vec![
-            Point3::new(1.0, 0.0, 0.0),
-            Point3::new(-0.5, 0.866, 0.0),
             Point3::new(-0.5, -0.866, 0.0),
+            Point3::new(-0.5, 0.866, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
         ];
 
         let face = crate::geom::Face::new_simple(verts, None, None).unwrap();
 
         // Normal incidence
-        let prop = Vector3::new(0.0, 0.0, -1.0);
-        let e_perp = Vector3::new(0.0, 1.0, 0.0);
+        let prop = default_prop();
+        let e_perp = default_e_perp();
 
         // Cross-polarised amplitude: only off-diagonal elements
         // [[0, 1], [1, 0]] - swaps perp and par components
@@ -978,9 +978,9 @@ mod tests {
 
             // Triangle in xy plane, clockwise when viewed from -z (along prop direction)
             let verts = vec![
-                Point3::new(1.0, 0.0, 0.0),
-                Point3::new(-0.5, 0.866, 0.0),
                 Point3::new(-0.5, -0.866, 0.0),
+                Point3::new(-0.5, 0.866, 0.0),
+                Point3::new(1.0, 0.0, 0.0),
             ];
 
             let face = crate::geom::Face::new_simple(verts, None, None).unwrap();

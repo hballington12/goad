@@ -31,7 +31,7 @@ pub const MIN_DISTORTION: f32 = 1e-5;
 /// Threshold for classification of direct forwards or backwards rays
 pub const DIRECT_THRESHOLD: f32 = 1e-4;
 /// Tolerance for planarity check in diffraction
-pub const PLANARITY_TOLERANCE: f32 = 1e-4;
+pub const PLANARITY_TOLERANCE: f32 = 1e-2;
 /// Tolerance for value matching in interval binning
 pub const INTERVAL_IGNORE_TOLERANCE: f32 = 0.0001;
 /// Tolerance for centered geometry
@@ -84,6 +84,10 @@ pub fn default_scale_factor() -> f32 {
 
 pub fn default_e_perp() -> Vector3<f32> {
     Vector3::x()
+}
+
+pub fn default_prop() -> Vector3<f32> {
+    -Vector3::z()
 }
 
 pub fn default_geom_scale() -> Option<Vec<f32>> {

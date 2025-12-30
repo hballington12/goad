@@ -3,6 +3,7 @@ use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
 use crate::result::ScattResult2D;
+use crate::settings::{default_e_perp, default_prop};
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     diff::Mapping,
@@ -375,10 +376,10 @@ impl Problem {
                     let bs_bins = [bs_bin];
                     let mut bs_ampl = Ampl::zeros();
                     for beam in queue.iter() {
-                        // let ampls = beam.diffract(&bs_bins, fov_factor);
-                        // if !ampls.is_empty() {
-                        //     bs_ampl += ampls[0].1;
-                        // }
+                        let ampls = beam.diffract(&bs_bins, fov_factor);
+                        if !ampls.is_empty() {
+                            bs_ampl += ampls[0].1;
+                        }
                     }
                     Some(bs_ampl.to_mueller())
                 } else {
@@ -398,13 +399,11 @@ impl Problem {
                     if i != 0 {
                         continue;
                     }
-                    // Debug hook for external diffraction beam
-                    // debug prints here
-                    // let ampls = beam.diffract(&fs_bins, fov_factor);
-                    // if !ampls.is_empty() {
-                    //     let ampl = ampls[0].1;
-                    //     fs_ampl += ampl;
-                    // }
+                    let ampls = beam.diffract(&fs_bins, fov_factor);
+                    if !ampls.is_empty() {
+                        let ampl = ampls[0].1;
+                        fs_ampl += ampl;
+                    }
                 }
                 Some(fs_ampl)
             } else {
@@ -826,7 +825,7 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
 
     let mut clip = Face::new_simple(clip_vertices, None, None).unwrap();
     clip.data_mut().area = Some((max[0] - min[0]) * (max[1] - min[1]));
-    let mut field = Field::new_identity(Vector3::x(), -Vector3::z()).unwrap();
+    let mut field = Field::new_identity(default_e_perp(), default_prop()).unwrap();
 
     // propagate field backwards so its as if the beam comes from z=0
     let dist = bounds.1[2] * FAC;

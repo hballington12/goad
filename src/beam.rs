@@ -13,7 +13,7 @@ use crate::{
     field::{Ampl, Field},
     fresnel,
     geom::{Face, Geom},
-    settings,
+    settings::{self, default_e_perp, default_prop},
     snell::get_theta_t,
 };
 
@@ -665,8 +665,8 @@ impl Beam {
                     bins,
                     // reference,
                     &IncidentBeam {
-                        e_perp: Vector3::x(), // to match basic_initial_beam
-                        prop: -Vector3::z(),
+                        e_perp: default_e_perp(), // to match basic_initial_beam
+                        prop: default_prop(),
                     },
                     fov_factor,
                 )
