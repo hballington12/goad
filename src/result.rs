@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use std::f32::consts::SQRT_2;
 use std::fmt::Debug;
 use std::ops::Add;
 use std::ops::AddAssign;
@@ -966,7 +967,7 @@ impl Results {
             let s3 = field_fs[(0, 1)];
             let s4 = field_fs[(1, 0)];
             let s1 = field_fs[(1, 1)];
-            let ext_cross_optical = (4.0 * PI / k.powi(1)) * (s2.im + s1.im);
+            let ext_cross_optical = (1.0 * PI / k.powi(2)) * (s2.im + s1.im);
             // + self.powers.input; // must add incident power to account for going from beam total -> difference field
             if let Some(ext_integrated) = self.params.ext_cross(&GOComponent::Total) {
                 eprintln!(

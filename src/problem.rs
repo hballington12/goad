@@ -392,13 +392,10 @@ impl Problem {
             // Forward scatter: only for ExtDiff component (optical theorem)
             // We only want external diffraction, not the geometric optics beam component
             let fs_ampl = if mapping == Mapping::ApertureDiffraction {
-                let fs_bin = SolidAngleBin::new(AngleBin::new(0.0, 0.0), AngleBin::new(0.0, 0.0));
+                let fs_bin = SolidAngleBin::new(AngleBin::new(0.1, 0.1), AngleBin::new(0.0, 0.0));
                 let fs_bins = [fs_bin];
                 let mut fs_ampl = Ampl::zeros();
                 for (i, beam) in queue.iter().enumerate() {
-                    if i != 0 {
-                        continue;
-                    }
                     let ampls = beam.diffract(&fs_bins, fov_factor);
                     if !ampls.is_empty() {
                         let ampl = ampls[0].1;
@@ -486,7 +483,7 @@ impl Problem {
             let fs_ampl = if mapping == Mapping::ApertureDiffraction
                 && component == GOComponent::ExtDiff
             {
-                let fs_bin = SolidAngleBin::new(AngleBin::new(0.0, 0.0), AngleBin::new(0.0, 0.0));
+                let fs_bin = SolidAngleBin::new(AngleBin::new(0.1, 0.1), AngleBin::new(0.0, 0.0));
                 let fs_bins = [fs_bin];
                 let mut fs_ampl = Ampl::zeros();
                 for beam in queue.iter() {
@@ -543,7 +540,7 @@ impl Problem {
         self.result.field_fs = Some(Ampl::zeros());
 
         self.solve_far_queue(GOComponent::ExtDiff);
-        self.solve_far_queue(GOComponent::Beam);
+        // self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
 
         // Combine backscatter components
