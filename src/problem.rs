@@ -407,13 +407,24 @@ impl Problem {
                     let mut bs_ampl = Ampl::zeros();
                     for beam in queue.iter() {
                         let ampls = beam.diffract(&[field_bs.bin], fov_factor);
-                        let ampl = ampls[0].1;
-                        bs_ampl += ampl;
+                        if !ampls.is_empty() {
+                            let ampl = ampls[0].1;
+                            bs_ampl += ampl;
+                        }
                     }
                     match component {
-                        GOComponent::Beam => field_bs.ampl_beam += bs_ampl,
-                        GOComponent::ExtDiff => field_bs.ampl_ext += bs_ampl,
-                        GOComponent::Total => field_bs.ampl_total += bs_ampl,
+                        GOComponent::Beam => {
+                            field_bs.ampl_beam += bs_ampl;
+                            field_bs.mueller_beam = field_bs.ampl_beam.to_mueller();
+                        }
+                        GOComponent::ExtDiff => {
+                            field_bs.ampl_ext += bs_ampl;
+                            field_bs.mueller_ext = field_bs.ampl_ext.to_mueller();
+                        }
+                        GOComponent::Total => {
+                            field_bs.ampl_total += bs_ampl;
+                            field_bs.mueller_total = field_bs.ampl_total.to_mueller();
+                        }
                     }
                 }
             }
