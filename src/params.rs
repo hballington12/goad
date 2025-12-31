@@ -31,14 +31,15 @@ impl Serialize for Params {
 #[pyo3::pyclass(eq, eq_int)]
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize)]
 pub enum Param {
-    Asymmetry,           // raw asymmetry parameter g
-    Albedo,              // raw single scattering albedo
-    ScatCross,           // scattering cross section
-    ExtCross,            // extinction cross section
-    BackscatterCross,    // backscatter (differential) cross section
-    LidarRatio,          // extinction / backscatter cross section
-    DepolarizationRatio, // linear depolarization ratio at backscatter
-    BackscatterS11S22,   // S11 + S22 at backscatter (for DepolarizationRatio weighting)
+    Asymmetry,              // raw asymmetry parameter g
+    Albedo,                 // raw single scattering albedo
+    ScatCross,              // scattering cross section
+    ExtCross,               // extinction cross section
+    BackscatterCross,       // backscatter (differential) cross section
+    LidarRatio,             // extinction / backscatter cross section
+    DepolarizationRatio,    // linear depolarization ratio at backscatter
+    BackscatterS11S22,      // S11 + S22 at backscatter (for DepolarizationRatio weighting)
+    ExtCrossOpticalTheorem, // extinction cross section using optical theorem
 }
 
 impl Params {
@@ -160,6 +161,12 @@ impl Params {
             .copied()
     }
 
+    pub fn ext_cross_optical_theorem(&self, component: &GOComponent) -> Option<f32> {
+        self.params
+            .get(&(Param::ExtCrossOpticalTheorem, *component))
+            .copied()
+    }
+
     /// Returns a weighted version of Params for convergence tracking.
     /// - asymmetry becomes asymmetry * scat_cross
     /// - albedo becomes albedo * ext_cross
@@ -236,6 +243,10 @@ impl Params {
             }
             if self.backscatter_s11s22(&component).is_some() {
                 result.set_param(Param::BackscatterS11S22, component, 1.0);
+            }
+            // ExtCrossOpticalTheorem weight is 1.0 (simple average)
+            if self.ext_cross_optical_theorem(&component).is_some() {
+                result.set_param(Param::ExtCrossOpticalTheorem, component, 1.0);
             }
         }
         result
@@ -379,6 +390,22 @@ impl Convergeable for Params {
                 result.set_param(Param::BackscatterS11S22, component, s1);
             } else if let Some(s2) = other.backscatter_s11s22(&component) {
                 result.set_param(Param::BackscatterS11S22, component, s2);
+            }
+
+            // ExtCrossOpticalTheorem: simple weighted average by count
+            if let (Some(e1), Some(e2)) = (
+                self.ext_cross_optical_theorem(&component),
+                other.ext_cross_optical_theorem(&component),
+            ) {
+                result.set_param(
+                    Param::ExtCrossOpticalTheorem,
+                    component,
+                    (e1 * w1 + e2 * w2) / total_weight,
+                );
+            } else if let Some(e1) = self.ext_cross_optical_theorem(&component) {
+                result.set_param(Param::ExtCrossOpticalTheorem, component, e1);
+            } else if let Some(e2) = other.ext_cross_optical_theorem(&component) {
+                result.set_param(Param::ExtCrossOpticalTheorem, component, e2);
             }
         }
 

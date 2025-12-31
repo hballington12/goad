@@ -1,5 +1,4 @@
 use std::f32::consts::PI;
-use std::f32::consts::SQRT_2;
 use std::fmt::Debug;
 use std::ops::Add;
 use std::ops::AddAssign;
@@ -412,7 +411,8 @@ pub struct Results {
     pub field_2d: Vec<ScattResult2D>,
     pub field_1d: Option<Vec<ScattResult1D>>,
     pub field_bs: Option<ScattResult2D>,
-    pub field_fs: Option<Ampl>, // Forward scatter amplitude for optical theorem
+    // pub field_fs: Option<Ampl>, // Forward scatter amplitude for optical theorem
+    pub field_fs: Option<ScattResult2D>,
     pub powers: Powers,
     pub params: Params,
 }
@@ -445,7 +445,7 @@ impl AddAssign for Results {
                 (None, Some(b)) => Some(b),
                 (None, None) => None,
             },
-            field_fs: match (self.field_fs, other.field_fs) {
+            field_fs: match (self.field_fs.clone(), other.field_fs) {
                 (Some(a), Some(b)) => Some(a + b),
                 (Some(a), None) => Some(a),
                 (None, Some(b)) => Some(b),
@@ -487,7 +487,7 @@ impl Mul<f32> for Results {
             None => None,
         };
         let field_bs = self.field_bs.map(|bs| bs * rhs);
-        let field_fs = self.field_fs.map(|fs| fs * Complex::new(rhs, 0.0));
+        let field_fs = self.field_fs.map(|fs| fs * rhs);
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a * rhs).collect(),
             field_1d,
@@ -527,8 +527,8 @@ impl Mul for Results {
             (None, Some(b)) => Some(b),
             (None, None) => None,
         };
-        let field_fs = match (self.field_fs, other.field_fs) {
-            (Some(a), Some(b)) => Some(a.component_mul(&b)),
+        let field_fs = match (self.field_fs.clone(), other.field_fs) {
+            (Some(a), Some(b)) => Some(a * b),
             (Some(a), None) => Some(a),
             (None, Some(b)) => Some(b),
             (None, None) => None,
@@ -649,7 +649,7 @@ impl Div<f32> for Results {
             None => None,
         };
         let field_bs = self.field_bs.map(|bs| bs / rhs);
-        let field_fs = self.field_fs.map(|fs| fs / Complex::new(rhs, 0.0));
+        let field_fs = self.field_fs.map(|fs| fs / rhs);
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a / rhs).collect(),
             field_1d,
@@ -683,8 +683,8 @@ impl Div for Results {
             (None, Some(_)) => None,
             (None, None) => None,
         };
-        let field_fs = match (self.field_fs, other.field_fs) {
-            (Some(a), Some(b)) => Some(a.component_div(&b)),
+        let field_fs = match (self.field_fs.clone(), other.field_fs) {
+            (Some(a), Some(b)) => Some(a / b),
             (Some(a), None) => Some(a),
             (None, Some(_)) => None,
             (None, None) => None,
@@ -737,9 +737,9 @@ impl Convergeable for Results {
 
         // Combine field_fs if both present (simple weighted sum for amplitudes)
         let field_fs = match (&self.field_fs, &other.field_fs) {
-            (Some(a), Some(b)) => Some(a * Complex::new(w1, 0.0) + b * Complex::new(w2, 0.0)),
-            (Some(a), None) => Some(*a),
-            (None, Some(b)) => Some(*b),
+            (Some(a), Some(b)) => Some(a.weighted_add(b, w1, w2)),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(b.clone()),
             (None, None) => None,
         };
 
@@ -959,48 +959,14 @@ impl Results {
             }
         }
 
-        // Optical theorem: ExtCross = (2π/k) * Im[S_11 + S_22] at θ=0°
-        // This is experimental - compare with integrated ExtCross
+        // Optical theorem: ExtCross = (4π/k) * Im[S_2] at θ=0°
         if let Some(ref field_fs) = self.field_fs {
             let k = 2.0 * PI / wavelength;
-            let s2 = field_fs[(0, 0)];
-            let s3 = field_fs[(0, 1)];
-            let s4 = field_fs[(1, 0)];
-            let s1 = field_fs[(1, 1)];
-            let ext_cross_optical = (4.0 * PI / k.powi(2)) * (s2.im); // using imaginary part (diffraction convention is positive i prefactor)
-            if let Some(ext_integrated) = self.params.ext_cross(&GOComponent::Total) {
-                eprintln!(
-                    "Optical theorem ExtCross: {:.6} vs Integrated: {:.6} (ratio: {:.4})",
-                    ext_cross_optical,
-                    ext_integrated,
-                    ext_cross_optical / ext_integrated
-                );
-            }
-            // Print phase of amplitude elements
-            eprintln!(
-                "Forward scatter s2: {:+.4} {:+.4}i (phase: {:.2}°)",
-                s2.re,
-                s2.im,
-                s2.arg().to_degrees()
-            );
-            eprintln!(
-                "Forward scatter s1: {:+.4} {:+.4}i (phase: {:.2}°)",
-                s1.re,
-                s1.im,
-                s1.arg().to_degrees()
-            );
-            eprintln!(
-                "Forward scatter s3: {:+.4} {:+.4}i (phase: {:.2}°)",
-                s3.re,
-                s3.im,
-                s3.arg().to_degrees()
-            );
-            eprintln!(
-                "Forward scatter s4: {:+.4} {:+.4}i (phase: {:.2}°)",
-                s4.re,
-                s4.im,
-                s4.arg().to_degrees()
-            );
+            let s2 = field_fs.ampl_total[(0, 0)];
+            // let s1 = field_fs[(1, 1)]; // can also use s1 here since e perp and e par are indistinguishable in the direct forwards
+            let ext_cross = s2.im * 4.0 * PI / k.powi(2); // using imaginary part (diffraction convention is positive i prefactor)
+            self.params
+                .set_param(Param::ExtCrossOpticalTheorem, GOComponent::Total, ext_cross);
         }
     }
 
@@ -1032,8 +998,7 @@ impl Results {
             .as_ref()
             .map(|f| f.iter().map(|x| x.ones_like()).collect());
         result.field_bs = self.field_bs.as_ref().map(|f| f.ones_like());
-        // field_fs: weight is 1.0 (identity for amplitude)
-        result.field_fs = self.field_fs.map(|_| Ampl::identity());
+        result.field_fs = self.field_fs.as_ref().map(|f| f.ones_like());
         result
     }
 

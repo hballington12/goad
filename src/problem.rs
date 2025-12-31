@@ -280,6 +280,16 @@ impl Problem {
                 result.mueller_total = result.mueller_beam + result.mueller_ext;
             }
         }
+        if self.settings.coherence {
+            if let Some(ref mut field_bs) = self.result.field_bs {
+                field_bs.ampl_total = field_bs.ampl_beam + field_bs.ampl_ext;
+                field_bs.mueller_total = field_bs.ampl_total.to_mueller();
+            }
+        }
+        if let Some(ref mut field_fs) = self.result.field_fs {
+            field_fs.ampl_total = field_fs.ampl_beam + field_fs.ampl_ext;
+            field_fs.mueller_total = field_fs.ampl_total.to_mueller();
+        }
     }
 
     fn ampl_to_mueller(&mut self, component: GOComponent) {
@@ -335,6 +345,24 @@ impl Problem {
             }
         };
 
+        // Forward scatter (always coherent because of the optical theorem)
+        if mapping == Mapping::ApertureDiffraction {
+            if let Some(ref mut field_fs) = self.result.field_fs {
+                let mut fs_ampl = Ampl::zeros();
+                for beam in queue.iter() {
+                    let ampls = beam.diffract(&[field_fs.bin], fov_factor);
+                    let ampl = ampls[0].1;
+                    fs_ampl += ampl;
+                }
+                match component {
+                    GOComponent::Beam => field_fs.ampl_beam += fs_ampl,
+                    GOComponent::ExtDiff => field_fs.ampl_ext += fs_ampl,
+                    GOComponent::Total => field_fs.ampl_total += fs_ampl,
+                }
+            }
+        }
+
+        // Mapping helper closure
         let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
                 Mapping::GeometricOptics => {
@@ -344,8 +372,9 @@ impl Problem {
             }
         };
 
-        // // coherence:
+        // coherence:
         if self.settings.coherence {
+            // main query points
             let zero_ampls: Vec<(usize, Ampl)> = self
                 .result
                 .field_2d
@@ -370,67 +399,28 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
-            // Backscatter: accumulate coherently (as Ampl), only for diffraction
-            // Compute before mutable borrow of self
-            let bs_mueller = if mapping == Mapping::ApertureDiffraction {
-                if let Some(ref field_bs) = self.result.field_bs {
-                    let bs_bin = field_bs.bin;
-                    let bs_bins = [bs_bin];
+            // Backscatter
+            if mapping == Mapping::ApertureDiffraction {
+                if let Some(ref mut field_bs) = self.result.field_bs {
                     let mut bs_ampl = Ampl::zeros();
                     for beam in queue.iter() {
-                        let ampls = beam.diffract(&bs_bins, fov_factor);
-                        if !ampls.is_empty() {
-                            bs_ampl += ampls[0].1;
-                        }
-                    }
-                    Some(bs_ampl.to_mueller())
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            // Forward scatter: only for ExtDiff component (optical theorem)
-            // We only want external diffraction, not the geometric optics beam component
-            let fs_ampl = if mapping == Mapping::ApertureDiffraction {
-                let fs_bin = SolidAngleBin::new(AngleBin::new(0.1, 0.1), AngleBin::new(0.0, 0.0));
-                let fs_bins = [fs_bin];
-                let mut fs_ampl = Ampl::zeros();
-                for (i, beam) in queue.iter().enumerate() {
-                    let ampls = beam.diffract(&fs_bins, fov_factor);
-                    if !ampls.is_empty() {
+                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
                         let ampl = ampls[0].1;
-                        fs_ampl += ampl;
+                        bs_ampl += ampl;
+                    }
+                    match component {
+                        GOComponent::Beam => field_bs.ampl_beam += bs_ampl,
+                        GOComponent::ExtDiff => field_bs.ampl_ext += bs_ampl,
+                        GOComponent::Total => field_bs.ampl_total += bs_ampl,
                     }
                 }
-                Some(fs_ampl)
-            } else {
-                None
-            };
+            }
 
             self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
-
-            // Apply backscatter result
-            if let Some(mueller) = bs_mueller {
-                if let Some(ref mut field_bs) = self.result.field_bs {
-                    match component {
-                        GOComponent::Beam => field_bs.mueller_beam = mueller,
-                        GOComponent::ExtDiff => field_bs.mueller_ext = mueller,
-                        GOComponent::Total => {}
-                    }
-                }
-            }
-
-            // Apply forward scatter result (accumulate amplitudes)
-            if let Some(ampl) = fs_ampl {
-                if let Some(ref mut field_fs) = self.result.field_fs {
-                    *field_fs += ampl;
-                }
-            }
         } else {
             // no coherence
+            // main query points
             let zero_muellers: Vec<(usize, Mueller)> = self
                 .result
                 .field_2d
@@ -459,90 +449,34 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
-            // Backscatter: accumulate incoherently (as Mueller), only for diffraction
-            // Compute before mutable borrow of self
-            let bs_mueller = if mapping == Mapping::ApertureDiffraction {
-                if let Some(ref field_bs) = self.result.field_bs {
-                    let bs_bin = field_bs.bin;
-                    let bs_bins = [bs_bin];
+            // Backscatter
+            if mapping == Mapping::ApertureDiffraction {
+                if let Some(ref mut field_bs) = self.result.field_bs {
                     let mut bs_mueller = Mueller::zeros();
                     for beam in queue.iter() {
-                        let ampls = beam.diffract(&bs_bins, fov_factor);
-                        if !ampls.is_empty() {
-                            bs_mueller += ampls[0].1.to_mueller();
-                        }
+                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
+                        let ampl = ampls[0].1;
+                        bs_mueller += ampl.to_mueller();
                     }
-                    Some(bs_mueller)
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            // Forward scatter: only for ExtDiff component (optical theorem)
-            // We only want external diffraction, not the geometric optics beam component
-            let fs_ampl = if mapping == Mapping::ApertureDiffraction
-                && component == GOComponent::ExtDiff
-            {
-                let fs_bin = SolidAngleBin::new(AngleBin::new(0.1, 0.1), AngleBin::new(0.0, 0.0));
-                let fs_bins = [fs_bin];
-                let mut fs_ampl = Ampl::zeros();
-                for beam in queue.iter() {
-                    // Debug hook
-                    // debug prints here
-                    let ampls = beam.diffract(&fs_bins, fov_factor);
-                    if !ampls.is_empty() {
-                        fs_ampl += ampls[0].1;
+                    match component {
+                        GOComponent::Beam => field_bs.mueller_beam += bs_mueller,
+                        GOComponent::ExtDiff => field_bs.mueller_ext += bs_mueller,
+                        GOComponent::Total => field_bs.mueller_total += bs_mueller,
                     }
                 }
-                Some(fs_ampl)
-            } else {
-                None
-            };
+            }
 
             self.assign_muellers(component, muellers);
-
-            // Apply backscatter result
-            if let Some(mueller) = bs_mueller {
-                if let Some(ref mut field_bs) = self.result.field_bs {
-                    match component {
-                        GOComponent::Beam => field_bs.mueller_beam = mueller,
-                        GOComponent::ExtDiff => field_bs.mueller_ext = mueller,
-                        GOComponent::Total => {}
-                    }
-                }
-            }
-
-            // Apply forward scatter result (accumulate amplitudes)
-            if let Some(ampl) = fs_ampl {
-                if let Some(ref mut field_fs) = self.result.field_fs {
-                    *field_fs += ampl;
-                }
-            }
         }
-        // subtract incident field contribution to forward scattering
-        // if component == GOComponent::Beam {
-        //     if let Some(ref mut field_fs) = self.result.field_fs {
-        //         let wavenumber = 2.0 * PI / self.settings.wavelength;
-        //         let fwd_correction = Ampl::identity()
-        //             * Complex::new(
-        //                 0.0,
-        //                 wavenumber.powi(2) * self.result.powers.input / (2.0 * PI),
-        //             );
-        //         *field_fs += fwd_correction;
-        //     }
-        // }
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
     pub fn solve_far(&mut self) {
         // Initialize field_bs with backscatter bin
         let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
+        let fs_bin = SolidAngleBin::new(AngleBin::new(0.01, 0.01), AngleBin::new(0.0, 0.0));
         self.result.field_bs = Some(ScattResult2D::new(bs_bin));
-
-        // Initialize field_fs for forward scatter (optical theorem)
-        self.result.field_fs = Some(Ampl::zeros());
+        self.result.field_fs = Some(ScattResult2D::new(fs_bin));
 
         self.solve_far_queue(GOComponent::ExtDiff);
         self.solve_far_queue(GOComponent::Beam);

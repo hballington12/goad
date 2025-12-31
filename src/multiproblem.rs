@@ -242,6 +242,17 @@ impl MultiProblem {
             _ => {}
         }
 
+        // Add forwards scatter field if present
+        match (&mut acc.field_fs, item.field_fs) {
+            (Some(a), Some(i)) => {
+                a.mueller_total += i.mueller_total;
+                a.mueller_beam += i.mueller_beam;
+                a.mueller_ext += i.mueller_ext;
+            }
+            (None, Some(i)) => acc.field_fs = Some(i),
+            _ => {}
+        }
+
         acc
     }
 
@@ -272,6 +283,17 @@ impl MultiProblem {
             field_bs.mueller_total /= num_orientations;
             field_bs.mueller_beam /= num_orientations;
             field_bs.mueller_ext /= num_orientations;
+        }
+
+        // Normalize forward scatter field if present
+        if let Some(ref mut field_fs) = self.result.field_fs {
+            let div_c = Complex::from(num_orientations);
+            field_fs.ampl_total /= div_c;
+            field_fs.ampl_beam /= div_c;
+            field_fs.ampl_ext /= div_c;
+            field_fs.mueller_total /= num_orientations;
+            field_fs.mueller_beam /= num_orientations;
+            field_fs.mueller_ext /= num_orientations;
         }
     }
 

@@ -316,6 +316,9 @@ fn is_converged_check(
             Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
             Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
             Param::BackscatterS11S22 => mean.params.backscatter_s11s22(&GOComponent::Total),
+            Param::ExtCrossOpticalTheorem => {
+                mean.params.ext_cross_optical_theorem(&GOComponent::Total)
+            }
         };
         let sem_val = match t.param {
             Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
@@ -326,6 +329,9 @@ fn is_converged_check(
             Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
             Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
             Param::BackscatterS11S22 => sem.params.backscatter_s11s22(&GOComponent::Total),
+            Param::ExtCrossOpticalTheorem => {
+                sem.params.ext_cross_optical_theorem(&GOComponent::Total)
+            }
         };
 
         match (mean_val, sem_val) {
@@ -440,6 +446,9 @@ impl Convergence {
                 Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
                 Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
                 Param::BackscatterS11S22 => mean.params.backscatter_s11s22(&GOComponent::Total),
+                Param::ExtCrossOpticalTheorem => {
+                    mean.params.ext_cross_optical_theorem(&GOComponent::Total)
+                }
             };
             let sem_val = match t.param {
                 Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
@@ -450,6 +459,9 @@ impl Convergence {
                 Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
                 Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
                 Param::BackscatterS11S22 => sem.params.backscatter_s11s22(&GOComponent::Total),
+                Param::ExtCrossOpticalTheorem => {
+                    sem.params.ext_cross_optical_theorem(&GOComponent::Total)
+                }
             };
 
             match (mean_val, sem_val) {
@@ -613,6 +625,9 @@ impl Convergence {
                                     Param::BackscatterS11S22 => {
                                         mean.params.backscatter_s11s22(&GOComponent::Total)
                                     }
+                                    Param::ExtCrossOpticalTheorem => {
+                                        mean.params.ext_cross_optical_theorem(&GOComponent::Total)
+                                    }
                                 };
                                 let sem_val = match target.param {
                                     Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
@@ -630,6 +645,9 @@ impl Convergence {
                                     }
                                     Param::BackscatterS11S22 => {
                                         sem.params.backscatter_s11s22(&GOComponent::Total)
+                                    }
+                                    Param::ExtCrossOpticalTheorem => {
+                                        sem.params.ext_cross_optical_theorem(&GOComponent::Total)
                                     }
                                 };
 
