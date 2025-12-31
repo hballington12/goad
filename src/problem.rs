@@ -280,10 +280,12 @@ impl Problem {
                 result.mueller_total = result.mueller_beam + result.mueller_ext;
             }
         }
-        if self.settings.coherence {
-            if let Some(ref mut field_bs) = self.result.field_bs {
+        if let Some(ref mut field_bs) = self.result.field_bs {
+            if self.settings.coherence {
                 field_bs.ampl_total = field_bs.ampl_beam + field_bs.ampl_ext;
                 field_bs.mueller_total = field_bs.ampl_total.to_mueller();
+            } else {
+                field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
             }
         }
         if let Some(ref mut field_fs) = self.result.field_fs {
@@ -481,11 +483,6 @@ impl Problem {
         self.solve_far_queue(GOComponent::ExtDiff);
         self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
-
-        // Combine backscatter components
-        if let Some(ref mut field_bs) = self.result.field_bs {
-            field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
-        }
     }
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self) {
