@@ -1,0 +1,19 @@
+{
+  "ScatCross_Total": 175.40498,
+  "ScatCross_ExtDiff": 123.55081,
+  "BackscatterCross_Beam": 1109.8882,
+  "ExtCrossOpticalTheorem_Total": 168.88783,
+  "Asymmetry_ExtDiff": 0.9934545,
+  "BackscatterCross_ExtDiff": 1.8362622e-14,
+  "Albedo_Total": 1.0,
+  "DepolarizationRatio_Beam": 0.18845631,
+  "ScatCross_Beam": 101.80984,
+  "BackscatterS11S22_Beam": 20732.543,
+  "Asymmetry_Beam": 0.5713037,
+  "BackscatterS11S22_Total": 20732.543,
+  "BackscatterCross_Total": 1109.8882,
+  "LidarRatio_Total": 0.15803842,
+  "ExtCross_Total": 175.40498,
+  "Asymmetry_Total": 0.7463232,
+  "DepolarizationRatio_Total": 0.18845631
+}

@@ -335,42 +335,75 @@ impl Problem {
         }
     }
 
-    pub fn solve_far_queue(&mut self, component: GOComponent) {
-        let (queue, mapping, fov_factor) = match component {
-            GOComponent::Beam => (
-                &self.out_beam_queue,
-                self.settings.mapping,
-                self.settings.fov_factor,
-            ),
-            GOComponent::ExtDiff => (
-                &self.ext_diff_beam_queue,
-                Mapping::ApertureDiffraction,
-                None,
-            ),
-            GOComponent::Total => {
-                panic!("No such beam queue exists for GOComponent: {:?}", component)
+    /// Forward scatter - always coherent (optical theorem), aperture diffraction only
+    fn solve_far_fs(&mut self, component: GOComponent, queue: &[Beam], fov_factor: Option<f32>) {
+        if let Some(ref mut field_fs) = self.result.field_fs {
+            let mut fs_ampl = Ampl::zeros();
+            for beam in queue.iter() {
+                let ampls = beam.diffract(&[field_fs.bin], fov_factor);
+                if !ampls.is_empty() {
+                    let ampl = ampls[0].1;
+                    fs_ampl += ampl;
+                }
             }
-        };
+            match component {
+                GOComponent::Beam => field_fs.ampl_beam += fs_ampl,
+                GOComponent::ExtDiff => field_fs.ampl_ext += fs_ampl,
+                GOComponent::Total => field_fs.ampl_total += fs_ampl,
+            }
+        }
+    }
 
-        // Forward scatter (always coherent because of the optical theorem)
-        if mapping == Mapping::ApertureDiffraction {
-            if let Some(ref mut field_fs) = self.result.field_fs {
-                let mut fs_ampl = Ampl::zeros();
+    /// Backscatter - respects coherence setting, aperture diffraction only
+    fn solve_far_bs(&mut self, component: GOComponent, queue: &[Beam], fov_factor: Option<f32>) {
+        if let Some(ref mut field_bs) = self.result.field_bs {
+            if self.settings.coherence {
+                let mut bs_ampl = Ampl::zeros();
                 for beam in queue.iter() {
-                    let ampls = beam.diffract(&[field_fs.bin], fov_factor);
+                    let ampls = beam.diffract(&[field_bs.bin], fov_factor);
                     if !ampls.is_empty() {
                         let ampl = ampls[0].1;
-                        fs_ampl += ampl;
+                        bs_ampl += ampl;
                     }
                 }
                 match component {
-                    GOComponent::Beam => field_fs.ampl_beam += fs_ampl,
-                    GOComponent::ExtDiff => field_fs.ampl_ext += fs_ampl,
-                    GOComponent::Total => field_fs.ampl_total += fs_ampl,
+                    GOComponent::Beam => {
+                        field_bs.ampl_beam += bs_ampl;
+                        field_bs.mueller_beam = field_bs.ampl_beam.to_mueller();
+                    }
+                    GOComponent::ExtDiff => {
+                        field_bs.ampl_ext += bs_ampl;
+                        field_bs.mueller_ext = field_bs.ampl_ext.to_mueller();
+                    }
+                    GOComponent::Total => {
+                        field_bs.ampl_total += bs_ampl;
+                        field_bs.mueller_total = field_bs.ampl_total.to_mueller();
+                    }
+                }
+            } else {
+                let mut bs_mueller = Mueller::zeros();
+                for beam in queue.iter() {
+                    let ampls = beam.diffract(&[field_bs.bin], fov_factor);
+                    let ampl = ampls[0].1;
+                    bs_mueller += ampl.to_mueller();
+                }
+                match component {
+                    GOComponent::Beam => field_bs.mueller_beam += bs_mueller,
+                    GOComponent::ExtDiff => field_bs.mueller_ext += bs_mueller,
+                    GOComponent::Total => field_bs.mueller_total += bs_mueller,
                 }
             }
         }
+    }
 
+    /// Main bins - respects coherence setting, supports both mapping types
+    fn solve_far_main(
+        &mut self,
+        component: GOComponent,
+        queue: &[Beam],
+        mapping: Mapping,
+        fov_factor: Option<f32>,
+    ) {
         // Mapping helper closure
         let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
@@ -383,9 +416,7 @@ impl Problem {
             }
         };
 
-        // coherence:
         if self.settings.coherence {
-            // main query points
             let zero_ampls: Vec<(usize, Ampl)> = self
                 .result
                 .field_2d
@@ -410,39 +441,9 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
-            // Backscatter
-            if mapping == Mapping::ApertureDiffraction {
-                if let Some(ref mut field_bs) = self.result.field_bs {
-                    let mut bs_ampl = Ampl::zeros();
-                    for beam in queue.iter() {
-                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
-                        if !ampls.is_empty() {
-                            let ampl = ampls[0].1;
-                            bs_ampl += ampl;
-                        }
-                    }
-                    match component {
-                        GOComponent::Beam => {
-                            field_bs.ampl_beam += bs_ampl;
-                            field_bs.mueller_beam = field_bs.ampl_beam.to_mueller();
-                        }
-                        GOComponent::ExtDiff => {
-                            field_bs.ampl_ext += bs_ampl;
-                            field_bs.mueller_ext = field_bs.ampl_ext.to_mueller();
-                        }
-                        GOComponent::Total => {
-                            field_bs.ampl_total += bs_ampl;
-                            field_bs.mueller_total = field_bs.ampl_total.to_mueller();
-                        }
-                    }
-                }
-            }
-
             self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
         } else {
-            // no coherence
-            // main query points
             let zero_muellers: Vec<(usize, Mueller)> = self
                 .result
                 .field_2d
@@ -471,24 +472,41 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
-            // Backscatter
-            if mapping == Mapping::ApertureDiffraction {
-                if let Some(ref mut field_bs) = self.result.field_bs {
-                    let mut bs_mueller = Mueller::zeros();
-                    for beam in queue.iter() {
-                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
-                        let ampl = ampls[0].1;
-                        bs_mueller += ampl.to_mueller();
-                    }
-                    match component {
-                        GOComponent::Beam => field_bs.mueller_beam += bs_mueller,
-                        GOComponent::ExtDiff => field_bs.mueller_ext += bs_mueller,
-                        GOComponent::Total => field_bs.mueller_total += bs_mueller,
-                    }
-                }
-            }
-
             self.assign_muellers(component, muellers);
+        }
+    }
+
+    pub fn solve_far_queue(&mut self, component: GOComponent) {
+        let (queue, mapping, fov_factor) = match component {
+            GOComponent::Beam => (
+                &self.out_beam_queue,
+                self.settings.mapping,
+                self.settings.fov_factor,
+            ),
+            GOComponent::ExtDiff => (
+                &self.ext_diff_beam_queue,
+                Mapping::ApertureDiffraction,
+                None,
+            ),
+            GOComponent::Total => {
+                panic!("No such beam queue exists for GOComponent: {:?}", component)
+            }
+        };
+
+        // Clone the queue to avoid borrow issues
+        let queue_clone: Vec<Beam> = queue.clone();
+
+        // Forward scatter (always coherent, aperture diffraction only)
+        if mapping == Mapping::ApertureDiffraction {
+            self.solve_far_fs(component, &queue_clone, fov_factor);
+        }
+
+        // Main bins
+        self.solve_far_main(component, &queue_clone, mapping, fov_factor);
+
+        // Backscatter (aperture diffraction only)
+        if mapping == Mapping::ApertureDiffraction {
+            self.solve_far_bs(component, &queue_clone, fov_factor);
         }
     }
 
