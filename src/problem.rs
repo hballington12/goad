@@ -496,18 +496,9 @@ impl Problem {
         // Clone the queue to avoid borrow issues
         let queue_clone: Vec<Beam> = queue.clone();
 
-        // Forward scatter (always coherent, aperture diffraction only)
-        if mapping == Mapping::ApertureDiffraction {
-            self.solve_far_fs(component, &queue_clone, fov_factor);
-        }
-
-        // Main bins
+        self.solve_far_fs(component, &queue_clone, fov_factor);
         self.solve_far_main(component, &queue_clone, mapping, fov_factor);
-
-        // Backscatter (aperture diffraction only)
-        if mapping == Mapping::ApertureDiffraction {
-            self.solve_far_bs(component, &queue_clone, fov_factor);
-        }
+        self.solve_far_bs(component, &queue_clone, fov_factor);
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
