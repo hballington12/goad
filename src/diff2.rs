@@ -1,8 +1,7 @@
 //! Reimplemented near-to-far field aperture diffraction.
 
 use anyhow::Result;
-use nalgebra::{Complex, Matrix3, Matrix4, Point3, Vector2, Vector3};
-use num_complex::ComplexFloat;
+use nalgebra::{Complex, Matrix3, Matrix4, Point3, Vector3};
 
 use crate::beam::Beam;
 use crate::bins::SolidAngleBin;
@@ -67,31 +66,6 @@ fn assert_face_simple(face: &Face) {
     }
 }
 
-/// Panic if the vertex ordering is not clockwise as viewed along the propagation direction.
-#[cfg(debug_assertions)]
-fn assert_clockwise_winding(verts: &[Point3<f32>], prop: Vector3<f32>) {
-    if verts.len() < 3 {
-        return;
-    }
-
-    // Compute face normal from vertex ordering (cross product of first two edges)
-    let v0: Vector3<f32> = verts[1] - verts[0];
-    let v1: Vector3<f32> = verts[2] - verts[0];
-    let normal = v0.cross(&v1);
-
-    // For clockwise winding as viewed along prop, normal should point opposite to prop
-    // i.e., normal · prop < 0
-    let dot = normal.dot(&prop);
-    if dot >= 0.0 {
-        panic!(
-            "Vertex ordering is not clockwise as viewed along propagation direction (normal · prop = {})",
-            dot
-        );
-    } else {
-        println!("Vertex ordering is clockwise as viewed along propagation direction (normal · prop = {})", dot);
-    }
-}
-
 /// Panic if e_perp is not perpendicular to prop.
 #[cfg(debug_assertions)]
 fn assert_e_perp_perpendicular_to_prop(e_perp: Vector3<f32>, prop: Vector3<f32>) {
@@ -144,18 +118,6 @@ fn rotation_e_perp_to_y(beam: &Beam) -> Matrix4<f32> {
     rot3.to_homogeneous()
 }
 
-/// Build a 3x3 rotation matrix that rotates around z-axis based on prop.
-/// This matches the original diff.rs calculate_rotation_matrix function.
-/// Takes prop after it has been rotated into the xy-plane system.
-fn rotation_prop_to_xz_plane(prop: Vector3<f32>) -> Matrix3<f32> {
-    let angle = -prop.y.atan2(prop.x);
-    let (sin_angle, cos_angle) = angle.sin_cos();
-
-    Matrix3::new(
-        cos_angle, -sin_angle, 0.0, sin_angle, cos_angle, 0.0, 0.0, 0.0, 1.0,
-    )
-}
-
 /// Build a 4x4 rotation matrix that rotates the aperture into the xy plane.
 /// Takes the centered beam (face already at origin).
 fn rotation_to_xy_plane(beam: &Beam) -> Matrix4<f32> {
@@ -188,8 +150,6 @@ struct EdgeData {
     y: Vec<f32>,     // y coordinates of vertices
     dx: Vec<f32>,    // delta x for each edge
     dy: Vec<f32>,    // delta y for each edge
-    m: Vec<f32>,     // slope dy/dx
-    n: Vec<f32>,     // inverse slope dx/dy
     m_adj: Vec<f32>, // adjusted slope (clamped for numerical stability)
     n_adj: Vec<f32>, // adjusted inverse slope
 }
@@ -263,8 +223,6 @@ impl EdgeData {
             y,
             dx: dx_vec,
             dy: dy_vec,
-            m,
-            n,
             m_adj,
             n_adj,
         }
