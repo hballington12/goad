@@ -851,9 +851,15 @@ impl Results {
             Scheme::Simple { .. } | Scheme::Interval { .. } => {}
         }
 
-        // Step 2: Group by theta using chunk_by (leveraging sorted property)
-        let theta_groups: Vec<Vec<&ScattResult2D>> = self
-            .field_2d
+        // Step 2: Get field_2d - prefer zones, fall back to legacy
+        let field_2d: &[ScattResult2D] = self
+            .zones
+            .full_zone()
+            .map(|z| z.field_2d.as_slice())
+            .unwrap_or(&self.field_2d);
+
+        // Step 3: Group by theta using chunk_by (leveraging sorted property)
+        let theta_groups: Vec<Vec<&ScattResult2D>> = field_2d
             .iter()
             .chunk_by(|result| result.bin.theta)
             .into_iter()
