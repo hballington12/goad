@@ -804,7 +804,12 @@ impl Convergeable for Results {
 impl Results {
     /// Returns an owned vector of solid angle bins
     pub fn bins(&self) -> Vec<SolidAngleBin> {
-        self.field_2d.iter().map(|a| a.bin.clone()).collect()
+        // Prefer zones if available, fall back to legacy field_2d
+        if let Some(full_zone) = self.zones.full_zone() {
+            full_zone.bins.clone()
+        } else {
+            self.field_2d.iter().map(|a| a.bin.clone()).collect()
+        }
     }
 
     /// Writes some stuff to a file
