@@ -1,4 +1,9 @@
+mod convergeable;
 mod progress;
+mod python;
+
+pub use convergeable::{Convergeable, ConvergenceTracker};
+use log::{error, info};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -14,135 +19,15 @@ use crate::{
     multiproblem::{init_result, load_and_init_geoms, load_settings_or_default},
     orientation::{Euler, OrientationSampler},
     params::Param,
-    problem::{init_geom, Problem},
+    problem::Problem,
     result::{GOComponent, Results},
     settings::Settings,
 };
 use progress::ConvergenceProgress;
-use pyo3::prelude::*;
+use pyo3::pyclass;
 use rand::{Rng, SeedableRng};
 
 const MAX_CONVERGENCE_ORIENTATIONS: usize = 100_000;
-
-/// Trait for types that can be tracked for convergence.
-/// Provides operations needed for online mean/variance computation.
-pub trait Convergeable: Clone + Sized {
-    /// Create a zero/empty version with the same structure
-    fn zero_like(&self) -> Self;
-
-    /// Weighted addition: combines self (with weight w1) and other (with weight w2).
-    /// For simple quantities: (self * w1 + other * w2) / (w1 + w2)
-    /// For derived quantities like asymmetry: uses appropriate weighting (e.g., by ScatCross)
-    fn weighted_add(&self, other: &Self, self_weight: f32, other_weight: f32) -> Self;
-
-    /// Element-wise multiplication (for computing x²)
-    fn mul_elem(&self, other: &Self) -> Self;
-
-    /// Element-wise division
-    fn div_elem(&self, other: &Self) -> Self;
-
-    /// Element-wise addition
-    fn add_elem(&self, other: &Self) -> Self;
-
-    /// Element-wise subtraction
-    fn sub_elem(&self, other: &Self) -> Self;
-
-    /// Scale by a scalar
-    fn scale(&self, scalar: f32) -> Self;
-
-    /// Element-wise square root (for SEM computation)
-    fn sqrt_elem(&self) -> Self;
-
-    /// Returns a pre-weighted version for convergence tracking.
-    /// e.g., asymmetry becomes asymmetry * scat_cross
-    fn to_weighted(&self) -> Self;
-
-    /// Returns the weights for each field.
-    /// e.g., asymmetry weight is scat_cross, powers weight is 1.0
-    fn weights(&self) -> Self;
-}
-
-/// Tracks running statistics for convergence using Welford's online algorithm.
-/// Matches the Python implementation in goad/convergence/convergable.py exactly.
-/// Computes mean and standard error of the mean (SEM) incrementally.
-#[derive(Debug)]
-pub struct ConvergenceTracker<T: Convergeable> {
-    i: usize, // iteration counter
-    m: T,     // running weighted sum (stores value*weight accumulated via Welford)
-    s: T,     // sum of squared deltas (for variance)
-    w: T,     // running mean weight
-}
-
-impl<T: Convergeable> ConvergenceTracker<T> {
-    /// Create a new tracker using a template for structure
-    pub fn new(template: &T) -> Self {
-        Self {
-            i: 0,
-            m: template.zero_like(),
-            s: template.zero_like(),
-            w: template.zero_like(),
-        }
-    }
-
-    /// Update with a new result.
-    /// Internally computes weighted value and weight via to_weighted()/weights(),
-    /// then applies Welford's algorithm matching Python exactly.
-    pub fn update(&mut self, result: &T) {
-        self.i += 1;
-
-        // Get pre-weighted value and weights from result
-        let value = result.to_weighted();
-        let weight = result.weights();
-
-        if self.i == 1 {
-            self.m = value;
-            self.w = weight;
-            // s stays zero
-        } else {
-            // delta = value - m_old
-            let delta = value.sub_elem(&self.m);
-
-            // m = m_old + delta / i
-            self.m = self.m.add_elem(&delta.scale(1.0 / self.i as f32));
-
-            // s = s + delta^2 * (i-1)/i
-            let delta_sq = delta.mul_elem(&delta);
-            let factor = (self.i - 1) as f32 / self.i as f32;
-            self.s = self.s.add_elem(&delta_sq.scale(factor));
-
-            // w = w_old + (weight - w_old) / i
-            let dw = weight.sub_elem(&self.w);
-            self.w = self.w.add_elem(&dw.scale(1.0 / self.i as f32));
-        }
-    }
-
-    /// Get the current count
-    pub fn count(&self) -> usize {
-        self.i
-    }
-
-    /// Get the running mean: m / w
-    pub fn mean(&self) -> T {
-        if self.i == 0 {
-            return self.m.zero_like();
-        }
-        self.m.div_elem(&self.w)
-    }
-
-    /// Get the standard error of the mean: sqrt(s / (i-1)^2 / w^2)
-    pub fn sem(&self) -> T {
-        if self.i < 2 {
-            return self.m.zero_like();
-        }
-        // SEM = sqrt(s / (i-1)^2 / w^2)
-        let n_minus_1 = (self.i - 1) as f32;
-        let w_sq = self.w.mul_elem(&self.w);
-        self.s
-            .scale(1.0 / (n_minus_1 * n_minus_1))
-            .div_elem(&w_sq)
-            .sqrt_elem()
-    }
-}
 
 /// A convergence target for a specific parameter.
 #[derive(Clone, Debug)]
@@ -447,10 +332,10 @@ impl Convergence {
 
         // Print final status
         if self.is_converged() {
-            println!("Converged after {} orientations", self.tracker.count());
+            info!("Converged after {} orientations", self.tracker.count());
         } else {
-            println!(
-                "Completed {} orientations (max reached or interrupted)",
+            info!(
+                "Did not converge after {} orientations (max reached or interrupted)",
                 self.tracker.count()
             );
         }
@@ -474,7 +359,7 @@ impl Convergence {
 
                     // Run the simulation
                     if let Err(err) = problem.run(Some(&task.euler)) {
-                        eprintln!("Error running problem (will skip this iteration): {}", err);
+                        error!("Error running problem (will skip this iteration): {}", err);
                     }
 
                     // Send result back to master (ignore send errors on shutdown)
@@ -526,121 +411,5 @@ impl Convergence {
             sem_val,
             target.relative_error,
         );
-    }
-}
-
-#[pymethods]
-impl Convergence {
-    #[new]
-    #[pyo3(signature = (settings, geoms = None))]
-    fn py_new(settings: Settings, geoms: Option<Vec<Geom>>) -> PyResult<Self> {
-        let mut geoms = match geoms {
-            Some(g) => g,
-            None => Geom::load(&settings.geom_name).map_err(|e| {
-                pyo3::exceptions::PyValueError::new_err(format!(
-                    "Failed to load geometry file '{}': {}\n\
-                    Hint: This may be caused by degenerate faces (zero cross product), \
-                    faces that are too small, or non-planar geometry. \
-                    Please check and fix the geometry file.",
-                    settings.geom_name, e
-                ))
-            })?,
-        };
-
-        for geom in geoms.iter_mut() {
-            init_geom(&settings, geom);
-        }
-
-        let bins = &settings.binning.scheme.generate();
-        let template = Results::new_empty(bins);
-
-        // Convergence always uses uniform random sampling (infinite supply)
-        let sampler = OrientationSampler::uniform(settings.seed);
-
-        let rng = if let Some(seed) = settings.seed {
-            rand::rngs::StdRng::seed_from_u64(seed)
-        } else {
-            rand::rngs::StdRng::from_rng(&mut rand::rng())
-        };
-
-        Ok(Self {
-            geoms,
-            settings,
-            max_orientations: MAX_CONVERGENCE_ORIENTATIONS,
-            targets: Vec::new(),
-            tracker: ConvergenceTracker::new(&template),
-            sampler,
-            rng,
-        })
-    }
-
-    /// Solve the multi-orientation scattering problem using work-stealing.
-    /// Periodically checks for Python signals (Ctrl-C) and interrupts if needed.
-    #[pyo3(name = "solve")]
-    pub fn py_solve(&mut self, py: Python) -> PyResult<()> {
-        self.solve_with_interrupt(|| py.check_signals().is_err())
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
-    }
-
-    /// Access the current mean results (live during solve).
-    #[getter]
-    pub fn get_mean(&self) -> Results {
-        self.tracker.mean()
-    }
-
-    /// Access the current standard error of the mean (live during solve).
-    #[getter]
-    pub fn get_sem(&self) -> Results {
-        self.tracker.sem()
-    }
-
-    /// Get the max orientations (safety cap).
-    #[getter]
-    pub fn get_count(&self) -> usize {
-        self.tracker.count()
-    }
-
-    #[getter]
-    pub fn get_max_orientations(&self) -> usize {
-        self.max_orientations
-    }
-
-    /// Set the max orientations (safety cap).
-    #[setter]
-    pub fn set_max_orientations(&mut self, max_orientations: usize) {
-        self.max_orientations = max_orientations;
-    }
-
-    /// Add a convergence target for a parameter (Python API).
-    /// Solver terminates when ALL targets are satisfied.
-    #[pyo3(name = "add_target")]
-    pub fn py_add_target(&mut self, param: Param, relative_error: f32) {
-        self.add_target(param, relative_error);
-    }
-
-    /// Clear all convergence targets (Python API).
-    #[pyo3(name = "clear_targets")]
-    pub fn py_clear_targets(&mut self) {
-        self.clear_targets();
-    }
-
-    /// Reset the solver to initial state.
-    pub fn py_reset(&mut self) -> PyResult<()> {
-        self.reset();
-        Ok(())
-    }
-
-    /// Reset the orientation sampler (for reproducibility).
-    pub fn py_reset_sampler(&mut self) -> PyResult<()> {
-        self.reset_sampler();
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_convergence_creation() {
-        // Smoke test - full comparison in tests/convergence_tests.rs
     }
 }
