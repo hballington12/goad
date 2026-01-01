@@ -1,0 +1,13 @@
+{
+  "input": 106.24999,
+  "output": 106.24143,
+  "absorbed": 0.0,
+  "trnc_ref": 0.0,
+  "trnc_rec": 0.0,
+  "trnc_clip": -0.00029564457,
+  "trnc_energy": 0.00849225,
+  "clip_err": 0.0,
+  "trnc_area": 0.000101953294,
+  "trnc_cop": 0.0,
+  "ext_diff": 106.24999
+}

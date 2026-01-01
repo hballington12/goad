@@ -7,6 +7,7 @@ use crate::{
     problem::{self, Problem},
     result::Results,
     settings::Settings,
+    zones::Zones,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use nalgebra::Complex;
@@ -50,10 +51,11 @@ pub fn load_and_init_geoms(
     Ok(geoms)
 }
 
-/// Initializes bins and creates an empty Results struct.
+/// Initializes zones and creates an empty Results struct.
 pub fn init_result(settings: &Settings) -> Results {
     let bins = settings.first_zone_scheme().generate();
-    Results::new_empty(&bins)
+    let zones = Zones::from_configs(&settings.zones);
+    Results::new_with_zones(&bins, zones)
 }
 
 // ============================================================================

@@ -823,6 +823,20 @@ impl Results {
         }
     }
 
+    /// Create a new empty Results with initialized zones.
+    pub fn new_with_zones(bins: &[SolidAngleBin], zones: Zones) -> Self {
+        let field = bins.iter().map(|&bin| ScattResult2D::new(bin)).collect();
+        Self {
+            field_2d: field,
+            field_1d: None,
+            field_bs: None,
+            field_fs: None,
+            zones,
+            powers: Powers::new(),
+            params: Params::new(),
+        }
+    }
+
     pub fn mueller_to_1d(&mut self, binning_scheme: &crate::bins::Scheme) {
         // Step 1: Check scheme compatibility
         match binning_scheme {
