@@ -6,9 +6,12 @@
 
 use log::info;
 use pyo3::prelude::*;
+use rand_distr::num_traits::Pow;
 use serde::{Deserialize, Serialize};
+use std::ops::{Add, Div, Mul, Sub};
 
 use crate::bins::{Scheme, SolidAngleBin};
+use crate::convergence::Convergeable;
 use crate::params::Params;
 use crate::result::{ScattResult1D, ScattResult2D};
 
@@ -305,5 +308,429 @@ impl<'a> IntoIterator for &'a mut Zones {
 
     fn into_iter(self) -> Self::IntoIter {
         self.zones.iter_mut()
+    }
+}
+
+// ============================================================================
+// Arithmetic operations for Zone
+// ============================================================================
+
+impl Add for Zone {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a + b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(f1), Some(f2)) => Some(f1.into_iter().zip(f2).map(|(a, b)| a + b).collect()),
+            (Some(f1), None) => Some(f1),
+            (None, Some(f2)) => Some(f2),
+            (None, None) => None,
+        };
+        Self {
+            label: self.label,
+            zone_type: self.zone_type,
+            scheme: self.scheme,
+            bins: self.bins,
+            field_2d,
+            field_1d,
+            params: self.params + other.params,
+        }
+    }
+}
+
+impl Sub for Zone {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a - b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(f1), Some(f2)) => Some(f1.into_iter().zip(f2).map(|(a, b)| a - b).collect()),
+            (Some(f1), None) => Some(f1),
+            (None, Some(f2)) => Some(f2),
+            (None, None) => None,
+        };
+        Self {
+            label: self.label,
+            zone_type: self.zone_type,
+            scheme: self.scheme,
+            bins: self.bins,
+            field_2d,
+            field_1d,
+            params: self.params - other.params,
+        }
+    }
+}
+
+impl Mul for Zone {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a * b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(f1), Some(f2)) => Some(f1.into_iter().zip(f2).map(|(a, b)| a * b).collect()),
+            (Some(f1), None) => Some(f1),
+            (None, Some(f2)) => Some(f2),
+            (None, None) => None,
+        };
+        Self {
+            label: self.label,
+            zone_type: self.zone_type,
+            scheme: self.scheme,
+            bins: self.bins,
+            field_2d,
+            field_1d,
+            params: self.params * other.params,
+        }
+    }
+}
+
+impl Mul<f32> for Zone {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        let field_2d = self.field_2d.into_iter().map(|f| f * rhs).collect();
+        let field_1d = self
+            .field_1d
+            .map(|f| f.into_iter().map(|x| x * rhs).collect());
+        Self {
+            label: self.label,
+            zone_type: self.zone_type,
+            scheme: self.scheme,
+            bins: self.bins,
+            field_2d,
+            field_1d,
+            params: self.params * rhs,
+        }
+    }
+}
+
+impl Div for Zone {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a / b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(f1), Some(f2)) => Some(f1.into_iter().zip(f2).map(|(a, b)| a / b).collect()),
+            (Some(f1), None) => Some(f1),
+            (None, Some(_)) => None,
+            (None, None) => None,
+        };
+        Self {
+            label: self.label,
+            zone_type: self.zone_type,
+            scheme: self.scheme,
+            bins: self.bins,
+            field_2d,
+            field_1d,
+            params: self.params.div_elem(&other.params),
+        }
+    }
+}
+
+impl Div<f32> for Zone {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self {
+        let field_2d = self.field_2d.into_iter().map(|f| f / rhs).collect();
+        let field_1d = self
+            .field_1d
+            .map(|f| f.into_iter().map(|x| x / rhs).collect());
+        Self {
+            label: self.label,
+            zone_type: self.zone_type,
+            scheme: self.scheme,
+            bins: self.bins,
+            field_2d,
+            field_1d,
+            params: self.params / rhs,
+        }
+    }
+}
+
+impl Pow<f32> for Zone {
+    type Output = Self;
+
+    fn pow(self, rhs: f32) -> Self {
+        let field_2d = self.field_2d.into_iter().map(|f| f.pow(rhs)).collect();
+        let field_1d = self
+            .field_1d
+            .map(|f| f.into_iter().map(|x| x.pow(rhs)).collect());
+        Self {
+            label: self.label,
+            zone_type: self.zone_type,
+            scheme: self.scheme,
+            bins: self.bins,
+            field_2d,
+            field_1d,
+            params: self.params.pow(rhs),
+        }
+    }
+}
+
+// ============================================================================
+// Arithmetic operations for Zones
+// ============================================================================
+
+impl Add for Zones {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let zones = self
+            .zones
+            .into_iter()
+            .zip(other.zones)
+            .map(|(a, b)| a + b)
+            .collect();
+        Self { zones }
+    }
+}
+
+impl Sub for Zones {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        let zones = self
+            .zones
+            .into_iter()
+            .zip(other.zones)
+            .map(|(a, b)| a - b)
+            .collect();
+        Self { zones }
+    }
+}
+
+impl Mul for Zones {
+    type Output = Self;
+
+    fn mul(self, other: Self) -> Self {
+        let zones = self
+            .zones
+            .into_iter()
+            .zip(other.zones)
+            .map(|(a, b)| a * b)
+            .collect();
+        Self { zones }
+    }
+}
+
+impl Mul<f32> for Zones {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        let zones = self.zones.into_iter().map(|z| z * rhs).collect();
+        Self { zones }
+    }
+}
+
+impl Div for Zones {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        let zones = self
+            .zones
+            .into_iter()
+            .zip(other.zones)
+            .map(|(a, b)| a / b)
+            .collect();
+        Self { zones }
+    }
+}
+
+impl Div<f32> for Zones {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self {
+        let zones = self.zones.into_iter().map(|z| z / rhs).collect();
+        Self { zones }
+    }
+}
+
+impl Pow<f32> for Zones {
+    type Output = Self;
+
+    fn pow(self, rhs: f32) -> Self {
+        let zones = self.zones.into_iter().map(|z| z.pow(rhs)).collect();
+        Self { zones }
+    }
+}
+
+// ============================================================================
+// Convergeable implementations for Zone and Zones
+// ============================================================================
+
+impl Convergeable for Zone {
+    fn zero_like(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            zone_type: self.zone_type,
+            scheme: self.scheme.clone(),
+            bins: self.bins.clone(),
+            field_2d: self
+                .bins
+                .iter()
+                .map(|&bin| ScattResult2D::new(bin))
+                .collect(),
+            field_1d: None,
+            params: self.params.zero_like(),
+        }
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        let field_2d = self
+            .field_2d
+            .iter()
+            .zip(other.field_2d.iter())
+            .map(|(a, b)| a.weighted_add(b, w1, w2))
+            .collect();
+        let field_1d = match (&self.field_1d, &other.field_1d) {
+            (Some(f1), Some(f2)) => Some(
+                f1.iter()
+                    .zip(f2.iter())
+                    .map(|(a, b)| a.weighted_add(b, w1, w2))
+                    .collect(),
+            ),
+            (Some(f1), None) => Some(f1.clone()),
+            (None, Some(f2)) => Some(f2.clone()),
+            (None, None) => None,
+        };
+        Self {
+            label: self.label.clone(),
+            zone_type: self.zone_type,
+            scheme: self.scheme.clone(),
+            bins: self.bins.clone(),
+            field_2d,
+            field_1d,
+            params: self.params.weighted_add(&other.params, w1, w2),
+        }
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        self.clone() * other.clone()
+    }
+
+    fn div_elem(&self, other: &Self) -> Self {
+        self.clone() / other.clone()
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        self.clone() + other.clone()
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        self.clone() - other.clone()
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self.clone() * scalar
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        Pow::pow(self.clone(), 0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        // For zones, each field's to_weighted is delegated
+        Self {
+            label: self.label.clone(),
+            zone_type: self.zone_type,
+            scheme: self.scheme.clone(),
+            bins: self.bins.clone(),
+            field_2d: self.field_2d.iter().map(|f| f.to_weighted()).collect(),
+            field_1d: self
+                .field_1d
+                .as_ref()
+                .map(|fs| fs.iter().map(|f| f.to_weighted()).collect()),
+            params: self.params.to_weighted(),
+        }
+    }
+
+    fn weights(&self) -> Self {
+        // For zones, each field's weights is delegated
+        Self {
+            label: self.label.clone(),
+            zone_type: self.zone_type,
+            scheme: self.scheme.clone(),
+            bins: self.bins.clone(),
+            field_2d: self.field_2d.iter().map(|f| f.weights()).collect(),
+            field_1d: self
+                .field_1d
+                .as_ref()
+                .map(|fs| fs.iter().map(|f| f.weights()).collect()),
+            params: self.params.weights(),
+        }
+    }
+}
+
+impl Convergeable for Zones {
+    fn zero_like(&self) -> Self {
+        Self {
+            zones: self.zones.iter().map(|z| z.zero_like()).collect(),
+        }
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        let zones = self
+            .zones
+            .iter()
+            .zip(other.zones.iter())
+            .map(|(a, b)| a.weighted_add(b, w1, w2))
+            .collect();
+        Self { zones }
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        self.clone() * other.clone()
+    }
+
+    fn div_elem(&self, other: &Self) -> Self {
+        self.clone() / other.clone()
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        self.clone() + other.clone()
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        self.clone() - other.clone()
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self.clone() * scalar
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        Pow::pow(self.clone(), 0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        Self {
+            zones: self.zones.iter().map(|z| z.to_weighted()).collect(),
+        }
+    }
+
+    fn weights(&self) -> Self {
+        Self {
+            zones: self.zones.iter().map(|z| z.weights()).collect(),
+        }
     }
 }

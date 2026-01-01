@@ -457,7 +457,7 @@ impl AddAssign for Results {
                 (None, Some(b)) => Some(b),
                 (None, None) => None,
             },
-            zones: Zones::empty(), // TODO: combine zones properly
+            zones: self.zones.clone() + other.zones,
             powers: self.powers.clone() + other.powers,
             params: self.params.clone() + other.params,
         };
@@ -479,7 +479,7 @@ impl Pow<f32> for Results {
             field_1d,
             field_bs,
             field_fs: self.field_fs,
-            zones: Zones::empty(),
+            zones: self.zones.pow(rhs),
             powers: self.powers.pow(rhs),
             params: self.params.pow(rhs),
         }
@@ -501,7 +501,7 @@ impl Mul<f32> for Results {
             field_1d,
             field_bs,
             field_fs,
-            zones: Zones::empty(),
+            zones: self.zones * rhs,
             powers: self.powers * rhs,
             params: self.params * rhs,
         }
@@ -549,7 +549,7 @@ impl Mul for Results {
             field_1d,
             field_bs,
             field_fs,
-            zones: Zones::empty(),
+            zones: self.zones * other.zones,
             powers,
             params,
         }
@@ -597,7 +597,7 @@ impl Add for Results {
             field_1d,
             field_bs,
             field_fs,
-            zones: Zones::empty(),
+            zones: self.zones + other.zones,
             powers,
             params,
         }
@@ -645,7 +645,7 @@ impl Sub for Results {
             field_1d,
             field_bs,
             field_fs,
-            zones: Zones::empty(),
+            zones: self.zones - other.zones,
             powers,
             params,
         }
@@ -667,7 +667,7 @@ impl Div<f32> for Results {
             field_1d,
             field_bs,
             field_fs,
-            zones: Zones::empty(),
+            zones: self.zones / rhs,
             powers: self.powers / rhs,
             params: self.params / rhs,
         }
@@ -707,7 +707,7 @@ impl Div for Results {
             field_1d,
             field_bs,
             field_fs,
-            zones: Zones::empty(),
+            zones: self.zones / other.zones,
             powers: self.powers.div_elem(&other.powers),
             params: self.params.div_elem(&other.params),
         }
@@ -762,7 +762,7 @@ impl Convergeable for Results {
             field_1d,
             field_bs,
             field_fs,
-            zones: Zones::empty(),
+            zones: self.zones.weighted_add(&other.zones, w1, w2),
             powers: self.powers.weighted_add(&other.powers, w1, w2),
             params: self.params.weighted_add(&other.params, w1, w2),
         }
