@@ -284,8 +284,10 @@ impl Convergence {
         progress.update_info(count);
         // Update per-target progress bars
         if count >= MIN_ORIENTATIONS {
+            let mean = self.tracker.mean();
+            let sem = self.tracker.sem();
             for (i, target) in self.targets.iter().enumerate() {
-                self.update_target(progress, i, target);
+                self.update_target(progress, i, target, &mean, &sem);
             }
         }
         // Check convergence periodically (every orientation after minimum)
@@ -386,21 +388,13 @@ impl Convergence {
         progress: &ConvergenceProgress,
         i: usize,
         target: &ParamConvergenceTarget,
+        mean: &Results,
+        sem: &Results,
     ) {
-        let Some(mean_val) = self
-            .tracker
-            .mean()
-            .params
-            .get(&target.param, &GOComponent::Total)
-        else {
+        let Some(mean_val) = mean.params.get(&target.param, &GOComponent::Total) else {
             return;
         };
-        let Some(sem_val) = self
-            .tracker
-            .sem()
-            .params
-            .get(&target.param, &GOComponent::Total)
-        else {
+        let Some(sem_val) = sem.params.get(&target.param, &GOComponent::Total) else {
             return;
         };
 
