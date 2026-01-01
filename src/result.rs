@@ -13,6 +13,7 @@ use crate::convergence::Convergeable;
 use crate::params::Param;
 use crate::params::Params;
 use crate::powers::Powers;
+use crate::zones::Zones;
 use itertools::Itertools;
 use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
@@ -408,11 +409,16 @@ pub type ScattResult1D = ScattResult<AngleBin>;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Results {
+    // Legacy fields - will be migrated to zones
     pub field_2d: Vec<ScattResult2D>,
     pub field_1d: Option<Vec<ScattResult1D>>,
     pub field_bs: Option<ScattResult2D>,
-    // pub field_fs: Option<Ampl>, // Forward scatter amplitude for optical theorem
     pub field_fs: Option<ScattResult2D>,
+
+    // New zones-based structure (not yet used, migration in progress)
+    #[allow(dead_code)]
+    pub zones: Zones,
+
     pub powers: Powers,
     pub params: Params,
 }
@@ -451,6 +457,7 @@ impl AddAssign for Results {
                 (None, Some(b)) => Some(b),
                 (None, None) => None,
             },
+            zones: Zones::empty(), // TODO: combine zones properly
             powers: self.powers.clone() + other.powers,
             params: self.params.clone() + other.params,
         };
@@ -472,6 +479,7 @@ impl Pow<f32> for Results {
             field_1d,
             field_bs,
             field_fs: self.field_fs,
+            zones: Zones::empty(),
             powers: self.powers.pow(rhs),
             params: self.params.pow(rhs),
         }
@@ -493,6 +501,7 @@ impl Mul<f32> for Results {
             field_1d,
             field_bs,
             field_fs,
+            zones: Zones::empty(),
             powers: self.powers * rhs,
             params: self.params * rhs,
         }
@@ -540,6 +549,7 @@ impl Mul for Results {
             field_1d,
             field_bs,
             field_fs,
+            zones: Zones::empty(),
             powers,
             params,
         }
@@ -587,6 +597,7 @@ impl Add for Results {
             field_1d,
             field_bs,
             field_fs,
+            zones: Zones::empty(),
             powers,
             params,
         }
@@ -634,6 +645,7 @@ impl Sub for Results {
             field_1d,
             field_bs,
             field_fs,
+            zones: Zones::empty(),
             powers,
             params,
         }
@@ -655,6 +667,7 @@ impl Div<f32> for Results {
             field_1d,
             field_bs,
             field_fs,
+            zones: Zones::empty(),
             powers: self.powers / rhs,
             params: self.params / rhs,
         }
@@ -694,6 +707,7 @@ impl Div for Results {
             field_1d,
             field_bs,
             field_fs,
+            zones: Zones::empty(),
             powers: self.powers.div_elem(&other.powers),
             params: self.params.div_elem(&other.params),
         }
@@ -748,6 +762,7 @@ impl Convergeable for Results {
             field_1d,
             field_bs,
             field_fs,
+            zones: Zones::empty(),
             powers: self.powers.weighted_add(&other.powers, w1, w2),
             params: self.params.weighted_add(&other.params, w1, w2),
         }
@@ -802,6 +817,7 @@ impl Results {
             field_1d: None,
             field_bs: None,
             field_fs: None,
+            zones: Zones::empty(),
             powers: Powers::new(),
             params: Params::new(),
         }
