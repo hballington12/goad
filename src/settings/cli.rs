@@ -1,5 +1,5 @@
 use clap::{Args, Parser};
-use log::{error, trace, warn};
+use log::{trace, warn};
 use nalgebra::Complex;
 use std::path::PathBuf;
 

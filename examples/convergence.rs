@@ -1,20 +1,12 @@
 // --8<-- [start:convergence]
 fn main() {
     use goad::convergence::Convergence;
-    use goad::orientation::{EulerConvention, Orientation, Scheme};
     use goad::params::Param;
     use goad::result::GOComponent;
     use goad::settings;
 
-    // Load default settings and configure for convergence
-    let mut settings = settings::load_default_config().unwrap();
-
-    // Use uniform random orientations (enough for convergence)
-    // TODO: fix this because it shouldn't be a requirement
-    settings.orientation = Orientation {
-        scheme: Scheme::Uniform { num_orients: 2000 },
-        euler_convention: EulerConvention::ZYZ,
-    };
+    // Load default settings
+    let settings = settings::load_default_config().unwrap();
 
     // Create a convergence solver
     let mut convergence = Convergence::new(None, Some(settings)).unwrap();

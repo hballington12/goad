@@ -167,6 +167,22 @@ impl Params {
             .copied()
     }
 
+    /// Get a parameter value by Param enum variant.
+    /// This provides a single dispatch point for all parameter lookups.
+    pub fn get(&self, param: &Param, component: &GOComponent) -> Option<f32> {
+        match param {
+            Param::Asymmetry => self.asymmetry(component),
+            Param::Albedo => self.albedo(component),
+            Param::ScatCross => self.scatt_cross(component),
+            Param::ExtCross => self.ext_cross(component),
+            Param::BackscatterCross => self.backscatter_cross(component),
+            Param::LidarRatio => self.lidar_ratio(component),
+            Param::DepolarizationRatio => self.depolarization_ratio(component),
+            Param::BackscatterS11S22 => self.backscatter_s11s22(component),
+            Param::ExtCrossOpticalTheorem => self.ext_cross_optical_theorem(component),
+        }
+    }
+
     /// Returns a weighted version of Params for convergence tracking.
     /// - asymmetry becomes asymmetry * scat_cross
     /// - albedo becomes albedo * ext_cross

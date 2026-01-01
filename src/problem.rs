@@ -4,6 +4,7 @@ use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
+use crate::multiproblem::{init_result, load_settings_or_default};
 use crate::result::ScattResult2D;
 use crate::settings::{default_e_perp, default_prop};
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
     geom::{Face, Geom},
     orientation, output,
     result::{GOComponent, Mueller, Results},
-    settings::{load_config, Settings},
+    settings::Settings,
 };
 
 use anyhow::Result;
@@ -36,7 +37,7 @@ mod tests {
         let mut geom = geoms[0].clone();
         init_geom(&settings, &mut geom);
 
-        let mut problem = Problem::new(Some(geom), Some(settings));
+        let mut problem = Problem::new(Some(geom), Some(settings)).unwrap();
         let euler = crate::orientation::Euler::new(30.0, 30.0, 0.0);
         problem.run(Some(&euler)).expect("run");
 
@@ -114,7 +115,7 @@ mod tests {
         // Use default config to avoid loading local.toml which may have test-breaking settings
         let default_settings =
             crate::settings::load_default_config().expect("Failed to load default config");
-        let mut problem = Problem::new(Some(geom), Some(default_settings));
+        let mut problem = Problem::new(Some(geom), Some(default_settings)).unwrap();
 
         problem.propagate_next();
     }
@@ -137,8 +138,10 @@ pub struct Problem {
 impl Problem {
     #[new]
     #[pyo3(signature = (settings = None, geom = None))]
-    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> Self {
-        Problem::new(geom, settings)
+    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> PyResult<Self> {
+        Problem::new(geom, settings).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Failed to create Problem: {}", e))
+        })
     }
 
     /// Setter function for the problem settings
@@ -194,26 +197,30 @@ impl Problem {
     /// Creates a new `Problem` from optional `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
-    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
-        let settings = settings.unwrap_or_else(|| load_config().expect("Failed to load config"));
-        let mut geom = geom
-            .unwrap_or_else(|| load_geom(&settings.geom_name).expect("Failed to load geometry"));
+    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Result<Self> {
+        let settings = load_settings_or_default(settings);
+        let mut geom = match geom {
+            Some(g) => g,
+            None => load_geom(&settings.geom_name).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to load geometry file '{}': {}",
+                    settings.geom_name,
+                    e
+                )
+            })?,
+        };
         init_geom(&settings, &mut geom);
+        let result = init_result(&settings);
 
-        let bins = &settings.binning.scheme.generate();
-        let solution = Results::new_empty(&bins);
-
-        let problem = Self {
+        Ok(Self {
             base_geom: geom.clone(),
             geom,
             beam_queue: vec![],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             settings,
-            result: solution,
-        };
-
-        problem
+            result,
+        })
     }
 
     /// Resets the problem.
@@ -254,10 +261,8 @@ impl Problem {
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        let settings = load_config().expect("Failed to load config");
-
-        let bins = &settings.binning.scheme.generate();
-        let solution = Results::new_empty(&bins);
+        let settings = load_settings_or_default(None);
+        let result = init_result(&settings);
 
         Self {
             base_geom: geom.clone(),
@@ -266,7 +271,7 @@ impl Problem {
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             settings,
-            result: solution,
+            result,
         }
     }
 

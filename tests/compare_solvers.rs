@@ -123,7 +123,7 @@ fn test_tracker_5_orientations() {
     let mut tracker: Option<ConvergenceTracker<goad::result::Results>> = None;
 
     for (i, euler) in eulers.iter().enumerate() {
-        let mut problem = Problem::new(None, Some(settings.clone()));
+        let mut problem = Problem::new(None, Some(settings.clone())).unwrap();
         problem.run(Some(euler)).unwrap();
 
         let asym = problem

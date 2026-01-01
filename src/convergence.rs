@@ -8,9 +8,10 @@ use crossbeam_deque::{Injector, Steal};
 
 use crate::{
     geom::Geom,
-    orientation::{Euler, OrientationSampler, Scheme as OrientScheme},
+    multiproblem::{init_result, load_and_init_geoms, load_settings_or_default},
+    orientation::{Euler, OrientationSampler},
     params::Param,
-    problem::{self, Problem},
+    problem::{init_geom, Problem},
     result::{GOComponent, Results},
     settings::Settings,
 };
@@ -307,32 +308,8 @@ fn is_converged_check(
     let sem = tracker.sem();
 
     targets.iter().all(|t| {
-        let mean_val = match t.param {
-            Param::Asymmetry => mean.params.asymmetry(&GOComponent::Total),
-            Param::Albedo => mean.params.albedo(&GOComponent::Total),
-            Param::ScatCross => mean.params.scatt_cross(&GOComponent::Total),
-            Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
-            Param::BackscatterCross => mean.params.backscatter_cross(&GOComponent::Total),
-            Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
-            Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
-            Param::BackscatterS11S22 => mean.params.backscatter_s11s22(&GOComponent::Total),
-            Param::ExtCrossOpticalTheorem => {
-                mean.params.ext_cross_optical_theorem(&GOComponent::Total)
-            }
-        };
-        let sem_val = match t.param {
-            Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
-            Param::Albedo => sem.params.albedo(&GOComponent::Total),
-            Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
-            Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
-            Param::BackscatterCross => sem.params.backscatter_cross(&GOComponent::Total),
-            Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
-            Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
-            Param::BackscatterS11S22 => sem.params.backscatter_s11s22(&GOComponent::Total),
-            Param::ExtCrossOpticalTheorem => {
-                sem.params.ext_cross_optical_theorem(&GOComponent::Total)
-            }
-        };
+        let mean_val = mean.params.get(&t.param, &GOComponent::Total);
+        let sem_val = sem.params.get(&t.param, &GOComponent::Total);
 
         match (mean_val, sem_val) {
             (Some(m), Some(s)) if m.abs() > 1e-10 => (s / m.abs()) < t.relative_error,
@@ -354,42 +331,19 @@ pub struct Convergence {
 impl Convergence {
     /// Creates a new Convergence solver from geometries and settings.
     pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
-        let settings = settings
-            .unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
+        let settings = load_settings_or_default(settings);
+        let geoms = load_and_init_geoms(geoms, &settings)?;
+        let result = init_result(&settings);
 
-        let mut geoms = match geoms {
-            Some(g) => g,
-            None => Geom::load(&settings.geom_name).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to load geometry file '{}': {}\n\
-                    Hint: This may be caused by degenerate faces (zero cross product), \
-                    faces that are too small, or non-planar geometry. \
-                    Please check and fix the geometry file.",
-                    settings.geom_name,
-                    e
-                )
-            })?,
-        };
-
-        for geom in geoms.iter_mut() {
-            problem::init_geom(&settings, geom);
-        }
-
-        let bins = &settings.binning.scheme.generate();
-        let template = Results::new_empty(bins);
-
-        // Create sampler based on orientation scheme
-        let sampler = match &settings.orientation.scheme {
-            OrientScheme::Discrete { eulers } => OrientationSampler::discrete(eulers.clone()),
-            _ => OrientationSampler::uniform(settings.seed),
-        };
+        // Convergence always uses uniform random sampling (infinite supply)
+        let sampler = OrientationSampler::uniform(settings.seed);
 
         Ok(Self {
             geoms,
             settings,
             max_orientations: 100_000, // safety cap
             targets: Vec::new(),
-            tracker: ConvergenceTracker::new(&template),
+            tracker: ConvergenceTracker::new(&result),
             sampler,
         })
     }
@@ -437,32 +391,8 @@ impl Convergence {
         let sem = self.tracker.sem();
 
         self.targets.iter().all(|t| {
-            let mean_val = match t.param {
-                Param::Asymmetry => mean.params.asymmetry(&GOComponent::Total),
-                Param::Albedo => mean.params.albedo(&GOComponent::Total),
-                Param::ScatCross => mean.params.scatt_cross(&GOComponent::Total),
-                Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
-                Param::BackscatterCross => mean.params.backscatter_cross(&GOComponent::Total),
-                Param::LidarRatio => mean.params.lidar_ratio(&GOComponent::Total),
-                Param::DepolarizationRatio => mean.params.depolarization_ratio(&GOComponent::Total),
-                Param::BackscatterS11S22 => mean.params.backscatter_s11s22(&GOComponent::Total),
-                Param::ExtCrossOpticalTheorem => {
-                    mean.params.ext_cross_optical_theorem(&GOComponent::Total)
-                }
-            };
-            let sem_val = match t.param {
-                Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
-                Param::Albedo => sem.params.albedo(&GOComponent::Total),
-                Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
-                Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
-                Param::BackscatterCross => sem.params.backscatter_cross(&GOComponent::Total),
-                Param::LidarRatio => sem.params.lidar_ratio(&GOComponent::Total),
-                Param::DepolarizationRatio => sem.params.depolarization_ratio(&GOComponent::Total),
-                Param::BackscatterS11S22 => sem.params.backscatter_s11s22(&GOComponent::Total),
-                Param::ExtCrossOpticalTheorem => {
-                    sem.params.ext_cross_optical_theorem(&GOComponent::Total)
-                }
-            };
+            let mean_val = mean.params.get(&t.param, &GOComponent::Total);
+            let sem_val = sem.params.get(&t.param, &GOComponent::Total);
 
             match (mean_val, sem_val) {
                 (Some(m), Some(s)) if m.abs() > 1e-10 => (s / m.abs()) < t.relative_error,
@@ -529,7 +459,10 @@ impl Convergence {
         let problems_base: Vec<Problem> = self
             .geoms
             .iter()
-            .map(|geom| Problem::new(Some(geom.clone()), Some(self.settings.clone())))
+            .map(|geom| {
+                Problem::new(Some(geom.clone()), Some(self.settings.clone()))
+                    .expect("Failed to create Problem")
+            })
             .collect();
         let num_problems = problems_base.len();
 
@@ -606,50 +539,8 @@ impl Convergence {
                             let sem = tracker.sem();
 
                             for (i, target) in targets.iter().enumerate() {
-                                let mean_val = match target.param {
-                                    Param::Asymmetry => mean.params.asymmetry(&GOComponent::Total),
-                                    Param::Albedo => mean.params.albedo(&GOComponent::Total),
-                                    Param::ScatCross => {
-                                        mean.params.scatt_cross(&GOComponent::Total)
-                                    }
-                                    Param::ExtCross => mean.params.ext_cross(&GOComponent::Total),
-                                    Param::BackscatterCross => {
-                                        mean.params.backscatter_cross(&GOComponent::Total)
-                                    }
-                                    Param::LidarRatio => {
-                                        mean.params.lidar_ratio(&GOComponent::Total)
-                                    }
-                                    Param::DepolarizationRatio => {
-                                        mean.params.depolarization_ratio(&GOComponent::Total)
-                                    }
-                                    Param::BackscatterS11S22 => {
-                                        mean.params.backscatter_s11s22(&GOComponent::Total)
-                                    }
-                                    Param::ExtCrossOpticalTheorem => {
-                                        mean.params.ext_cross_optical_theorem(&GOComponent::Total)
-                                    }
-                                };
-                                let sem_val = match target.param {
-                                    Param::Asymmetry => sem.params.asymmetry(&GOComponent::Total),
-                                    Param::Albedo => sem.params.albedo(&GOComponent::Total),
-                                    Param::ScatCross => sem.params.scatt_cross(&GOComponent::Total),
-                                    Param::ExtCross => sem.params.ext_cross(&GOComponent::Total),
-                                    Param::BackscatterCross => {
-                                        sem.params.backscatter_cross(&GOComponent::Total)
-                                    }
-                                    Param::LidarRatio => {
-                                        sem.params.lidar_ratio(&GOComponent::Total)
-                                    }
-                                    Param::DepolarizationRatio => {
-                                        sem.params.depolarization_ratio(&GOComponent::Total)
-                                    }
-                                    Param::BackscatterS11S22 => {
-                                        sem.params.backscatter_s11s22(&GOComponent::Total)
-                                    }
-                                    Param::ExtCrossOpticalTheorem => {
-                                        sem.params.ext_cross_optical_theorem(&GOComponent::Total)
-                                    }
-                                };
+                                let mean_val = mean.params.get(&target.param, &GOComponent::Total);
+                                let sem_val = sem.params.get(&target.param, &GOComponent::Total);
 
                                 if let (Some(m), Some(s)) = (mean_val, sem_val) {
                                     progress.update_target(
@@ -771,17 +662,14 @@ impl Convergence {
         };
 
         for geom in geoms.iter_mut() {
-            problem::init_geom(&settings, geom);
+            init_geom(&settings, geom);
         }
 
         let bins = &settings.binning.scheme.generate();
         let template = Results::new_empty(bins);
 
-        // Create sampler based on orientation scheme
-        let sampler = match &settings.orientation.scheme {
-            OrientScheme::Discrete { eulers } => OrientationSampler::discrete(eulers.clone()),
-            _ => OrientationSampler::uniform(settings.seed),
-        };
+        // Convergence always uses uniform random sampling (infinite supply)
+        let sampler = OrientationSampler::uniform(settings.seed);
 
         Ok(Self {
             geoms,

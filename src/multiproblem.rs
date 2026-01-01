@@ -15,6 +15,49 @@ use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 use std::time::Duration;
 
+// ============================================================================
+// Helper functions for solver initialization
+// ============================================================================
+
+/// Loads settings from config if not provided.
+pub fn load_settings_or_default(settings: Option<Settings>) -> Settings {
+    settings.unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"))
+}
+
+/// Loads and initializes geometries. Used by MultiProblem and Convergence.
+pub fn load_and_init_geoms(
+    geoms: Option<Vec<Geom>>,
+    settings: &Settings,
+) -> anyhow::Result<Vec<Geom>> {
+    let mut geoms = match geoms {
+        Some(g) => g,
+        None => Geom::load(&settings.geom_name).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load geometry file '{}': {}\n\
+                Hint: This may be caused by degenerate faces (zero cross product), \
+                faces that are too small, or non-planar geometry. \
+                Please check and fix the geometry file.",
+                settings.geom_name,
+                e
+            )
+        })?,
+    };
+
+    for geom in geoms.iter_mut() {
+        problem::init_geom(settings, geom);
+    }
+
+    Ok(geoms)
+}
+
+/// Initializes bins and creates an empty Results struct.
+pub fn init_result(settings: &Settings) -> Results {
+    let bins = settings.binning.scheme.generate();
+    Results::new_empty(&bins)
+}
+
+// ============================================================================
+
 /// Multi-orientation light scattering simulation for a single geometry.
 ///
 /// Computes orientation-averaged scattering properties by running multiple
@@ -52,28 +95,10 @@ impl MultiProblem {
     /// If settings not provided, loads from config file.
     /// If geoms not provided, load from file
     pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
-        let settings = settings
-            .unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
-        let mut geoms = match geoms {
-            Some(g) => g,
-            None => Geom::load(&settings.geom_name).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to load geometry file '{}': {}\n\
-                    Hint: This may be caused by degenerate faces (zero cross product), \
-                    faces that are too small, or non-planar geometry. \
-                    Please check and fix the geometry file.",
-                    settings.geom_name,
-                    e
-                )
-            })?,
-        };
-
-        for geom in geoms.iter_mut() {
-            problem::init_geom(&settings, geom);
-        }
+        let settings = load_settings_or_default(settings);
+        let geoms = load_and_init_geoms(geoms, &settings)?;
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = &settings.binning.scheme.generate();
-        let result = Results::new_empty(&bins);
+        let result = init_result(&settings);
 
         Ok(Self {
             geoms,
@@ -154,7 +179,10 @@ impl MultiProblem {
         let problems_base: Vec<Problem> = self
             .geoms
             .iter()
-            .map(|geom| Problem::new(Some(geom.clone()), Some(self.settings.clone())))
+            .map(|geom| {
+                Problem::new(Some(geom.clone()), Some(self.settings.clone()))
+                    .expect("Failed to create Problem")
+            })
             .collect();
         let num_problems = problems_base.iter().len();
         // let problem_base = Problem::new(Some(self.geoms.clone()), Some(self.settings.clone()));
