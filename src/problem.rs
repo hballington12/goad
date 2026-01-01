@@ -42,13 +42,14 @@ mod tests {
 
         let result = &problem.result;
 
-        // Check that field_bs is populated
+        // Check that backward zone is populated
+        let backward_zone = result.zones.backward_zone();
         assert!(
-            result.field_bs.is_some(),
-            "field_bs should be Some after solve"
+            backward_zone.is_some(),
+            "backward zone should exist after solve"
         );
 
-        let bs = result.field_bs.as_ref().unwrap();
+        let bs = backward_zone.unwrap().field_2d.first().unwrap();
         // S11 should be positive for any scattering
         assert!(
             bs.mueller_total[(0, 0)] > 0.0,
@@ -420,32 +421,6 @@ impl Problem {
             self.solve_far_zone(GOComponent::ExtDiff, zone_idx);
             self.solve_far_zone(GOComponent::Beam, zone_idx);
             self.combine_far_zone(zone_idx);
-        }
-
-        // Copy zone results to legacy fields for backward compatibility
-        self.copy_zones_to_legacy();
-    }
-
-    /// Copy zone results to legacy field_2d/field_bs/field_fs fields.
-    /// TODO: Remove once all consumers use zones directly.
-    fn copy_zones_to_legacy(&mut self) {
-        // Copy first Full zone to field_2d
-        if let Some(full_zone) = self.result.zones.full_zone() {
-            self.result.field_2d = full_zone.field_2d.clone();
-        }
-
-        // Copy Forward zone to field_fs
-        if let Some(forward_zone) = self.result.zones.forward_zone() {
-            if let Some(field) = forward_zone.field_2d.first() {
-                self.result.field_fs = Some(field.clone());
-            }
-        }
-
-        // Copy Backward zone to field_bs
-        if let Some(backward_zone) = self.result.zones.backward_zone() {
-            if let Some(field) = backward_zone.field_2d.first() {
-                self.result.field_bs = Some(field.clone());
-            }
         }
     }
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices

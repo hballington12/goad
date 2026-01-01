@@ -31,8 +31,12 @@ fn fixed_hex_30_30_30() {
         MultiProblem::new(None, Some(settings)).expect("Failed to create MultiProblem");
     multiproblem.solve();
 
-    let result = multiproblem
+    let full_zone = multiproblem
         .result
+        .zones
+        .full_zone()
+        .expect("No full zone found");
+    let result = full_zone
         .field_2d
         .iter()
         .map(|m| m.mueller_total.to_vec())
@@ -61,8 +65,12 @@ fn fixed_hex_30_20_20() {
         MultiProblem::new(None, Some(settings)).expect("Failed to create MultiProblem");
     multiproblem.solve();
 
-    let result = multiproblem
+    let full_zone = multiproblem
         .result
+        .zones
+        .full_zone()
+        .expect("No full zone found");
+    let result = full_zone
         .field_2d
         .iter()
         .map(|m| m.mueller_total.to_vec())

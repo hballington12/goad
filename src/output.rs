@@ -67,40 +67,42 @@ impl<'a> OutputManager<'a> {
         let output_dir = &self.settings.directory;
         let config = &self.settings.output.mueller_components;
 
+        // Get full zone for 2D/1D Mueller data
+        let full_zone = self.results.zones.full_zone();
+
         // Write 2D Mueller matrices
         if self.settings.output.mueller_2d {
-            if config.total {
-                let muellers = &self
-                    .results
-                    .field_2d
-                    .iter()
-                    .map(|f| f.mueller_total)
-                    .collect::<Vec<_>>();
-                write_mueller(&self.results.bins(), muellers, "", output_dir)?;
-            }
-            if config.beam {
-                let muellers = &self
-                    .results
-                    .field_2d
-                    .iter()
-                    .map(|f| f.mueller_beam)
-                    .collect::<Vec<_>>();
-                write_mueller(&self.results.bins(), muellers, "_beam", output_dir)?;
-            }
-            if config.external {
-                let muellers = &self
-                    .results
-                    .field_2d
-                    .iter()
-                    .map(|f| f.mueller_ext)
-                    .collect::<Vec<_>>();
-                write_mueller(&self.results.bins(), muellers, "_ext", output_dir)?;
+            if let Some(zone) = full_zone {
+                if config.total {
+                    let muellers = &zone
+                        .field_2d
+                        .iter()
+                        .map(|f| f.mueller_total)
+                        .collect::<Vec<_>>();
+                    write_mueller(&self.results.bins(), muellers, "", output_dir)?;
+                }
+                if config.beam {
+                    let muellers = &zone
+                        .field_2d
+                        .iter()
+                        .map(|f| f.mueller_beam)
+                        .collect::<Vec<_>>();
+                    write_mueller(&self.results.bins(), muellers, "_beam", output_dir)?;
+                }
+                if config.external {
+                    let muellers = &zone
+                        .field_2d
+                        .iter()
+                        .map(|f| f.mueller_ext)
+                        .collect::<Vec<_>>();
+                    write_mueller(&self.results.bins(), muellers, "_ext", output_dir)?;
+                }
             }
         }
 
         // Write 1D Mueller matrices
         if self.settings.output.mueller_1d {
-            if let Some(field_1d) = &self.results.field_1d {
+            if let Some(field_1d) = full_zone.and_then(|z| z.field_1d.as_ref()) {
                 if config.total {
                     write_mueller_1d(
                         "",

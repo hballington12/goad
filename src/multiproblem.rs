@@ -1,6 +1,7 @@
 // use std::time::Instant;
 
 use crate::{
+    convergence::Convergeable,
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
@@ -119,14 +120,7 @@ impl MultiProblem {
 
     /// Resets a `MultiOrientProblem` to its initial state.
     pub fn reset(&mut self) {
-        self.result = Results::new_empty(
-            &self
-                .result
-                .field_2d
-                .iter()
-                .map(|f| f.bin)
-                .collect::<Vec<_>>(),
-        );
+        self.result = Results::new_empty(&self.result.bins());
         self.regenerate_orientations();
     }
 
@@ -217,10 +211,7 @@ impl MultiProblem {
                 problem.result
             })
             .reduce(
-                || {
-                    let bins = &self.result.bins();
-                    Results::new_empty(bins)
-                },
+                || self.result.zero_like(),
                 |accum, item| self.reduce_results(accum, item),
             );
 
@@ -253,34 +244,18 @@ impl MultiProblem {
         // Add powers
         acc.powers += item.powers;
 
-        // Add Mueller matrix elements
-        for (a, i) in acc.field_2d.iter_mut().zip(item.field_2d.into_iter()) {
-            // Handle Mueller matrices
-            a.mueller_total += i.mueller_total;
-            a.mueller_beam += i.mueller_beam;
-            a.mueller_ext += i.mueller_ext;
-        }
-
-        // Add backscatter field if present
-        match (&mut acc.field_bs, item.field_bs) {
-            (Some(a), Some(i)) => {
+        // Add zones (uses zone arithmetic)
+        for (acc_zone, item_zone) in acc.zones.iter_mut().zip(item.zones.iter()) {
+            for (a, i) in acc_zone.field_2d.iter_mut().zip(item_zone.field_2d.iter()) {
+                // Amplitude matrices (complex)
+                a.ampl_total += i.ampl_total;
+                a.ampl_beam += i.ampl_beam;
+                a.ampl_ext += i.ampl_ext;
+                // Mueller matrices (real)
                 a.mueller_total += i.mueller_total;
                 a.mueller_beam += i.mueller_beam;
                 a.mueller_ext += i.mueller_ext;
             }
-            (None, Some(i)) => acc.field_bs = Some(i),
-            _ => {}
-        }
-
-        // Add forwards scatter field if present
-        match (&mut acc.field_fs, item.field_fs) {
-            (Some(a), Some(i)) => {
-                a.mueller_total += i.mueller_total;
-                a.mueller_beam += i.mueller_beam;
-                a.mueller_ext += i.mueller_ext;
-            }
-            (None, Some(i)) => acc.field_fs = Some(i),
-            _ => {}
         }
 
         acc
@@ -291,39 +266,20 @@ impl MultiProblem {
         // Powers
         self.result.powers /= num_orientations;
 
-        for field in self.result.field_2d.iter_mut() {
-            // Amplitude Matrices - divide by complex representation
-            let div_c = Complex::from(num_orientations);
-            field.ampl_total /= div_c;
-            field.ampl_beam /= div_c;
-            field.ampl_ext /= div_c;
+        // Normalize all zones
+        let div_c = Complex::from(num_orientations);
+        for zone in self.result.zones.iter_mut() {
+            for field in zone.field_2d.iter_mut() {
+                // Amplitude Matrices - divide by complex representation
+                field.ampl_total /= div_c;
+                field.ampl_beam /= div_c;
+                field.ampl_ext /= div_c;
 
-            // Mueller Matrices - divide by real value
-            field.mueller_total /= num_orientations;
-            field.mueller_beam /= num_orientations;
-            field.mueller_ext /= num_orientations;
-        }
-
-        // Normalize backscatter field if present
-        if let Some(ref mut field_bs) = self.result.field_bs {
-            let div_c = Complex::from(num_orientations);
-            field_bs.ampl_total /= div_c;
-            field_bs.ampl_beam /= div_c;
-            field_bs.ampl_ext /= div_c;
-            field_bs.mueller_total /= num_orientations;
-            field_bs.mueller_beam /= num_orientations;
-            field_bs.mueller_ext /= num_orientations;
-        }
-
-        // Normalize forward scatter field if present
-        if let Some(ref mut field_fs) = self.result.field_fs {
-            let div_c = Complex::from(num_orientations);
-            field_fs.ampl_total /= div_c;
-            field_fs.ampl_beam /= div_c;
-            field_fs.ampl_ext /= div_c;
-            field_fs.mueller_total /= num_orientations;
-            field_fs.mueller_beam /= num_orientations;
-            field_fs.mueller_ext /= num_orientations;
+                // Mueller Matrices - divide by real value
+                field.mueller_total /= num_orientations;
+                field.mueller_beam /= num_orientations;
+                field.mueller_ext /= num_orientations;
+            }
         }
     }
 
