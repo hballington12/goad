@@ -9,6 +9,7 @@ use std::ops::Sub;
 use crate::bins::AngleBin;
 use crate::bins::Scheme;
 use crate::bins::SolidAngleBin;
+use crate::convergence::Convergeable;
 use crate::params::Param;
 use crate::params::Params;
 use crate::powers::Powers;
@@ -38,11 +39,11 @@ pub trait ScatteringBin: Clone + Debug {
 
 impl ScatteringBin for SolidAngleBin {
     fn theta_center(&self) -> f32 {
-        self.theta_bin.center
+        self.theta.center
     }
 
     fn theta_bin(&self) -> &AngleBin {
-        &self.theta_bin
+        &self.theta
     }
 }
 
@@ -304,6 +305,22 @@ impl<B: ScatteringBin> Div<f32> for ScattResult<B> {
     }
 }
 
+impl<B: ScatteringBin> Div for ScattResult<B> {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        Self {
+            bin: self.bin,
+            ampl_total: self.ampl_total.component_div(&other.ampl_total),
+            ampl_beam: self.ampl_beam.component_div(&other.ampl_beam),
+            ampl_ext: self.ampl_ext.component_div(&other.ampl_ext),
+            mueller_total: self.mueller_total.component_div(&other.mueller_total),
+            mueller_beam: self.mueller_beam.component_div(&other.mueller_beam),
+            mueller_ext: self.mueller_ext.component_div(&other.mueller_ext),
+        }
+    }
+}
+
 impl<B: ScatteringBin> ScattResult<B> {
     /// Creates a new empty ScattResult.
     pub fn new(bin: B) -> Self {
@@ -316,6 +333,65 @@ impl<B: ScatteringBin> ScattResult<B> {
             mueller_beam: Mueller::zeros(),
             mueller_ext: Mueller::zeros(),
         }
+    }
+
+    /// Returns a ScattResult with all values set to 1.0 (for weights)
+    pub fn ones_like(&self) -> Self {
+        Self {
+            bin: self.bin.clone(),
+            ampl_total: Ampl::from_element(Complex::new(1.0, 0.0)),
+            ampl_beam: Ampl::from_element(Complex::new(1.0, 0.0)),
+            ampl_ext: Ampl::from_element(Complex::new(1.0, 0.0)),
+            mueller_total: Mueller::from_element(1.0),
+            mueller_beam: Mueller::from_element(1.0),
+            mueller_ext: Mueller::from_element(1.0),
+        }
+    }
+}
+
+impl<B: ScatteringBin> Convergeable for ScattResult<B> {
+    fn zero_like(&self) -> Self {
+        ScattResult::new(self.bin.clone())
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        // Simple weighted average by count
+        let total = w1 + w2;
+        (self.clone() * w1 + other.clone() * w2) / total
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        self.clone() * other.clone()
+    }
+
+    fn div_elem(&self, other: &Self) -> Self {
+        self.clone() / other.clone()
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        self.clone() + other.clone()
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        self.clone() - other.clone()
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self.clone() * scalar
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        self.clone().pow(0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        // ScattResult doesn't need special weighting
+        self.clone()
+    }
+
+    fn weights(&self) -> Self {
+        // All weights are 1.0
+        self.ones_like()
     }
 }
 
@@ -334,6 +410,9 @@ pub type ScattResult1D = ScattResult<AngleBin>;
 pub struct Results {
     pub field_2d: Vec<ScattResult2D>,
     pub field_1d: Option<Vec<ScattResult1D>>,
+    pub field_bs: Option<ScattResult2D>,
+    // pub field_fs: Option<Ampl>, // Forward scatter amplitude for optical theorem
+    pub field_fs: Option<ScattResult2D>,
     pub powers: Powers,
     pub params: Params,
 }
@@ -360,6 +439,18 @@ impl AddAssign for Results {
                 (None, Some(other_field_1d)) => Some(other_field_1d),
                 (None, None) => None,
             },
+            field_bs: match (self.field_bs.clone(), other.field_bs) {
+                (Some(a), Some(b)) => Some(a + b),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
+            field_fs: match (self.field_fs.clone(), other.field_fs) {
+                (Some(a), Some(b)) => Some(a + b),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            },
             powers: self.powers.clone() + other.powers,
             params: self.params.clone() + other.params,
         };
@@ -374,9 +465,13 @@ impl Pow<f32> for Results {
             Some(field_1d) => Some(field_1d.into_iter().map(|a| a.pow(rhs)).collect()),
             None => None,
         };
+        let field_bs = self.field_bs.map(|bs| bs.pow(rhs));
+        // field_fs: amplitude doesn't support pow, pass through unchanged
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a.pow(rhs)).collect(),
             field_1d,
+            field_bs,
+            field_fs: self.field_fs,
             powers: self.powers.pow(rhs),
             params: self.params.pow(rhs),
         }
@@ -391,9 +486,13 @@ impl Mul<f32> for Results {
             Some(field_1d) => Some(field_1d.into_iter().map(|a| a * rhs).collect()),
             None => None,
         };
+        let field_bs = self.field_bs.map(|bs| bs * rhs);
+        let field_fs = self.field_fs.map(|fs| fs * rhs);
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a * rhs).collect(),
             field_1d,
+            field_bs,
+            field_fs,
             powers: self.powers * rhs,
             params: self.params * rhs,
         }
@@ -422,11 +521,25 @@ impl Mul for Results {
             (None, Some(other_field_1d)) => Some(other_field_1d),
             (None, None) => None,
         };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a * b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+        let field_fs = match (self.field_fs.clone(), other.field_fs) {
+            (Some(a), Some(b)) => Some(a * b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
         let powers = self.powers * other.powers;
         let params = self.params * other.params;
         Self {
             field_2d,
             field_1d,
+            field_bs,
+            field_fs,
             powers,
             params,
         }
@@ -455,11 +568,25 @@ impl Add for Results {
             (None, Some(other_field_1d)) => Some(other_field_1d),
             (None, None) => None,
         };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a + b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+        let field_fs = match (self.field_fs, other.field_fs) {
+            (Some(a), Some(b)) => Some(a + b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
         let powers = self.powers + other.powers;
         let params = self.params + other.params;
         Self {
             field_2d,
             field_1d,
+            field_bs,
+            field_fs,
             powers,
             params,
         }
@@ -488,11 +615,25 @@ impl Sub for Results {
             (None, Some(other_field_1d)) => Some(other_field_1d),
             (None, None) => None,
         };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a - b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+        let field_fs = match (self.field_fs, other.field_fs) {
+            (Some(a), Some(b)) => Some(a - b),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
         let powers = self.powers - other.powers;
         let params = self.params - other.params;
         Self {
             field_2d,
             field_1d,
+            field_bs,
+            field_fs,
             powers,
             params,
         }
@@ -507,12 +648,141 @@ impl Div<f32> for Results {
             Some(field_1d) => Some(field_1d.into_iter().map(|a| a / rhs).collect()),
             None => None,
         };
+        let field_bs = self.field_bs.map(|bs| bs / rhs);
+        let field_fs = self.field_fs.map(|fs| fs / rhs);
         Self {
             field_2d: self.field_2d.into_iter().map(|a| a / rhs).collect(),
             field_1d,
+            field_bs,
+            field_fs,
             powers: self.powers / rhs,
             params: self.params / rhs,
         }
+    }
+}
+
+impl Div for Results {
+    type Output = Self;
+
+    fn div(self, other: Self) -> Self {
+        let field_2d = self
+            .field_2d
+            .into_iter()
+            .zip(other.field_2d)
+            .map(|(a, b)| a / b)
+            .collect();
+        let field_1d = match (self.field_1d, other.field_1d) {
+            (Some(f1), Some(f2)) => Some(f1.into_iter().zip(f2).map(|(a, b)| a / b).collect()),
+            (Some(f1), None) => Some(f1),
+            (None, Some(_)) => None,
+            (None, None) => None,
+        };
+        let field_bs = match (self.field_bs, other.field_bs) {
+            (Some(a), Some(b)) => Some(a / b),
+            (Some(a), None) => Some(a),
+            (None, Some(_)) => None,
+            (None, None) => None,
+        };
+        let field_fs = match (self.field_fs.clone(), other.field_fs) {
+            (Some(a), Some(b)) => Some(a / b),
+            (Some(a), None) => Some(a),
+            (None, Some(_)) => None,
+            (None, None) => None,
+        };
+        Self {
+            field_2d,
+            field_1d,
+            field_bs,
+            field_fs,
+            powers: self.powers.div_elem(&other.powers),
+            params: self.params.div_elem(&other.params),
+        }
+    }
+}
+
+impl Convergeable for Results {
+    fn zero_like(&self) -> Self {
+        Results::new_empty(&self.bins())
+    }
+
+    fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
+        // Combine field_2d
+        let field_2d: Vec<ScattResult2D> = self
+            .field_2d
+            .iter()
+            .zip(other.field_2d.iter())
+            .map(|(a, b)| a.weighted_add(b, w1, w2))
+            .collect();
+
+        // Combine field_1d if both present
+        let field_1d = match (&self.field_1d, &other.field_1d) {
+            (Some(f1), Some(f2)) => Some(
+                f1.iter()
+                    .zip(f2.iter())
+                    .map(|(a, b)| a.weighted_add(b, w1, w2))
+                    .collect(),
+            ),
+            (Some(f1), None) => Some(f1.clone()),
+            (None, Some(f2)) => Some(f2.clone()),
+            (None, None) => None,
+        };
+
+        // Combine field_bs if both present
+        let field_bs = match (&self.field_bs, &other.field_bs) {
+            (Some(a), Some(b)) => Some(a.weighted_add(b, w1, w2)),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(b.clone()),
+            (None, None) => None,
+        };
+
+        // Combine field_fs if both present (simple weighted sum for amplitudes)
+        let field_fs = match (&self.field_fs, &other.field_fs) {
+            (Some(a), Some(b)) => Some(a.weighted_add(b, w1, w2)),
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(b.clone()),
+            (None, None) => None,
+        };
+
+        Self {
+            field_2d,
+            field_1d,
+            field_bs,
+            field_fs,
+            powers: self.powers.weighted_add(&other.powers, w1, w2),
+            params: self.params.weighted_add(&other.params, w1, w2),
+        }
+    }
+
+    fn mul_elem(&self, other: &Self) -> Self {
+        self.clone() * other.clone()
+    }
+
+    fn div_elem(&self, other: &Self) -> Self {
+        self.clone() / other.clone()
+    }
+
+    fn add_elem(&self, other: &Self) -> Self {
+        self.clone() + other.clone()
+    }
+
+    fn sub_elem(&self, other: &Self) -> Self {
+        self.clone() - other.clone()
+    }
+
+    fn scale(&self, scalar: f32) -> Self {
+        self.clone() * scalar
+    }
+
+    fn sqrt_elem(&self) -> Self {
+        self.clone().pow(0.5)
+    }
+
+    fn to_weighted(&self) -> Self {
+        Results::to_weighted(self)
+    }
+
+    fn weights(&self) -> Self {
+        Results::weights(self)
     }
 }
 
@@ -529,8 +799,10 @@ impl Results {
         let field = bins.iter().map(|&bin| ScattResult2D::new(bin)).collect();
         Self {
             field_2d: field,
-            powers: Powers::new(),
             field_1d: None,
+            field_bs: None,
+            field_fs: None,
+            powers: Powers::new(),
             params: Params::new(),
         }
     }
@@ -548,7 +820,7 @@ impl Results {
         let theta_groups: Vec<Vec<&ScattResult2D>> = self
             .field_2d
             .iter()
-            .chunk_by(|result| result.bin.theta_bin)
+            .chunk_by(|result| result.bin.theta)
             .into_iter()
             .map(|(_, group)| group.collect())
             .collect();
@@ -567,12 +839,12 @@ impl Results {
     /// Weighted by phi bin width in radians
     fn integrate_over_phi(phi_group: Vec<&ScattResult2D>) -> ScattResult1D {
         // All results in group have same theta bin
-        let theta_bin = phi_group[0].bin.theta_bin;
+        let theta_bin = phi_group[0].bin.theta;
         let mut result = ScattResult1D::new(theta_bin);
 
         for phi_result in phi_group {
             // Convert phi width to radians to match theta integration units
-            let phi_width_rad = phi_result.bin.phi_bin.width().to_radians();
+            let phi_width_rad = phi_result.bin.phi.width().to_radians();
 
             // Integrate Mueller (weighted by phi bin width in radians)
             result.mueller_total += phi_result.mueller_total * phi_width_rad;
@@ -589,6 +861,8 @@ impl Results {
         // Total field
         if let Some(field_1d) = &self.field_1d {
             let k = 2.0 * PI / wavelength;
+
+            // Total field
             let scatt_total =
                 integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
                     theta.sin() * s11 / k.powi(2)
@@ -597,17 +871,19 @@ impl Results {
                 integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
                     theta.sin() * theta.cos() * s11 / k.powi(2)
                 });
+            let ext_total = scatt_total + self.powers.absorbed;
 
             self.params
                 .set_param(Param::ScatCross, GOComponent::Total, scatt_total);
-            self.params.set_param(
-                Param::AsymmetryScatt,
-                GOComponent::Total,
-                asymmetry_scatt_total,
-            );
-            let ext_total = scatt_total + self.powers.absorbed;
             self.params
                 .set_param(Param::ExtCross, GOComponent::Total, ext_total);
+            self.params.set_param(
+                Param::Asymmetry,
+                GOComponent::Total,
+                asymmetry_scatt_total / scatt_total,
+            );
+            self.params
+                .set_param(Param::Albedo, GOComponent::Total, scatt_total / ext_total);
 
             // Beam field
             let scatt_beam =
@@ -618,12 +894,13 @@ impl Results {
                 integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
                     theta.sin() * theta.cos() * s11 / k.powi(2)
                 });
+
             self.params
                 .set_param(Param::ScatCross, GOComponent::Beam, scatt_beam);
             self.params.set_param(
-                Param::AsymmetryScatt,
+                Param::Asymmetry,
                 GOComponent::Beam,
-                asymmetry_scatt_beam,
+                asymmetry_scatt_beam / scatt_beam,
             );
 
             // Ext field
@@ -632,17 +909,97 @@ impl Results {
                     theta.sin() * s11 / k.powi(2)
                 });
             let asymmetry_scatt_ext =
-                integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
+                integrate_theta_weighted_component(field_1d, GOComponent::ExtDiff, |theta, s11| {
                     theta.sin() * theta.cos() * s11 / k.powi(2)
                 });
+
             self.params
                 .set_param(Param::ScatCross, GOComponent::ExtDiff, scatt_ext);
             self.params.set_param(
-                Param::AsymmetryScatt,
+                Param::Asymmetry,
                 GOComponent::ExtDiff,
-                asymmetry_scatt_ext,
+                asymmetry_scatt_ext / scatt_ext,
             );
         }
+
+        // Backscatter params (if field_bs is available)
+        if let Some(ref field_bs) = self.field_bs {
+            let k = 2.0 * PI / wavelength;
+
+            // BackscatterCross = S11 * 4π / k²
+            // DepolarizationRatio = (S11 - S22) / (S11 + S22)
+            for (component, mueller) in [
+                (GOComponent::Total, field_bs.mueller_total),
+                (GOComponent::Beam, field_bs.mueller_beam),
+                (GOComponent::ExtDiff, field_bs.mueller_ext),
+            ] {
+                let s11 = mueller[(0, 0)];
+                let s22 = mueller[(1, 1)];
+                let bs_cross = s11 * 4.0 * PI / k.powi(2);
+                self.params
+                    .set_param(Param::BackscatterCross, component, bs_cross);
+
+                // LidarRatio = ExtCross / BackscatterCross
+                if let Some(ext_cross) = self.params.ext_cross(&component) {
+                    if bs_cross > 1e-10 {
+                        self.params
+                            .set_param(Param::LidarRatio, component, ext_cross / bs_cross);
+                    }
+                }
+
+                // DepolarizationRatio = (S11 - S22) / (S11 + S22)
+                let s11_plus_s22 = s11 + s22;
+                if s11_plus_s22.abs() > 1e-10 {
+                    let depol = (s11 - s22) / s11_plus_s22;
+                    self.params
+                        .set_param(Param::DepolarizationRatio, component, depol);
+                    self.params
+                        .set_param(Param::BackscatterS11S22, component, s11_plus_s22);
+                }
+            }
+        }
+
+        // Optical theorem: ExtCross = (4π/k) * Im[S_2] at θ=0°
+        if let Some(ref field_fs) = self.field_fs {
+            let k = 2.0 * PI / wavelength;
+            let s2 = field_fs.ampl_total[(0, 0)];
+            // let s1 = field_fs[(1, 1)]; // can also use s1 here since e perp and e par are indistinguishable in the direct forwards
+            let ext_cross = s2.im * 4.0 * PI / k.powi(2); // using imaginary part (diffraction convention is positive i prefactor)
+            self.params
+                .set_param(Param::ExtCrossOpticalTheorem, GOComponent::Total, ext_cross);
+        }
+    }
+
+    /// Returns a weighted version of Results for convergence tracking.
+    /// - asymmetry becomes asymmetry * scat_cross
+    /// - albedo becomes albedo * ext_cross
+    /// - powers and other params stay the same (weight = 1)
+    pub fn to_weighted(&self) -> Self {
+        let mut result = self.clone();
+        result.params = self.params.to_weighted();
+        result
+    }
+
+    /// Returns a Results struct containing the weights for each field.
+    /// - asymmetry slot contains scat_cross
+    /// - albedo slot contains ext_cross
+    /// - powers fields are all 1.0
+    /// - scat_cross and ext_cross slots contain 1.0
+    pub fn weights(&self) -> Self {
+        let mut result = self.clone();
+        // Powers: all weights are 1.0
+        result.powers = Powers::ones();
+        // Params: get appropriate weights
+        result.params = self.params.weights();
+        // Fields: weights are 1.0 (use existing structure but with 1.0 values)
+        result.field_2d = self.field_2d.iter().map(|f| f.ones_like()).collect();
+        result.field_1d = self
+            .field_1d
+            .as_ref()
+            .map(|f| f.iter().map(|x| x.ones_like()).collect());
+        result.field_bs = self.field_bs.as_ref().map(|f| f.ones_like());
+        result.field_fs = self.field_fs.as_ref().map(|f| f.ones_like());
+        result
     }
 
     pub fn print(&self) {
@@ -718,7 +1075,7 @@ impl Results {
         let bins: Vec<f32> = self
             .bins()
             .iter()
-            .flat_map(|bin| vec![bin.theta_bin.center, bin.phi_bin.center])
+            .flat_map(|bin| vec![bin.theta.center, bin.phi.center])
             .collect();
 
         Array2::from_shape_vec((bins.len() / 2, 2), bins)

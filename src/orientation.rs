@@ -298,6 +298,71 @@ impl Orientation {
     }
 }
 
+/// Orientation sampler that generates orientations on demand.
+pub enum OrientationSampler {
+    /// Generates uniform random orientations (never exhausts).
+    Uniform {
+        rng: rand::rngs::StdRng,
+        seed: Option<u64>,
+    },
+    /// Iterates over a discrete set of orientations.
+    Discrete { eulers: Vec<Euler>, index: usize },
+}
+
+impl OrientationSampler {
+    /// Create a uniform random sampler.
+    pub fn uniform(seed: Option<u64>) -> Self {
+        let rng = if let Some(seed) = seed {
+            rand::rngs::StdRng::seed_from_u64(seed)
+        } else {
+            rand::rngs::StdRng::from_rng(&mut rand::rng())
+        };
+        Self::Uniform { rng, seed }
+    }
+
+    /// Create a discrete sampler from a list of Euler angles.
+    pub fn discrete(eulers: Vec<Euler>) -> Self {
+        Self::Discrete { eulers, index: 0 }
+    }
+
+    /// Get the next orientation. Returns None if exhausted (for discrete samplers).
+    pub fn next(&mut self) -> Option<Euler> {
+        match self {
+            Self::Uniform { rng, .. } => {
+                let alpha = rng.random_range(0.0..1.0) as f32 * 360.0;
+                let beta = (1.0 - rng.random_range(0.0..1.0) as f32 * 2.0).acos() * 180.0 / PI;
+                let gamma = rng.random_range(0.0..1.0) as f32 * 360.0;
+                Some(Euler::new(alpha, beta, gamma))
+            }
+            Self::Discrete { eulers, index } => {
+                if *index < eulers.len() {
+                    let euler = eulers[*index].clone();
+                    *index += 1;
+                    Some(euler)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    /// Reset the sampler to its initial state (for reproducibility).
+    pub fn reset(&mut self) {
+        match self {
+            Self::Uniform { rng, seed } => {
+                *rng = if let Some(s) = seed {
+                    rand::rngs::StdRng::seed_from_u64(*s)
+                } else {
+                    rand::rngs::StdRng::from_rng(&mut rand::rng())
+                };
+            }
+            Self::Discrete { index, .. } => {
+                *index = 0;
+            }
+        }
+    }
+}
+
 /// Orientation scheme for problem averaging. Can either be a discrete list of angles
 /// or a distribution.
 #[derive(Debug, Clone, PartialEq)]

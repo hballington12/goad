@@ -1,3 +1,5 @@
+use nalgebra::Vector3;
+
 use super::{MuellerComponentConfig, OutputConfig};
 use crate::{diff::Mapping, orientation::EulerConvention};
 use std::path::PathBuf;
@@ -11,7 +13,7 @@ pub const VERTEX_MERGE_DISTANCE: f32 = 0.001;
 /// Scaling factor for integer coordinates during clipping.
 pub const CLIP_TOLERANCE: f32 = 1e16;
 /// Minimum absolute value of the dot product of two vectors to be considered colinear.
-pub const COLINEAR_THRESHOLD: f32 = 0.001;
+pub const COLINEAR_THRESHOLD: f32 = 0.0001;
 /// Minimum vector length (in geometry units) to be considered non-degenerate.
 pub const VEC_LENGTH_THRESHOLD: f32 = 0.001;
 /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.
@@ -28,6 +30,8 @@ pub const PROP_PERTURBATION: f32 = 1e-5;
 pub const MIN_DISTORTION: f32 = 1e-5;
 /// Threshold for classification of direct forwards or backwards rays
 pub const DIRECT_THRESHOLD: f32 = 1e-4;
+/// Tolerance for planarity check in diffraction
+pub const PLANARITY_TOLERANCE: f32 = 1e-2;
 /// Tolerance for value matching in interval binning
 pub const INTERVAL_IGNORE_TOLERANCE: f32 = 0.0001;
 /// Tolerance for centered geometry
@@ -67,6 +71,8 @@ pub const DEFAULT_MAPPING: Mapping = Mapping::ApertureDiffraction;
 pub const DEFAULT_COHERENCE: bool = true;
 /// Default quiet mode (false = show progress bars)
 pub const DEFAULT_QUIET: bool = false;
+/// Minimum orientations before checking convergence (for stable SEM estimates)
+pub const MIN_ORIENTATIONS: usize = 10;
 
 // =================
 // Default Functions
@@ -74,6 +80,14 @@ pub const DEFAULT_QUIET: bool = false;
 
 pub fn default_scale_factor() -> f32 {
     1.0
+}
+
+pub fn default_e_perp() -> Vector3<f32> {
+    Vector3::x()
+}
+
+pub fn default_prop() -> Vector3<f32> {
+    -Vector3::z()
 }
 
 pub fn default_geom_scale() -> Option<Vec<f32>> {

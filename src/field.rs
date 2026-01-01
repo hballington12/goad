@@ -5,12 +5,13 @@ use crate::settings;
 use anyhow::Result;
 use std::fmt::Debug;
 
-use nalgebra::{Complex, Matrix2, RealField, Vector3};
+use nalgebra::{Complex, Matrix2, Matrix3, RealField, Vector3};
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+    use crate::settings;
 
     #[test]
     fn identity_ampl() {
@@ -274,6 +275,21 @@ impl Field {
         field
     }
 
+    /// Returns a new Field with prop and e_perp rotated by the given 3x3 rotation matrix.
+    /// The amplitude and phase remain unchanged since they represent the relationship
+    /// between polarization components, which is preserved under coordinate rotation.
+    pub fn rotated(&self, rot: &Matrix3<f32>) -> Self {
+        let new_prop = (rot * self.prop).normalize();
+        let new_e_perp = (rot * self.e_perp).normalize();
+
+        Self {
+            prop: new_prop,
+            e_perp: new_e_perp,
+            ampl: self.ampl,
+            phase: self.phase,
+        }
+    }
+
     /// Creates a new unit electric field with the given input perpendicular
     /// and propagation vectors.
     pub fn new_identity(e_perp: Vector3<f32>, prop: Vector3<f32>) -> Result<Self> {
@@ -364,7 +380,7 @@ impl Field {
         let evo2 = prop.cross(&e_perp_in).normalize();
         let dot2 = e_perp_out.dot(&evo2);
 
-        let result = Matrix2::new(dot1, -dot2, dot2.clone(), dot1.clone());
+        let result = Matrix2::new(dot1, dot2.clone(), -dot2, dot1.clone());
         let det = result.determinant();
 
         result / det.abs().sqrt()

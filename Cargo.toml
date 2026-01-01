@@ -7,9 +7,10 @@
 
 [dependencies]
     anyhow = "1.0.95"
-    chrono = "0.4.40"
+    chrono = "0.4.42"
     clap = { version = "4.5.27", features = ["derive"] }
     config = "0.15.7"
+    crossbeam-deque = "0.8"
     geo = "0.29.3"
     geo-clipper = "0.8.0"
     geo-types = "0.7.14"
@@ -27,6 +28,9 @@
     serde_json = "1.0.140"
     tobj = "4.0.2"
     toml = "0.8.19"
+
+[dev-dependencies]
+plotters = { version = "0.3", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "line_series", "point_series", "ttf"] }
 
 [features]
 default = []

@@ -1,6 +1,11 @@
+use std::f32::consts::PI;
+
+use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
+use crate::result::ScattResult2D;
+use crate::settings::{default_e_perp, default_prop};
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     diff::Mapping,
@@ -12,7 +17,7 @@ use crate::{
 };
 
 use anyhow::Result;
-use nalgebra::{Complex, Point3, Vector3};
+use nalgebra::{Complex, Point3};
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
@@ -21,6 +26,74 @@ mod tests {
 
     use super::*;
     use nalgebra::Complex;
+
+    #[test]
+    fn backscatter_params_computed() {
+        // Use default config
+        let settings =
+            crate::settings::load_default_config().expect("Failed to load default config");
+        let geoms = Geom::load("./examples/data/hex.obj").expect("load geom");
+        let mut geom = geoms[0].clone();
+        init_geom(&settings, &mut geom);
+
+        let mut problem = Problem::new(Some(geom), Some(settings));
+        let euler = crate::orientation::Euler::new(30.0, 30.0, 0.0);
+        problem.run(Some(&euler)).expect("run");
+
+        let result = &problem.result;
+
+        // Check that field_bs is populated
+        assert!(
+            result.field_bs.is_some(),
+            "field_bs should be Some after solve"
+        );
+
+        let bs = result.field_bs.as_ref().unwrap();
+        // S11 should be positive for any scattering
+        assert!(
+            bs.mueller_total[(0, 0)] > 0.0,
+            "Total S11 should be positive"
+        );
+
+        // Check that backscatter params are computed
+        assert!(
+            result
+                .params
+                .backscatter_cross(&GOComponent::Total)
+                .is_some(),
+            "BackscatterCross should be computed"
+        );
+        assert!(
+            result.params.lidar_ratio(&GOComponent::Total).is_some(),
+            "LidarRatio should be computed"
+        );
+        assert!(
+            result
+                .params
+                .depolarization_ratio(&GOComponent::Total)
+                .is_some(),
+            "DepolarizationRatio should be computed"
+        );
+
+        // Sanity checks on values
+        let bs_cross = result
+            .params
+            .backscatter_cross(&GOComponent::Total)
+            .unwrap();
+        let lidar = result.params.lidar_ratio(&GOComponent::Total).unwrap();
+        let depol = result
+            .params
+            .depolarization_ratio(&GOComponent::Total)
+            .unwrap();
+
+        assert!(bs_cross > 0.0, "BackscatterCross should be positive");
+        assert!(lidar > 0.0, "LidarRatio should be positive");
+        assert!(
+            depol >= 0.0 && depol <= 1.0,
+            "DepolarizationRatio should be in [0, 1], got: {}",
+            depol
+        );
+    }
 
     #[test]
     fn cube_inside_ico() {
@@ -207,6 +280,18 @@ impl Problem {
                 result.mueller_total = result.mueller_beam + result.mueller_ext;
             }
         }
+        if let Some(ref mut field_bs) = self.result.field_bs {
+            if self.settings.coherence {
+                field_bs.ampl_total = field_bs.ampl_beam + field_bs.ampl_ext;
+                field_bs.mueller_total = field_bs.ampl_total.to_mueller();
+            } else {
+                field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
+            }
+        }
+        if let Some(ref mut field_fs) = self.result.field_fs {
+            field_fs.ampl_total = field_fs.ampl_beam + field_fs.ampl_ext;
+            field_fs.mueller_total = field_fs.ampl_total.to_mueller();
+        }
     }
 
     fn ampl_to_mueller(&mut self, component: GOComponent) {
@@ -262,6 +347,26 @@ impl Problem {
             }
         };
 
+        // Forward scatter (always coherent because of the optical theorem)
+        if mapping == Mapping::ApertureDiffraction {
+            if let Some(ref mut field_fs) = self.result.field_fs {
+                let mut fs_ampl = Ampl::zeros();
+                for beam in queue.iter() {
+                    let ampls = beam.diffract(&[field_fs.bin], fov_factor);
+                    if !ampls.is_empty() {
+                        let ampl = ampls[0].1;
+                        fs_ampl += ampl;
+                    }
+                }
+                match component {
+                    GOComponent::Beam => field_fs.ampl_beam += fs_ampl,
+                    GOComponent::ExtDiff => field_fs.ampl_ext += fs_ampl,
+                    GOComponent::Total => field_fs.ampl_total += fs_ampl,
+                }
+            }
+        }
+
+        // Mapping helper closure
         let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
                 Mapping::GeometricOptics => {
@@ -273,6 +378,7 @@ impl Problem {
 
         // coherence:
         if self.settings.coherence {
+            // main query points
             let zero_ampls: Vec<(usize, Ampl)> = self
                 .result
                 .field_2d
@@ -281,7 +387,7 @@ impl Problem {
                 .into_iter()
                 .enumerate()
                 .collect();
-            let ampls = queue
+            let ampls: Vec<Ampl> = queue
                 .par_iter()
                 .map(|beam| map_beam_to_far_field(beam))
                 .reduce(
@@ -297,10 +403,39 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
+            // Backscatter
+            if mapping == Mapping::ApertureDiffraction {
+                if let Some(ref mut field_bs) = self.result.field_bs {
+                    let mut bs_ampl = Ampl::zeros();
+                    for beam in queue.iter() {
+                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
+                        if !ampls.is_empty() {
+                            let ampl = ampls[0].1;
+                            bs_ampl += ampl;
+                        }
+                    }
+                    match component {
+                        GOComponent::Beam => {
+                            field_bs.ampl_beam += bs_ampl;
+                            field_bs.mueller_beam = field_bs.ampl_beam.to_mueller();
+                        }
+                        GOComponent::ExtDiff => {
+                            field_bs.ampl_ext += bs_ampl;
+                            field_bs.mueller_ext = field_bs.ampl_ext.to_mueller();
+                        }
+                        GOComponent::Total => {
+                            field_bs.ampl_total += bs_ampl;
+                            field_bs.mueller_total = field_bs.ampl_total.to_mueller();
+                        }
+                    }
+                }
+            }
+
             self.assign_ampls(component, ampls);
             self.ampl_to_mueller(component);
         } else {
             // no coherence
+            // main query points
             let zero_muellers: Vec<(usize, Mueller)> = self
                 .result
                 .field_2d
@@ -309,7 +444,7 @@ impl Problem {
                 .into_iter()
                 .enumerate()
                 .collect();
-            let muellers = queue
+            let muellers: Vec<Mueller> = queue
                 .par_iter()
                 .map(|beam| {
                     let ampls = map_beam_to_far_field(beam);
@@ -329,17 +464,39 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
+            // Backscatter
+            if mapping == Mapping::ApertureDiffraction {
+                if let Some(ref mut field_bs) = self.result.field_bs {
+                    let mut bs_mueller = Mueller::zeros();
+                    for beam in queue.iter() {
+                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
+                        let ampl = ampls[0].1;
+                        bs_mueller += ampl.to_mueller();
+                    }
+                    match component {
+                        GOComponent::Beam => field_bs.mueller_beam += bs_mueller,
+                        GOComponent::ExtDiff => field_bs.mueller_ext += bs_mueller,
+                        GOComponent::Total => field_bs.mueller_total += bs_mueller,
+                    }
+                }
+            }
+
             self.assign_muellers(component, muellers);
         }
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
     pub fn solve_far(&mut self) {
+        // Initialize field_bs with backscatter bin
+        let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
+        let fs_bin = SolidAngleBin::new(AngleBin::new(0.01, 0.01), AngleBin::new(0.0, 0.0));
+        self.result.field_bs = Some(ScattResult2D::new(bs_bin));
+        self.result.field_fs = Some(ScattResult2D::new(fs_bin));
+
         self.solve_far_queue(GOComponent::ExtDiff);
         self.solve_far_queue(GOComponent::Beam);
         self.combine_far();
     }
-
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self) {
         self.solve_near();
@@ -614,11 +771,11 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
 
     let mut clip = Face::new_simple(clip_vertices, None, None).unwrap();
     clip.data_mut().area = Some((max[0] - min[0]) * (max[1] - min[1]));
-    let mut field = Field::new_identity(Vector3::x(), -Vector3::z()).unwrap();
+    let mut field = Field::new_identity(default_e_perp(), default_prop()).unwrap();
 
     // propagate field backwards so its as if the beam comes from z=0
-    let dist = bounds.1[2];
-    let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
+    let dist = bounds.1[2] * FAC;
+    let wavenumber = 2.0 * PI / wavelength;
     let arg = -dist * wavenumber * medium_refractive_index.re;
     field.wind(arg);
 

@@ -203,8 +203,8 @@ pub fn n2f_aperture_diffraction(
     // Iterate over the flattened combinations
     for (index, bin) in bins.iter().enumerate() {
         // Compute sin and cos values for current theta and phi bin centers
-        let (sin_theta, cos_theta) = bin.theta_bin.center.to_radians().sin_cos();
-        let (sin_phi, cos_phi) = bin.phi_bin.center.to_radians().sin_cos();
+        let (sin_theta, cos_theta) = bin.theta.center.to_radians().sin_cos();
+        let (sin_phi, cos_phi) = bin.phi.center.to_radians().sin_cos();
 
         // Calculate observation direction in original frame
         let k_obs = Vector3::new(sin_theta * cos_phi, sin_theta * sin_phi, -cos_theta);
@@ -308,7 +308,7 @@ fn get_rotations(
     (karczewski, rot4, prerotation)
 }
 
-fn init_diff(
+pub fn init_diff(
     verts: &[Point3<f32>],
     ampl: &mut Matrix2<Complex<f32>>,
     prop: Vector3<f32>,
@@ -327,7 +327,7 @@ fn init_diff(
 
     let center_of_mass = geom::calculate_center_of_mass(verts);
 
-    let relative_vertices = geom::translate(verts, &center_of_mass);
+    let relative_vertices = geom::negative_translate(verts, &center_of_mass);
 
     let rot1 = get_rotation_matrix2(&relative_vertices);
     let prop1 = rot1 * prop;

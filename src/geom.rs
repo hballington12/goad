@@ -461,6 +461,24 @@ impl FaceData {
         vec.dot(&proj)
     }
 
+    /// Returns a new FaceData with reversed vertex order and flipped normal.
+    pub fn flipped(&self) -> Result<Self> {
+        // let mut reversed_verts = self.exterior.clone();
+        let vertices = self.exterior.clone();
+        // reversed_verts.reverse();
+        let reversed_indices = self.exterior_indices.as_ref().map(|indices| {
+            let mut rev = indices.clone();
+            rev.reverse();
+            rev
+        });
+        // let indices = self.exterior_indices.clone();
+        let mut flipped = FaceData::new(vertices, self.shape_id, reversed_indices)?;
+        // also manually flip the normal
+        flipped.normal = -self.normal;
+        flipped.area = self.area;
+        Ok(flipped)
+    }
+
     /// Returns the minimum value of the vertices in a `FaceData` along the
     /// specified dimension.
     pub fn vert_min(&self, dim: usize) -> Result<f32> {
@@ -774,6 +792,17 @@ impl Face {
         match self {
             Face::Simple(data) => data.midpoint,
             Face::Complex { data, .. } => data.midpoint,
+        }
+    }
+
+    /// Returns a new Face with reversed vertex order and flipped normal.
+    pub fn flipped(&self) -> Result<Self> {
+        match self {
+            Face::Simple(data) => Ok(Face::Simple(data.flipped()?)),
+            Face::Complex { data, interiors } => Ok(Face::Complex {
+                data: data.flipped()?,
+                interiors: interiors.clone(),
+            }),
         }
     }
 
@@ -1598,7 +1627,10 @@ pub fn calculate_center_of_mass(verts: &[Point3<f32>]) -> Point3<f32> {
     )
 }
 
-pub fn translate(verts: &[Point3<f32>], center_of_mass: &Point3<f32>) -> Vec<Vector3<f32>> {
+pub fn negative_translate(
+    verts: &[Point3<f32>],
+    center_of_mass: &Point3<f32>,
+) -> Vec<Vector3<f32>> {
     verts
         .iter()
         .map(|point| point.coords - center_of_mass.coords)

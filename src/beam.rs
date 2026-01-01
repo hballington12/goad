@@ -3,16 +3,16 @@ use std::f32::consts::PI;
 
 use geo::Coord;
 
-use nalgebra::{Complex, Matrix2, Point3, Vector3};
+use nalgebra::{Complex, Matrix2, Matrix4, Point3, Vector3};
 
 use crate::{
     bins::SolidAngleBin,
     clip::Clipping,
-    diff,
+    diff2::{self, IncidentBeam},
     field::{Ampl, Field},
     fresnel,
     geom::{Face, Geom},
-    settings,
+    settings::{self, default_e_perp, default_prop},
     snell::get_theta_t,
 };
 
@@ -189,6 +189,7 @@ impl Beam {
             let n2 = self.get_n2(geom, face, normal, medium_refr_index);
             let e_perp = self.get_e_perp(&normal);
             let mut field = self.field.new_from_e_perp(&e_perp);
+
             let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.field.prop()); // z-distance
             let wavenumber = self.wavenumber();
             field.wind(dist * wavenumber * n1.re); // increment phase
@@ -201,16 +202,18 @@ impl Beam {
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
             if self.variant == BeamVariant::Initial {
-                let external_diff = Beam::new(
-                    face.clone(),
-                    n1,
-                    self.rec_count + 1,
-                    self.tir_count,
-                    field.clone(),
-                    BeamVariant::ExternalDiff,
-                    self.wavelength,
-                );
-                outputs.push(external_diff);
+                if let Ok(flipped_face) = face.flipped() {
+                    let external_diff = Beam::new(
+                        flipped_face,
+                        n1,
+                        self.rec_count + 1,
+                        self.tir_count,
+                        field.clone(),
+                        BeamVariant::ExternalDiff,
+                        self.wavelength,
+                    );
+                    outputs.push(external_diff);
+                }
             }
 
             // untracked energy leaks can occur here if the amplitude matrix contains NaN values
@@ -524,25 +527,54 @@ impl Beam {
         2.0 * PI / self.wavelength
     }
 
-    pub fn diffract(&self, bins: &[SolidAngleBin], fov_factor: Option<f32>) -> Vec<(usize, Ampl)> {
+    /// Returns a new Beam with the given 4x4 transformation matrix applied.
+    /// The transformation is applied to the face (vertices, normal, midpoint)
+    /// and the field (prop and e_perp vectors are rotated by the upper-left 3x3).
+    pub fn transformed(&self, transform: &Matrix4<f32>) -> Result<Self> {
+        // Clone and transform the face
+        let mut new_face = self.face.clone();
+        new_face.transform(transform)?;
+
+        // Extract the 3x3 rotation part from the 4x4 matrix
+        let rot3 = transform.fixed_view::<3, 3>(0, 0).into_owned();
+
+        // Rotate the field
+        let new_field = self.field.rotated(&rot3);
+
+        Ok(Self {
+            face: new_face,
+            refr_index: self.refr_index,
+            rec_count: self.rec_count,
+            tir_count: self.tir_count,
+            field: new_field,
+            absorbed_power: self.absorbed_power,
+            clipping_area: self.clipping_area,
+            variant: self.variant.clone(),
+            wavelength: self.wavelength,
+        })
+    }
+
+    pub fn diffract(
+        &self,
+        bins: &[SolidAngleBin],
+        fov_factor: Option<f32>,
+        // incidence_beam: Option<&IncidentBeam>,
+    ) -> Vec<(usize, Ampl)> {
         match &self.face {
-            Face::Simple(face) => {
-                let verts = &face.exterior;
-                let ampl = self.field.ampl();
-                let prop = self.field.prop();
-                let vk7 = self.field.e_perp();
-                diff::n2f_aperture_diffraction(
-                    verts,
-                    ampl,
-                    prop,
-                    vk7,
+            Face::Simple(..) => {
+                // TODO: remove match statement
+                let result = diff2::n2f_aperture_diffraction(
+                    &self,
                     bins,
-                    self.wavenumber(),
+                    // reference,
+                    &IncidentBeam {
+                        e_perp: default_e_perp(), // to match basic_initial_beam
+                        prop: default_prop(),
+                    },
                     fov_factor,
                 )
-                .into_iter()
-                .enumerate()
-                .collect()
+                .unwrap_or_default();
+                result.into_iter().collect()
             }
             Face::Complex { .. } => {
                 println!("complex face not supported yet...");
