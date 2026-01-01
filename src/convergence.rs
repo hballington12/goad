@@ -3,7 +3,7 @@ mod progress;
 mod python;
 
 pub use convergeable::{Convergeable, ConvergenceTracker};
-use log::{error, info};
+use log::{error, info, warn};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -172,7 +172,7 @@ impl Convergence {
         std::thread::available_parallelism()
             .map(|p| p.get())
             .unwrap_or_else(|e| {
-                eprintln!(
+                warn!(
                     "Warning: Could not determine available parallelism ({}), defaulting to 4",
                     e
                 );
@@ -284,10 +284,10 @@ impl Convergence {
         progress.update_info(count);
         // Update per-target progress bars
         if count >= MIN_ORIENTATIONS {
-            let mean = self.tracker.mean();
-            let sem = self.tracker.sem();
+            let mean_results = self.tracker.mean();
+            let sem_results = self.tracker.sem();
             for (i, target) in self.targets.iter().enumerate() {
-                self.update_target(progress, i, target, &mean, &sem);
+                self.update_target(progress, i, target, &mean_results, &sem_results);
             }
         }
         // Check convergence periodically (every orientation after minimum)
