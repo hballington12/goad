@@ -957,8 +957,14 @@ impl Results {
             );
         }
 
-        // Backscatter params (if field_bs is available)
-        if let Some(ref field_bs) = self.field_bs {
+        // Backscatter params - prefer zones, fall back to legacy field_bs
+        let field_bs = self
+            .zones
+            .backward_zone()
+            .and_then(|z| z.field_2d.first())
+            .or(self.field_bs.as_ref());
+
+        if let Some(field_bs) = field_bs {
             let k = 2.0 * PI / wavelength;
 
             // BackscatterCross = S11 * 4π / k²
@@ -995,7 +1001,14 @@ impl Results {
         }
 
         // Optical theorem: ExtCross = (4π/k) * Im[S_2] at θ=0°
-        if let Some(ref field_fs) = self.field_fs {
+        // Prefer zones, fall back to legacy field_fs
+        let field_fs = self
+            .zones
+            .forward_zone()
+            .and_then(|z| z.field_2d.first())
+            .or(self.field_fs.as_ref());
+
+        if let Some(field_fs) = field_fs {
             let k = 2.0 * PI / wavelength;
             let s2 = field_fs.ampl_total[(0, 0)];
             // let s1 = field_fs[(1, 1)]; // can also use s1 here since e perp and e par are indistinguishable in the direct forwards
