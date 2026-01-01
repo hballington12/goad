@@ -10,6 +10,7 @@ fn main() {
     let mut settings = settings::load_default_config().unwrap();
 
     // Use uniform random orientations (enough for convergence)
+    // TODO: fix this because it shouldn't be a requirement
     settings.orientation = Orientation {
         scheme: Scheme::Uniform { num_orients: 2000 },
         euler_convention: EulerConvention::ZYZ,
@@ -22,6 +23,9 @@ fn main() {
     convergence.add_target(Param::Asymmetry, 0.03);
     convergence.add_target(Param::Asymmetry, 0.02);
     convergence.add_target(Param::ScatCross, 0.02);
+    convergence.add_target(Param::ExtCrossOpticalTheorem, 0.02);
+    convergence.add_target(Param::DepolarizationRatio, 0.1);
+    convergence.add_target(Param::LidarRatio, 0.1);
 
     // Optionally set max orientations as safety cap (default is 100k)
     convergence.max_orientations = 500;

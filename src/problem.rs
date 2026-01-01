@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
@@ -353,8 +351,10 @@ impl Problem {
                 let mut fs_ampl = Ampl::zeros();
                 for beam in queue.iter() {
                     let ampls = beam.diffract(&[field_fs.bin], fov_factor);
-                    let ampl = ampls[0].1;
-                    fs_ampl += ampl;
+                    if !ampls.is_empty() {
+                        let ampl = ampls[0].1;
+                        fs_ampl += ampl;
+                    }
                 }
                 match component {
                     GOComponent::Beam => field_fs.ampl_beam += fs_ampl,
