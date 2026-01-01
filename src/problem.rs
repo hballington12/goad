@@ -1,11 +1,9 @@
 use std::f32::consts::PI;
 
-use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
 use crate::multiproblem::{init_result, load_settings_or_default};
-use crate::result::ScattResult2D;
 use crate::settings::{default_e_perp, default_prop};
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
@@ -276,232 +274,6 @@ impl Problem {
         }
     }
 
-    /// Combines the external diffraction and outbeams to get the far-field solution.
-    fn combine_far(&mut self) {
-        for result in self.result.field_2d.iter_mut() {
-            if self.settings.coherence {
-                result.ampl_total = result.ampl_beam + result.ampl_ext;
-                result.mueller_total = result.ampl_total.to_mueller();
-            } else {
-                result.mueller_total = result.mueller_beam + result.mueller_ext;
-            }
-        }
-        if let Some(ref mut field_bs) = self.result.field_bs {
-            if self.settings.coherence {
-                field_bs.ampl_total = field_bs.ampl_beam + field_bs.ampl_ext;
-                field_bs.mueller_total = field_bs.ampl_total.to_mueller();
-            } else {
-                field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
-            }
-        }
-        if let Some(ref mut field_fs) = self.result.field_fs {
-            field_fs.ampl_total = field_fs.ampl_beam + field_fs.ampl_ext;
-            field_fs.mueller_total = field_fs.ampl_total.to_mueller();
-        }
-    }
-
-    fn ampl_to_mueller(&mut self, component: GOComponent) {
-        for result in self.result.field_2d.iter_mut() {
-            match component {
-                GOComponent::Total => {
-                    result.mueller_total = result.ampl_total.to_mueller();
-                }
-                GOComponent::Beam => {
-                    result.mueller_beam = result.ampl_beam.to_mueller();
-                }
-                GOComponent::ExtDiff => {
-                    result.mueller_ext = result.ampl_ext.to_mueller();
-                }
-            }
-        }
-    }
-
-    fn assign_ampls(&mut self, component: GOComponent, ampls: Vec<Ampl>) {
-        for (field, ampl) in self.result.field_2d.iter_mut().zip(ampls) {
-            match component {
-                GOComponent::Total => field.ampl_total = ampl,
-                GOComponent::Beam => field.ampl_beam = ampl,
-                GOComponent::ExtDiff => field.ampl_ext = ampl,
-            }
-        }
-    }
-
-    fn assign_muellers(&mut self, component: GOComponent, muellers: Vec<Mueller>) {
-        for (field, mueller) in self.result.field_2d.iter_mut().zip(muellers) {
-            match component {
-                GOComponent::Total => field.mueller_total = mueller,
-                GOComponent::Beam => field.mueller_beam = mueller,
-                GOComponent::ExtDiff => field.mueller_ext = mueller,
-            }
-        }
-    }
-
-    /// Forward scatter - always coherent (optical theorem), aperture diffraction only
-    fn solve_far_fs(&mut self, component: GOComponent, queue: &[Beam], fov_factor: Option<f32>) {
-        if let Some(ref mut field_fs) = self.result.field_fs {
-            let mut fs_ampl = Ampl::zeros();
-            for beam in queue.iter() {
-                let ampls = beam.diffract(&[field_fs.bin], fov_factor);
-                if !ampls.is_empty() {
-                    let ampl = ampls[0].1;
-                    fs_ampl += ampl;
-                }
-            }
-            match component {
-                GOComponent::Beam => field_fs.ampl_beam += fs_ampl,
-                GOComponent::ExtDiff => field_fs.ampl_ext += fs_ampl,
-                GOComponent::Total => field_fs.ampl_total += fs_ampl,
-            }
-        }
-    }
-
-    /// Backscatter - respects coherence setting, aperture diffraction only
-    fn solve_far_bs(&mut self, component: GOComponent, queue: &[Beam], fov_factor: Option<f32>) {
-        if let Some(ref mut field_bs) = self.result.field_bs {
-            if self.settings.coherence {
-                let mut bs_ampl = Ampl::zeros();
-                for beam in queue.iter() {
-                    let ampls = beam.diffract(&[field_bs.bin], fov_factor);
-                    if !ampls.is_empty() {
-                        let ampl = ampls[0].1;
-                        bs_ampl += ampl;
-                    }
-                }
-                match component {
-                    GOComponent::Beam => {
-                        field_bs.ampl_beam += bs_ampl;
-                        field_bs.mueller_beam = field_bs.ampl_beam.to_mueller();
-                    }
-                    GOComponent::ExtDiff => {
-                        field_bs.ampl_ext += bs_ampl;
-                        field_bs.mueller_ext = field_bs.ampl_ext.to_mueller();
-                    }
-                    GOComponent::Total => {
-                        field_bs.ampl_total += bs_ampl;
-                        field_bs.mueller_total = field_bs.ampl_total.to_mueller();
-                    }
-                }
-            } else {
-                let mut bs_mueller = Mueller::zeros();
-                for beam in queue.iter() {
-                    let ampls = beam.diffract(&[field_bs.bin], fov_factor);
-                    let ampl = ampls[0].1;
-                    bs_mueller += ampl.to_mueller();
-                }
-                match component {
-                    GOComponent::Beam => field_bs.mueller_beam += bs_mueller,
-                    GOComponent::ExtDiff => field_bs.mueller_ext += bs_mueller,
-                    GOComponent::Total => field_bs.mueller_total += bs_mueller,
-                }
-            }
-        }
-    }
-
-    /// Main bins - respects coherence setting, supports both mapping types
-    fn solve_far_main(
-        &mut self,
-        component: GOComponent,
-        queue: &[Beam],
-        mapping: Mapping,
-        fov_factor: Option<f32>,
-    ) {
-        // Mapping helper closure
-        let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
-            match mapping {
-                Mapping::GeometricOptics => n2f_go(
-                    &self.settings.first_zone_binning(),
-                    &self.result.bins(),
-                    beam,
-                ),
-                Mapping::ApertureDiffraction => beam.diffract(&self.result.bins(), fov_factor),
-            }
-        };
-
-        if self.settings.coherence {
-            let zero_ampls: Vec<(usize, Ampl)> = self
-                .result
-                .field_2d
-                .iter()
-                .map(|_| Ampl::zeros())
-                .into_iter()
-                .enumerate()
-                .collect();
-            let ampls: Vec<Ampl> = queue
-                .par_iter()
-                .map(|beam| map_beam_to_far_field(beam))
-                .reduce(
-                    || zero_ampls.clone(),
-                    |mut acc, val| {
-                        for (i, ampl) in val.into_iter() {
-                            acc[i].1 += ampl;
-                        }
-                        acc
-                    },
-                )
-                .into_iter()
-                .map(|x| x.1)
-                .collect();
-
-            self.assign_ampls(component, ampls);
-            self.ampl_to_mueller(component);
-        } else {
-            let zero_muellers: Vec<(usize, Mueller)> = self
-                .result
-                .field_2d
-                .iter()
-                .map(|_| Mueller::zeros())
-                .into_iter()
-                .enumerate()
-                .collect();
-            let muellers: Vec<Mueller> = queue
-                .par_iter()
-                .map(|beam| {
-                    let ampls = map_beam_to_far_field(beam);
-                    let muellers = ampls.into_iter().map(|x| (x.0, x.1.to_mueller())).collect();
-                    muellers
-                })
-                .reduce(
-                    || zero_muellers.clone(),
-                    |mut acc, val| {
-                        for (i, mueller) in val.into_iter() {
-                            acc[i].1 += mueller;
-                        }
-                        acc
-                    },
-                )
-                .into_iter()
-                .map(|x| x.1)
-                .collect();
-
-            self.assign_muellers(component, muellers);
-        }
-    }
-
-    pub fn solve_far_queue(&mut self, component: GOComponent) {
-        let (queue, mapping, fov_factor) = match component {
-            GOComponent::Beam => (
-                &self.out_beam_queue,
-                self.settings.mapping,
-                self.settings.fov_factor,
-            ),
-            GOComponent::ExtDiff => (
-                &self.ext_diff_beam_queue,
-                Mapping::ApertureDiffraction,
-                None,
-            ),
-            GOComponent::Total => {
-                panic!("No such beam queue exists for GOComponent: {:?}", component)
-            }
-        };
-
-        // Clone the queue to avoid borrow issues
-        let queue_clone: Vec<Beam> = queue.clone();
-
-        self.solve_far_fs(component, &queue_clone, fov_factor);
-        self.solve_far_main(component, &queue_clone, mapping, fov_factor);
-        self.solve_far_bs(component, &queue_clone, fov_factor);
-    }
-
     /// Solve far field for a single zone.
     ///
     /// Determines coherence based on zone type:
@@ -650,16 +422,31 @@ impl Problem {
             self.combine_far_zone(zone_idx);
         }
 
-        // Legacy: also populate field_bs/field_fs/field_2d for backward compatibility
-        // TODO: Remove once all consumers use zones
-        let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
-        let fs_bin = SolidAngleBin::new(AngleBin::new(0.01, 0.01), AngleBin::new(0.0, 0.0));
-        self.result.field_bs = Some(ScattResult2D::new(bs_bin));
-        self.result.field_fs = Some(ScattResult2D::new(fs_bin));
+        // Copy zone results to legacy fields for backward compatibility
+        self.copy_zones_to_legacy();
+    }
 
-        self.solve_far_queue(GOComponent::ExtDiff);
-        self.solve_far_queue(GOComponent::Beam);
-        self.combine_far();
+    /// Copy zone results to legacy field_2d/field_bs/field_fs fields.
+    /// TODO: Remove once all consumers use zones directly.
+    fn copy_zones_to_legacy(&mut self) {
+        // Copy first Full zone to field_2d
+        if let Some(full_zone) = self.result.zones.full_zone() {
+            self.result.field_2d = full_zone.field_2d.clone();
+        }
+
+        // Copy Forward zone to field_fs
+        if let Some(forward_zone) = self.result.zones.forward_zone() {
+            if let Some(field) = forward_zone.field_2d.first() {
+                self.result.field_fs = Some(field.clone());
+            }
+        }
+
+        // Copy Backward zone to field_bs
+        if let Some(backward_zone) = self.result.zones.backward_zone() {
+            if let Some(field) = backward_zone.field_2d.first() {
+                self.result.field_bs = Some(field.clone());
+            }
+        }
     }
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self) {

@@ -116,10 +116,11 @@ impl Zone {
         }
     }
 
-    /// Create a forward scattering zone (single bin at theta=0).
+    /// Create a forward scattering zone (single bin at theta≈0).
+    /// Uses theta=0.01 to match legacy behavior and avoid singularity at exact zero.
     pub fn forward() -> Self {
         let scheme = Scheme::Custom {
-            bins: vec![[[0.0, 0.0], [0.0, 360.0]]],
+            bins: vec![[[0.01, 0.01], [0.0, 0.0]]],
             file: None,
         };
         let bins = scheme.generate();
@@ -141,7 +142,7 @@ impl Zone {
     /// Create a backscatter zone (single bin at theta=180).
     pub fn backward() -> Self {
         let scheme = Scheme::Custom {
-            bins: vec![[[180.0, 180.0], [0.0, 360.0]]],
+            bins: vec![[[180.0, 180.0], [0.0, 0.0]]],
             file: None,
         };
         let bins = scheme.generate();
