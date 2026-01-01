@@ -471,7 +471,7 @@ impl FaceData {
             rev.reverse();
             rev
         });
-        let indices = self.exterior_indices.clone();
+        // let indices = self.exterior_indices.clone();
         let mut flipped = FaceData::new(vertices, self.shape_id, reversed_indices)?;
         // also manually flip the normal
         flipped.normal = -self.normal;

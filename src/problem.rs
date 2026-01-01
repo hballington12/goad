@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
@@ -15,7 +17,7 @@ use crate::{
 };
 
 use anyhow::Result;
-use nalgebra::{Complex, Point3, Vector3};
+use nalgebra::{Complex, Point3};
 use pyo3::prelude::*;
 use rayon::prelude::*;
 
@@ -773,13 +775,11 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
 
     // propagate field backwards so its as if the beam comes from z=0
     let dist = bounds.1[2] * FAC;
-    let wavenumber = 2.0 * std::f32::consts::PI / wavelength;
+    let wavenumber = 2.0 * PI / wavelength;
     let arg = -dist * wavenumber * medium_refractive_index.re;
     field.wind(arg);
 
     let beam = Beam::new_from_field(clip, medium_refractive_index, field, wavelength);
-    // Debug hook for initial beam
-    let a = beam.field.ampl();
     beam
 }
 

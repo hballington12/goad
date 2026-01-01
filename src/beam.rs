@@ -8,7 +8,6 @@ use nalgebra::{Complex, Matrix2, Matrix4, Point3, Vector3};
 use crate::{
     bins::SolidAngleBin,
     clip::Clipping,
-    diff,
     diff2::{self, IncidentBeam},
     field::{Ampl, Field},
     fresnel,
@@ -562,16 +561,8 @@ impl Beam {
         // incidence_beam: Option<&IncidentBeam>,
     ) -> Vec<(usize, Ampl)> {
         match &self.face {
-            Face::Simple(face) => {
+            Face::Simple(..) => {
                 // TODO: remove match statement
-                // use the reference if given, else use the beam as reference
-                // let reference = match incidence_beam {
-                //     Some(beam) => beam,
-                //     None => &IncidentBeam {
-                //         e_perp: self.field.e_perp(),
-                //         prop: self.field.prop(),
-                //     },
-                // };
                 let result = diff2::n2f_aperture_diffraction(
                     &self,
                     bins,
