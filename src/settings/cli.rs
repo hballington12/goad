@@ -1,4 +1,5 @@
 use clap::{Args, Parser};
+use log::{error, trace, warn};
 use nalgebra::Complex;
 use std::path::PathBuf;
 
@@ -224,50 +225,84 @@ pub fn update_settings_from_cli(config: &mut Settings) {
     let args = CliArgs::parse();
 
     if let Some(wavelength) = args.propagation.w {
+        trace!("config updated from cli arg: wavelength = {}", wavelength);
         config.wavelength = wavelength;
     }
     if let Some(medium) = args.material.ri0 {
+        trace!(
+            "config updated from cli arg: medium_refr_index = {}",
+            medium
+        );
         config.medium_refr_index = medium;
     }
-    if let Some(particle) = args.material.ri {
+    if let Some(particle) = args.material.ri.clone() {
+        trace!(
+            "config updated from cli arg: particle_refr_index = {:?}",
+            particle
+        );
         config.particle_refr_index = particle;
     }
-    if let Some(geo) = args.material.geo {
+    if let Some(geo) = args.material.geo.clone() {
+        trace!("config updated from cli arg: geom_name = {}", geo);
         config.geom_name = geo;
     }
     if let Some(mp) = args.propagation.bp {
+        trace!("config updated from cli arg: beam_power_threshold = {}", mp);
         config.beam_power_threshold = mp;
     }
     if let Some(maf) = args.propagation.baf {
+        trace!(
+            "config updated from cli arg: beam_area_threshold_fac = {}",
+            maf
+        );
         config.beam_area_threshold_fac = maf;
     }
     if let Some(cop) = args.propagation.cop {
+        trace!("config updated from cli arg: cutoff = {}", cop);
         config.cutoff = cop;
     }
     if let Some(rec) = args.propagation.rec {
+        trace!("config updated from cli arg: max_rec = {}", rec);
         config.max_rec = rec;
     }
     if let Some(tir) = args.propagation.tir {
+        trace!("config updated from cli arg: max_tir = {}", tir);
         config.max_tir = tir;
     }
 
     let euler_convention = args.orientation.euler.unwrap_or(DEFAULT_EULER_ORDER);
 
     if let Some(num_orients) = args.orientation.uniform {
+        trace!(
+            "config updated from cli arg: orientation = Uniform {{ num_orients: {} }}",
+            num_orients
+        );
         config.orientation = Orientation {
             scheme: Scheme::Uniform { num_orients },
             euler_convention,
         };
-    } else if let Some(eulers) = args.orientation.discrete {
+    } else if let Some(eulers) = args.orientation.discrete.clone() {
+        trace!(
+            "config updated from cli arg: orientation = Discrete {{ eulers: {:?} }}",
+            eulers
+        );
         config.orientation = Orientation {
             scheme: Scheme::Discrete { eulers },
             euler_convention,
         };
     } else if let Some(convention) = args.orientation.euler {
+        trace!(
+            "config updated from cli arg: euler_convention = {:?}",
+            convention
+        );
         config.orientation.euler_convention = convention;
     }
 
     if let Some(custom_path) = &args.binning.custom {
+        trace!(
+            "config updated from cli arg: binning = Custom {{ file: {} }}",
+            custom_path
+        );
         config.binning = BinningScheme {
             scheme: bins::Scheme::Custom {
                 bins: vec![],
@@ -278,13 +313,16 @@ pub fn update_settings_from_cli(config: &mut Settings) {
         if simple_bins.len() == 2 {
             let num_theta = simple_bins[0];
             let num_phi = simple_bins[1];
+            trace!(
+                "config updated from cli arg: binning = Simple {{ num_theta: {}, num_phi: {} }}",
+                num_theta,
+                num_phi
+            );
             config.binning = BinningScheme {
                 scheme: bins::Scheme::new_simple(num_theta, num_phi),
             };
         } else {
-            eprintln!(
-                "Warning: Simple binning requires exactly two values. Using default binning."
-            );
+            warn!("Warning: Simple binning requires exactly two values. Using default binning.");
         }
     } else if args.binning.interval {
         let mut valid_binning = true;
@@ -293,13 +331,13 @@ pub fn update_settings_from_cli(config: &mut Settings) {
             match parse_interval_specification(theta_values) {
                 Ok(result) => result,
                 Err(err) => {
-                    eprintln!("Error in theta specification: {}", err);
+                    warn!("Error in theta specification: {}", err);
                     valid_binning = false;
                     (vec![], vec![])
                 }
             }
         } else {
-            eprintln!("Warning: Interval binning requires --theta parameter.");
+            warn!("Warning: Interval binning requires --theta parameter.");
             valid_binning = false;
             (vec![], vec![])
         };
@@ -308,18 +346,23 @@ pub fn update_settings_from_cli(config: &mut Settings) {
             match parse_interval_specification(phi_values) {
                 Ok(result) => result,
                 Err(err) => {
-                    eprintln!("Error in phi specification: {}", err);
+                    warn!("Error in phi specification: {}", err);
                     valid_binning = false;
                     (vec![], vec![])
                 }
             }
         } else {
-            eprintln!("Warning: Interval binning requires --phi parameter.");
+            warn!("Warning: Interval binning requires --phi parameter.");
             valid_binning = false;
             (vec![], vec![])
         };
 
         if valid_binning {
+            trace!(
+                "config updated from cli arg: binning = Interval {{ thetas: {:?}, phis: {:?} }}",
+                thetas,
+                phis
+            );
             config.binning = BinningScheme {
                 scheme: bins::Scheme::Interval {
                     thetas,
@@ -329,29 +372,34 @@ pub fn update_settings_from_cli(config: &mut Settings) {
                 },
             };
         } else {
-            eprintln!("Warning: Could not create interval binning. Using default binning.");
+            warn!("Warning: Could not create interval binning. Using default binning.");
         }
     }
 
-    if let Some(dir) = args.dir {
+    if let Some(dir) = args.dir.clone() {
+        trace!("config updated from cli arg: directory = {:?}", dir);
         config.directory = dir;
     }
 
     if let Some(distortion) = args.material.distortion {
+        trace!("config updated from cli arg: distortion = {}", distortion);
         config.distortion = Some(distortion);
     }
 
     if let Some(fov_factor) = args.fov_factor {
+        trace!("config updated from cli arg: fov_factor = {}", fov_factor);
         config.fov_factor = Some(fov_factor);
     }
     if let Some(mapping) = args.mapping {
+        trace!("config updated from cli arg: mapping = {:?}", mapping);
         config.mapping = mapping;
     }
 
-    if let Some(geom_scale) = args.material.geom_scale {
+    if let Some(geom_scale) = args.material.geom_scale.clone() {
         if geom_scale.len() != 3 {
             panic!("Geometry scale must have exactly 3 values (x, y, z)");
         } else {
+            trace!("config updated from cli arg: geom_scale = {:?}", geom_scale);
             config.geom_scale = Some(geom_scale);
         }
     }

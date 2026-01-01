@@ -1,5 +1,6 @@
 use anyhow::Result;
 use config::{Config, Environment, File};
+use log::{error, info, trace};
 use std::env;
 use std::path::PathBuf;
 
@@ -33,7 +34,9 @@ pub fn load_config() -> Result<Settings> {
 
 pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
     let config_file = get_config_file()?;
+    info!("loading config file: {:?}", config_file);
 
+    trace!("reading config and environment variables");
     let settings: Config = Config::builder()
         .add_source(File::from(config_file).required(true))
         .add_source(Environment::with_prefix("goad"))
@@ -43,16 +46,21 @@ pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
             std::process::exit(1);
         });
 
+    trace!("building config");
     let mut config: Settings = settings.try_deserialize().unwrap_or_else(|err| {
-        eprintln!("Error deserializing configuration: {}", err);
+        error!("Error deserializing configuration: {}", err);
         std::process::exit(1);
     });
 
+    trace!("updating config with cli args");
     if apply_cli_updates {
         cli::update_settings_from_cli(&mut config);
     }
 
+    trace!("validating config");
     validation::validate_config(&mut config);
+
+    info!("config loaded successfully");
 
     Ok(config)
 }
