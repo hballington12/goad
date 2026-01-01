@@ -3,10 +3,11 @@ use log::{trace, warn};
 use nalgebra::Complex;
 use std::path::PathBuf;
 
-use crate::bins::{self, BinningScheme};
+use crate::bins::{self};
 use crate::diff::Mapping;
 use crate::orientation::{Euler, EulerConvention, Orientation, Scheme};
 use crate::settings::{Settings, DEFAULT_EULER_ORDER};
+use crate::zones::ZoneConfig;
 
 #[derive(Parser, Debug)]
 #[command(version, about = "GOAD - Geometric Optics with Aperture Diffraction")]
@@ -298,31 +299,30 @@ pub fn update_settings_from_cli(config: &mut Settings) {
         config.orientation.euler_convention = convention;
     }
 
+    // CLI binning args create a single zone (replaces existing zones)
     if let Some(custom_path) = &args.binning.custom {
         trace!(
-            "config updated from cli arg: binning = Custom {{ file: {} }}",
+            "config updated from cli arg: zone = Custom {{ file: {} }}",
             custom_path
         );
-        config.binning = BinningScheme {
-            scheme: bins::Scheme::Custom {
-                bins: vec![],
-                file: Some(custom_path.clone()),
-            },
-        };
+        config.zones = vec![ZoneConfig::new(bins::Scheme::Custom {
+            bins: vec![],
+            file: Some(custom_path.clone()),
+        })];
     } else if let Some(simple_bins) = &args.binning.simple {
         if simple_bins.len() == 2 {
             let num_theta = simple_bins[0];
             let num_phi = simple_bins[1];
             trace!(
-                "config updated from cli arg: binning = Simple {{ num_theta: {}, num_phi: {} }}",
+                "config updated from cli arg: zone = Simple {{ num_theta: {}, num_phi: {} }}",
                 num_theta,
                 num_phi
             );
-            config.binning = BinningScheme {
-                scheme: bins::Scheme::new_simple(num_theta, num_phi),
-            };
+            config.zones = vec![ZoneConfig::new(bins::Scheme::new_simple(
+                num_theta, num_phi,
+            ))];
         } else {
-            warn!("Warning: Simple binning requires exactly two values. Using default binning.");
+            warn!("Warning: Simple binning requires exactly two values. Using default zones.");
         }
     } else if args.binning.interval {
         let mut valid_binning = true;
@@ -359,20 +359,18 @@ pub fn update_settings_from_cli(config: &mut Settings) {
 
         if valid_binning {
             trace!(
-                "config updated from cli arg: binning = Interval {{ thetas: {:?}, phis: {:?} }}",
+                "config updated from cli arg: zone = Interval {{ thetas: {:?}, phis: {:?} }}",
                 thetas,
                 phis
             );
-            config.binning = BinningScheme {
-                scheme: bins::Scheme::Interval {
-                    thetas,
-                    theta_spacings,
-                    phis,
-                    phi_spacings,
-                },
-            };
+            config.zones = vec![ZoneConfig::new(bins::Scheme::Interval {
+                thetas,
+                theta_spacings,
+                phis,
+                phi_spacings,
+            })];
         } else {
-            warn!("Warning: Could not create interval binning. Using default binning.");
+            warn!("Warning: Could not create interval binning. Using default zones.");
         }
     }
 

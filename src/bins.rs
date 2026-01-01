@@ -235,6 +235,29 @@ impl Scheme {
         }
     }
 
+    /// Returns the theta range (min, max) for this scheme.
+    pub fn theta_range(&self) -> (f32, f32) {
+        match self {
+            Scheme::Simple { .. } => (0.0, 180.0),
+            Scheme::Interval { thetas, .. } => {
+                let min = thetas.first().copied().unwrap_or(0.0);
+                let max = thetas.last().copied().unwrap_or(180.0);
+                (min, max)
+            }
+            Scheme::Custom { bins, .. } => {
+                if bins.is_empty() {
+                    return (0.0, 0.0);
+                }
+                let min = bins.iter().map(|b| b[0][0]).fold(f32::INFINITY, f32::min);
+                let max = bins
+                    .iter()
+                    .map(|b| b[0][1])
+                    .fold(f32::NEG_INFINITY, f32::max);
+                (min, max)
+            }
+        }
+    }
+
     /// Generate the bins for this scheme.
     pub fn generate(&self) -> Vec<SolidAngleBin> {
         match self {

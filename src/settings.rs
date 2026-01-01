@@ -8,10 +8,16 @@ use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::bins;
+use crate::bins::{self, BinningScheme};
 use crate::diff::Mapping;
 use crate::orientation::Euler;
-use crate::{bins::BinningScheme, orientation::*};
+use crate::orientation::*;
+use crate::zones::ZoneConfig;
+
+/// Provides a default empty zones vec.
+fn default_zones() -> Vec<ZoneConfig> {
+    vec![]
+}
 
 /// Configuration for output file generation
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -61,7 +67,13 @@ pub struct Settings {
     pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,
-    pub binning: BinningScheme,
+    /// Zones for binning (new format). Takes precedence over `binning`.
+    #[serde(default = "default_zones")]
+    pub zones: Vec<ZoneConfig>,
+    /// Legacy binning field (deprecated, use `zones` instead).
+    /// If present and zones is empty, this will be converted to a single zone.
+    #[serde(default, skip_serializing)]
+    pub binning: Option<BinningScheme>,
     pub seed: Option<u64>,
     /// Problem scaling factor - scales the entire problem (geometry, wavelength, and beam area thresholds)
     #[serde(default = "constants::default_scale_factor")]
@@ -94,7 +106,6 @@ impl Settings {
         medium_refr_index_re = DEFAULT_MEDIUM_REFR_INDEX_RE,
         medium_refr_index_im = DEFAULT_MEDIUM_REFR_INDEX_IM,
         orientation = None,
-        binning = None,
         beam_power_threshold = DEFAULT_BEAM_POWER_THRESHOLD,
         beam_area_threshold_fac = DEFAULT_BEAM_AREA_THRESHOLD_FAC,
         cutoff = DEFAULT_CUTOFF,
@@ -116,7 +127,6 @@ impl Settings {
         medium_refr_index_re: f32,
         medium_refr_index_im: f32,
         orientation: Option<Orientation>,
-        binning: Option<BinningScheme>,
         beam_power_threshold: f32,
         beam_area_threshold_fac: f32,
         cutoff: f32,
@@ -171,15 +181,13 @@ impl Settings {
             euler_convention: DEFAULT_EULER_ORDER,
         });
 
-        // Create default binning if none provided (interval binning with high resolution)
-        let binning = binning.unwrap_or_else(|| BinningScheme {
-            scheme: bins::Scheme::Interval {
-                thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
-                theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
-                phis: vec![0.0, 360.0],
-                phi_spacings: vec![7.5],
-            },
-        });
+        // Create default zones (single full zone with interval binning)
+        let zones = vec![ZoneConfig::new(bins::Scheme::Interval {
+            thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
+            theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
+            phis: vec![0.0, 360.0],
+            phi_spacings: vec![7.5],
+        })];
 
         let mut settings = Settings {
             wavelength,
@@ -192,7 +200,8 @@ impl Settings {
             geom_name: geom_path,
             max_rec,
             max_tir,
-            binning,
+            zones,
+            binning: None,
             seed,
             scale,
             distortion,
@@ -374,17 +383,7 @@ impl Settings {
         self.max_tir
     }
 
-    /// Set the binning scheme
-    #[setter]
-    fn set_binning(&mut self, binning: BinningScheme) {
-        self.binning = binning;
-    }
-
-    /// Get the binning scheme
-    #[getter]
-    fn get_binning(&self) -> BinningScheme {
-        self.binning.clone()
-    }
+    // TODO: Add zones getter/setter when ZoneConfig has PyO3 bindings
 
     /// Set the per-axis geometry scaling [x, y, z]
     #[setter]
@@ -450,5 +449,24 @@ impl Settings {
 impl Settings {
     pub fn beam_area_threshold(&self) -> f32 {
         self.wavelength * self.wavelength * self.beam_area_threshold_fac * self.scale.powi(2)
+    }
+
+    /// Get the first zone's scheme (for backward compatibility during migration).
+    /// Panics if no zones are configured.
+    pub fn first_zone_scheme(&self) -> &bins::Scheme {
+        &self.zones.first().expect("No zones configured").scheme
+    }
+
+    /// Get the first zone's binning scheme as a BinningScheme (for backward compatibility).
+    /// Panics if no zones are configured.
+    pub fn first_zone_binning(&self) -> BinningScheme {
+        BinningScheme {
+            scheme: self
+                .zones
+                .first()
+                .expect("No zones configured")
+                .scheme
+                .clone(),
+        }
     }
 }

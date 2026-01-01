@@ -35,29 +35,37 @@ geom_scale = [1,1,1]        # Scale factor for the geometry
 mapping = "ApertureDiffraction" # ApertureDiffraction / GeometricOptics
 coherence = true # Enable coherence for near to far field mapping
 
-[binning] # Binning configuration
+# ===================================
+# ZONES CONFIGURATION
+# ===================================
+# Zones define angular regions for scattering calculations.
+# Each zone has its own binning scheme and computed parameters.
+# Zone type is inferred: 0-180 theta = Full, otherwise = Custom.
+# Forward and Backward zones are added automatically.
 
-[binning.scheme] # Uncomment the desired binning scheme below
-
-
-# [binning.scheme.Simple] # Simple square grid binning
-# num_theta = 180 # Number of theta bins
-# num_phi = 5    # Number of phi bins
-
-[binning.scheme.Interval] # Interval binning with specified theta and phi spacings
-thetas = [0,180]
-theta_spacings =[2]
+[[zones]]
+label = "main"
+[zones.scheme.Interval]
+thetas = [0, 180]
+theta_spacings = [2]
 phis = [0, 360]
 phi_spacings = [4]
 
-# [binning.scheme.Custom] # Custom binning with specified bin edges [[theta_min, theta_max], [phi_min, phi_max]]
-# bins = [
-#     [[0.0, 10.0], [0.0, 90.0]],      # First bin: theta 0-10°, phi 0-90°
-#     [[0.0, 10.0], [90.0, 180.0]],    # Second bin: theta 0-10°, phi 90-180°
-#     [[10.0, 20.0], [0.0, 90.0]],     # Third bin: theta 10-20°, phi 0-90°
-#     [[10.0, 20.0], [90.0, 180.0]],   # Fourth bin: theta 10-20°, phi 90-180°
-# ]
-# file = "phips_bins_edges.toml" # Or load bins from external file (relative to working directory)
+# Example: Add a high-resolution forward zone
+# [[zones]]
+# label = "forward_hires"
+# [zones.scheme.Interval]
+# thetas = [0, 10]
+# theta_spacings = [0.5]
+# phis = [0, 360]
+# phi_spacings = [4]
+
+# Example: Simple binning zone
+# [[zones]]
+# label = "simple_zone"
+# [zones.scheme.Simple]
+# num_theta = 90
+# num_phi = 48
 
 
 [orientation] # Orientation configuration

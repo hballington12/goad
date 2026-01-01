@@ -32,7 +32,7 @@ impl Convergence {
             init_geom(&settings, geom);
         }
 
-        let bins = &settings.binning.scheme.generate();
+        let bins = &settings.first_zone_scheme().generate();
         let template = Results::new_empty(bins);
 
         // Convergence always uses uniform random sampling (infinite supply)

@@ -52,7 +52,7 @@ pub fn load_and_init_geoms(
 
 /// Initializes bins and creates an empty Results struct.
 pub fn init_result(settings: &Settings) -> Results {
-    let bins = settings.binning.scheme.generate();
+    let bins = settings.first_zone_scheme().generate();
     Results::new_empty(&bins)
 }
 
@@ -232,7 +232,7 @@ impl MultiProblem {
 
         // Compute 1D integration
         info_pb.set_message("Computing 1D integrated Mueller matrices...");
-        self.result.mueller_to_1d(&self.settings.binning.scheme);
+        self.result.mueller_to_1d(self.settings.first_zone_scheme());
 
         // Compute derived parameters
         info_pb.set_message("Computing scattering parameters...");
@@ -369,7 +369,7 @@ impl MultiProblem {
             problem::init_geom(&settings, geom);
         }
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = &settings.binning.scheme.generate();
+        let bins = &settings.first_zone_scheme().generate();
         let result = Results::new_empty(&bins);
 
         Ok(Self {

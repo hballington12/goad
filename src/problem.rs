@@ -374,9 +374,11 @@ impl Problem {
         // Mapping helper closure
         let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
-                Mapping::GeometricOptics => {
-                    n2f_go(&self.settings.binning, &self.result.bins(), beam)
-                }
+                Mapping::GeometricOptics => n2f_go(
+                    &self.settings.first_zone_binning(),
+                    &self.result.bins(),
+                    beam,
+                ),
                 Mapping::ApertureDiffraction => beam.diffract(&self.result.bins(), fov_factor),
             }
         };
@@ -515,7 +517,7 @@ impl Problem {
     }
 
     pub fn mueller_to_1d(&mut self) {
-        self.result.mueller_to_1d(&self.settings.binning.scheme);
+        self.result.mueller_to_1d(self.settings.first_zone_scheme());
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>) -> Result<()> {
