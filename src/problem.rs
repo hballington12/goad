@@ -15,6 +15,7 @@ use crate::{
     orientation, output,
     result::{GOComponent, Mueller, Results},
     settings::Settings,
+    zones::ZoneType,
 };
 
 use anyhow::Result;
@@ -501,9 +502,156 @@ impl Problem {
         self.solve_far_bs(component, &queue_clone, fov_factor);
     }
 
+    /// Solve far field for a single zone.
+    ///
+    /// Determines coherence based on zone type:
+    /// - Forward zones: always coherent (optical theorem)
+    /// - Other zones: respect global coherence setting
+    fn solve_far_zone(&mut self, component: GOComponent, zone_idx: usize) {
+        let (queue, mapping, fov_factor) = match component {
+            GOComponent::Beam => (
+                self.out_beam_queue.clone(),
+                self.settings.mapping,
+                self.settings.fov_factor,
+            ),
+            GOComponent::ExtDiff => (
+                self.ext_diff_beam_queue.clone(),
+                Mapping::ApertureDiffraction,
+                None,
+            ),
+            GOComponent::Total => {
+                panic!("No such beam queue exists for GOComponent: {:?}", component)
+            }
+        };
+
+        let zone = &self.result.zones.all()[zone_idx];
+        let zone_type = zone.zone_type;
+        let bins = zone.bins.clone();
+
+        // Forward zones are always coherent (optical theorem)
+        let use_coherence = match zone_type {
+            ZoneType::Forward => true,
+            _ => self.settings.coherence,
+        };
+
+        // Map beams to this zone's bins
+        let map_beam_to_zone = |beam: &Beam| -> Vec<(usize, Ampl)> {
+            match mapping {
+                Mapping::GeometricOptics => {
+                    n2f_go(&self.settings.first_zone_binning(), &bins, beam)
+                }
+                Mapping::ApertureDiffraction => beam.diffract(&bins, fov_factor),
+            }
+        };
+
+        if use_coherence {
+            // Coherent: accumulate amplitudes, convert to Mueller at end
+            let zero_ampls: Vec<(usize, Ampl)> =
+                bins.iter().map(|_| Ampl::zeros()).enumerate().collect();
+
+            let ampls: Vec<Ampl> = queue
+                .par_iter()
+                .map(|beam| map_beam_to_zone(beam))
+                .reduce(
+                    || zero_ampls.clone(),
+                    |mut acc, val| {
+                        for (i, ampl) in val.into_iter() {
+                            acc[i].1 += ampl;
+                        }
+                        acc
+                    },
+                )
+                .into_iter()
+                .map(|x| x.1)
+                .collect();
+
+            // Assign to zone's field_2d
+            let zone = &mut self.result.zones.all_mut()[zone_idx];
+            for (field, ampl) in zone.field_2d.iter_mut().zip(ampls) {
+                match component {
+                    GOComponent::Total => {
+                        field.ampl_total += ampl;
+                        field.mueller_total = field.ampl_total.to_mueller();
+                    }
+                    GOComponent::Beam => {
+                        field.ampl_beam += ampl;
+                        field.mueller_beam = field.ampl_beam.to_mueller();
+                    }
+                    GOComponent::ExtDiff => {
+                        field.ampl_ext += ampl;
+                        field.mueller_ext = field.ampl_ext.to_mueller();
+                    }
+                }
+            }
+        } else {
+            // Incoherent: convert each beam to Mueller, then sum
+            let zero_muellers: Vec<(usize, Mueller)> =
+                bins.iter().map(|_| Mueller::zeros()).enumerate().collect();
+
+            let muellers: Vec<Mueller> = queue
+                .par_iter()
+                .map(|beam| {
+                    let ampls = map_beam_to_zone(beam);
+                    ampls
+                        .into_iter()
+                        .map(|(i, a)| (i, a.to_mueller()))
+                        .collect()
+                })
+                .reduce(
+                    || zero_muellers.clone(),
+                    |mut acc, val: Vec<(usize, Mueller)>| {
+                        for (i, mueller) in val.into_iter() {
+                            acc[i].1 += mueller;
+                        }
+                        acc
+                    },
+                )
+                .into_iter()
+                .map(|x| x.1)
+                .collect();
+
+            // Assign to zone's field_2d
+            let zone = &mut self.result.zones.all_mut()[zone_idx];
+            for (field, mueller) in zone.field_2d.iter_mut().zip(muellers) {
+                match component {
+                    GOComponent::Total => field.mueller_total += mueller,
+                    GOComponent::Beam => field.mueller_beam += mueller,
+                    GOComponent::ExtDiff => field.mueller_ext += mueller,
+                }
+            }
+        }
+    }
+
+    /// Combine beam and ext_diff components for a zone.
+    fn combine_far_zone(&mut self, zone_idx: usize) {
+        let zone = &mut self.result.zones.all_mut()[zone_idx];
+        let use_coherence = match zone.zone_type {
+            ZoneType::Forward => true,
+            _ => self.settings.coherence,
+        };
+
+        for field in zone.field_2d.iter_mut() {
+            if use_coherence {
+                field.ampl_total = field.ampl_beam + field.ampl_ext;
+                field.mueller_total = field.ampl_total.to_mueller();
+            } else {
+                field.mueller_total = field.mueller_beam + field.mueller_ext;
+            }
+        }
+    }
+
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
     pub fn solve_far(&mut self) {
-        // Initialize field_bs with backscatter bin
+        // Process each zone
+        let num_zones = self.result.zones.len();
+        for zone_idx in 0..num_zones {
+            self.solve_far_zone(GOComponent::ExtDiff, zone_idx);
+            self.solve_far_zone(GOComponent::Beam, zone_idx);
+            self.combine_far_zone(zone_idx);
+        }
+
+        // Legacy: also populate field_bs/field_fs/field_2d for backward compatibility
+        // TODO: Remove once all consumers use zones
         let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
         let fs_bin = SolidAngleBin::new(AngleBin::new(0.01, 0.01), AngleBin::new(0.0, 0.0));
         self.result.field_bs = Some(ScattResult2D::new(bs_bin));
