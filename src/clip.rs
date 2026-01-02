@@ -138,6 +138,21 @@ mod tests {
             "normal.z: expected -1.0, got {}",
             normal.z
         );
+
+        // Check vertex positions (hexagonal shape at z=-5)
+        let verts = &intsn.data().exterior;
+        assert!((verts[0].x - 0.0).abs() < 0.01 && (verts[0].y - (-5.0)).abs() < 0.01);
+        assert!((verts[1].x - (-4.330127)).abs() < 0.01 && (verts[1].y - (-2.5)).abs() < 0.01);
+        assert!((verts[2].x - (-4.330127)).abs() < 0.01 && (verts[2].y - 2.5).abs() < 0.01);
+        assert!((verts[3].x - 0.0).abs() < 0.01 && (verts[3].y - 5.0).abs() < 0.01);
+        assert!((verts[4].x - 4.330127).abs() < 0.01 && (verts[4].y - 2.5).abs() < 0.01);
+        assert!((verts[5].x - 4.330127).abs() < 0.01 && (verts[5].y - (-2.5)).abs() < 0.01);
+        for v in verts {
+            assert!(
+                (v.z - (-5.0)).abs() < 0.01,
+                "All vertices should be at z=-5"
+            );
+        }
     }
 
     /// Test based on projection1.rs example
@@ -178,6 +193,42 @@ mod tests {
         // Check counts
         assert_eq!(clipping.intersections.len(), 4, "Expected 4 intersections");
         assert_eq!(clipping.remaining.len(), 0, "Expected 0 remaining");
+
+        // Check vertex counts for each intersection
+        assert_eq!(clipping.intersections[0].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[1].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[2].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[3].data().num_vertices, 7);
+
+        // Check first intersection midpoint
+        let mid0 = clipping.intersections[0].data().midpoint;
+        assert!(
+            (mid0.x - 1.166282).abs() < 0.01,
+            "intersection[0] midpoint.x"
+        );
+        assert!(
+            (mid0.y - 1.495947).abs() < 0.01,
+            "intersection[0] midpoint.y"
+        );
+        assert!(
+            (mid0.z - 0.033455).abs() < 0.01,
+            "intersection[0] midpoint.z"
+        );
+
+        // Check last intersection (7 vertices) midpoint
+        let mid3 = clipping.intersections[3].data().midpoint;
+        assert!(
+            (mid3.x - (-2.315247)).abs() < 0.01,
+            "intersection[3] midpoint.x"
+        );
+        assert!(
+            (mid3.y - (-0.006494)).abs() < 0.01,
+            "intersection[3] midpoint.y"
+        );
+        assert!(
+            (mid3.z - (-4.682372)).abs() < 0.01,
+            "intersection[3] midpoint.z"
+        );
     }
 
     /// Test based on projection2.rs example
@@ -219,6 +270,37 @@ mod tests {
         // Check counts
         assert_eq!(clipping.intersections.len(), 3, "Expected 3 intersections");
         assert_eq!(clipping.remaining.len(), 0, "Expected 0 remaining");
+
+        // Check vertex counts
+        assert_eq!(clipping.intersections[0].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[1].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[2].data().num_vertices, 4);
+
+        // Check intersection midpoints
+        let mid0 = clipping.intersections[0].data().midpoint;
+        assert!(
+            (mid0.x - 0.264427).abs() < 0.01,
+            "intersection[0] midpoint.x"
+        );
+        assert!(
+            (mid0.y - (-0.852768)).abs() < 0.01,
+            "intersection[0] midpoint.y"
+        );
+        assert!(
+            (mid0.z - (-0.508341)).abs() < 0.01,
+            "intersection[0] midpoint.z"
+        );
+
+        let mid2 = clipping.intersections[2].data().midpoint;
+        assert!(
+            (mid2.x - (-0.231690)).abs() < 0.01,
+            "intersection[2] midpoint.x"
+        );
+        assert!((mid2.y - 0.0).abs() < 0.01, "intersection[2] midpoint.y");
+        assert!(
+            (mid2.z - (-1.158448)).abs() < 0.01,
+            "intersection[2] midpoint.z"
+        );
     }
 
     /// Test based on projection_multi.rs example
@@ -265,6 +347,40 @@ mod tests {
         // Check counts
         assert_eq!(clipping.intersections.len(), 3, "Expected 3 intersections");
         assert_eq!(clipping.remaining.len(), 2, "Expected 2 remaining");
+
+        // Check vertex counts
+        assert_eq!(clipping.intersections[0].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[1].data().num_vertices, 7);
+        assert_eq!(clipping.intersections[2].data().num_vertices, 4);
+        assert_eq!(clipping.remaining[0].data().num_vertices, 3);
+        assert_eq!(clipping.remaining[1].data().num_vertices, 3);
+
+        // Check intersection midpoints
+        let mid0 = clipping.intersections[0].data().midpoint;
+        assert!(
+            (mid0.x - (-9.606176)).abs() < 0.01,
+            "intersection[0] midpoint.x"
+        );
+        assert!(
+            (mid0.y - (-0.560584)).abs() < 0.01,
+            "intersection[0] midpoint.y"
+        );
+        assert!(
+            (mid0.z - 1.742397).abs() < 0.01,
+            "intersection[0] midpoint.z"
+        );
+
+        // Check remaining midpoints
+        let rem0 = clipping.remaining[0].data().midpoint;
+        assert!(
+            (rem0.x - (-4.330127)).abs() < 0.01,
+            "remaining[0] midpoint.x"
+        );
+        assert!((rem0.y - 1.951482).abs() < 0.01, "remaining[0] midpoint.y");
+        assert!(
+            (rem0.z - (-2.436753)).abs() < 0.01,
+            "remaining[0] midpoint.z"
+        );
     }
 
     /// Test based on clip_test.rs example
@@ -306,6 +422,30 @@ mod tests {
         // Check counts
         assert_eq!(clipping.intersections.len(), 3, "Expected 3 intersections");
         assert_eq!(clipping.remaining.len(), 0, "Expected 0 remaining");
+
+        // Check vertex counts
+        assert_eq!(clipping.intersections[0].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[1].data().num_vertices, 5);
+        assert_eq!(clipping.intersections[2].data().num_vertices, 4);
+
+        // Check intersection midpoints
+        let mid0 = clipping.intersections[0].data().midpoint;
+        assert!((mid0.x - 2.0515).abs() < 0.01, "intersection[0] midpoint.x");
+        assert!((mid0.y - 3.0).abs() < 0.01, "intersection[0] midpoint.y");
+        assert!(mid0.z.abs() < 0.01, "intersection[0] midpoint.z");
+
+        let mid2 = clipping.intersections[2].data().midpoint;
+        assert!((mid2.x - 3.0).abs() < 0.01, "intersection[2] midpoint.x");
+        assert!(
+            (mid2.y - 2.909945).abs() < 0.01,
+            "intersection[2] midpoint.y"
+        );
+        assert!(mid2.z.abs() < 0.01, "intersection[2] midpoint.z");
+
+        // Check some vertex positions from intersection[0]
+        let verts0 = &clipping.intersections[0].data().exterior;
+        assert!((verts0[0].x - 2.922890).abs() < 0.01);
+        assert!((verts0[0].y - 3.0).abs() < 0.01);
     }
 
     /// Test based on remainder.rs example
@@ -359,6 +499,51 @@ mod tests {
         // Check counts
         assert_eq!(clipping.intersections.len(), 4, "Expected 4 intersections");
         assert_eq!(clipping.remaining.len(), 4, "Expected 4 remaining");
+
+        // Check vertex counts
+        assert_eq!(clipping.intersections[0].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[1].data().num_vertices, 7);
+        assert_eq!(clipping.intersections[2].data().num_vertices, 4);
+        assert_eq!(clipping.intersections[3].data().num_vertices, 4);
+        assert_eq!(clipping.remaining[0].data().num_vertices, 3);
+        assert_eq!(clipping.remaining[1].data().num_vertices, 4);
+        assert_eq!(clipping.remaining[2].data().num_vertices, 4);
+        assert_eq!(clipping.remaining[3].data().num_vertices, 4);
+
+        // Check intersection midpoints
+        let mid0 = clipping.intersections[0].data().midpoint;
+        assert!(
+            (mid0.x - (-11.720262)).abs() < 0.01,
+            "intersection[0] midpoint.x"
+        );
+        assert!((mid0.y - 0.0).abs() < 0.01, "intersection[0] midpoint.y");
+        assert!(
+            (mid0.z - 7.021183).abs() < 0.01,
+            "intersection[0] midpoint.z"
+        );
+
+        let mid2 = clipping.intersections[2].data().midpoint;
+        assert!(
+            (mid2.x - 2.165063).abs() < 0.01,
+            "intersection[2] midpoint.x"
+        );
+        assert!((mid2.y - 0.0).abs() < 0.01, "intersection[2] midpoint.y");
+        assert!(
+            (mid2.z - 3.921344).abs() < 0.01,
+            "intersection[2] midpoint.z"
+        );
+
+        // Check remaining midpoints (all at z=10)
+        for rem in &clipping.remaining {
+            assert!(
+                (rem.data().midpoint.z - 10.0).abs() < 0.01,
+                "Remaining faces should be at z=10"
+            );
+        }
+
+        let rem3 = clipping.remaining[3].data().midpoint;
+        assert!((rem3.x - 7.165063).abs() < 0.01, "remaining[3] midpoint.x");
+        assert!((rem3.y - 0.0).abs() < 0.01, "remaining[3] midpoint.y");
     }
 }
 trait Point3Extensions {
