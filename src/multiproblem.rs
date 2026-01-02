@@ -225,7 +225,7 @@ impl MultiProblem {
 
         // Compute 1D integration
         info_pb.set_message("Computing 1D integrated Mueller matrices...");
-        self.result.mueller_to_1d(self.settings.first_zone_scheme());
+        self.result.mueller_to_1d();
 
         // Compute derived parameters
         info_pb.set_message("Computing scattering parameters...");

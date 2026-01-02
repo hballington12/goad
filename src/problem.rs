@@ -436,7 +436,7 @@ impl Problem {
     }
 
     pub fn mueller_to_1d(&mut self) {
-        self.result.mueller_to_1d(self.settings.first_zone_scheme());
+        self.result.mueller_to_1d();
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>) -> Result<()> {

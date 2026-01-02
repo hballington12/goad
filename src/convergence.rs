@@ -123,7 +123,7 @@ impl Convergence {
     pub fn writeup(&self) {
         let mut result = self.mean();
         // Recompute params from averaged Mueller matrices
-        result.mueller_to_1d(self.settings.first_zone_scheme());
+        result.mueller_to_1d();
         let _ = result.compute_params(self.settings.wavelength);
         let output_manager = output::OutputManager::new(&self.settings, &result);
         let _ = output_manager.write_all();

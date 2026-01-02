@@ -585,38 +585,30 @@ impl Results {
         }
     }
 
-    pub fn mueller_to_1d(&mut self, binning_scheme: &crate::bins::Scheme) {
-        // Step 1: Check scheme compatibility
-        match binning_scheme {
-            Scheme::Custom { .. } => {
-                return;
+    pub fn mueller_to_1d(&mut self) {
+        for zone in self.zones.iter_mut() {
+            // Skip Custom schemes (no regular grid for integration)
+            match &zone.scheme {
+                Scheme::Custom { .. } => continue,
+                Scheme::Simple { .. } | Scheme::Interval { .. } => {}
             }
-            Scheme::Simple { .. } | Scheme::Interval { .. } => {}
-        }
 
-        // Step 2: Get field_2d from full zone
-        let Some(full_zone) = self.zones.full_zone() else {
-            return;
-        };
-        let field_2d = &full_zone.field_2d;
+            // Group by theta using chunk_by (leveraging sorted property)
+            let theta_groups: Vec<Vec<&ScattResult2D>> = zone
+                .field_2d
+                .iter()
+                .chunk_by(|result| result.bin.theta)
+                .into_iter()
+                .map(|(_, group)| group.collect())
+                .collect();
 
-        // Step 3: Group by theta using chunk_by (leveraging sorted property)
-        let theta_groups: Vec<Vec<&ScattResult2D>> = field_2d
-            .iter()
-            .chunk_by(|result| result.bin.theta)
-            .into_iter()
-            .map(|(_, group)| group.collect())
-            .collect();
+            // Rectangular integration over phi for each theta
+            let field_1d: Vec<ScattResult1D> = theta_groups
+                .into_iter()
+                .map(|group| Self::integrate_over_phi(group))
+                .collect();
 
-        // Step 4: Rectangular integration over phi for each theta
-        let field_1d: Vec<ScattResult1D> = theta_groups
-            .into_iter()
-            .map(|group| Self::integrate_over_phi(group))
-            .collect();
-
-        // Step 5: Store in zones
-        if let Some(full_zone) = self.zones.full_zone_mut() {
-            full_zone.field_1d = Some(field_1d);
+            zone.field_1d = Some(field_1d);
         }
     }
 
