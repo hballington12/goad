@@ -374,21 +374,6 @@ impl Zones {
             .find(|z| z.label.as_deref() == Some(label))
     }
 
-    /// Get a zone by label mutably.
-    pub fn get_mut(&mut self, label: &str) -> Option<&mut Zone> {
-        self.zones
-            .iter_mut()
-            .find(|z| z.label.as_deref() == Some(label))
-    }
-
-    /// Get all zones of a specific type.
-    pub fn by_type(&self, zone_type: ZoneType) -> Vec<&Zone> {
-        self.zones
-            .iter()
-            .filter(|z| z.zone_type == zone_type)
-            .collect()
-    }
-
     /// Get the first Full zone, if any.
     pub fn full_zone(&self) -> Option<&Zone> {
         self.zones.iter().find(|z| z.zone_type == ZoneType::Full)
@@ -399,11 +384,6 @@ impl Zones {
         self.zones
             .iter_mut()
             .find(|z| z.zone_type == ZoneType::Full)
-    }
-
-    /// Get the forward zone.
-    pub fn forward_zone(&self) -> Option<&Zone> {
-        self.zones.iter().find(|z| z.zone_type == ZoneType::Forward)
     }
 
     /// Get the backward zone.
