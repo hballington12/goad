@@ -5,10 +5,12 @@ use std::path::{Path, PathBuf};
 use std::{fs::File, io::BufWriter};
 
 use anyhow::Result;
+use serde::Serialize;
 
 use crate::bins::SolidAngleBin;
 use crate::result::{Mueller, Results};
 use crate::settings::{OutputConfig, Settings};
+use crate::zones::Zone;
 
 /// Trait for writing output data to files
 pub trait OutputWriter {
@@ -44,6 +46,7 @@ impl<'a> OutputManager<'a> {
             Box::new(SettingsJsonWriter::new(self.settings)),
             Box::new(PowersJsonWriter::new(&self.results.powers)),
             Box::new(ParamsJsonWriter::new(&self.results.params)),
+            Box::new(ConsolidatedResultsWriter::new(self.results)),
         ];
 
         // Write enabled outputs
@@ -67,48 +70,50 @@ impl<'a> OutputManager<'a> {
         let output_dir = &self.settings.directory;
         let config = &self.settings.output.mueller_components;
 
-        // Get full zone for 2D/1D Mueller data
-        let full_zone = self.results.zones.full_zone();
+        // Write Mueller matrices for each zone in its own directory
+        for zone in self.results.zones.iter() {
+            let zone_dir = output_dir.join(zone.display_name());
+            fs::create_dir_all(&zone_dir)?;
 
+            self.write_zone_mueller(zone, &zone_dir, config)?;
+        }
+
+        Ok(())
+    }
+
+    fn write_zone_mueller(
+        &self,
+        zone: &Zone,
+        zone_dir: &Path,
+        config: &crate::settings::MuellerComponentConfig,
+    ) -> Result<()> {
         // Write 2D Mueller matrices
-        if self.settings.output.mueller_2d {
-            if let Some(zone) = full_zone {
-                if config.total {
-                    let muellers = &zone
-                        .field_2d
-                        .iter()
-                        .map(|f| f.mueller_total)
-                        .collect::<Vec<_>>();
-                    write_mueller(&self.results.bins(), muellers, "", output_dir)?;
-                }
-                if config.beam {
-                    let muellers = &zone
-                        .field_2d
-                        .iter()
-                        .map(|f| f.mueller_beam)
-                        .collect::<Vec<_>>();
-                    write_mueller(&self.results.bins(), muellers, "_beam", output_dir)?;
-                }
-                if config.external {
-                    let muellers = &zone
-                        .field_2d
-                        .iter()
-                        .map(|f| f.mueller_ext)
-                        .collect::<Vec<_>>();
-                    write_mueller(&self.results.bins(), muellers, "_ext", output_dir)?;
-                }
+        if self.settings.output.mueller_2d && !zone.field_2d.is_empty() {
+            let bins: Vec<_> = zone.bins.clone();
+
+            if config.total {
+                let muellers: Vec<_> = zone.field_2d.iter().map(|f| f.mueller_total).collect();
+                write_mueller(&bins, &muellers, "", zone_dir)?;
+            }
+            if config.beam {
+                let muellers: Vec<_> = zone.field_2d.iter().map(|f| f.mueller_beam).collect();
+                write_mueller(&bins, &muellers, "_beam", zone_dir)?;
+            }
+            if config.external {
+                let muellers: Vec<_> = zone.field_2d.iter().map(|f| f.mueller_ext).collect();
+                write_mueller(&bins, &muellers, "_ext", zone_dir)?;
             }
         }
 
         // Write 1D Mueller matrices
         if self.settings.output.mueller_1d {
-            if let Some(field_1d) = full_zone.and_then(|z| z.field_1d.as_ref()) {
+            if let Some(field_1d) = &zone.field_1d {
                 if config.total {
                     write_mueller_1d(
                         "",
                         field_1d,
                         &|r: &crate::result::ScattResult1D| r.mueller_total.clone(),
-                        output_dir,
+                        zone_dir,
                     )?;
                 }
                 if config.beam {
@@ -116,7 +121,7 @@ impl<'a> OutputManager<'a> {
                         "_beam",
                         field_1d,
                         &|r: &crate::result::ScattResult1D| r.mueller_beam.clone(),
-                        output_dir,
+                        zone_dir,
                     )?;
                 }
                 if config.external {
@@ -124,7 +129,7 @@ impl<'a> OutputManager<'a> {
                         "_ext",
                         field_1d,
                         &|r: &crate::result::ScattResult1D| r.mueller_ext.clone(),
-                        output_dir,
+                        zone_dir,
                     )?;
                 }
             }
@@ -477,5 +482,76 @@ impl<'a> OutputWriter for ParamsJsonWriter<'a> {
 
     fn is_enabled(&self, config: &OutputConfig) -> bool {
         config.params_json
+    }
+}
+
+// ========================================
+// Consolidated Results JSON Output
+// ========================================
+
+/// Serializable zone summary for results.json
+#[derive(Serialize)]
+struct ZoneOutput {
+    label: String,
+    zone_type: String,
+    num_bins: usize,
+    params: crate::params::Params,
+    mueller_dir: String,
+}
+
+/// Serializable consolidated results
+#[derive(Serialize)]
+struct ConsolidatedResults {
+    powers: crate::powers::Powers,
+    zones: Vec<ZoneOutput>,
+}
+
+/// Writer for consolidated results.json file
+pub struct ConsolidatedResultsWriter<'a> {
+    results: &'a Results,
+}
+
+impl<'a> ConsolidatedResultsWriter<'a> {
+    pub fn new(results: &'a Results) -> Self {
+        Self { results }
+    }
+}
+
+impl<'a> OutputWriter for ConsolidatedResultsWriter<'a> {
+    fn write(&self, output_dir: &Path) -> Result<()> {
+        let zones: Vec<ZoneOutput> = self
+            .results
+            .zones
+            .iter()
+            .map(|zone| {
+                let label = zone.display_name();
+                ZoneOutput {
+                    zone_type: format!("{:?}", zone.zone_type),
+                    num_bins: zone.bins.len(),
+                    params: zone.params.clone(),
+                    mueller_dir: label.clone(),
+                    label,
+                }
+            })
+            .collect();
+
+        let consolidated = ConsolidatedResults {
+            powers: self.results.powers.clone(),
+            zones,
+        };
+
+        let path = output_path(Some(output_dir), &self.filename())?;
+        let json = serde_json::to_string_pretty(&consolidated)?;
+        fs::write(path, json)?;
+        Ok(())
+    }
+
+    fn filename(&self) -> String {
+        "results.json".to_string()
+    }
+
+    fn is_enabled(&self, _config: &OutputConfig) -> bool {
+        // Always enabled for now - could add config option later
+        true
     }
 }
