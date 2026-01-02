@@ -1,5 +1,6 @@
 use crate::convergence::Convergeable;
 use crate::result::GOComponent;
+use pyo3_stub_gen::derive::*;
 use rand_distr::num_traits::Pow;
 use serde::ser::{SerializeMap, Serializer};
 use serde::Serialize;
@@ -28,7 +29,8 @@ impl Serialize for Params {
 }
 
 // Params are stored as raw values. Weighted averaging is handled by Convergeable trait.
-#[pyo3::pyclass(eq, eq_int)]
+#[gen_stub_pyclass_enum]
+#[pyo3::pyclass(module = "goad._goad", eq, eq_int)]
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize)]
 pub enum Param {
     Asymmetry,              // raw asymmetry parameter g

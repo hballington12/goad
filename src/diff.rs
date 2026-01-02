@@ -1,6 +1,7 @@
 use clap::ValueEnum;
 use nalgebra::{Complex, Matrix2, Matrix3, Point3, Vector3};
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::*;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
@@ -10,7 +11,8 @@ use crate::field::{Ampl, Field};
 use crate::{geom, settings};
 
 /// Enum representing different mapping methods from near to far field.
-#[pyclass]
+#[gen_stub_pyclass_enum]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, ValueEnum, Copy)]
 pub enum Mapping {
     GeometricOptics,

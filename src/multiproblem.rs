@@ -13,6 +13,7 @@ use crate::{
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use nalgebra::Complex;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::*;
 use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 use std::time::Duration;
@@ -83,7 +84,8 @@ pub fn init_result(settings: &Settings) -> Results {
 /// results = mp.results
 /// print(f"Scattering cross-section: {results.scat_cross}")
 /// ```
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug)]
 pub struct MultiProblem {
     pub geoms: Vec<Geom>,
@@ -303,6 +305,7 @@ impl MultiProblem {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl MultiProblem {
     #[new]

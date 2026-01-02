@@ -5,6 +5,7 @@ nav:
   - results.md
   - checks.md
   - convergence.md
+  - api.md
 
 site_url: https://hballington12.github.io/goad/
 repo_url: https://github.com/hballington12/goad
@@ -16,6 +17,14 @@ plugins:
   - search
   - macros:
       module_name: docs/source/_build/scripts/macro
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_bases: false
+            inherited_members: false
+            show_if_no_docstring: false
 
 # Build directories
 theme:

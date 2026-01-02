@@ -1,6 +1,5 @@
 use ndarray::Array2;
-use numpy::PyArrayMethods;
-use numpy::{IntoPyArray, PyArray2};
+use numpy::{IntoPyArray, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 
 use crate::zones::{Zone, ZoneType, Zones};
@@ -8,6 +7,9 @@ use crate::zones::{Zone, ZoneType, Zones};
 use super::mueller::{Mueller, MuellerMatrix};
 use super::results::Results;
 
+// Note: gen_stub_pymethods is not used here because the pymethods are in a separate
+// file from the pyclass definition. The stub generation will capture the pyclass
+// attributes from results.rs.
 #[pymethods]
 impl Results {
     fn __add__(&self, other: &Results) -> Results {

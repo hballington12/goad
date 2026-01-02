@@ -19,6 +19,7 @@ use crate::{
 use anyhow::Result;
 use nalgebra::{Complex, Point3};
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::*;
 use rayon::prelude::*;
 
 #[cfg(test)]
@@ -122,7 +123,8 @@ mod tests {
 }
 
 /// A solvable physics problem.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone)] // Added Default derive
 pub struct Problem {
     pub base_geom: Geom,                // original geometry
@@ -134,6 +136,7 @@ pub struct Problem {
     pub result: Results,                // results of the problem
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Problem {
     #[new]

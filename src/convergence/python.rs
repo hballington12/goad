@@ -1,4 +1,5 @@
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::*;
 use rand::SeedableRng;
 
 use crate::geom::Geom;
@@ -11,6 +12,7 @@ use crate::settings::Settings;
 
 use super::{Convergence, ConvergenceTracker, MAX_CONVERGENCE_ORIENTATIONS};
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Convergence {
     #[new]

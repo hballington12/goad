@@ -27,6 +27,7 @@ pub mod params;
 pub mod powers;
 pub mod problem;
 pub mod python;
+pub use python::stub_info;
 pub mod result;
 pub mod settings;
 pub mod snell;

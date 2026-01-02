@@ -4,13 +4,15 @@ use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::*;
 use rand::Rng;
 use rand::SeedableRng;
 use serde::Deserialize;
 
 use crate::settings::DEFAULT_EULER_ORDER;
 
-#[pyclass]
+#[gen_stub_pyclass_enum]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Scheme {
     /// Solve the problem by averaging over a uniform distribution of angles.
@@ -22,7 +24,8 @@ pub enum Scheme {
 }
 
 /// Euler angle order for the discrete orientation scheme.
-#[pyclass]
+#[gen_stub_pyclass_enum]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum EulerConvention {
     XZX,
@@ -64,7 +67,8 @@ impl EulerConvention {
     }
 }
 
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Euler {
     #[pyo3(get, set)]
@@ -247,6 +251,7 @@ impl FromStr for Euler {
     }
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Euler {
     #[new]
@@ -262,7 +267,8 @@ impl Euler {
     }
 }
 
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Orientation {
     #[pyo3(get, set)]
@@ -271,6 +277,7 @@ pub struct Orientation {
     pub euler_convention: EulerConvention,
 }
 
+#[gen_stub_pymethods]
 #[pymethods]
 impl Orientation {
     #[staticmethod]

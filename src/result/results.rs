@@ -12,6 +12,7 @@ use crate::powers::Powers;
 use crate::zones::{Zone, ZoneType, Zones};
 use itertools::Itertools;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::*;
 use rand_distr::num_traits::Pow;
 
 use super::component::GOComponent;
@@ -22,7 +23,8 @@ use super::scatt_result::{ScattResult1D, ScattResult2D};
 /// Contains all computed scattering data including Mueller matrices,
 /// amplitude matrices, power distributions, and derived parameters.
 /// Supports both 2D angular distributions and 1D integrated results.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone)]
 pub struct Results {
     pub zones: Zones,

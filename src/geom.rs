@@ -7,6 +7,7 @@ use geo_types::{Coord, LineString, Polygon};
 use nalgebra::{self as na, Complex, Isometry3, Matrix4, Point3, Vector3, Vector4};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+use pyo3_stub_gen::derive::*;
 use std::path::Path;
 use tobj::{self, Model};
 
@@ -951,7 +952,8 @@ impl Face {
 }
 
 /// Represents a 3D surface mesh.
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
     pub vertices: Vec<Point3<f32>>, // List of all vertices in the mesh
@@ -1114,6 +1116,7 @@ impl Shape {
 }
 
 /// Python bindings for the `Shape` struct.
+#[gen_stub_pymethods]
 #[pymethods]
 impl Shape {
     #[new]
@@ -1153,7 +1156,8 @@ impl Shape {
     }
 }
 
-#[pyclass]
+#[gen_stub_pyclass]
+#[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geom {
     pub shapes: Vec<Shape>,
@@ -1559,6 +1563,7 @@ pub fn load_geom(resolved_filename: &String) -> Result<Geom, anyhow::Error> {
 }
 
 /// Python bindings for the `Geom` struct.
+#[gen_stub_pymethods]
 #[pymethods]
 impl Geom {
     #[new]

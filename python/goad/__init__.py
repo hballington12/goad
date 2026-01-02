@@ -1,1 +1,1 @@
-from .goad import *
+from ._goad import *
