@@ -8,6 +8,12 @@
 //! provides a command line interface for running a general problem. To get
 //! started, have a look at the [quick start guide][_quickstart].
 
+// Use jemalloc as the global allocator on non-Windows platforms
+// This avoids memory corruption issues with the macOS system allocator
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 pub mod _quickstart;
 pub mod beam;
 pub mod bins;

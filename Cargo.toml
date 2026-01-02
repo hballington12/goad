@@ -4,6 +4,7 @@
     edition = "2021"
     license = "GPL-3.0"
     description = "Compute the single scattering properties of particles much larger than the wavelength of light with geometric optics and aperture diffraction theory."
+    default-run = "goad"
 
 [dependencies]
     anyhow = "1.0.95"
@@ -32,6 +33,9 @@
     tobj = "4.0.2"
     toml = "0.8.19"
 
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.6"
+
 [dev-dependencies]
 plotters = { version = "0.3", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "line_series", "point_series", "ttf"] }
 
@@ -49,3 +53,7 @@ crate-type = ["rlib", "cdylib"]
 name = "stub_gen"
 doc = false
 required-features = ["stub-gen"]
+
+[[example]]
+name = "backscattering"
+path = "examples/backscattering/main.rs"

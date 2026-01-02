@@ -1,0 +1,57 @@
+{
+  "wavelength": 0.532,
+  "beam_power_threshold": 0.01,
+  "beam_area_threshold_fac": 0.01,
+  "cutoff": 0.999,
+  "medium_refr_index": [
+    1.0,
+    0.0
+  ],
+  "particle_refr_index": [
+    [
+      1.31,
+      0.0
+    ]
+  ],
+  "orientation": {
+    "scheme": {
+      "Discrete": {
+        "eulers": [
+          {
+            "alpha": 30.0,
+            "beta": 30.0,
+            "gamma": 0.0
+          }
+        ]
+      }
+    },
+    "euler_convention": "ZYZ"
+  },
+  "geom_name": "examples/backscattering/roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_6904c8.obj",
+  "max_rec": 10,
+  "max_tir": 20,
+  "zones": [],
+  "seed": null,
+  "scale": 1.0,
+  "distortion": 0.0,
+  "geom_scale": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "directory": "examples/backscattering",
+  "fov_factor": null,
+  "mapping": "ApertureDiffraction",
+  "output": {
+    "settings_json": true,
+    "mueller_2d": true,
+    "mueller_1d": true,
+    "mueller_components": {
+      "total": true,
+      "beam": true,
+      "external": true
+    }
+  },
+  "coherence": true,
+  "quiet": false
+}

@@ -17,6 +17,7 @@ use crate::{
 };
 
 use anyhow::Result;
+use log::debug;
 use nalgebra::{Complex, Point3};
 use pyo3::prelude::*;
 #[cfg(feature = "stub-gen")]
@@ -428,9 +429,13 @@ impl Problem {
     }
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self) {
+        debug!("solving near-field problem");
         self.solve_near();
+        debug!("solving far-field problem");
         self.solve_far();
+        debug!("computing 1d-mueller matrices");
         self.mueller_to_1d();
+        debug!("computing parameters");
         self.compute_params();
     }
 
