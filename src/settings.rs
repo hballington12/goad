@@ -22,14 +22,8 @@ fn default_zones() -> Vec<ZoneConfig> {
 /// Configuration for output file generation
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct OutputConfig {
-    /// Enable writing of results.dat summary file
-    pub results_summary: bool,
     /// Enable writing of settings.json configuration file
     pub settings_json: bool,
-    /// Enable writing of powers.json power distribution file
-    pub powers_json: bool,
-    /// Enable writing of params.json derived parameters file
-    pub params_json: bool,
     /// Enable writing of 2D Mueller matrix files
     pub mueller_2d: bool,
     /// Enable writing of 1D integrated Mueller matrix files

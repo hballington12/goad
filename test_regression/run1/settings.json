@@ -61,20 +61,17 @@
     1.0,
     1.0
   ],
-  "directory": "test_regression/run8",
+  "directory": "test_regression/run1",
   "fov_factor": null,
   "mapping": "ApertureDiffraction",
   "output": {
-    "results_summary": true,
     "settings_json": true,
-    "powers_json": true,
-    "params_json": true,
     "mueller_2d": false,
     "mueller_1d": false,
     "mueller_components": {
       "total": true,
-      "beam": true,
-      "external": true
+      "beam": false,
+      "external": false
     }
   },
   "coherence": true,

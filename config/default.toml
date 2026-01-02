@@ -83,13 +83,8 @@ eulers = [[30,30,0]]
 # OUTPUT CONFIGURATION
 # ===================================
 [output]
-# Summary file (human-readable text) - DEFAULT: true
-results_summary = true
-
-# JSON files for structured data access - DEFAULT: false
+# JSON files for structured data access
 settings_json = true   # Enable to dump settings.json (entire config)
-powers_json = true     # Enable to dump powers.json (power distribution)
-params_json = true     # Enable to dump params.json (derived parameters)
 
 # Mueller matrix files (custom format) - DEFAULT: true
 mueller_2d = true       # Enable 2D Mueller matrix files
