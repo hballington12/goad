@@ -25,6 +25,17 @@ plugins:
             show_bases: false
             inherited_members: false
             show_if_no_docstring: false
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            docstring_style: google
+            members_order: source
+            filters:
+              - "!^__module__$"
+              - "!^__doc__$"
+              - "!^__dict__$"
+              - "!^__weakref__$"
 
 # Build directories
 theme:
