@@ -851,6 +851,48 @@ impl<'a> Clipping<'a> {
     }
 }
 
+/// Determines if a subject face can possibly intersect the clip face.
+/// Returns false if:
+/// - The subject is entirely behind the clip (in z-coordinate)
+/// - The 2D bounding boxes (x,y) don't overlap
+fn can_subject_clip(subject: &Face, clip_in: &Face) -> bool {
+    // Check z-coordinate: subject must not be entirely behind clip
+    let z_ok = match (subject.data().vert_min(2), clip_in.data().vert_max(2)) {
+        (Ok(subj_min), Ok(clip_max)) => subj_min <= clip_max,
+        _ => return false,
+    };
+    if !z_ok {
+        return false;
+    }
+
+    // Check 2D bounding box overlap (x and y dimensions)
+    let subj_data = subject.data();
+    let clip_data = clip_in.data();
+
+    let (subj_x_min, subj_x_max) = match (subj_data.vert_min(0), subj_data.vert_max(0)) {
+        (Ok(min), Ok(max)) => (min, max),
+        _ => return true, // Can't determine, assume possible overlap
+    };
+    let (subj_y_min, subj_y_max) = match (subj_data.vert_min(1), subj_data.vert_max(1)) {
+        (Ok(min), Ok(max)) => (min, max),
+        _ => return true,
+    };
+    let (clip_x_min, clip_x_max) = match (clip_data.vert_min(0), clip_data.vert_max(0)) {
+        (Ok(min), Ok(max)) => (min, max),
+        _ => return true,
+    };
+    let (clip_y_min, clip_y_max) = match (clip_data.vert_min(1), clip_data.vert_max(1)) {
+        (Ok(min), Ok(max)) => (min, max),
+        _ => return true,
+    };
+
+    // Check if bounding boxes overlap
+    let x_overlap = subj_x_min <= clip_x_max && subj_x_max >= clip_x_min;
+    let y_overlap = subj_y_min <= clip_y_max && subj_y_max >= clip_y_min;
+
+    x_overlap && y_overlap
+}
+
 /// Clips the `clip_in` against the `subjects_in`, in the current coordinate system.
 pub fn clip_faces<'a>(
     clip_in: &Face,
@@ -877,12 +919,10 @@ pub fn clip_faces<'a>(
         subjects
     };
 
-    for subject in sorted_subjects.iter().filter(|subj| {
-        match (subj.data().vert_min(2), clip_in.data().vert_max(2)) {
-            (Ok(subj_min), Ok(clip_max)) => subj_min <= clip_max,
-            _ => false,
-        }
-    }) {
+    for subject in sorted_subjects
+        .iter()
+        .filter(|subj| can_subject_clip(subj, clip_in))
+    {
         let subject_poly = subject.to_polygon();
         let mut next_clips = Vec::new();
 
