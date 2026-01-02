@@ -102,6 +102,27 @@ The following table lists the current convergable parameters and some recommenda
 | `Param.LidarRatio` | `0.05` | Lidar ratio, the ratio of extinction to backscatter cross section |
 | `Param.DepolarizationRatio` | `0.05` | Linear depolarization ratio at backscatter, (S11-S22)/(S11+S22) |
 
+## Saving Results
+
+GOAD simulations can be expensive. To avoid re-running simulations when you want to process results differently, always save your results to disk:
+
+```python
+from goad import Convergence, Param, Settings
+
+settings = Settings(geom_path="path/to/geometry.obj")
+convergence = Convergence(settings)
+convergence.add_target(Param.Asymmetry, 0.02)
+convergence.solve()
+
+# Save results to a directory
+convergence.save("my_simulation_results")
+
+# Or use default directory from settings
+convergence.save()
+```
+
+This writes Mueller matrices, parameters, and other output files that can be loaded and analyzed later without re-running the simulation.
+
 ## Python API Reference
 
 ```python
@@ -120,6 +141,9 @@ convergence.max_orientations = 5000
 
 # Solve (supports Ctrl-C interruption)
 convergence.solve()
+
+# Save results to disk
+convergence.save("output_directory")
 
 # Access results
 mean = convergence.mean  # Mean values

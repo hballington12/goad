@@ -113,6 +113,19 @@ class Convergence:
         """
         ...
 
+    def save(self, directory:typing.Optional[builtins.str]=None) -> None:
+        r"""
+        Save simulation results to disk.
+        
+        Writes Mueller matrices, parameters, and other output files to the
+        specified directory (or the directory configured in settings).
+        
+        Args:
+            directory: Optional output directory path. If not provided, uses
+                       the directory from settings.
+        """
+        ...
+
 
 class Euler:
     alpha: builtins.float
@@ -173,9 +186,16 @@ class MultiProblem:
         """
         ...
 
-    def py_writeup(self) -> None:
+    def save(self, directory:typing.Optional[builtins.str]=None) -> None:
         r"""
-        Python wrapper for writeup method
+        Save simulation results to disk.
+        
+        Writes Mueller matrices, parameters, and other output files to the
+        specified directory (or the directory configured in settings).
+        
+        Args:
+            directory: Optional output directory path. If not provided, uses
+                       the directory from settings.
         """
         ...
 

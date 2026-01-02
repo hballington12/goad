@@ -368,9 +368,26 @@ impl MultiProblem {
         self.result.clone()
     }
 
-    /// Python wrapper for writeup method
-    pub fn py_writeup(&self) -> PyResult<()> {
-        let _ = self.writeup();
+    /// Save simulation results to disk.
+    ///
+    /// Writes Mueller matrices, parameters, and other output files to the
+    /// specified directory (or the directory configured in settings).
+    ///
+    /// Args:
+    ///     directory: Optional output directory path. If not provided, uses
+    ///                the directory from settings.
+    #[pyo3(signature = (directory=None))]
+    pub fn save(&self, directory: Option<String>) -> PyResult<()> {
+        if let Some(dir) = directory {
+            let mut settings = self.settings.clone();
+            settings.directory = std::path::PathBuf::from(dir);
+            let output_manager = crate::output::OutputManager::new(&settings, &self.result);
+            output_manager.write_all().map_err(|e| {
+                pyo3::exceptions::PyIOError::new_err(format!("Failed to save results: {}", e))
+            })?;
+        } else {
+            self.writeup();
+        }
         Ok(())
     }
 

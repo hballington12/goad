@@ -5,6 +5,7 @@ settings = Settings(geom_path="../../../examples/data/hex.obj", quiet=True)
 convergence = Convergence(settings)
 convergence.add_target(Param.Asymmetry, 0.02)  # 2% relative error
 convergence.solve()
+convergence.save("my_results")  # Save results to disk for later analysis
 # --8<-- [end:basic]
 
 # --8<-- [start:multiple]

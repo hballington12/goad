@@ -118,4 +118,33 @@ impl Convergence {
         self.reset_sampler();
         Ok(())
     }
+
+    /// Save simulation results to disk.
+    ///
+    /// Writes Mueller matrices, parameters, and other output files to the
+    /// specified directory (or the directory configured in settings).
+    ///
+    /// Args:
+    ///     directory: Optional output directory path. If not provided, uses
+    ///                the directory from settings.
+    #[pyo3(signature = (directory=None))]
+    pub fn save(&self, directory: Option<String>) -> PyResult<()> {
+        let mut result = self.mean();
+        result.mueller_to_1d();
+        let _ = result.compute_params(self.settings.wavelength);
+
+        let settings = if let Some(dir) = directory {
+            let mut s = self.settings.clone();
+            s.directory = std::path::PathBuf::from(dir);
+            s
+        } else {
+            self.settings.clone()
+        };
+
+        let output_manager = crate::output::OutputManager::new(&settings, &result);
+        output_manager.write_all().map_err(|e| {
+            pyo3::exceptions::PyIOError::new_err(format!("Failed to save results: {}", e))
+        })?;
+        Ok(())
+    }
 }
