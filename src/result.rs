@@ -504,7 +504,7 @@ impl Div for Results {
 
 impl Convergeable for Results {
     fn zero_like(&self) -> Self {
-        Results::new_with_zones(&self.bins(), self.zones.zero_like())
+        Results::new_with_zones(self.zones.zero_like())
     }
 
     fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
@@ -577,7 +577,7 @@ impl Results {
     }
 
     /// Create a new empty Results with initialized zones.
-    pub fn new_with_zones(_bins: &[SolidAngleBin], zones: Zones) -> Self {
+    pub fn new_with_zones(zones: Zones) -> Self {
         Self {
             zones,
             powers: Powers::new(),

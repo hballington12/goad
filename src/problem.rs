@@ -228,7 +228,7 @@ impl Problem {
         self.beam_queue.clear();
         self.out_beam_queue.clear();
         self.ext_diff_beam_queue.clear();
-        self.result = Results::new_empty(&self.result.bins());
+        self.result = init_result(&self.settings);
         self.geom.clone_from(&self.base_geom);
     }
 
@@ -299,6 +299,7 @@ impl Problem {
 
         let zone = &self.result.zones.all()[zone_idx];
         let zone_type = zone.zone_type;
+        let zone_scheme = zone.scheme.clone();
         let bins = zone.bins.clone();
 
         // Forward zones are always coherent (optical theorem)
@@ -310,9 +311,7 @@ impl Problem {
         // Map beams to this zone's bins
         let map_beam_to_zone = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
-                Mapping::GeometricOptics => {
-                    n2f_go(&self.settings.first_zone_binning(), &bins, beam)
-                }
+                Mapping::GeometricOptics => n2f_go(&zone_scheme, &bins, beam),
                 Mapping::ApertureDiffraction => beam.diffract(&bins, fov_factor),
             }
         };

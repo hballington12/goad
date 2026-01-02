@@ -444,23 +444,4 @@ impl Settings {
     pub fn beam_area_threshold(&self) -> f32 {
         self.wavelength * self.wavelength * self.beam_area_threshold_fac * self.scale.powi(2)
     }
-
-    /// Get the first zone's scheme (for backward compatibility during migration).
-    /// Panics if no zones are configured.
-    pub fn first_zone_scheme(&self) -> &bins::Scheme {
-        &self.zones.first().expect("No zones configured").scheme
-    }
-
-    /// Get the first zone's binning scheme as a BinningScheme (for backward compatibility).
-    /// Panics if no zones are configured.
-    pub fn first_zone_binning(&self) -> BinningScheme {
-        BinningScheme {
-            scheme: self
-                .zones
-                .first()
-                .expect("No zones configured")
-                .scheme
-                .clone(),
-        }
-    }
 }

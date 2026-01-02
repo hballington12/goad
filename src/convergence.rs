@@ -168,8 +168,7 @@ impl Convergence {
 
     /// Resets the solver to its initial state.
     pub fn reset(&mut self) {
-        let bins = self.settings.first_zone_scheme().generate();
-        let template = Results::new_empty(&bins);
+        let template = init_result(&self.settings);
         self.tracker = ConvergenceTracker::new(&template);
         self.reset_sampler();
     }

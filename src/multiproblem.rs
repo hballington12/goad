@@ -54,9 +54,8 @@ pub fn load_and_init_geoms(
 
 /// Initializes zones and creates an empty Results struct.
 pub fn init_result(settings: &Settings) -> Results {
-    let bins = settings.first_zone_scheme().generate();
     let zones = Zones::from_configs(&settings.zones);
-    Results::new_with_zones(&bins, zones)
+    Results::new_with_zones(zones)
 }
 
 // ============================================================================
@@ -120,7 +119,7 @@ impl MultiProblem {
 
     /// Resets a `MultiOrientProblem` to its initial state.
     pub fn reset(&mut self) {
-        self.result = Results::new_empty(&self.result.bins());
+        self.result = init_result(&self.settings);
         self.regenerate_orientations();
     }
 
@@ -327,8 +326,7 @@ impl MultiProblem {
             problem::init_geom(&settings, geom);
         }
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = &settings.first_zone_scheme().generate();
-        let result = Results::new_empty(&bins);
+        let result = init_result(&settings);
 
         Ok(Self {
             geoms,

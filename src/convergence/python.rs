@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 use rand::SeedableRng;
 
 use crate::geom::Geom;
+use crate::multiproblem::init_result;
 use crate::orientation::OrientationSampler;
 use crate::params::Param;
 use crate::problem::init_geom;
@@ -32,8 +33,7 @@ impl Convergence {
             init_geom(&settings, geom);
         }
 
-        let bins = &settings.first_zone_scheme().generate();
-        let template = Results::new_empty(bins);
+        let template = init_result(&settings);
 
         // Convergence always uses uniform random sampling (infinite supply)
         let sampler = OrientationSampler::uniform(settings.seed);
