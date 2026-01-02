@@ -6,13 +6,14 @@
 //! Debug mode is ~10-20x slower and will cause timeouts.
 
 use goad::{
-    bins::{self, BinningScheme},
+    bins,
     convergence::Convergence,
     multiproblem::MultiProblem,
     orientation::{EulerConvention, Orientation, Scheme as OrientScheme},
     params::Param,
     result::MuellerMatrix,
     settings,
+    zones::ZoneConfig,
 };
 use std::fs::File;
 use std::io::Write;
@@ -23,9 +24,7 @@ fn dump_1d_mueller_comparison() {
     let mut settings = settings::load_default_config().unwrap();
 
     // Use uniform orientations for comparison
-    settings.binning = Some(BinningScheme {
-        scheme: bins::Scheme::new_simple(37, 37),
-    });
+    settings.zones = vec![ZoneConfig::new(bins::Scheme::new_simple(37, 37))];
     settings.orientation = Orientation {
         scheme: OrientScheme::Uniform { num_orients: 100 },
         euler_convention: EulerConvention::ZYZ,
@@ -182,14 +181,12 @@ fn test_convergence_with_target() {
     let mut settings = settings::load_default_config().unwrap();
 
     // Use the same binning scheme as Python default
-    settings.binning = Some(BinningScheme {
-        scheme: bins::Scheme::Interval {
-            thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
-            theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
-            phis: vec![0.0, 360.0],
-            phi_spacings: vec![7.5],
-        },
-    });
+    settings.zones = vec![ZoneConfig::new(bins::Scheme::Interval {
+        thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
+        theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
+        phis: vec![0.0, 360.0],
+        phi_spacings: vec![7.5],
+    })];
     settings.orientation = Orientation {
         scheme: OrientScheme::Uniform { num_orients: 2000 },
         euler_convention: EulerConvention::ZYZ,
