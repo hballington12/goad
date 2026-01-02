@@ -1,5 +1,6 @@
 use nalgebra::Vector3;
 use pyo3::prelude::*;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::derive::*;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -281,14 +282,14 @@ impl Scheme {
 /// Defines how to discretize the scattering sphere into angular bins
 /// for Mueller matrix and amplitude computations. Supports simple
 /// regular grids, custom intervals, and arbitrary bin arrangements.
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct BinningScheme {
     pub scheme: Scheme,
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl BinningScheme {
     #[new]

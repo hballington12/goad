@@ -7,6 +7,7 @@ use geo_types::{Coord, LineString, Polygon};
 use nalgebra::{self as na, Complex, Isometry3, Matrix4, Point3, Vector3, Vector4};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::derive::*;
 use std::path::Path;
 use tobj::{self, Model};
@@ -952,7 +953,7 @@ impl Face {
 }
 
 /// Represents a 3D surface mesh.
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
@@ -1116,7 +1117,7 @@ impl Shape {
 }
 
 /// Python bindings for the `Shape` struct.
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl Shape {
     #[new]
@@ -1156,7 +1157,7 @@ impl Shape {
     }
 }
 
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Geom {
@@ -1563,7 +1564,7 @@ pub fn load_geom(resolved_filename: &String) -> Result<Geom, anyhow::Error> {
 }
 
 /// Python bindings for the `Geom` struct.
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl Geom {
     #[new]

@@ -23,7 +23,7 @@
     num-complex = { version = "0.4.6", features = ["serde"] }
     numpy = "0.27.0"
     pyo3 = { version = "0.27.1"}
-    pyo3-stub-gen = "0.17"
+    pyo3-stub-gen = { version = "0.17", optional = true }
     rand = "0.9.0"
     rand_distr = "0.5.1"
     rayon = "1.10.0"
@@ -38,6 +38,7 @@ plotters = { version = "0.3", default-features = false, features = ["bitmap_back
 [features]
 default = []
 extension-module = ["pyo3/extension-module"]
+stub-gen = ["pyo3-stub-gen"]
 visualization = []
 
 [lib]
@@ -47,3 +48,4 @@ crate-type = ["rlib", "cdylib"]
 [[bin]]
 name = "stub_gen"
 doc = false
+required-features = ["stub-gen"]

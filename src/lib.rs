@@ -27,6 +27,7 @@ pub mod params;
 pub mod powers;
 pub mod problem;
 pub mod python;
+#[cfg(feature = "stub-gen")]
 pub use python::stub_info;
 pub mod result;
 pub mod settings;

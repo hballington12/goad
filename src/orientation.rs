@@ -4,6 +4,7 @@ use std::{f32::consts::PI, str::FromStr};
 
 use anyhow::Result;
 use pyo3::prelude::*;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::derive::*;
 use rand::Rng;
 use rand::SeedableRng;
@@ -11,7 +12,7 @@ use serde::Deserialize;
 
 use crate::settings::DEFAULT_EULER_ORDER;
 
-#[gen_stub_pyclass_enum]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass_enum)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Scheme {
@@ -24,7 +25,7 @@ pub enum Scheme {
 }
 
 /// Euler angle order for the discrete orientation scheme.
-#[gen_stub_pyclass_enum]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass_enum)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy)]
 pub enum EulerConvention {
@@ -67,7 +68,7 @@ impl EulerConvention {
     }
 }
 
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Euler {
@@ -251,7 +252,7 @@ impl FromStr for Euler {
     }
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl Euler {
     #[new]
@@ -267,7 +268,7 @@ impl Euler {
     }
 }
 
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Orientation {
@@ -277,7 +278,7 @@ pub struct Orientation {
     pub euler_convention: EulerConvention,
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl Orientation {
     #[staticmethod]

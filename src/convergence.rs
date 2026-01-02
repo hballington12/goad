@@ -26,6 +26,7 @@ use crate::{
 };
 use progress::ConvergenceProgress;
 use pyo3::pyclass;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::derive::*;
 use rand::{Rng, SeedableRng};
 
@@ -56,7 +57,7 @@ struct OrientationTask {
 
 use crate::settings::constants::MIN_ORIENTATIONS;
 
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 pub struct Convergence {
     pub geoms: Vec<Geom>,

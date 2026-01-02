@@ -1,5 +1,6 @@
 use crate::convergence::Convergeable;
 use crate::result::GOComponent;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::derive::*;
 use rand_distr::num_traits::Pow;
 use serde::ser::{SerializeMap, Serializer};
@@ -29,7 +30,7 @@ impl Serialize for Params {
 }
 
 // Params are stored as raw values. Weighted averaging is handled by Convergeable trait.
-#[gen_stub_pyclass_enum]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass_enum)]
 #[pyo3::pyclass(module = "goad._goad", eq, eq_int)]
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq, Serialize)]
 pub enum Param {

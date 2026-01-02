@@ -7,6 +7,7 @@
 use log::{info, warn};
 use numpy::IntoPyArray;
 use pyo3::prelude::*;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::derive::*;
 use rand_distr::num_traits::Pow;
 
@@ -23,7 +24,7 @@ use crate::result::{
 };
 
 /// The type of zone, which determines what parameters can be computed.
-#[gen_stub_pyclass_enum]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass_enum)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[pyclass(module = "goad._goad", eq)]
 pub enum ZoneType {
@@ -53,7 +54,7 @@ impl ZoneType {
 }
 
 /// Configuration for a zone, as specified in TOML or via CLI.
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ZoneConfig {
@@ -82,7 +83,7 @@ impl ZoneConfig {
     }
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl ZoneConfig {
     /// Create a new zone configuration.
@@ -137,7 +138,7 @@ impl ZoneConfig {
 
 /// A zone represents a region of the scattering sphere with its own binning,
 /// results, and computed parameters.
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[derive(Debug, Clone)]
 #[pyclass(module = "goad._goad")]
 pub struct Zone {
@@ -390,7 +391,7 @@ impl Zone {
     }
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl Zone {
     /// Get the zone label
@@ -521,7 +522,7 @@ impl Zone {
 }
 
 /// A collection of zones for a simulation.
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[derive(Debug, Clone)]
 #[pyclass(module = "goad._goad")]
 pub struct Zones {
@@ -622,7 +623,7 @@ impl Zones {
     }
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl Zones {
     /// Get the number of zones
@@ -698,14 +699,14 @@ impl Zones {
 }
 
 /// Iterator for Zones in Python
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 pub struct ZonesIterator {
     zones: Vec<Zone>,
     index: usize,
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl ZonesIterator {
     fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {

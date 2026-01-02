@@ -5,6 +5,7 @@ pub mod validation;
 
 use nalgebra::Complex;
 use pyo3::prelude::*;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::derive::*;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -49,7 +50,7 @@ pub use self::constants::*;
 pub use self::loading::{load_config, load_config_with_cli, load_default_config};
 
 /// Runtime configuration for the application.
-#[gen_stub_pyclass]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
 #[pyclass(module = "goad._goad")]
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct Settings {
@@ -91,7 +92,7 @@ pub struct Settings {
     pub quiet: bool,
 }
 
-#[gen_stub_pymethods]
+#[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
 #[pymethods]
 impl Settings {
     #[new]

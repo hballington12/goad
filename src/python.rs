@@ -12,31 +12,32 @@ use crate::{
     zones::{Zone, ZoneConfig, ZoneType, Zones, ZonesIterator},
 };
 use pyo3::prelude::*;
+#[cfg(feature = "stub-gen")]
 use pyo3_stub_gen::{define_stub_info_gatherer, derive::*};
 
 /// Formats the sum of two numbers as string.
-#[gen_stub_pyfunction(module = "goad._goad")]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
 #[pyfunction]
 fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
     Ok((a + b).to_string())
 }
 
 /// Create a uniform orientation scheme with specified number of orientations
-#[gen_stub_pyfunction(module = "goad._goad")]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
 #[pyfunction]
 fn uniform_orientation(num_orients: usize) -> PyResult<Scheme> {
     Ok(Scheme::Uniform { num_orients })
 }
 
 /// Create a discrete orientation scheme from a list of Euler angles
-#[gen_stub_pyfunction(module = "goad._goad")]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
 #[pyfunction]
 fn discrete_orientation(eulers: Vec<Euler>) -> PyResult<Scheme> {
     Ok(Scheme::Discrete { eulers })
 }
 
 /// Create an Orientation with uniform scheme and default convention
-#[gen_stub_pyfunction(module = "goad._goad")]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
 #[pyfunction]
 #[pyo3(signature = (num_orients, euler_convention = None))]
 fn create_uniform_orientation(
@@ -50,7 +51,7 @@ fn create_uniform_orientation(
 }
 
 /// Create an Orientation with discrete scheme and default convention
-#[gen_stub_pyfunction(module = "goad._goad")]
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
 #[pyfunction]
 #[pyo3(signature = (eulers, euler_convention = None))]
 fn create_discrete_orientation(
@@ -64,6 +65,7 @@ fn create_discrete_orientation(
 }
 
 // Gather stub info from all annotated items
+#[cfg(feature = "stub-gen")]
 define_stub_info_gatherer!(stub_info);
 
 /// A Python module implemented in Rust.
