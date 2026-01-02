@@ -6,13 +6,14 @@
 //! Debug mode is ~10-20x slower and will cause timeouts.
 
 use goad::{
-    bins::{self, BinningScheme},
+    bins,
     convergence::Convergence,
     multiproblem::MultiProblem,
     orientation::{EulerConvention, Orientation, Scheme as OrientScheme},
     params::Param,
     result::MuellerMatrix,
     settings,
+    zones::ZoneConfig,
 };
 use std::fs::File;
 use std::io::Write;
@@ -23,9 +24,7 @@ fn dump_1d_mueller_comparison() {
     let mut settings = settings::load_default_config().unwrap();
 
     // Use uniform orientations for comparison
-    settings.binning = BinningScheme {
-        scheme: bins::Scheme::new_simple(37, 37),
-    };
+    settings.zones = vec![ZoneConfig::new(bins::Scheme::new_simple(37, 37))];
     settings.orientation = Orientation {
         scheme: OrientScheme::Uniform { num_orients: 100 },
         euler_convention: EulerConvention::ZYZ,
@@ -48,11 +47,16 @@ fn dump_1d_mueller_comparison() {
     // Dump 1D Mueller results
     let mp_1d = multiproblem
         .result
-        .field_1d
-        .as_ref()
+        .zones
+        .full_zone()
+        .and_then(|z| z.field_1d.as_ref())
         .expect("No 1D results");
     let conv_mean = convergence.mean();
-    let conv_1d = conv_mean.field_1d.as_ref().expect("No 1D results");
+    let conv_1d = conv_mean
+        .zones
+        .full_zone()
+        .and_then(|z| z.field_1d.as_ref())
+        .expect("No 1D results");
 
     let mut mp_file = File::create("multiproblem_1d.dat").unwrap();
     let mut conv_file = File::create("convergence_1d.dat").unwrap();
@@ -123,7 +127,7 @@ fn test_tracker_5_orientations() {
     let mut tracker: Option<ConvergenceTracker<goad::result::Results>> = None;
 
     for (i, euler) in eulers.iter().enumerate() {
-        let mut problem = Problem::new(None, Some(settings.clone()));
+        let mut problem = Problem::new(None, Some(settings.clone())).unwrap();
         problem.run(Some(euler)).unwrap();
 
         let asym = problem
@@ -177,14 +181,12 @@ fn test_convergence_with_target() {
     let mut settings = settings::load_default_config().unwrap();
 
     // Use the same binning scheme as Python default
-    settings.binning = BinningScheme {
-        scheme: bins::Scheme::Interval {
-            thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
-            theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
-            phis: vec![0.0, 360.0],
-            phi_spacings: vec![7.5],
-        },
-    };
+    settings.zones = vec![ZoneConfig::new(bins::Scheme::Interval {
+        thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
+        theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
+        phis: vec![0.0, 360.0],
+        phi_spacings: vec![7.5],
+    })];
     settings.orientation = Orientation {
         scheme: OrientScheme::Uniform { num_orients: 2000 },
         euler_convention: EulerConvention::ZYZ,

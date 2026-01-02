@@ -9,6 +9,7 @@ use crate::{
     problem::Problem,
     result::Results,
     settings::Settings,
+    zones::{Zone, ZoneType, Zones, ZonesIterator},
 };
 use pyo3::prelude::*;
 
@@ -85,6 +86,12 @@ fn _goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Convergence solver
     m.add_class::<Convergence>()?;
+
+    // Zone classes
+    m.add_class::<ZoneType>()?;
+    m.add_class::<Zone>()?;
+    m.add_class::<Zones>()?;
+    m.add_class::<ZonesIterator>()?;
 
     // Helper functions for orientations
     m.add_function(wrap_pyfunction!(uniform_orientation, m)?)?;

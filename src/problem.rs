@@ -1,10 +1,9 @@
 use std::f32::consts::PI;
 
-use crate::bins::{AngleBin, SolidAngleBin};
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
-use crate::result::ScattResult2D;
+use crate::multiproblem::{init_result, load_settings_or_default};
 use crate::settings::{default_e_perp, default_prop};
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
@@ -13,7 +12,8 @@ use crate::{
     geom::{Face, Geom},
     orientation, output,
     result::{GOComponent, Mueller, Results},
-    settings::{load_config, Settings},
+    settings::Settings,
+    zones::ZoneType,
 };
 
 use anyhow::Result;
@@ -36,19 +36,20 @@ mod tests {
         let mut geom = geoms[0].clone();
         init_geom(&settings, &mut geom);
 
-        let mut problem = Problem::new(Some(geom), Some(settings));
+        let mut problem = Problem::new(Some(geom), Some(settings)).unwrap();
         let euler = crate::orientation::Euler::new(30.0, 30.0, 0.0);
         problem.run(Some(&euler)).expect("run");
 
         let result = &problem.result;
 
-        // Check that field_bs is populated
+        // Check that backward zone is populated
+        let backward_zone = result.zones.backward_zone();
         assert!(
-            result.field_bs.is_some(),
-            "field_bs should be Some after solve"
+            backward_zone.is_some(),
+            "backward zone should exist after solve"
         );
 
-        let bs = result.field_bs.as_ref().unwrap();
+        let bs = backward_zone.unwrap().field_2d.first().unwrap();
         // S11 should be positive for any scattering
         assert!(
             bs.mueller_total[(0, 0)] > 0.0,
@@ -114,7 +115,7 @@ mod tests {
         // Use default config to avoid loading local.toml which may have test-breaking settings
         let default_settings =
             crate::settings::load_default_config().expect("Failed to load default config");
-        let mut problem = Problem::new(Some(geom), Some(default_settings));
+        let mut problem = Problem::new(Some(geom), Some(default_settings)).unwrap();
 
         problem.propagate_next();
     }
@@ -137,8 +138,10 @@ pub struct Problem {
 impl Problem {
     #[new]
     #[pyo3(signature = (settings = None, geom = None))]
-    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> Self {
-        Problem::new(geom, settings)
+    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> PyResult<Self> {
+        Problem::new(geom, settings).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Failed to create Problem: {}", e))
+        })
     }
 
     /// Setter function for the problem settings
@@ -194,26 +197,30 @@ impl Problem {
     /// Creates a new `Problem` from optional `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
-    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Self {
-        let settings = settings.unwrap_or_else(|| load_config().expect("Failed to load config"));
-        let mut geom = geom
-            .unwrap_or_else(|| load_geom(&settings.geom_name).expect("Failed to load geometry"));
+    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Result<Self> {
+        let settings = load_settings_or_default(settings);
+        let mut geom = match geom {
+            Some(g) => g,
+            None => load_geom(&settings.geom_name).map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to load geometry file '{}': {}",
+                    settings.geom_name,
+                    e
+                )
+            })?,
+        };
         init_geom(&settings, &mut geom);
+        let result = init_result(&settings);
 
-        let bins = &settings.binning.scheme.generate();
-        let solution = Results::new_empty(&bins);
-
-        let problem = Self {
+        Ok(Self {
             base_geom: geom.clone(),
             geom,
             beam_queue: vec![],
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             settings,
-            result: solution,
-        };
-
-        problem
+            result,
+        })
     }
 
     /// Resets the problem.
@@ -221,7 +228,7 @@ impl Problem {
         self.beam_queue.clear();
         self.out_beam_queue.clear();
         self.ext_diff_beam_queue.clear();
-        self.result = Results::new_empty(&self.result.bins());
+        self.result = init_result(&self.settings);
         self.geom.clone_from(&self.base_geom);
     }
 
@@ -254,10 +261,8 @@ impl Problem {
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
-        let settings = load_config().expect("Failed to load config");
-
-        let bins = &settings.binning.scheme.generate();
-        let solution = Results::new_empty(&bins);
+        let settings = load_settings_or_default(None);
+        let result = init_result(&settings);
 
         Self {
             base_geom: geom.clone(),
@@ -266,79 +271,24 @@ impl Problem {
             out_beam_queue: vec![],
             ext_diff_beam_queue: vec![],
             settings,
-            result: solution,
+            result,
         }
     }
 
-    /// Combines the external diffraction and outbeams to get the far-field solution.
-    fn combine_far(&mut self) {
-        for result in self.result.field_2d.iter_mut() {
-            if self.settings.coherence {
-                result.ampl_total = result.ampl_beam + result.ampl_ext;
-                result.mueller_total = result.ampl_total.to_mueller();
-            } else {
-                result.mueller_total = result.mueller_beam + result.mueller_ext;
-            }
-        }
-        if let Some(ref mut field_bs) = self.result.field_bs {
-            if self.settings.coherence {
-                field_bs.ampl_total = field_bs.ampl_beam + field_bs.ampl_ext;
-                field_bs.mueller_total = field_bs.ampl_total.to_mueller();
-            } else {
-                field_bs.mueller_total = field_bs.mueller_beam + field_bs.mueller_ext;
-            }
-        }
-        if let Some(ref mut field_fs) = self.result.field_fs {
-            field_fs.ampl_total = field_fs.ampl_beam + field_fs.ampl_ext;
-            field_fs.mueller_total = field_fs.ampl_total.to_mueller();
-        }
-    }
-
-    fn ampl_to_mueller(&mut self, component: GOComponent) {
-        for result in self.result.field_2d.iter_mut() {
-            match component {
-                GOComponent::Total => {
-                    result.mueller_total = result.ampl_total.to_mueller();
-                }
-                GOComponent::Beam => {
-                    result.mueller_beam = result.ampl_beam.to_mueller();
-                }
-                GOComponent::ExtDiff => {
-                    result.mueller_ext = result.ampl_ext.to_mueller();
-                }
-            }
-        }
-    }
-
-    fn assign_ampls(&mut self, component: GOComponent, ampls: Vec<Ampl>) {
-        for (field, ampl) in self.result.field_2d.iter_mut().zip(ampls) {
-            match component {
-                GOComponent::Total => field.ampl_total = ampl,
-                GOComponent::Beam => field.ampl_beam = ampl,
-                GOComponent::ExtDiff => field.ampl_ext = ampl,
-            }
-        }
-    }
-
-    fn assign_muellers(&mut self, component: GOComponent, muellers: Vec<Mueller>) {
-        for (field, mueller) in self.result.field_2d.iter_mut().zip(muellers) {
-            match component {
-                GOComponent::Total => field.mueller_total = mueller,
-                GOComponent::Beam => field.mueller_beam = mueller,
-                GOComponent::ExtDiff => field.mueller_ext = mueller,
-            }
-        }
-    }
-
-    pub fn solve_far_queue(&mut self, component: GOComponent) {
+    /// Solve far field for a single zone.
+    ///
+    /// Determines coherence based on zone type:
+    /// - Forward zones: always coherent (optical theorem)
+    /// - Other zones: respect global coherence setting
+    fn solve_far_zone(&mut self, component: GOComponent, zone_idx: usize) {
         let (queue, mapping, fov_factor) = match component {
             GOComponent::Beam => (
-                &self.out_beam_queue,
+                self.out_beam_queue.clone(),
                 self.settings.mapping,
                 self.settings.fov_factor,
             ),
             GOComponent::ExtDiff => (
-                &self.ext_diff_beam_queue,
+                self.ext_diff_beam_queue.clone(),
                 Mapping::ApertureDiffraction,
                 None,
             ),
@@ -347,49 +297,33 @@ impl Problem {
             }
         };
 
-        // Forward scatter (always coherent because of the optical theorem)
-        if mapping == Mapping::ApertureDiffraction {
-            if let Some(ref mut field_fs) = self.result.field_fs {
-                let mut fs_ampl = Ampl::zeros();
-                for beam in queue.iter() {
-                    let ampls = beam.diffract(&[field_fs.bin], fov_factor);
-                    if !ampls.is_empty() {
-                        let ampl = ampls[0].1;
-                        fs_ampl += ampl;
-                    }
-                }
-                match component {
-                    GOComponent::Beam => field_fs.ampl_beam += fs_ampl,
-                    GOComponent::ExtDiff => field_fs.ampl_ext += fs_ampl,
-                    GOComponent::Total => field_fs.ampl_total += fs_ampl,
-                }
-            }
-        }
+        let zone = &self.result.zones.all()[zone_idx];
+        let zone_type = zone.zone_type;
+        let zone_scheme = zone.scheme.clone();
+        let bins = zone.bins.clone();
 
-        // Mapping helper closure
-        let map_beam_to_far_field = |beam: &Beam| -> Vec<(usize, Ampl)> {
+        // Forward zones are always coherent (optical theorem)
+        let use_coherence = match zone_type {
+            ZoneType::Forward => true,
+            _ => self.settings.coherence,
+        };
+
+        // Map beams to this zone's bins
+        let map_beam_to_zone = |beam: &Beam| -> Vec<(usize, Ampl)> {
             match mapping {
-                Mapping::GeometricOptics => {
-                    n2f_go(&self.settings.binning, &self.result.bins(), beam)
-                }
-                Mapping::ApertureDiffraction => beam.diffract(&self.result.bins(), fov_factor),
+                Mapping::GeometricOptics => n2f_go(&zone_scheme, &bins, beam),
+                Mapping::ApertureDiffraction => beam.diffract(&bins, fov_factor),
             }
         };
 
-        // coherence:
-        if self.settings.coherence {
-            // main query points
-            let zero_ampls: Vec<(usize, Ampl)> = self
-                .result
-                .field_2d
-                .iter()
-                .map(|_| Ampl::zeros())
-                .into_iter()
-                .enumerate()
-                .collect();
+        if use_coherence {
+            // Coherent: accumulate amplitudes, convert to Mueller at end
+            let zero_ampls: Vec<(usize, Ampl)> =
+                bins.iter().map(|_| Ampl::zeros()).enumerate().collect();
+
             let ampls: Vec<Ampl> = queue
                 .par_iter()
-                .map(|beam| map_beam_to_far_field(beam))
+                .map(|beam| map_beam_to_zone(beam))
                 .reduce(
                     || zero_ampls.clone(),
                     |mut acc, val| {
@@ -403,57 +337,41 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
-            // Backscatter
-            if mapping == Mapping::ApertureDiffraction {
-                if let Some(ref mut field_bs) = self.result.field_bs {
-                    let mut bs_ampl = Ampl::zeros();
-                    for beam in queue.iter() {
-                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
-                        if !ampls.is_empty() {
-                            let ampl = ampls[0].1;
-                            bs_ampl += ampl;
-                        }
+            // Assign to zone's field_2d
+            let zone = &mut self.result.zones.all_mut()[zone_idx];
+            for (field, ampl) in zone.field_2d.iter_mut().zip(ampls) {
+                match component {
+                    GOComponent::Total => {
+                        field.ampl_total += ampl;
+                        field.mueller_total = field.ampl_total.to_mueller();
                     }
-                    match component {
-                        GOComponent::Beam => {
-                            field_bs.ampl_beam += bs_ampl;
-                            field_bs.mueller_beam = field_bs.ampl_beam.to_mueller();
-                        }
-                        GOComponent::ExtDiff => {
-                            field_bs.ampl_ext += bs_ampl;
-                            field_bs.mueller_ext = field_bs.ampl_ext.to_mueller();
-                        }
-                        GOComponent::Total => {
-                            field_bs.ampl_total += bs_ampl;
-                            field_bs.mueller_total = field_bs.ampl_total.to_mueller();
-                        }
+                    GOComponent::Beam => {
+                        field.ampl_beam += ampl;
+                        field.mueller_beam = field.ampl_beam.to_mueller();
+                    }
+                    GOComponent::ExtDiff => {
+                        field.ampl_ext += ampl;
+                        field.mueller_ext = field.ampl_ext.to_mueller();
                     }
                 }
             }
-
-            self.assign_ampls(component, ampls);
-            self.ampl_to_mueller(component);
         } else {
-            // no coherence
-            // main query points
-            let zero_muellers: Vec<(usize, Mueller)> = self
-                .result
-                .field_2d
-                .iter()
-                .map(|_| Mueller::zeros())
-                .into_iter()
-                .enumerate()
-                .collect();
+            // Incoherent: convert each beam to Mueller, then sum
+            let zero_muellers: Vec<(usize, Mueller)> =
+                bins.iter().map(|_| Mueller::zeros()).enumerate().collect();
+
             let muellers: Vec<Mueller> = queue
                 .par_iter()
                 .map(|beam| {
-                    let ampls = map_beam_to_far_field(beam);
-                    let muellers = ampls.into_iter().map(|x| (x.0, x.1.to_mueller())).collect();
-                    muellers
+                    let ampls = map_beam_to_zone(beam);
+                    ampls
+                        .into_iter()
+                        .map(|(i, a)| (i, a.to_mueller()))
+                        .collect()
                 })
                 .reduce(
                     || zero_muellers.clone(),
-                    |mut acc, val| {
+                    |mut acc, val: Vec<(usize, Mueller)>| {
                         for (i, mueller) in val.into_iter() {
                             acc[i].1 += mueller;
                         }
@@ -464,38 +382,45 @@ impl Problem {
                 .map(|x| x.1)
                 .collect();
 
-            // Backscatter
-            if mapping == Mapping::ApertureDiffraction {
-                if let Some(ref mut field_bs) = self.result.field_bs {
-                    let mut bs_mueller = Mueller::zeros();
-                    for beam in queue.iter() {
-                        let ampls = beam.diffract(&[field_bs.bin], fov_factor);
-                        let ampl = ampls[0].1;
-                        bs_mueller += ampl.to_mueller();
-                    }
-                    match component {
-                        GOComponent::Beam => field_bs.mueller_beam += bs_mueller,
-                        GOComponent::ExtDiff => field_bs.mueller_ext += bs_mueller,
-                        GOComponent::Total => field_bs.mueller_total += bs_mueller,
-                    }
+            // Assign to zone's field_2d
+            let zone = &mut self.result.zones.all_mut()[zone_idx];
+            for (field, mueller) in zone.field_2d.iter_mut().zip(muellers) {
+                match component {
+                    GOComponent::Total => field.mueller_total += mueller,
+                    GOComponent::Beam => field.mueller_beam += mueller,
+                    GOComponent::ExtDiff => field.mueller_ext += mueller,
                 }
             }
+        }
+    }
 
-            self.assign_muellers(component, muellers);
+    /// Combine beam and ext_diff components for a zone.
+    fn combine_far_zone(&mut self, zone_idx: usize) {
+        let zone = &mut self.result.zones.all_mut()[zone_idx];
+        let use_coherence = match zone.zone_type {
+            ZoneType::Forward => true,
+            _ => self.settings.coherence,
+        };
+
+        for field in zone.field_2d.iter_mut() {
+            if use_coherence {
+                field.ampl_total = field.ampl_beam + field.ampl_ext;
+                field.mueller_total = field.ampl_total.to_mueller();
+            } else {
+                field.mueller_total = field.mueller_beam + field.mueller_ext;
+            }
         }
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
     pub fn solve_far(&mut self) {
-        // Initialize field_bs with backscatter bin
-        let bs_bin = SolidAngleBin::new(AngleBin::new(180.0, 180.0), AngleBin::new(0.0, 0.0));
-        let fs_bin = SolidAngleBin::new(AngleBin::new(0.01, 0.01), AngleBin::new(0.0, 0.0));
-        self.result.field_bs = Some(ScattResult2D::new(bs_bin));
-        self.result.field_fs = Some(ScattResult2D::new(fs_bin));
-
-        self.solve_far_queue(GOComponent::ExtDiff);
-        self.solve_far_queue(GOComponent::Beam);
-        self.combine_far();
+        // Process each zone
+        let num_zones = self.result.zones.len();
+        for zone_idx in 0..num_zones {
+            self.solve_far_zone(GOComponent::ExtDiff, zone_idx);
+            self.solve_far_zone(GOComponent::Beam, zone_idx);
+            self.combine_far_zone(zone_idx);
+        }
     }
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self) {
@@ -510,7 +435,7 @@ impl Problem {
     }
 
     pub fn mueller_to_1d(&mut self) {
-        self.result.mueller_to_1d(&self.settings.binning.scheme);
+        self.result.mueller_to_1d();
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>) -> Result<()> {
@@ -553,47 +478,8 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        // Collect Mueller matrices by component type
-        let mueller_total: Vec<Mueller> = self
-            .result
-            .field_2d
-            .iter()
-            .map(|field| field.mueller_total)
-            .collect();
-
-        let mueller_beam: Vec<Mueller> = self
-            .result
-            .field_2d
-            .iter()
-            .map(|field| field.mueller_beam)
-            .collect();
-
-        let mueller_ext: Vec<Mueller> = self
-            .result
-            .field_2d
-            .iter()
-            .map(|field| field.mueller_ext)
-            .collect();
-
-        let _ = output::write_mueller(
-            &self.result.bins(),
-            &mueller_total,
-            "",
-            &self.settings.directory,
-        );
-        let _ = output::write_mueller(
-            &self.result.bins(),
-            &mueller_beam,
-            "_beam",
-            &self.settings.directory,
-        );
-        let _ = output::write_mueller(
-            &self.result.bins(),
-            &mueller_ext,
-            "_ext",
-            &self.settings.directory,
-        );
-        let _ = output::write_result(&self.result, &self.settings.directory);
+        let output_manager = output::OutputManager::new(&self.settings, &self.result);
+        let _ = output_manager.write_all();
     }
 
     /// Propagates the next beam in the queue.

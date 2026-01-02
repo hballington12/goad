@@ -1,14 +1,15 @@
-use crate::result::{GOComponent, MuellerMatrix};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::{fs::File, io::BufWriter};
 
 use anyhow::Result;
+use serde::Serialize;
 
 use crate::bins::SolidAngleBin;
-use crate::result::{Mueller, Results};
+use crate::result::{Mueller, MuellerMatrix, Results};
 use crate::settings::{OutputConfig, Settings};
+use crate::zones::Zone;
 
 /// Trait for writing output data to files
 pub trait OutputWriter {
@@ -40,10 +41,8 @@ impl<'a> OutputManager<'a> {
 
         // Create all possible output writers
         let writers: Vec<Box<dyn OutputWriter>> = vec![
-            Box::new(ResultsSummaryWriter::new(self.results)),
             Box::new(SettingsJsonWriter::new(self.settings)),
-            Box::new(PowersJsonWriter::new(&self.results.powers)),
-            Box::new(ParamsJsonWriter::new(&self.results.params)),
+            Box::new(ConsolidatedResultsWriter::new(self.results)),
         ];
 
         // Write enabled outputs
@@ -67,46 +66,50 @@ impl<'a> OutputManager<'a> {
         let output_dir = &self.settings.directory;
         let config = &self.settings.output.mueller_components;
 
+        // Write Mueller matrices for each zone in its own directory
+        for zone in self.results.zones.iter() {
+            let zone_dir = output_dir.join(zone.display_name());
+            fs::create_dir_all(&zone_dir)?;
+
+            self.write_zone_mueller(zone, &zone_dir, config)?;
+        }
+
+        Ok(())
+    }
+
+    fn write_zone_mueller(
+        &self,
+        zone: &Zone,
+        zone_dir: &Path,
+        config: &crate::settings::MuellerComponentConfig,
+    ) -> Result<()> {
         // Write 2D Mueller matrices
-        if self.settings.output.mueller_2d {
+        if self.settings.output.mueller_2d && !zone.field_2d.is_empty() {
+            let bins: Vec<_> = zone.bins.clone();
+
             if config.total {
-                let muellers = &self
-                    .results
-                    .field_2d
-                    .iter()
-                    .map(|f| f.mueller_total)
-                    .collect::<Vec<_>>();
-                write_mueller(&self.results.bins(), muellers, "", output_dir)?;
+                let muellers: Vec<_> = zone.field_2d.iter().map(|f| f.mueller_total).collect();
+                write_mueller(&bins, &muellers, "", zone_dir)?;
             }
             if config.beam {
-                let muellers = &self
-                    .results
-                    .field_2d
-                    .iter()
-                    .map(|f| f.mueller_beam)
-                    .collect::<Vec<_>>();
-                write_mueller(&self.results.bins(), muellers, "_beam", output_dir)?;
+                let muellers: Vec<_> = zone.field_2d.iter().map(|f| f.mueller_beam).collect();
+                write_mueller(&bins, &muellers, "_beam", zone_dir)?;
             }
             if config.external {
-                let muellers = &self
-                    .results
-                    .field_2d
-                    .iter()
-                    .map(|f| f.mueller_ext)
-                    .collect::<Vec<_>>();
-                write_mueller(&self.results.bins(), muellers, "_ext", output_dir)?;
+                let muellers: Vec<_> = zone.field_2d.iter().map(|f| f.mueller_ext).collect();
+                write_mueller(&bins, &muellers, "_ext", zone_dir)?;
             }
         }
 
         // Write 1D Mueller matrices
         if self.settings.output.mueller_1d {
-            if let Some(field_1d) = &self.results.field_1d {
+            if let Some(field_1d) = &zone.field_1d {
                 if config.total {
                     write_mueller_1d(
                         "",
                         field_1d,
                         &|r: &crate::result::ScattResult1D| r.mueller_total.clone(),
-                        output_dir,
+                        zone_dir,
                     )?;
                 }
                 if config.beam {
@@ -114,7 +117,7 @@ impl<'a> OutputManager<'a> {
                         "_beam",
                         field_1d,
                         &|r: &crate::result::ScattResult1D| r.mueller_beam.clone(),
-                        output_dir,
+                        zone_dir,
                     )?;
                 }
                 if config.external {
@@ -122,7 +125,7 @@ impl<'a> OutputManager<'a> {
                         "_ext",
                         field_1d,
                         &|r: &crate::result::ScattResult1D| r.mueller_ext.clone(),
-                        output_dir,
+                        zone_dir,
                     )?;
                 }
             }
@@ -206,154 +209,6 @@ where
     Ok(())
 }
 
-/// Write the Mueller matrix to a file against the theta and phi bins
-pub fn write_result(result: &Results, output_dir: &Path) -> Result<()> {
-    let file_name = format!("results.dat");
-    let path = output_path(Some(output_dir), &file_name)?;
-
-    let file = File::create(&path)?;
-    let mut writer = BufWriter::new(file);
-
-    // Write the results to a file
-    writeln!(writer, "# GOAD Simulation Results")?;
-    writeln!(writer, "# ======================")?;
-
-    // Write parameters section
-    writeln!(writer, "\n# Optical Parameters")?;
-    writeln!(writer, "# ------------------")?;
-
-    // Write parameters for Total component (backwards compatible)
-    if let Some(scat) = result.params.scatt_cross(&GOComponent::Total) {
-        writeln!(writer, "Scattering Cross Section: {:.6}", scat)?;
-    }
-    if let Some(ext) = result.params.ext_cross(&GOComponent::Total) {
-        writeln!(writer, "Extinction Cross Section: {:.6}", ext)?;
-    }
-    if let Some(albedo) = result.params.albedo(&GOComponent::Total) {
-        writeln!(writer, "Single Scattering Albedo: {:.6}", albedo)?;
-    }
-    if let Some(asym) = result.params.asymmetry(&GOComponent::Total) {
-        writeln!(writer, "Asymmetry Parameter: {:.6}", asym)?;
-    }
-
-    // Backscatter parameters section
-    writeln!(writer, "\n# Backscatter Parameters")?;
-    writeln!(writer, "# ----------------------")?;
-
-    if let Some(bs_cross) = result.params.backscatter_cross(&GOComponent::Total) {
-        writeln!(writer, "Backscatter Cross Section: {:.6e}", bs_cross)?;
-    }
-    if let Some(lidar) = result.params.lidar_ratio(&GOComponent::Total) {
-        writeln!(writer, "Lidar Ratio: {:.6}", lidar)?;
-    }
-    if let Some(depol) = result.params.depolarization_ratio(&GOComponent::Total) {
-        writeln!(writer, "Backscatter Depolarization Ratio: {:.6}", depol)?;
-    }
-
-    // Write component-specific parameters
-    writeln!(writer, "\n# Component-Specific Parameters")?;
-    writeln!(writer, "# ------------------------------")?;
-
-    for component in [
-        crate::result::GOComponent::Beam,
-        crate::result::GOComponent::ExtDiff,
-    ] {
-        let comp_str = match component {
-            crate::result::GOComponent::Beam => "Beam",
-            crate::result::GOComponent::ExtDiff => "ExtDiff",
-            _ => continue,
-        };
-
-        writeln!(writer, "\n# {} Component", comp_str)?;
-        if let Some(scat) = result.params.scatt_cross(&component) {
-            writeln!(writer, "  Scattering Cross Section: {:.6}", scat)?;
-        }
-        if let Some(asym) = result.params.asymmetry(&component) {
-            writeln!(writer, "  Asymmetry Parameter: {:.6}", asym)?;
-        }
-        if let Some(bs_cross) = result.params.backscatter_cross(&component) {
-            writeln!(writer, "  Backscatter Cross Section: {:.6e}", bs_cross)?;
-        }
-        if let Some(lidar) = result.params.lidar_ratio(&component) {
-            writeln!(writer, "  Lidar Ratio: {:.6}", lidar)?;
-        }
-        if let Some(depol) = result.params.depolarization_ratio(&component) {
-            writeln!(writer, "  Backscatter Depolarization Ratio: {:.6}", depol)?;
-        }
-    }
-
-    // Write powers section
-    writeln!(writer, "\n# Power Distribution")?;
-    writeln!(writer, "# ----------------")?;
-    writeln!(writer, "Input Power:           {:.6}", result.powers.input)?;
-    writeln!(writer, "Output Power:          {:.6}", result.powers.output)?;
-    writeln!(
-        writer,
-        "Absorbed Power:        {:.6}",
-        result.powers.absorbed
-    )?;
-    writeln!(
-        writer,
-        "Truncated Reflections: {:.6}",
-        result.powers.trnc_ref
-    )?;
-    writeln!(
-        writer,
-        "Truncated Recursions:  {:.6}",
-        result.powers.trnc_rec
-    )?;
-    writeln!(
-        writer,
-        "Truncated Clip Error:  {:.6}",
-        result.powers.clip_err
-    )?;
-    writeln!(
-        writer,
-        "Truncated Energy:      {:.6}",
-        result.powers.trnc_energy
-    )?;
-    writeln!(
-        writer,
-        "Truncated Area:        {:.6}",
-        result.powers.trnc_area
-    )?;
-    writeln!(
-        writer,
-        "Truncated Cutoff:      {:.6}",
-        result.powers.trnc_cop
-    )?;
-    writeln!(
-        writer,
-        "External Diffraction:  {:.6}",
-        result.powers.ext_diff
-    )?;
-    writeln!(
-        writer,
-        "Missing Power:         {:.6}",
-        result.powers.missing()
-    )?;
-
-    // Write ratios
-    writeln!(writer, "\n# Power Ratios")?;
-    writeln!(writer, "# ------------")?;
-    let output_ratio = result.powers.output / result.powers.input;
-    let absorbed_ratio = result.powers.absorbed / result.powers.input;
-    let total_ratio = (result.powers.output + result.powers.absorbed) / result.powers.input;
-    writeln!(writer, "Scattered/Input Ratio: {:.6}", output_ratio)?;
-    writeln!(writer, "Absorbed/Input Ratio:  {:.6}", absorbed_ratio)?;
-    writeln!(writer, "Total/Input Ratio:     {:.6}", total_ratio)?;
-
-    // Write binning information
-    writeln!(writer, "\n# Simulation Information")?;
-    writeln!(writer, "# ---------------------")?;
-    writeln!(writer, "Number of bins: {}", result.bins().len())?;
-    // if let Some(bins_1d) = &result.bins_1d {
-    //     writeln!(writer, "Number of 1D bins: {}", bins_1d.len())?;
-    // }
-
-    Ok(())
-}
-
 // Helper function to construct the output path and ensure the directory exists
 pub fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf> {
     match output_dir {
@@ -368,31 +223,6 @@ pub fn output_path(output_dir: Option<&Path>, file_name: &str) -> Result<PathBuf
 // ========================================
 // Individual Output Writer Implementations
 // ========================================
-
-/// Writer for the results.dat summary file (existing implementation)
-pub struct ResultsSummaryWriter<'a> {
-    results: &'a Results,
-}
-
-impl<'a> ResultsSummaryWriter<'a> {
-    pub fn new(results: &'a Results) -> Self {
-        Self { results }
-    }
-}
-
-impl<'a> OutputWriter for ResultsSummaryWriter<'a> {
-    fn write(&self, output_dir: &Path) -> Result<()> {
-        write_result(self.results, output_dir)
-    }
-
-    fn filename(&self) -> String {
-        "results.dat".to_string()
-    }
-
-    fn is_enabled(&self, config: &OutputConfig) -> bool {
-        config.results_summary
-    }
-}
 
 /// Writer for settings.json file
 pub struct SettingsJsonWriter<'a> {
@@ -422,58 +252,73 @@ impl<'a> OutputWriter for SettingsJsonWriter<'a> {
     }
 }
 
-/// Writer for powers.json file
-pub struct PowersJsonWriter<'a> {
-    powers: &'a crate::powers::Powers,
+// ========================================
+// Consolidated Results JSON Output
+// ========================================
+
+/// Serializable zone summary for results.json
+#[derive(Serialize)]
+struct ZoneOutput {
+    label: String,
+    zone_type: String,
+    num_bins: usize,
+    params: crate::params::Params,
+    mueller_dir: String,
 }
 
-impl<'a> PowersJsonWriter<'a> {
-    pub fn new(powers: &'a crate::powers::Powers) -> Self {
-        Self { powers }
+/// Serializable consolidated results
+#[derive(Serialize)]
+struct ConsolidatedResults {
+    powers: crate::powers::Powers,
+    zones: Vec<ZoneOutput>,
+}
+
+/// Writer for consolidated results.json file
+pub struct ConsolidatedResultsWriter<'a> {
+    results: &'a Results,
+}
+
+impl<'a> ConsolidatedResultsWriter<'a> {
+    pub fn new(results: &'a Results) -> Self {
+        Self { results }
     }
 }
 
-impl<'a> OutputWriter for PowersJsonWriter<'a> {
+impl<'a> OutputWriter for ConsolidatedResultsWriter<'a> {
     fn write(&self, output_dir: &Path) -> Result<()> {
+        let zones: Vec<ZoneOutput> = self
+            .results
+            .zones
+            .iter()
+            .map(|zone| {
+                let label = zone.display_name();
+                ZoneOutput {
+                    zone_type: format!("{:?}", zone.zone_type),
+                    num_bins: zone.bins.len(),
+                    params: zone.params.clone(),
+                    mueller_dir: label.clone(),
+                    label,
+                }
+            })
+            .collect();
+
+        let consolidated = ConsolidatedResults {
+            powers: self.results.powers.clone(),
+            zones,
+        };
+
         let path = output_path(Some(output_dir), &self.filename())?;
-        let json = serde_json::to_string_pretty(self.powers)?;
+        let json = serde_json::to_string_pretty(&consolidated)?;
         fs::write(path, json)?;
         Ok(())
     }
 
     fn filename(&self) -> String {
-        "powers.json".to_string()
+        "results.json".to_string()
     }
 
-    fn is_enabled(&self, config: &OutputConfig) -> bool {
-        config.powers_json
-    }
-}
-
-/// Writer for params.json file
-pub struct ParamsJsonWriter<'a> {
-    params: &'a crate::params::Params,
-}
-
-impl<'a> ParamsJsonWriter<'a> {
-    pub fn new(params: &'a crate::params::Params) -> Self {
-        Self { params }
-    }
-}
-
-impl<'a> OutputWriter for ParamsJsonWriter<'a> {
-    fn write(&self, output_dir: &Path) -> Result<()> {
-        let path = output_path(Some(output_dir), &self.filename())?;
-        let json = serde_json::to_string_pretty(self.params)?;
-        fs::write(path, json)?;
-        Ok(())
-    }
-
-    fn filename(&self) -> String {
-        "params.json".to_string()
-    }
-
-    fn is_enabled(&self, config: &OutputConfig) -> bool {
-        config.params_json
+    fn is_enabled(&self, _config: &OutputConfig) -> bool {
+        // Always enabled for now - could add config option later
+        true
     }
 }

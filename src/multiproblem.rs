@@ -1,12 +1,14 @@
 // use std::time::Instant;
 
 use crate::{
+    convergence::Convergeable,
     geom::Geom,
     orientation::{Euler, Orientations},
     output,
     problem::{self, Problem},
     result::Results,
     settings::Settings,
+    zones::Zones,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use nalgebra::Complex;
@@ -14,6 +16,49 @@ use pyo3::prelude::*;
 use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
 use std::time::Duration;
+
+// ============================================================================
+// Helper functions for solver initialization
+// ============================================================================
+
+/// Loads settings from config if not provided.
+pub fn load_settings_or_default(settings: Option<Settings>) -> Settings {
+    settings.unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"))
+}
+
+/// Loads and initializes geometries. Used by MultiProblem and Convergence.
+pub fn load_and_init_geoms(
+    geoms: Option<Vec<Geom>>,
+    settings: &Settings,
+) -> anyhow::Result<Vec<Geom>> {
+    let mut geoms = match geoms {
+        Some(g) => g,
+        None => Geom::load(&settings.geom_name).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to load geometry file '{}': {}\n\
+                Hint: This may be caused by degenerate faces (zero cross product), \
+                faces that are too small, or non-planar geometry. \
+                Please check and fix the geometry file.",
+                settings.geom_name,
+                e
+            )
+        })?,
+    };
+
+    for geom in geoms.iter_mut() {
+        problem::init_geom(settings, geom);
+    }
+
+    Ok(geoms)
+}
+
+/// Initializes zones and creates an empty Results struct.
+pub fn init_result(settings: &Settings) -> Results {
+    let zones = Zones::from_configs(&settings.zones);
+    Results::new_with_zones(zones)
+}
+
+// ============================================================================
 
 /// Multi-orientation light scattering simulation for a single geometry.
 ///
@@ -52,28 +97,10 @@ impl MultiProblem {
     /// If settings not provided, loads from config file.
     /// If geoms not provided, load from file
     pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
-        let settings = settings
-            .unwrap_or_else(|| crate::settings::load_config().expect("Failed to load config"));
-        let mut geoms = match geoms {
-            Some(g) => g,
-            None => Geom::load(&settings.geom_name).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to load geometry file '{}': {}\n\
-                    Hint: This may be caused by degenerate faces (zero cross product), \
-                    faces that are too small, or non-planar geometry. \
-                    Please check and fix the geometry file.",
-                    settings.geom_name,
-                    e
-                )
-            })?,
-        };
-
-        for geom in geoms.iter_mut() {
-            problem::init_geom(&settings, geom);
-        }
+        let settings = load_settings_or_default(settings);
+        let geoms = load_and_init_geoms(geoms, &settings)?;
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = &settings.binning.scheme.generate();
-        let result = Results::new_empty(&bins);
+        let result = init_result(&settings);
 
         Ok(Self {
             geoms,
@@ -92,14 +119,7 @@ impl MultiProblem {
 
     /// Resets a `MultiOrientProblem` to its initial state.
     pub fn reset(&mut self) {
-        self.result = Results::new_empty(
-            &self
-                .result
-                .field_2d
-                .iter()
-                .map(|f| f.bin)
-                .collect::<Vec<_>>(),
-        );
+        self.result = init_result(&self.settings);
         self.regenerate_orientations();
     }
 
@@ -154,7 +174,10 @@ impl MultiProblem {
         let problems_base: Vec<Problem> = self
             .geoms
             .iter()
-            .map(|geom| Problem::new(Some(geom.clone()), Some(self.settings.clone())))
+            .map(|geom| {
+                Problem::new(Some(geom.clone()), Some(self.settings.clone()))
+                    .expect("Failed to create Problem")
+            })
             .collect();
         let num_problems = problems_base.iter().len();
         // let problem_base = Problem::new(Some(self.geoms.clone()), Some(self.settings.clone()));
@@ -187,10 +210,7 @@ impl MultiProblem {
                 problem.result
             })
             .reduce(
-                || {
-                    let bins = &self.result.bins();
-                    Results::new_empty(bins)
-                },
+                || self.result.zero_like(),
                 |accum, item| self.reduce_results(accum, item),
             );
 
@@ -204,7 +224,7 @@ impl MultiProblem {
 
         // Compute 1D integration
         info_pb.set_message("Computing 1D integrated Mueller matrices...");
-        self.result.mueller_to_1d(&self.settings.binning.scheme);
+        self.result.mueller_to_1d();
 
         // Compute derived parameters
         info_pb.set_message("Computing scattering parameters...");
@@ -223,34 +243,18 @@ impl MultiProblem {
         // Add powers
         acc.powers += item.powers;
 
-        // Add Mueller matrix elements
-        for (a, i) in acc.field_2d.iter_mut().zip(item.field_2d.into_iter()) {
-            // Handle Mueller matrices
-            a.mueller_total += i.mueller_total;
-            a.mueller_beam += i.mueller_beam;
-            a.mueller_ext += i.mueller_ext;
-        }
-
-        // Add backscatter field if present
-        match (&mut acc.field_bs, item.field_bs) {
-            (Some(a), Some(i)) => {
+        // Add zones (uses zone arithmetic)
+        for (acc_zone, item_zone) in acc.zones.iter_mut().zip(item.zones.iter()) {
+            for (a, i) in acc_zone.field_2d.iter_mut().zip(item_zone.field_2d.iter()) {
+                // Amplitude matrices (complex)
+                a.ampl_total += i.ampl_total;
+                a.ampl_beam += i.ampl_beam;
+                a.ampl_ext += i.ampl_ext;
+                // Mueller matrices (real)
                 a.mueller_total += i.mueller_total;
                 a.mueller_beam += i.mueller_beam;
                 a.mueller_ext += i.mueller_ext;
             }
-            (None, Some(i)) => acc.field_bs = Some(i),
-            _ => {}
-        }
-
-        // Add forwards scatter field if present
-        match (&mut acc.field_fs, item.field_fs) {
-            (Some(a), Some(i)) => {
-                a.mueller_total += i.mueller_total;
-                a.mueller_beam += i.mueller_beam;
-                a.mueller_ext += i.mueller_ext;
-            }
-            (None, Some(i)) => acc.field_fs = Some(i),
-            _ => {}
         }
 
         acc
@@ -261,39 +265,20 @@ impl MultiProblem {
         // Powers
         self.result.powers /= num_orientations;
 
-        for field in self.result.field_2d.iter_mut() {
-            // Amplitude Matrices - divide by complex representation
-            let div_c = Complex::from(num_orientations);
-            field.ampl_total /= div_c;
-            field.ampl_beam /= div_c;
-            field.ampl_ext /= div_c;
+        // Normalize all zones
+        let div_c = Complex::from(num_orientations);
+        for zone in self.result.zones.iter_mut() {
+            for field in zone.field_2d.iter_mut() {
+                // Amplitude Matrices - divide by complex representation
+                field.ampl_total /= div_c;
+                field.ampl_beam /= div_c;
+                field.ampl_ext /= div_c;
 
-            // Mueller Matrices - divide by real value
-            field.mueller_total /= num_orientations;
-            field.mueller_beam /= num_orientations;
-            field.mueller_ext /= num_orientations;
-        }
-
-        // Normalize backscatter field if present
-        if let Some(ref mut field_bs) = self.result.field_bs {
-            let div_c = Complex::from(num_orientations);
-            field_bs.ampl_total /= div_c;
-            field_bs.ampl_beam /= div_c;
-            field_bs.ampl_ext /= div_c;
-            field_bs.mueller_total /= num_orientations;
-            field_bs.mueller_beam /= num_orientations;
-            field_bs.mueller_ext /= num_orientations;
-        }
-
-        // Normalize forward scatter field if present
-        if let Some(ref mut field_fs) = self.result.field_fs {
-            let div_c = Complex::from(num_orientations);
-            field_fs.ampl_total /= div_c;
-            field_fs.ampl_beam /= div_c;
-            field_fs.ampl_ext /= div_c;
-            field_fs.mueller_total /= num_orientations;
-            field_fs.mueller_beam /= num_orientations;
-            field_fs.mueller_ext /= num_orientations;
+                // Mueller Matrices - divide by real value
+                field.mueller_total /= num_orientations;
+                field.mueller_beam /= num_orientations;
+                field.mueller_ext /= num_orientations;
+            }
         }
     }
 
@@ -341,8 +326,7 @@ impl MultiProblem {
             problem::init_geom(&settings, geom);
         }
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
-        let bins = &settings.binning.scheme.generate();
-        let result = Results::new_empty(&bins);
+        let result = init_result(&settings);
 
         Ok(Self {
             geoms,
