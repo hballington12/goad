@@ -478,39 +478,8 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        // Collect Mueller matrices by component type from full zone
-        let field_2d = self
-            .result
-            .zones
-            .full_zone()
-            .map(|z| z.field_2d.as_slice())
-            .unwrap_or(&[]);
-
-        let mueller_total: Vec<Mueller> =
-            field_2d.iter().map(|field| field.mueller_total).collect();
-
-        let mueller_beam: Vec<Mueller> = field_2d.iter().map(|field| field.mueller_beam).collect();
-
-        let mueller_ext: Vec<Mueller> = field_2d.iter().map(|field| field.mueller_ext).collect();
-
-        let _ = output::write_mueller(
-            &self.result.bins(),
-            &mueller_total,
-            "",
-            &self.settings.directory,
-        );
-        let _ = output::write_mueller(
-            &self.result.bins(),
-            &mueller_beam,
-            "_beam",
-            &self.settings.directory,
-        );
-        let _ = output::write_mueller(
-            &self.result.bins(),
-            &mueller_ext,
-            "_ext",
-            &self.settings.directory,
-        );
+        let output_manager = output::OutputManager::new(&self.settings, &self.result);
+        let _ = output_manager.write_all();
     }
 
     /// Propagates the next beam in the queue.
