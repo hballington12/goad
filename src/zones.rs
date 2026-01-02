@@ -5,8 +5,11 @@
 //! computed parameters.
 
 use log::{info, warn};
+use numpy::IntoPyArray;
 use pyo3::prelude::*;
 use rand_distr::num_traits::Pow;
+
+use crate::result::MuellerMatrix;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 use std::ops::{Add, Div, Mul, Sub};
@@ -78,6 +81,7 @@ impl ZoneConfig {
 /// A zone represents a region of the scattering sphere with its own binning,
 /// results, and computed parameters.
 #[derive(Debug, Clone)]
+#[pyclass]
 pub struct Zone {
     /// Optional user-provided label.
     pub label: Option<String>,
@@ -328,8 +332,138 @@ impl Zone {
     }
 }
 
+#[pymethods]
+impl Zone {
+    /// Get the zone label
+    #[getter]
+    pub fn get_label(&self) -> Option<String> {
+        self.label.clone()
+    }
+
+    /// Get the zone type
+    #[getter]
+    pub fn get_zone_type(&self) -> ZoneType {
+        self.zone_type
+    }
+
+    /// Get the display name for this zone
+    #[getter]
+    pub fn get_name(&self) -> String {
+        self.display_name()
+    }
+
+    /// Get the number of bins in this zone
+    #[getter]
+    pub fn get_num_bins(&self) -> usize {
+        self.bins.len()
+    }
+
+    /// Get the bins as a numpy array of shape (n_bins, 2) with columns [theta, phi]
+    #[getter]
+    pub fn get_bins<'py>(&self, py: Python<'py>) -> Bound<'py, numpy::PyArray2<f32>> {
+        let bins: Vec<f32> = self
+            .bins
+            .iter()
+            .flat_map(|bin| vec![bin.theta.center, bin.phi.center])
+            .collect();
+        ndarray::Array2::from_shape_vec((bins.len() / 2, 2), bins)
+            .unwrap()
+            .into_pyarray(py)
+    }
+
+    /// Get the Mueller matrix as a numpy array of shape (n_bins, 16)
+    #[getter]
+    pub fn get_mueller<'py>(&self, py: Python<'py>) -> Bound<'py, numpy::PyArray2<f32>> {
+        let muellers: Vec<f32> = self
+            .field_2d
+            .iter()
+            .flat_map(|r| r.mueller_total.to_vec())
+            .collect();
+        ndarray::Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+            .unwrap()
+            .into_pyarray(py)
+    }
+
+    /// Get the 1D Mueller matrix as a numpy array (if available)
+    #[getter]
+    pub fn get_mueller_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, numpy::PyArray2<f32>>> {
+        self.field_1d.as_ref().map(|field_1d| {
+            let muellers: Vec<f32> = field_1d
+                .iter()
+                .flat_map(|r| r.mueller_total.to_vec())
+                .collect();
+            ndarray::Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
+                .unwrap()
+                .into_pyarray(py)
+        })
+    }
+
+    /// Get the 1D theta bins as a numpy array (if available)
+    #[getter]
+    pub fn get_bins_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, numpy::PyArray1<f32>>> {
+        self.field_1d.as_ref().map(|field_1d| {
+            let bins: Vec<f32> = field_1d.iter().map(|r| r.bin.center).collect();
+            ndarray::Array1::from_vec(bins).into_pyarray(py)
+        })
+    }
+
+    /// Get zone-specific parameters as a dict
+    #[getter]
+    pub fn get_params(&self) -> PyResult<Py<PyAny>> {
+        use pyo3::types::PyDict;
+        Python::attach(|py| {
+            let dict = PyDict::new(py);
+            // Add all available params
+            if let Some(v) = self.params.asymmetry(&crate::result::GOComponent::Total) {
+                dict.set_item("asymmetry", v)?;
+            }
+            if let Some(v) = self.params.scatt_cross(&crate::result::GOComponent::Total) {
+                dict.set_item("scatt_cross", v)?;
+            }
+            if let Some(v) = self.params.ext_cross(&crate::result::GOComponent::Total) {
+                dict.set_item("ext_cross", v)?;
+            }
+            if let Some(v) = self.params.albedo(&crate::result::GOComponent::Total) {
+                dict.set_item("albedo", v)?;
+            }
+            if let Some(v) = self
+                .params
+                .ext_cross_optical_theorem(&crate::result::GOComponent::Total)
+            {
+                dict.set_item("ext_cross_optical_theorem", v)?;
+            }
+            if let Some(v) = self
+                .params
+                .backscatter_cross(&crate::result::GOComponent::Total)
+            {
+                dict.set_item("backscatter_cross", v)?;
+            }
+            if let Some(v) = self.params.lidar_ratio(&crate::result::GOComponent::Total) {
+                dict.set_item("lidar_ratio", v)?;
+            }
+            if let Some(v) = self
+                .params
+                .depolarization_ratio(&crate::result::GOComponent::Total)
+            {
+                dict.set_item("depolarization_ratio", v)?;
+            }
+            Ok(dict.into())
+        })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Zone(name='{}', type={:?}, bins={})",
+            self.display_name(),
+            self.zone_type,
+            self.bins.len()
+        )
+    }
+}
+
 /// A collection of zones for a simulation.
 #[derive(Debug, Clone)]
+#[pyclass]
 pub struct Zones {
     zones: Vec<Zone>,
 }
@@ -424,6 +558,104 @@ impl Zones {
     pub fn ones_like(&self) -> Self {
         Self {
             zones: self.zones.iter().map(|z| z.ones_like()).collect(),
+        }
+    }
+}
+
+#[pymethods]
+impl Zones {
+    /// Get the number of zones
+    fn __len__(&self) -> usize {
+        self.zones.len()
+    }
+
+    /// Get a zone by index
+    fn __getitem__(&self, index: isize) -> PyResult<Zone> {
+        let len = self.zones.len() as isize;
+        let idx = if index < 0 { len + index } else { index };
+        if idx < 0 || idx >= len {
+            return Err(pyo3::exceptions::PyIndexError::new_err(
+                "zone index out of range",
+            ));
+        }
+        Ok(self.zones[idx as usize].clone())
+    }
+
+    /// Get a zone by label
+    #[pyo3(name = "get")]
+    pub fn py_get(&self, label: &str) -> Option<Zone> {
+        self.get(label).cloned()
+    }
+
+    /// Get a zone by type (returns first matching zone)
+    pub fn get_by_type(&self, zone_type: ZoneType) -> Option<Zone> {
+        self.zones
+            .iter()
+            .find(|z| z.zone_type == zone_type)
+            .cloned()
+    }
+
+    /// Get the full zone (convenience method)
+    #[getter]
+    pub fn full(&self) -> Option<Zone> {
+        self.full_zone().cloned()
+    }
+
+    /// Get the forward zone (convenience method)
+    #[getter]
+    pub fn forward(&self) -> Option<Zone> {
+        self.zones
+            .iter()
+            .find(|z| z.zone_type == ZoneType::Forward)
+            .cloned()
+    }
+
+    /// Get the backward zone (convenience method)
+    #[getter]
+    pub fn backward(&self) -> Option<Zone> {
+        self.backward_zone().cloned()
+    }
+
+    /// Get all zones as a list
+    #[getter]
+    pub fn all_zones(&self) -> Vec<Zone> {
+        self.zones.clone()
+    }
+
+    fn __repr__(&self) -> String {
+        let zone_names: Vec<String> = self.zones.iter().map(|z| z.display_name()).collect();
+        format!("Zones([{}])", zone_names.join(", "))
+    }
+
+    fn __iter__(slf: PyRef<'_, Self>) -> PyResult<Py<ZonesIterator>> {
+        let iter = ZonesIterator {
+            zones: slf.zones.clone(),
+            index: 0,
+        };
+        Py::new(slf.py(), iter)
+    }
+}
+
+/// Iterator for Zones in Python
+#[pyclass]
+pub struct ZonesIterator {
+    zones: Vec<Zone>,
+    index: usize,
+}
+
+#[pymethods]
+impl ZonesIterator {
+    fn __iter__(slf: PyRef<'_, Self>) -> PyRef<'_, Self> {
+        slf
+    }
+
+    fn __next__(mut slf: PyRefMut<'_, Self>) -> Option<Zone> {
+        if slf.index < slf.zones.len() {
+            let zone = slf.zones[slf.index].clone();
+            slf.index += 1;
+            Some(zone)
+        } else {
+            None
         }
     }
 }

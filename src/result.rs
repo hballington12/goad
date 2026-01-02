@@ -737,6 +737,47 @@ impl Results {
     fn __truediv__(&self, rhs: f32) -> Results {
         self.clone() / rhs
     }
+
+    /// Get the zones collection
+    #[getter]
+    pub fn get_zones(&self) -> Zones {
+        self.zones.clone()
+    }
+
+    /// Get a specific zone by label
+    pub fn get_zone(&self, label: &str) -> Option<Zone> {
+        self.zones.get(label).cloned()
+    }
+
+    /// Get a zone by type (returns first matching)
+    pub fn get_zone_by_type(&self, zone_type: ZoneType) -> Option<Zone> {
+        self.zones
+            .iter()
+            .find(|z| z.zone_type == zone_type)
+            .cloned()
+    }
+
+    /// Get the full zone (convenience method)
+    #[getter]
+    pub fn get_full_zone(&self) -> Option<Zone> {
+        self.zones.full_zone().cloned()
+    }
+
+    /// Get the forward zone (convenience method)
+    #[getter]
+    pub fn get_forward_zone(&self) -> Option<Zone> {
+        self.zones
+            .iter()
+            .find(|z| z.zone_type == ZoneType::Forward)
+            .cloned()
+    }
+
+    /// Get the backward zone (convenience method)
+    #[getter]
+    pub fn get_backward_zone(&self) -> Option<Zone> {
+        self.zones.backward_zone().cloned()
+    }
+
     /// Get the bins as a numpy array of shape (n_bins, 2) with columns [theta, phi]
     #[getter]
     pub fn get_bins<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
