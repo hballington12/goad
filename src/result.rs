@@ -13,7 +13,7 @@ use crate::convergence::Convergeable;
 use crate::params::Param;
 use crate::params::Params;
 use crate::powers::Powers;
-use crate::zones::Zones;
+use crate::zones::{Zone, ZoneType, Zones};
 use itertools::Itertools;
 use nalgebra::Matrix4;
 use nalgebra::{Complex, Matrix2};
@@ -409,58 +409,14 @@ pub type ScattResult1D = ScattResult<AngleBin>;
 #[pyclass]
 #[derive(Debug, Clone)]
 pub struct Results {
-    // Legacy fields - will be migrated to zones
-    pub field_2d: Vec<ScattResult2D>,
-    pub field_1d: Option<Vec<ScattResult1D>>,
-    pub field_bs: Option<ScattResult2D>,
-    pub field_fs: Option<ScattResult2D>,
-
-    // New zones-based structure (not yet used, migration in progress)
-    #[allow(dead_code)]
     pub zones: Zones,
-
     pub powers: Powers,
     pub params: Params,
 }
 
 impl AddAssign for Results {
     fn add_assign(&mut self, other: Self) {
-        *self = Self {
-            field_2d: self
-                .field_2d
-                .clone()
-                .into_iter()
-                .zip(other.field_2d)
-                .map(|(a, b)| a + b)
-                .collect(),
-            field_1d: match (self.field_1d.clone(), other.field_1d) {
-                (Some(field_1d), Some(other_field_1d)) => Some(
-                    field_1d
-                        .into_iter()
-                        .zip(other_field_1d)
-                        .map(|(a, b)| a + b)
-                        .collect(),
-                ),
-                (Some(field_1d), None) => Some(field_1d),
-                (None, Some(other_field_1d)) => Some(other_field_1d),
-                (None, None) => None,
-            },
-            field_bs: match (self.field_bs.clone(), other.field_bs) {
-                (Some(a), Some(b)) => Some(a + b),
-                (Some(a), None) => Some(a),
-                (None, Some(b)) => Some(b),
-                (None, None) => None,
-            },
-            field_fs: match (self.field_fs.clone(), other.field_fs) {
-                (Some(a), Some(b)) => Some(a + b),
-                (Some(a), None) => Some(a),
-                (None, Some(b)) => Some(b),
-                (None, None) => None,
-            },
-            zones: self.zones.clone() + other.zones,
-            powers: self.powers.clone() + other.powers,
-            params: self.params.clone() + other.params,
-        };
+        *self = self.clone() + other;
     }
 }
 
@@ -468,17 +424,7 @@ impl Pow<f32> for Results {
     type Output = Self;
 
     fn pow(self, rhs: f32) -> Self {
-        let field_1d = match self.field_1d {
-            Some(field_1d) => Some(field_1d.into_iter().map(|a| a.pow(rhs)).collect()),
-            None => None,
-        };
-        let field_bs = self.field_bs.map(|bs| bs.pow(rhs));
-        // field_fs: amplitude doesn't support pow, pass through unchanged
         Self {
-            field_2d: self.field_2d.into_iter().map(|a| a.pow(rhs)).collect(),
-            field_1d,
-            field_bs,
-            field_fs: self.field_fs,
             zones: self.zones.pow(rhs),
             powers: self.powers.pow(rhs),
             params: self.params.pow(rhs),
@@ -490,17 +436,7 @@ impl Mul<f32> for Results {
     type Output = Self;
 
     fn mul(self, rhs: f32) -> Self {
-        let field_1d = match self.field_1d {
-            Some(field_1d) => Some(field_1d.into_iter().map(|a| a * rhs).collect()),
-            None => None,
-        };
-        let field_bs = self.field_bs.map(|bs| bs * rhs);
-        let field_fs = self.field_fs.map(|fs| fs * rhs);
         Self {
-            field_2d: self.field_2d.into_iter().map(|a| a * rhs).collect(),
-            field_1d,
-            field_bs,
-            field_fs,
             zones: self.zones * rhs,
             powers: self.powers * rhs,
             params: self.params * rhs,
@@ -512,46 +448,10 @@ impl Mul for Results {
     type Output = Self;
 
     fn mul(self, other: Self) -> Self {
-        let field_2d = self
-            .field_2d
-            .into_iter()
-            .zip(other.field_2d)
-            .map(|(a, b)| a * b)
-            .collect();
-        let field_1d = match (self.field_1d, other.field_1d) {
-            (Some(field_1d), Some(other_field_1d)) => Some(
-                field_1d
-                    .into_iter()
-                    .zip(other_field_1d)
-                    .map(|(a, b)| a * b)
-                    .collect(),
-            ),
-            (Some(field_1d), None) => Some(field_1d),
-            (None, Some(other_field_1d)) => Some(other_field_1d),
-            (None, None) => None,
-        };
-        let field_bs = match (self.field_bs, other.field_bs) {
-            (Some(a), Some(b)) => Some(a * b),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
-            (None, None) => None,
-        };
-        let field_fs = match (self.field_fs.clone(), other.field_fs) {
-            (Some(a), Some(b)) => Some(a * b),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
-            (None, None) => None,
-        };
-        let powers = self.powers * other.powers;
-        let params = self.params * other.params;
         Self {
-            field_2d,
-            field_1d,
-            field_bs,
-            field_fs,
             zones: self.zones * other.zones,
-            powers,
-            params,
+            powers: self.powers * other.powers,
+            params: self.params * other.params,
         }
     }
 }
@@ -560,46 +460,10 @@ impl Add for Results {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        let field_2d = self
-            .field_2d
-            .into_iter()
-            .zip(other.field_2d)
-            .map(|(a, b)| a + b)
-            .collect();
-        let field_1d = match (self.field_1d, other.field_1d) {
-            (Some(field_1d), Some(other_field_1d)) => Some(
-                field_1d
-                    .into_iter()
-                    .zip(other_field_1d)
-                    .map(|(a, b)| a + b)
-                    .collect(),
-            ),
-            (Some(field_1d), None) => Some(field_1d),
-            (None, Some(other_field_1d)) => Some(other_field_1d),
-            (None, None) => None,
-        };
-        let field_bs = match (self.field_bs, other.field_bs) {
-            (Some(a), Some(b)) => Some(a + b),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
-            (None, None) => None,
-        };
-        let field_fs = match (self.field_fs, other.field_fs) {
-            (Some(a), Some(b)) => Some(a + b),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
-            (None, None) => None,
-        };
-        let powers = self.powers + other.powers;
-        let params = self.params + other.params;
         Self {
-            field_2d,
-            field_1d,
-            field_bs,
-            field_fs,
             zones: self.zones + other.zones,
-            powers,
-            params,
+            powers: self.powers + other.powers,
+            params: self.params + other.params,
         }
     }
 }
@@ -608,46 +472,10 @@ impl Sub for Results {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self {
-        let field_2d = self
-            .field_2d
-            .into_iter()
-            .zip(other.field_2d)
-            .map(|(a, b)| a - b)
-            .collect();
-        let field_1d = match (self.field_1d, other.field_1d) {
-            (Some(field_1d), Some(other_field_1d)) => Some(
-                field_1d
-                    .into_iter()
-                    .zip(other_field_1d)
-                    .map(|(a, b)| a - b)
-                    .collect(),
-            ),
-            (Some(field_1d), None) => Some(field_1d),
-            (None, Some(other_field_1d)) => Some(other_field_1d),
-            (None, None) => None,
-        };
-        let field_bs = match (self.field_bs, other.field_bs) {
-            (Some(a), Some(b)) => Some(a - b),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
-            (None, None) => None,
-        };
-        let field_fs = match (self.field_fs, other.field_fs) {
-            (Some(a), Some(b)) => Some(a - b),
-            (Some(a), None) => Some(a),
-            (None, Some(b)) => Some(b),
-            (None, None) => None,
-        };
-        let powers = self.powers - other.powers;
-        let params = self.params - other.params;
         Self {
-            field_2d,
-            field_1d,
-            field_bs,
-            field_fs,
             zones: self.zones - other.zones,
-            powers,
-            params,
+            powers: self.powers - other.powers,
+            params: self.params - other.params,
         }
     }
 }
@@ -656,17 +484,7 @@ impl Div<f32> for Results {
     type Output = Self;
 
     fn div(self, rhs: f32) -> Self {
-        let field_1d = match self.field_1d {
-            Some(field_1d) => Some(field_1d.into_iter().map(|a| a / rhs).collect()),
-            None => None,
-        };
-        let field_bs = self.field_bs.map(|bs| bs / rhs);
-        let field_fs = self.field_fs.map(|fs| fs / rhs);
         Self {
-            field_2d: self.field_2d.into_iter().map(|a| a / rhs).collect(),
-            field_1d,
-            field_bs,
-            field_fs,
             zones: self.zones / rhs,
             powers: self.powers / rhs,
             params: self.params / rhs,
@@ -678,35 +496,7 @@ impl Div for Results {
     type Output = Self;
 
     fn div(self, other: Self) -> Self {
-        let field_2d = self
-            .field_2d
-            .into_iter()
-            .zip(other.field_2d)
-            .map(|(a, b)| a / b)
-            .collect();
-        let field_1d = match (self.field_1d, other.field_1d) {
-            (Some(f1), Some(f2)) => Some(f1.into_iter().zip(f2).map(|(a, b)| a / b).collect()),
-            (Some(f1), None) => Some(f1),
-            (None, Some(_)) => None,
-            (None, None) => None,
-        };
-        let field_bs = match (self.field_bs, other.field_bs) {
-            (Some(a), Some(b)) => Some(a / b),
-            (Some(a), None) => Some(a),
-            (None, Some(_)) => None,
-            (None, None) => None,
-        };
-        let field_fs = match (self.field_fs.clone(), other.field_fs) {
-            (Some(a), Some(b)) => Some(a / b),
-            (Some(a), None) => Some(a),
-            (None, Some(_)) => None,
-            (None, None) => None,
-        };
         Self {
-            field_2d,
-            field_1d,
-            field_bs,
-            field_fs,
             zones: self.zones / other.zones,
             powers: self.powers.div_elem(&other.powers),
             params: self.params.div_elem(&other.params),
@@ -720,48 +510,7 @@ impl Convergeable for Results {
     }
 
     fn weighted_add(&self, other: &Self, w1: f32, w2: f32) -> Self {
-        // Combine field_2d
-        let field_2d: Vec<ScattResult2D> = self
-            .field_2d
-            .iter()
-            .zip(other.field_2d.iter())
-            .map(|(a, b)| a.weighted_add(b, w1, w2))
-            .collect();
-
-        // Combine field_1d if both present
-        let field_1d = match (&self.field_1d, &other.field_1d) {
-            (Some(f1), Some(f2)) => Some(
-                f1.iter()
-                    .zip(f2.iter())
-                    .map(|(a, b)| a.weighted_add(b, w1, w2))
-                    .collect(),
-            ),
-            (Some(f1), None) => Some(f1.clone()),
-            (None, Some(f2)) => Some(f2.clone()),
-            (None, None) => None,
-        };
-
-        // Combine field_bs if both present
-        let field_bs = match (&self.field_bs, &other.field_bs) {
-            (Some(a), Some(b)) => Some(a.weighted_add(b, w1, w2)),
-            (Some(a), None) => Some(a.clone()),
-            (None, Some(b)) => Some(b.clone()),
-            (None, None) => None,
-        };
-
-        // Combine field_fs if both present (simple weighted sum for amplitudes)
-        let field_fs = match (&self.field_fs, &other.field_fs) {
-            (Some(a), Some(b)) => Some(a.weighted_add(b, w1, w2)),
-            (Some(a), None) => Some(a.clone()),
-            (None, Some(b)) => Some(b.clone()),
-            (None, None) => None,
-        };
-
         Self {
-            field_2d,
-            field_1d,
-            field_bs,
-            field_fs,
             zones: self.zones.weighted_add(&other.zones, w1, w2),
             powers: self.powers.weighted_add(&other.powers, w1, w2),
             params: self.params.weighted_add(&other.params, w1, w2),
@@ -804,38 +553,34 @@ impl Convergeable for Results {
 impl Results {
     /// Returns an owned vector of solid angle bins
     pub fn bins(&self) -> Vec<SolidAngleBin> {
-        // Prefer zones if available, fall back to legacy field_2d
-        if let Some(full_zone) = self.zones.full_zone() {
-            full_zone.bins.clone()
-        } else {
-            self.field_2d.iter().map(|a| a.bin.clone()).collect()
-        }
+        self.zones
+            .full_zone()
+            .map(|z| z.bins.clone())
+            .unwrap_or_default()
     }
 
     /// Writes some stuff to a file
 
     /// Creates a new `Result` with empty mueller and amplitude matrix
     pub fn new_empty(bins: &[SolidAngleBin]) -> Self {
-        let field = bins.iter().map(|&bin| ScattResult2D::new(bin)).collect();
+        let field_2d: Vec<ScattResult2D> =
+            bins.iter().map(|&bin| ScattResult2D::new(bin)).collect();
+        let full_zone = Zone::new(
+            ZoneType::Full,
+            bins.to_vec(),
+            field_2d,
+            None, // field_1d populated later by mueller_to_1d
+        );
         Self {
-            field_2d: field,
-            field_1d: None,
-            field_bs: None,
-            field_fs: None,
-            zones: Zones::empty(),
+            zones: Zones::new(vec![full_zone]),
             powers: Powers::new(),
             params: Params::new(),
         }
     }
 
     /// Create a new empty Results with initialized zones.
-    pub fn new_with_zones(bins: &[SolidAngleBin], zones: Zones) -> Self {
-        let field = bins.iter().map(|&bin| ScattResult2D::new(bin)).collect();
+    pub fn new_with_zones(_bins: &[SolidAngleBin], zones: Zones) -> Self {
         Self {
-            field_2d: field,
-            field_1d: None,
-            field_bs: None,
-            field_fs: None,
             zones,
             powers: Powers::new(),
             params: Params::new(),
@@ -851,12 +596,11 @@ impl Results {
             Scheme::Simple { .. } | Scheme::Interval { .. } => {}
         }
 
-        // Step 2: Get field_2d - prefer zones, fall back to legacy
-        let field_2d: &[ScattResult2D] = self
-            .zones
-            .full_zone()
-            .map(|z| z.field_2d.as_slice())
-            .unwrap_or(&self.field_2d);
+        // Step 2: Get field_2d from full zone
+        let Some(full_zone) = self.zones.full_zone() else {
+            return;
+        };
+        let field_2d = &full_zone.field_2d;
 
         // Step 3: Group by theta using chunk_by (leveraging sorted property)
         let theta_groups: Vec<Vec<&ScattResult2D>> = field_2d
@@ -866,14 +610,16 @@ impl Results {
             .map(|(_, group)| group.collect())
             .collect();
 
-        // Step 3: Rectangular integration over phi for each theta
+        // Step 4: Rectangular integration over phi for each theta
         let field_1d: Vec<ScattResult1D> = theta_groups
             .into_iter()
             .map(|group| Self::integrate_over_phi(group))
             .collect();
 
-        // Step 4: Update struct
-        self.field_1d = Some(field_1d);
+        // Step 5: Store in zones
+        if let Some(full_zone) = self.zones.full_zone_mut() {
+            full_zone.field_1d = Some(field_1d);
+        }
     }
 
     /// Integrates Mueller matrices over phi using rectangular rule
@@ -899,8 +645,10 @@ impl Results {
 
     /// Computes and sets the parameters of the result
     pub fn compute_params(&mut self, wavelength: f32) {
-        // Total field
-        if let Some(field_1d) = &self.field_1d {
+        // Get field_1d from full zone
+        let field_1d = self.zones.full_zone().and_then(|z| z.field_1d.as_ref());
+
+        if let Some(field_1d) = field_1d {
             let k = 2.0 * PI / wavelength;
 
             // Total field
@@ -963,12 +711,8 @@ impl Results {
             );
         }
 
-        // Backscatter params - prefer zones, fall back to legacy field_bs
-        let field_bs = self
-            .zones
-            .backward_zone()
-            .and_then(|z| z.field_2d.first())
-            .or(self.field_bs.as_ref());
+        // Backscatter params from backward zone
+        let field_bs = self.zones.backward_zone().and_then(|z| z.field_2d.first());
 
         if let Some(field_bs) = field_bs {
             let k = 2.0 * PI / wavelength;
@@ -1007,12 +751,7 @@ impl Results {
         }
 
         // Optical theorem: ExtCross = (4π/k) * Im[S_2] at θ=0°
-        // Prefer zones, fall back to legacy field_fs
-        let field_fs = self
-            .zones
-            .forward_zone()
-            .and_then(|z| z.field_2d.first())
-            .or(self.field_fs.as_ref());
+        let field_fs = self.zones.forward_zone().and_then(|z| z.field_2d.first());
 
         if let Some(field_fs) = field_fs {
             let k = 2.0 * PI / wavelength;
@@ -1040,20 +779,11 @@ impl Results {
     /// - powers fields are all 1.0
     /// - scat_cross and ext_cross slots contain 1.0
     pub fn weights(&self) -> Self {
-        let mut result = self.clone();
-        // Powers: all weights are 1.0
-        result.powers = Powers::ones();
-        // Params: get appropriate weights
-        result.params = self.params.weights();
-        // Fields: weights are 1.0 (use existing structure but with 1.0 values)
-        result.field_2d = self.field_2d.iter().map(|f| f.ones_like()).collect();
-        result.field_1d = self
-            .field_1d
-            .as_ref()
-            .map(|f| f.iter().map(|x| x.ones_like()).collect());
-        result.field_bs = self.field_bs.as_ref().map(|f| f.ones_like());
-        result.field_fs = self.field_fs.as_ref().map(|f| f.ones_like());
-        result
+        Self {
+            zones: self.zones.ones_like(),
+            powers: Powers::ones(),
+            params: self.params.weights(),
+        }
     }
 
     pub fn print(&self) {
@@ -1140,19 +870,25 @@ impl Results {
     /// Get the 1D bins (theta values) as a numpy array
     #[getter]
     pub fn get_bins_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
-        self.field_1d.as_ref().map(|field_1d| {
-            let bins: Vec<f32> = field_1d.iter().map(|result| result.bin.center).collect();
-            Array2::from_shape_vec((bins.len(), 1), bins)
-                .unwrap()
-                .into_pyarray(py)
+        self.zones.full_zone().and_then(|zone| {
+            zone.field_1d.as_ref().map(|field_1d| {
+                let bins: Vec<f32> = field_1d.iter().map(|result| result.bin.center).collect();
+                Array2::from_shape_vec((bins.len(), 1), bins)
+                    .unwrap()
+                    .into_pyarray(py)
+            })
         })
     }
 
     /// Get the Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
-        let muellers: Vec<f32> = self
-            .field_2d
+        let field_2d = self
+            .zones
+            .full_zone()
+            .map(|z| &z.field_2d[..])
+            .unwrap_or(&[]);
+        let muellers: Vec<f32> = field_2d
             .iter()
             .flat_map(|r| r.mueller_total.to_vec())
             .collect();
@@ -1165,21 +901,25 @@ impl Results {
     /// Set the Mueller matrix from a numpy array
     #[setter]
     pub fn set_mueller(&mut self, array: &Bound<'_, PyArray2<f32>>) {
-        // unsafe view in numpy array memory without bounds checking
         let array_view = unsafe { array.as_array() };
-
-        for (i, field) in self.field_2d.iter_mut().enumerate() {
-            let row = array_view.row(i);
-            let slice = row.as_slice().unwrap();
-            field.mueller_total = Mueller::from_row_slice(slice);
+        if let Some(zone) = self.zones.full_zone_mut() {
+            for (i, field) in zone.field_2d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_total = Mueller::from_row_slice(slice);
+            }
         }
     }
 
     /// Get the beam Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_beam<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
-        let muellers: Vec<f32> = self
-            .field_2d
+        let field_2d = self
+            .zones
+            .full_zone()
+            .map(|z| &z.field_2d[..])
+            .unwrap_or(&[]);
+        let muellers: Vec<f32> = field_2d
             .iter()
             .flat_map(|r| r.mueller_beam.to_vec())
             .collect();
@@ -1191,21 +931,25 @@ impl Results {
     /// Set the Mueller beam matrix from a numpy array
     #[setter]
     pub fn set_mueller_beam(&mut self, array: &Bound<'_, PyArray2<f32>>) {
-        // unsafe view in numpy array memory without bounds checking
         let array_view = unsafe { array.as_array() };
-
-        for (i, field) in self.field_2d.iter_mut().enumerate() {
-            let row = array_view.row(i);
-            let slice = row.as_slice().unwrap();
-            field.mueller_beam = Mueller::from_row_slice(slice);
+        if let Some(zone) = self.zones.full_zone_mut() {
+            for (i, field) in zone.field_2d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_beam = Mueller::from_row_slice(slice);
+            }
         }
     }
 
     /// Get the external diffraction Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_ext<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray2<f32>> {
-        let muellers: Vec<f32> = self
-            .field_2d
+        let field_2d = self
+            .zones
+            .full_zone()
+            .map(|z| &z.field_2d[..])
+            .unwrap_or(&[]);
+        let muellers: Vec<f32> = field_2d
             .iter()
             .flat_map(|r| r.mueller_ext.to_vec())
             .collect();
@@ -1217,44 +961,43 @@ impl Results {
     /// Set the Mueller ext matrix from a numpy array
     #[setter]
     pub fn set_mueller_ext(&mut self, array: &Bound<'_, PyArray2<f32>>) {
-        // unsafe view in numpy array memory without bounds checking
         let array_view = unsafe { array.as_array() };
-
-        for (i, field) in self.field_2d.iter_mut().enumerate() {
-            let row = array_view.row(i);
-            let slice = row.as_slice().unwrap();
-            field.mueller_ext = Mueller::from_row_slice(slice);
+        if let Some(zone) = self.zones.full_zone_mut() {
+            for (i, field) in zone.field_2d.iter_mut().enumerate() {
+                let row = array_view.row(i);
+                let slice = row.as_slice().unwrap();
+                field.mueller_ext = Mueller::from_row_slice(slice);
+            }
         }
     }
 
     /// Get the 1D Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_1d<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
-        if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<f32> = field_1d
-                .iter()
-                .flat_map(|r| r.mueller_total.to_vec())
-                .collect();
-            Some(
+        self.zones.full_zone().and_then(|zone| {
+            zone.field_1d.as_ref().map(|field_1d| {
+                let muellers: Vec<f32> = field_1d
+                    .iter()
+                    .flat_map(|r| r.mueller_total.to_vec())
+                    .collect();
                 Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
                     .unwrap()
-                    .into_pyarray(py),
-            )
-        } else {
-            None
-        }
+                    .into_pyarray(py)
+            })
+        })
     }
 
     /// Set the 1D Mueller matrix from a numpy array
     #[setter]
     pub fn set_mueller_1d(&mut self, array: &Bound<'_, PyArray2<f32>>) {
         let array_view = unsafe { array.as_array() };
-
-        if let Some(ref mut field_1d) = self.field_1d {
-            for (i, field) in field_1d.iter_mut().enumerate() {
-                let row = array_view.row(i);
-                let slice = row.as_slice().unwrap();
-                field.mueller_total = Mueller::from_row_slice(slice);
+        if let Some(zone) = self.zones.full_zone_mut() {
+            if let Some(ref mut field_1d) = zone.field_1d {
+                for (i, field) in field_1d.iter_mut().enumerate() {
+                    let row = array_view.row(i);
+                    let slice = row.as_slice().unwrap();
+                    field.mueller_total = Mueller::from_row_slice(slice);
+                }
             }
         }
     }
@@ -1262,31 +1005,30 @@ impl Results {
     /// Get the 1D beam Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_1d_beam<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
-        if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<f32> = field_1d
-                .iter()
-                .flat_map(|r| r.mueller_beam.to_vec())
-                .collect();
-            Some(
+        self.zones.full_zone().and_then(|zone| {
+            zone.field_1d.as_ref().map(|field_1d| {
+                let muellers: Vec<f32> = field_1d
+                    .iter()
+                    .flat_map(|r| r.mueller_beam.to_vec())
+                    .collect();
                 Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
                     .unwrap()
-                    .into_pyarray(py),
-            )
-        } else {
-            None
-        }
+                    .into_pyarray(py)
+            })
+        })
     }
 
     /// Set the 1D Mueller beam matrix from a numpy array
     #[setter]
     pub fn set_mueller_1d_beam(&mut self, array: &Bound<'_, PyArray2<f32>>) {
         let array_view = unsafe { array.as_array() };
-
-        if let Some(ref mut field_1d) = self.field_1d {
-            for (i, field) in field_1d.iter_mut().enumerate() {
-                let row = array_view.row(i);
-                let slice = row.as_slice().unwrap();
-                field.mueller_beam = Mueller::from_row_slice(slice);
+        if let Some(zone) = self.zones.full_zone_mut() {
+            if let Some(ref mut field_1d) = zone.field_1d {
+                for (i, field) in field_1d.iter_mut().enumerate() {
+                    let row = array_view.row(i);
+                    let slice = row.as_slice().unwrap();
+                    field.mueller_beam = Mueller::from_row_slice(slice);
+                }
             }
         }
     }
@@ -1294,31 +1036,30 @@ impl Results {
     /// Get the 1D external diffraction Mueller matrix as a numpy array
     #[getter]
     pub fn get_mueller_1d_ext<'py>(&self, py: Python<'py>) -> Option<Bound<'py, PyArray2<f32>>> {
-        if let Some(ref field_1d) = self.field_1d {
-            let muellers: Vec<f32> = field_1d
-                .iter()
-                .flat_map(|r| r.mueller_ext.to_vec())
-                .collect();
-            Some(
+        self.zones.full_zone().and_then(|zone| {
+            zone.field_1d.as_ref().map(|field_1d| {
+                let muellers: Vec<f32> = field_1d
+                    .iter()
+                    .flat_map(|r| r.mueller_ext.to_vec())
+                    .collect();
                 Array2::from_shape_vec((muellers.len() / 16, 16), muellers)
                     .unwrap()
-                    .into_pyarray(py),
-            )
-        } else {
-            None
-        }
+                    .into_pyarray(py)
+            })
+        })
     }
 
-    /// Set the 1D Mueller beam matrix from a numpy array
+    /// Set the 1D Mueller ext matrix from a numpy array
     #[setter]
     pub fn set_mueller_1d_ext(&mut self, array: &Bound<'_, PyArray2<f32>>) {
         let array_view = unsafe { array.as_array() };
-
-        if let Some(ref mut field_1d) = self.field_1d {
-            for (i, field) in field_1d.iter_mut().enumerate() {
-                let row = array_view.row(i);
-                let slice = row.as_slice().unwrap();
-                field.mueller_ext = Mueller::from_row_slice(slice);
+        if let Some(zone) = self.zones.full_zone_mut() {
+            if let Some(ref mut field_1d) = zone.field_1d {
+                for (i, field) in field_1d.iter_mut().enumerate() {
+                    let row = array_view.row(i);
+                    let slice = row.as_slice().unwrap();
+                    field.mueller_ext = Mueller::from_row_slice(slice);
+                }
             }
         }
     }

@@ -479,27 +479,20 @@ impl Problem {
     }
 
     pub fn writeup(&self) {
-        // Collect Mueller matrices by component type
-        let mueller_total: Vec<Mueller> = self
+        // Collect Mueller matrices by component type from full zone
+        let field_2d = self
             .result
-            .field_2d
-            .iter()
-            .map(|field| field.mueller_total)
-            .collect();
+            .zones
+            .full_zone()
+            .map(|z| z.field_2d.as_slice())
+            .unwrap_or(&[]);
 
-        let mueller_beam: Vec<Mueller> = self
-            .result
-            .field_2d
-            .iter()
-            .map(|field| field.mueller_beam)
-            .collect();
+        let mueller_total: Vec<Mueller> =
+            field_2d.iter().map(|field| field.mueller_total).collect();
 
-        let mueller_ext: Vec<Mueller> = self
-            .result
-            .field_2d
-            .iter()
-            .map(|field| field.mueller_ext)
-            .collect();
+        let mueller_beam: Vec<Mueller> = field_2d.iter().map(|field| field.mueller_beam).collect();
+
+        let mueller_ext: Vec<Mueller> = field_2d.iter().map(|field| field.mueller_ext).collect();
 
         let _ = output::write_mueller(
             &self.result.bins(),

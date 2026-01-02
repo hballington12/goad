@@ -48,11 +48,16 @@ fn dump_1d_mueller_comparison() {
     // Dump 1D Mueller results
     let mp_1d = multiproblem
         .result
-        .field_1d
-        .as_ref()
+        .zones
+        .full_zone()
+        .and_then(|z| z.field_1d.as_ref())
         .expect("No 1D results");
     let conv_mean = convergence.mean();
-    let conv_1d = conv_mean.field_1d.as_ref().expect("No 1D results");
+    let conv_1d = conv_mean
+        .zones
+        .full_zone()
+        .and_then(|z| z.field_1d.as_ref())
+        .expect("No 1D results");
 
     let mut mp_file = File::create("multiproblem_1d.dat").unwrap();
     let mut conv_file = File::create("convergence_1d.dat").unwrap();

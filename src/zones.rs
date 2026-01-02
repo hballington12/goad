@@ -93,6 +93,27 @@ pub struct Zone {
 }
 
 impl Zone {
+    /// Create a new zone with explicit fields.
+    pub fn new(
+        zone_type: ZoneType,
+        bins: Vec<SolidAngleBin>,
+        field_2d: Vec<ScattResult2D>,
+        field_1d: Option<Vec<ScattResult1D>>,
+    ) -> Self {
+        Self {
+            label: None,
+            zone_type,
+            scheme: Scheme::Custom {
+                bins: vec![],
+                file: None,
+            },
+            bins,
+            field_2d,
+            field_1d,
+            params: Params::new(),
+        }
+    }
+
     /// Create a new zone from a config, generating bins and initializing empty results.
     pub fn from_config(config: &ZoneConfig) -> Self {
         let zone_type = ZoneType::infer_from_scheme(&config.scheme);
@@ -181,6 +202,22 @@ impl Zone {
         self.field_1d = None;
         self.params = Params::new();
     }
+
+    /// Returns a Zone with all values set to 1.0 (for weights).
+    pub fn ones_like(&self) -> Self {
+        Self {
+            label: self.label.clone(),
+            zone_type: self.zone_type,
+            scheme: self.scheme.clone(),
+            bins: self.bins.clone(),
+            field_2d: self.field_2d.iter().map(|f| f.ones_like()).collect(),
+            field_1d: self
+                .field_1d
+                .as_ref()
+                .map(|f| f.iter().map(|x| x.ones_like()).collect()),
+            params: self.params.weights(),
+        }
+    }
 }
 
 /// A collection of zones for a simulation.
@@ -199,6 +236,11 @@ impl Zones {
         zones.push(Zone::forward());
         zones.push(Zone::backward());
 
+        Self { zones }
+    }
+
+    /// Create a Zones collection from a vector of zones.
+    pub fn new(zones: Vec<Zone>) -> Self {
         Self { zones }
     }
 
@@ -244,6 +286,13 @@ impl Zones {
         self.zones.iter().find(|z| z.zone_type == ZoneType::Full)
     }
 
+    /// Get the first Full zone mutably, if any.
+    pub fn full_zone_mut(&mut self) -> Option<&mut Zone> {
+        self.zones
+            .iter_mut()
+            .find(|z| z.zone_type == ZoneType::Full)
+    }
+
     /// Get the forward zone.
     pub fn forward_zone(&self) -> Option<&Zone> {
         self.zones.iter().find(|z| z.zone_type == ZoneType::Forward)
@@ -280,6 +329,13 @@ impl Zones {
     pub fn reset(&mut self) {
         for zone in &mut self.zones {
             zone.reset();
+        }
+    }
+
+    /// Returns a Zones collection with all values set to 1.0 (for weights).
+    pub fn ones_like(&self) -> Self {
+        Self {
+            zones: self.zones.iter().map(|z| z.ones_like()).collect(),
         }
     }
 }
