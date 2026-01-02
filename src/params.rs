@@ -123,6 +123,13 @@ impl Params {
         }
     }
 
+    /// Merge another Params into this one, overwriting existing values.
+    pub fn merge(&mut self, other: &Params) {
+        for (key, value) in &other.params {
+            self.params.insert(*key, *value);
+        }
+    }
+
     pub fn asymmetry(&self, component: &GOComponent) -> Option<f32> {
         self.params.get(&(Param::Asymmetry, *component)).copied()
     }

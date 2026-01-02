@@ -4,16 +4,19 @@
 //! angular regions, each with its own binning configuration, results, and
 //! computed parameters.
 
-use log::info;
+use log::{info, warn};
 use pyo3::prelude::*;
 use rand_distr::num_traits::Pow;
 use serde::{Deserialize, Serialize};
+use std::f32::consts::PI;
 use std::ops::{Add, Div, Mul, Sub};
 
 use crate::bins::{Scheme, SolidAngleBin};
 use crate::convergence::Convergeable;
-use crate::params::Params;
-use crate::result::{ScattResult1D, ScattResult2D};
+use crate::params::{Param, Params};
+use crate::result::{
+    integrate_theta_weighted_component, GOComponent, ScattResult1D, ScattResult2D,
+};
 
 /// The type of zone, which determines what parameters can be computed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -216,6 +219,111 @@ impl Zone {
                 .as_ref()
                 .map(|f| f.iter().map(|x| x.ones_like()).collect()),
             params: self.params.weights(),
+        }
+    }
+
+    /// Compute zone-specific parameters based on zone type.
+    ///
+    /// - Full: scatt_cross, ext_cross, asymmetry, albedo
+    /// - Forward: ext_cross_optical_theorem
+    /// - Backward: backscatter_cross, depolarization_ratio, lidar_ratio
+    /// - Custom: nothing (for now)
+    pub fn compute_params(&mut self, wavelength: f32, absorbed: f32, global_params: &Params) {
+        let k = 2.0 * PI / wavelength;
+
+        match self.zone_type {
+            ZoneType::Full => {
+                self.compute_full_params(k, absorbed);
+            }
+            ZoneType::Forward => {
+                self.compute_forward_params(k);
+            }
+            ZoneType::Backward => {
+                self.compute_backward_params(k, global_params);
+            }
+            ZoneType::Custom => {
+                // No params computed for custom zones (yet)
+            }
+        }
+    }
+
+    fn compute_full_params(&mut self, k: f32, absorbed: f32) {
+        let Some(field_1d) = &self.field_1d else {
+            return;
+        };
+
+        for component in [GOComponent::Total, GOComponent::Beam, GOComponent::ExtDiff] {
+            let scatt = integrate_theta_weighted_component(field_1d, component, |theta, s11| {
+                theta.sin() * s11 / k.powi(2)
+            });
+            let asymmetry_scatt =
+                integrate_theta_weighted_component(field_1d, component, |theta, s11| {
+                    theta.sin() * theta.cos() * s11 / k.powi(2)
+                });
+
+            self.params.set_param(Param::ScatCross, component, scatt);
+            self.params
+                .set_param(Param::Asymmetry, component, asymmetry_scatt / scatt);
+
+            // ext_cross and albedo only for Total component
+            if component == GOComponent::Total {
+                let ext = scatt + absorbed;
+                self.params.set_param(Param::ExtCross, component, ext);
+                self.params.set_param(Param::Albedo, component, scatt / ext);
+            }
+        }
+    }
+
+    fn compute_forward_params(&mut self, k: f32) {
+        let Some(field_fs) = self.field_2d.first() else {
+            return;
+        };
+
+        let s2 = field_fs.ampl_total[(0, 0)];
+        let ext_cross = s2.im * 4.0 * PI / k.powi(2);
+        self.params
+            .set_param(Param::ExtCrossOpticalTheorem, GOComponent::Total, ext_cross);
+    }
+
+    fn compute_backward_params(&mut self, k: f32, global_params: &Params) {
+        let Some(field_bs) = self.field_2d.first() else {
+            return;
+        };
+
+        for (component, mueller) in [
+            (GOComponent::Total, field_bs.mueller_total),
+            (GOComponent::Beam, field_bs.mueller_beam),
+            (GOComponent::ExtDiff, field_bs.mueller_ext),
+        ] {
+            let s11 = mueller[(0, 0)];
+            let s22 = mueller[(1, 1)];
+            let bs_cross = s11 * 4.0 * PI / k.powi(2);
+
+            self.params
+                .set_param(Param::BackscatterCross, component, bs_cross);
+
+            // Lidar ratio = ext_cross_optical_theorem / backscatter_cross
+            if let Some(ext_cross_ot) = global_params.ext_cross_optical_theorem(&component) {
+                if bs_cross > 1e-10 {
+                    self.params
+                        .set_param(Param::LidarRatio, component, ext_cross_ot / bs_cross);
+                }
+            } else if component == GOComponent::Total {
+                warn!(
+                    "Cannot compute lidar ratio: ext_cross_optical_theorem not available. \
+                     Ensure Forward zone is processed before Backward zone."
+                );
+            }
+
+            // Depolarization ratio = (S11 - S22) / (S11 + S22)
+            let s11_plus_s22 = s11 + s22;
+            if s11_plus_s22.abs() > 1e-10 {
+                let depol = (s11 - s22) / s11_plus_s22;
+                self.params
+                    .set_param(Param::DepolarizationRatio, component, depol);
+                self.params
+                    .set_param(Param::BackscatterS11S22, component, s11_plus_s22);
+            }
         }
     }
 }

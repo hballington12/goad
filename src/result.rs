@@ -1,4 +1,3 @@
-use std::f32::consts::PI;
 use std::fmt::Debug;
 use std::ops::Add;
 use std::ops::AddAssign;
@@ -10,7 +9,6 @@ use crate::bins::AngleBin;
 use crate::bins::Scheme;
 use crate::bins::SolidAngleBin;
 use crate::convergence::Convergeable;
-use crate::params::Param;
 use crate::params::Params;
 use crate::powers::Powers;
 use crate::zones::{Zone, ZoneType, Zones};
@@ -643,123 +641,17 @@ impl Results {
         result
     }
 
-    /// Computes and sets the parameters of the result
+    /// Computes and sets the parameters for each zone, then aggregates to global params.
     pub fn compute_params(&mut self, wavelength: f32) {
-        // Get field_1d from full zone
-        let field_1d = self.zones.full_zone().and_then(|z| z.field_1d.as_ref());
+        let absorbed = self.powers.absorbed;
 
-        if let Some(field_1d) = field_1d {
-            let k = 2.0 * PI / wavelength;
+        // Compute params for each zone
+        // Order matters: Forward must come before Backward for lidar ratio
+        for zone in self.zones.iter_mut() {
+            zone.compute_params(wavelength, absorbed, &self.params);
 
-            // Total field
-            let scatt_total =
-                integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
-                    theta.sin() * s11 / k.powi(2)
-                });
-            let asymmetry_scatt_total =
-                integrate_theta_weighted_component(field_1d, GOComponent::Total, |theta, s11| {
-                    theta.sin() * theta.cos() * s11 / k.powi(2)
-                });
-            let ext_total = scatt_total + self.powers.absorbed;
-
-            self.params
-                .set_param(Param::ScatCross, GOComponent::Total, scatt_total);
-            self.params
-                .set_param(Param::ExtCross, GOComponent::Total, ext_total);
-            self.params.set_param(
-                Param::Asymmetry,
-                GOComponent::Total,
-                asymmetry_scatt_total / scatt_total,
-            );
-            self.params
-                .set_param(Param::Albedo, GOComponent::Total, scatt_total / ext_total);
-
-            // Beam field
-            let scatt_beam =
-                integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
-                    theta.sin() * s11 / k.powi(2)
-                });
-            let asymmetry_scatt_beam =
-                integrate_theta_weighted_component(field_1d, GOComponent::Beam, |theta, s11| {
-                    theta.sin() * theta.cos() * s11 / k.powi(2)
-                });
-
-            self.params
-                .set_param(Param::ScatCross, GOComponent::Beam, scatt_beam);
-            self.params.set_param(
-                Param::Asymmetry,
-                GOComponent::Beam,
-                asymmetry_scatt_beam / scatt_beam,
-            );
-
-            // Ext field
-            let scatt_ext =
-                integrate_theta_weighted_component(field_1d, GOComponent::ExtDiff, |theta, s11| {
-                    theta.sin() * s11 / k.powi(2)
-                });
-            let asymmetry_scatt_ext =
-                integrate_theta_weighted_component(field_1d, GOComponent::ExtDiff, |theta, s11| {
-                    theta.sin() * theta.cos() * s11 / k.powi(2)
-                });
-
-            self.params
-                .set_param(Param::ScatCross, GOComponent::ExtDiff, scatt_ext);
-            self.params.set_param(
-                Param::Asymmetry,
-                GOComponent::ExtDiff,
-                asymmetry_scatt_ext / scatt_ext,
-            );
-        }
-
-        // Backscatter params from backward zone
-        let field_bs = self.zones.backward_zone().and_then(|z| z.field_2d.first());
-
-        if let Some(field_bs) = field_bs {
-            let k = 2.0 * PI / wavelength;
-
-            // BackscatterCross = S11 * 4π / k²
-            // DepolarizationRatio = (S11 - S22) / (S11 + S22)
-            for (component, mueller) in [
-                (GOComponent::Total, field_bs.mueller_total),
-                (GOComponent::Beam, field_bs.mueller_beam),
-                (GOComponent::ExtDiff, field_bs.mueller_ext),
-            ] {
-                let s11 = mueller[(0, 0)];
-                let s22 = mueller[(1, 1)];
-                let bs_cross = s11 * 4.0 * PI / k.powi(2);
-                self.params
-                    .set_param(Param::BackscatterCross, component, bs_cross);
-
-                // LidarRatio = ExtCross / BackscatterCross
-                if let Some(ext_cross) = self.params.ext_cross(&component) {
-                    if bs_cross > 1e-10 {
-                        self.params
-                            .set_param(Param::LidarRatio, component, ext_cross / bs_cross);
-                    }
-                }
-
-                // DepolarizationRatio = (S11 - S22) / (S11 + S22)
-                let s11_plus_s22 = s11 + s22;
-                if s11_plus_s22.abs() > 1e-10 {
-                    let depol = (s11 - s22) / s11_plus_s22;
-                    self.params
-                        .set_param(Param::DepolarizationRatio, component, depol);
-                    self.params
-                        .set_param(Param::BackscatterS11S22, component, s11_plus_s22);
-                }
-            }
-        }
-
-        // Optical theorem: ExtCross = (4π/k) * Im[S_2] at θ=0°
-        let field_fs = self.zones.forward_zone().and_then(|z| z.field_2d.first());
-
-        if let Some(field_fs) = field_fs {
-            let k = 2.0 * PI / wavelength;
-            let s2 = field_fs.ampl_total[(0, 0)];
-            // let s1 = field_fs[(1, 1)]; // can also use s1 here since e perp and e par are indistinguishable in the direct forwards
-            let ext_cross = s2.im * 4.0 * PI / k.powi(2); // using imaginary part (diffraction convention is positive i prefactor)
-            self.params
-                .set_param(Param::ExtCrossOpticalTheorem, GOComponent::Total, ext_cross);
+            // Aggregate zone params to global params for backwards compatibility
+            self.params.merge(&zone.params);
         }
     }
 
@@ -1151,7 +1043,7 @@ impl Results {
 }
 
 /// Helper function to integrate over theta for a specific component with custom weighting
-fn integrate_theta_weighted_component<F>(
+pub fn integrate_theta_weighted_component<F>(
     field_1d: &[ScattResult1D],
     component: GOComponent,
     weight_fn: F,
