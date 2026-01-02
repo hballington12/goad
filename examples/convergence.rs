@@ -37,5 +37,7 @@ fn main() {
         "Asymmetry: {:.4} +/- {:.4} ({:.2}% relative SEM)",
         asym, asym_sem, relative_sem
     );
+
+    convergence.writeup();
 }
 // --8<-- [end:convergence]
