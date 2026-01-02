@@ -16,3 +16,4 @@ goad.log
 site/
 uv.lock
 *.dat
+examples/backscattering/bpy-geometries/

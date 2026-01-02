@@ -6,6 +6,8 @@ nav:
   - checks.md
   - convergence.md
   - api.md
+  - Examples:
+      - examples/backscattering.md
 
 site_url: https://hballington12.github.io/goad/
 repo_url: https://github.com/hballington12/goad
