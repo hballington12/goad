@@ -129,16 +129,80 @@ total_accounted = (
 print(f"Energy conservation error: {powers['input'] - total_accounted}")
 # --8<-- [end:powers]
 
+# --8<-- [start:zones]
+from goad import MultiProblem, Settings
+
+mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+mp.solve()
+
+# Access all zones
+zones = mp.results.zones
+print(f"Available zones: {zones}")
+
+# Access specific zones by type
+full_zone = mp.results.full_zone
+forward_zone = mp.results.forward_zone
+backward_zone = mp.results.backward_zone
+
+print(f"Full zone: {full_zone.name}, bins: {full_zone.num_bins}")
+print(f"Forward zone: {forward_zone.name}, bins: {forward_zone.num_bins}")
+print(f"Backward zone: {backward_zone.name}, bins: {backward_zone.num_bins}")
+# --8<-- [end:zones]
+
+# --8<-- [start:zone_params]
+from goad import MultiProblem, Settings
+
+mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+mp.solve()
+
+# Full zone parameters (requires full theta coverage)
+full_zone = mp.results.full_zone
+full_params = full_zone.params
+print(f"Scattering cross section: {full_params['scatt_cross']}")
+print(f"Extinction cross section: {full_params['ext_cross']}")
+print(f"Asymmetry parameter: {full_params['asymmetry']}")
+print(f"Single scattering albedo: {full_params['albedo']}")
+
+# Backward zone parameters (lidar-relevant)
+backward_zone = mp.results.backward_zone
+back_params = backward_zone.params
+print(f"Backscatter cross section: {back_params['backscatter_cross']}")
+print(f"Lidar ratio: {back_params['lidar_ratio']}")
+print(f"Depolarization ratio: {back_params['depolarization_ratio']}")
+
+# Forward zone parameters (optical theorem)
+forward_zone = mp.results.forward_zone
+fwd_params = forward_zone.params
+print(f"Extinction (optical theorem): {fwd_params['ext_cross_optical_theorem']}")
+# --8<-- [end:zone_params]
+
+# --8<-- [start:zone_mueller]
+from goad import MultiProblem, Settings
+
+mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+mp.solve()
+
+# Access Mueller matrix for a specific zone
+zone = mp.results.full_zone
+mueller = zone.mueller  # 2D Mueller matrix for this zone
+mueller_1d = zone.mueller_1d  # 1D phi-integrated Mueller matrix
+bins = zone.bins  # Angular bins for this zone
+bins_1d = zone.bins_1d  # 1D theta bins
+
+print(f"Zone '{zone.name}' has {zone.num_bins} bins")
+print(f"Mueller matrix shape: {mueller.shape}")
+# --8<-- [end:zone_mueller]
+
 # --8<-- [start:complete]
 import numpy as np
-from goad import BinningScheme, MultiProblem, Orientation, Settings
+from goad import BinningScheme, MultiProblem, Orientation, Settings, ZoneConfig
 
 # Configure and solve
 settings = Settings(
     geom_path="path/to/geometry.obj",
     wavelength=0.532,
     orientation=Orientation.uniform(num_orients=100),
-    binning=BinningScheme.simple(num_theta=180, num_phi=48),
+    zones=[ZoneConfig(BinningScheme.simple(num_theta=180, num_phi=48))],
 )
 mp = MultiProblem(settings)
 mp.solve()
@@ -156,6 +220,11 @@ print(f"Scattering cross section: {results.scat_cross:.6f}")
 print(f"Extinction cross section: {results.ext_cross:.6f}")
 print(f"Asymmetry parameter: {results.asymmetry:.4f}")
 print(f"Single scattering albedo: {results.albedo:.4f}")
+
+# Access zone-specific parameters
+backward = results.backward_zone
+print(f"Lidar ratio: {backward.params['lidar_ratio']:.4f}")
+print(f"Backscatter cross section: {backward.params['backscatter_cross']:.6f}")
 
 # Check power budget
 powers = results.powers

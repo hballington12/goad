@@ -73,7 +73,7 @@ Zones define a set of query points to evaluate the far-field scattering at. By d
 
 You can add additional zones as needed for your application. For backscattering-only applications, you can exclude the full zone and compute only at forward and backward scattering for faster computations.
 
-Note: GOAD automatically determines the zone type based on the theta range of your binning scheme. If the theta range covers 0° to 180°, it is classified as a Full zone and integrated parameters (asymmetry, scattering cross-section, etc.) will be computed. If the range is partial, it is classified as a Custom zone and these parameters will not be computed.
+>Note: GOAD automatically determines the zone type based on the theta range of your binning scheme. If the theta range covers 0° to 180°, it is classified as a Full zone and integrated parameters (asymmetry, scattering cross-section, etc.) will be computed. If the range is partial, it is classified as a Custom zone and these parameters will not be computed.
 
 Different parameters are computed depending on the zone type - see [Integrated Parameters](results.md#integrated-parameters) for more details.
 
