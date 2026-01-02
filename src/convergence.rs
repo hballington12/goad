@@ -18,6 +18,7 @@ use crate::{
     geom::Geom,
     multiproblem::{init_result, load_and_init_geoms, load_settings_or_default},
     orientation::{Euler, OrientationSampler},
+    output,
     params::Param,
     problem::Problem,
     result::{GOComponent, Results},
@@ -116,6 +117,14 @@ impl Convergence {
     /// Get the current standard error of the mean (live during solve).
     pub fn sem(&self) -> Results {
         self.tracker.sem()
+    }
+
+    /// Write results to output files.
+    pub fn writeup(&self) {
+        let result = self.mean();
+        let output_manager = output::OutputManager::new(&self.settings, &result);
+        let _ = output_manager.write_all();
+        info!("Output written to {}", self.settings.directory.display());
     }
 
     /// Check if all convergence targets are satisfied.
