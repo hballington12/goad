@@ -100,6 +100,7 @@ impl Settings {
         medium_refr_index_re = DEFAULT_MEDIUM_REFR_INDEX_RE,
         medium_refr_index_im = DEFAULT_MEDIUM_REFR_INDEX_IM,
         orientation = None,
+        zones = None,
         beam_power_threshold = DEFAULT_BEAM_POWER_THRESHOLD,
         beam_area_threshold_fac = DEFAULT_BEAM_AREA_THRESHOLD_FAC,
         cutoff = DEFAULT_CUTOFF,
@@ -121,6 +122,7 @@ impl Settings {
         medium_refr_index_re: f32,
         medium_refr_index_im: f32,
         orientation: Option<Orientation>,
+        zones: Option<Vec<ZoneConfig>>,
         beam_power_threshold: f32,
         beam_area_threshold_fac: f32,
         cutoff: f32,
@@ -175,13 +177,15 @@ impl Settings {
             euler_convention: DEFAULT_EULER_ORDER,
         });
 
-        // Create default zones (single full zone with interval binning)
-        let zones = vec![ZoneConfig::new(bins::Scheme::Interval {
-            thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
-            theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
-            phis: vec![0.0, 360.0],
-            phi_spacings: vec![7.5],
-        })];
+        // Use provided zones or create default (single full zone with interval binning)
+        let zones = zones.unwrap_or_else(|| {
+            vec![ZoneConfig::new(bins::Scheme::Interval {
+                thetas: vec![0.0, 5.0, 175.0, 179.0, 180.0],
+                theta_spacings: vec![0.1, 2.0, 0.5, 0.1],
+                phis: vec![0.0, 360.0],
+                phi_spacings: vec![7.5],
+            })]
+        });
 
         let mut settings = Settings {
             wavelength,
@@ -377,7 +381,17 @@ impl Settings {
         self.max_tir
     }
 
-    // TODO: Add zones getter/setter when ZoneConfig has PyO3 bindings
+    /// Set the zones configuration
+    #[setter]
+    fn set_zones(&mut self, zones: Vec<ZoneConfig>) {
+        self.zones = zones;
+    }
+
+    /// Get the zones configuration
+    #[getter]
+    fn get_zones(&self) -> Vec<ZoneConfig> {
+        self.zones.clone()
+    }
 
     /// Set the per-axis geometry scaling [x, y, z]
     #[setter]

@@ -384,6 +384,34 @@ impl BinningScheme {
         };
         bins
     }
+
+    /// Returns all 2D bins as a numpy array of shape (n_bins, 2) with columns [theta, phi]
+    fn bins<'py>(&self, py: Python<'py>) -> Bound<'py, numpy::PyArray2<f32>> {
+        use numpy::IntoPyArray;
+        let solid_bins = self.scheme.generate();
+        let flat: Vec<f32> = solid_bins
+            .iter()
+            .flat_map(|bin| vec![bin.theta.center, bin.phi.center])
+            .collect();
+        ndarray::Array2::from_shape_vec((solid_bins.len(), 2), flat)
+            .unwrap()
+            .into_pyarray(py)
+    }
+
+    /// Returns unique 1D theta bins as a numpy array
+    fn bins_1d<'py>(&self, py: Python<'py>) -> Bound<'py, numpy::PyArray1<f32>> {
+        use numpy::IntoPyArray;
+        let thetas = self.thetas();
+        // Get unique thetas (they may repeat for each phi)
+        let mut unique_thetas: Vec<f32> = thetas.clone();
+        unique_thetas.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
+        ndarray::Array1::from_vec(unique_thetas).into_pyarray(py)
+    }
+
+    /// Returns the number of bins
+    fn num_bins(&self) -> usize {
+        self.scheme.generate().len()
+    }
 }
 
 pub fn interval_spacings(splits: &[f32], spacings: &[f32]) -> Vec<f32> {

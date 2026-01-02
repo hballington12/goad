@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 use std::ops::{Add, Div, Mul, Sub};
 
-use crate::bins::{Scheme, SolidAngleBin};
+use crate::bins::{BinningScheme, Scheme, SolidAngleBin};
 use crate::convergence::Convergeable;
 use crate::params::{Param, Params};
 use crate::result::{
@@ -51,6 +51,7 @@ impl ZoneType {
 }
 
 /// Configuration for a zone, as specified in TOML or via CLI.
+#[pyclass]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ZoneConfig {
     /// Optional user-provided label for the zone.
@@ -75,6 +76,58 @@ impl ZoneConfig {
             label: Some(label.into()),
             scheme,
         }
+    }
+}
+
+#[pymethods]
+impl ZoneConfig {
+    /// Create a new zone configuration.
+    ///
+    /// Args:
+    ///     binning: The binning scheme for this zone
+    ///     label: Optional label for the zone
+    #[new]
+    #[pyo3(signature = (binning, label=None))]
+    fn py_new(binning: BinningScheme, label: Option<String>) -> Self {
+        Self {
+            label,
+            scheme: binning.scheme,
+        }
+    }
+
+    /// Get the zone label
+    #[getter]
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
+    }
+
+    /// Set the zone label
+    #[setter]
+    fn set_label(&mut self, label: Option<String>) {
+        self.label = label;
+    }
+
+    /// Get the binning scheme
+    #[getter]
+    fn get_binning(&self) -> BinningScheme {
+        BinningScheme {
+            scheme: self.scheme.clone(),
+        }
+    }
+
+    /// Set the binning scheme
+    #[setter]
+    fn set_binning(&mut self, binning: BinningScheme) {
+        self.scheme = binning.scheme;
+    }
+
+    fn __repr__(&self) -> String {
+        let label_str = self
+            .label
+            .as_ref()
+            .map(|l| format!("'{}'", l))
+            .unwrap_or_else(|| "None".to_string());
+        format!("ZoneConfig(label={}, binning=...)", label_str)
     }
 }
 
