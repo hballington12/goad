@@ -57,6 +57,309 @@ mod tests {
         let cleaned_exterior = &cleaned.0[0].exterior();
         assert_eq!(cleaned_exterior.coords_count(), 5);
     }
+
+    // =========================================================================
+    // Regression tests for clipping behavior (for i_overlay migration)
+    // Based on old macroquad visualization examples
+    // =========================================================================
+
+    /// Test based on projection-debug.rs example
+    /// hex.obj, face 4, projection (0,0,-1)
+    #[test]
+    fn projection_debug_hex() {
+        let geoms = Geom::load("./examples/data/hex.obj").unwrap();
+        let mut geom = geoms[0].clone();
+
+        assert_eq!(geom.shapes.len(), 1);
+        assert_eq!(geom.shapes[0].faces.len(), 8);
+
+        let mut clip = geom.shapes[0].faces.remove(4);
+        let projection = Vector3::new(0.0, 0.0, -1.0);
+
+        let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
+        clipping.clip(AREA_THRESHOLD).unwrap();
+
+        let stats = clipping.stats.as_ref().unwrap();
+
+        // Expected values from old implementation
+        assert!(
+            (stats.clipping_area - 64.951904).abs() < 0.01,
+            "clipping_area: expected 64.951904, got {}",
+            stats.clipping_area
+        );
+        assert!(
+            (stats.intersection_area - 64.951904).abs() < 0.01,
+            "intersection_area: expected 64.951904, got {}",
+            stats.intersection_area
+        );
+        assert!(
+            stats.remaining_area.abs() < 0.01,
+            "remaining_area: expected 0, got {}",
+            stats.remaining_area
+        );
+        assert!(
+            (stats.total_consvtn - 1.0).abs() < 0.001,
+            "total_consvtn: expected 1.0, got {}",
+            stats.total_consvtn
+        );
+
+        // Check counts
+        assert_eq!(clipping.intersections.len(), 1, "Expected 1 intersection");
+        assert_eq!(clipping.remaining.len(), 0, "Expected 0 remaining");
+
+        // Check intersection geometry
+        let intsn = &clipping.intersections[0];
+        assert_eq!(
+            intsn.data().num_vertices,
+            6,
+            "Intersection should have 6 vertices"
+        );
+
+        let midpoint = intsn.data().midpoint;
+        assert!(
+            (midpoint.x - 0.0).abs() < 0.01,
+            "midpoint.x: expected 0.0, got {}",
+            midpoint.x
+        );
+        assert!(
+            (midpoint.y - 0.0).abs() < 0.01,
+            "midpoint.y: expected 0.0, got {}",
+            midpoint.y
+        );
+        assert!(
+            (midpoint.z - (-5.0)).abs() < 0.01,
+            "midpoint.z: expected -5.0, got {}",
+            midpoint.z
+        );
+
+        let normal = intsn.data().normal;
+        assert!(
+            (normal.z - (-1.0)).abs() < 0.01,
+            "normal.z: expected -1.0, got {}",
+            normal.z
+        );
+    }
+
+    /// Test based on projection1.rs example
+    /// concave1.obj, face 4, projection (-0.3, 0, -1)
+    #[test]
+    fn projection1_concave() {
+        let geoms = Geom::load("./examples/data/concave1.obj").unwrap();
+        let mut geom = geoms[0].clone();
+
+        assert_eq!(geom.shapes.len(), 1);
+        assert_eq!(geom.shapes[0].faces.len(), 8);
+
+        let mut clip = geom.shapes[0].faces.remove(4);
+        let projection = Vector3::new(-0.3, 0.0, -1.0);
+
+        let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
+        clipping.clip(AREA_THRESHOLD).unwrap();
+
+        let stats = clipping.stats.as_ref().unwrap();
+
+        // Expected values from old implementation
+        assert!(
+            (stats.clipping_area - 43.419937).abs() < 0.01,
+            "clipping_area: expected 43.419937, got {}",
+            stats.clipping_area
+        );
+        assert!(
+            (stats.intersection_area - 43.41993).abs() < 0.01,
+            "intersection_area: expected 43.41993, got {}",
+            stats.intersection_area
+        );
+        assert!(
+            (stats.total_consvtn - 1.0).abs() < 0.001,
+            "total_consvtn: expected 1.0, got {}",
+            stats.total_consvtn
+        );
+
+        // Check counts
+        assert_eq!(clipping.intersections.len(), 4, "Expected 4 intersections");
+        assert_eq!(clipping.remaining.len(), 0, "Expected 0 remaining");
+    }
+
+    /// Test based on projection2.rs example
+    /// cube_inside_ico.obj, face 5 from shape 0, projection (-0.2, 0, -1)
+    #[test]
+    fn projection2_cube_inside_ico() {
+        let geoms = Geom::load("./examples/data/cube_inside_ico.obj").unwrap();
+        let mut geom = geoms[0].clone();
+
+        assert_eq!(geom.shapes.len(), 2);
+        assert_eq!(geom.shapes[0].faces.len(), 6);
+        assert_eq!(geom.shapes[1].faces.len(), 20);
+
+        let mut clip = geom.shapes[0].faces.remove(5);
+        let projection = Vector3::new(-0.2, 0.0, -1.0);
+
+        let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
+        clipping.clip(AREA_THRESHOLD).unwrap();
+
+        let stats = clipping.stats.as_ref().unwrap();
+
+        // Expected values from old implementation
+        assert!(
+            (stats.clipping_area - 3.385843).abs() < 0.01,
+            "clipping_area: expected 3.385843, got {}",
+            stats.clipping_area
+        );
+        assert!(
+            (stats.intersection_area - 3.385844).abs() < 0.01,
+            "intersection_area: expected 3.385844, got {}",
+            stats.intersection_area
+        );
+        assert!(
+            (stats.total_consvtn - 1.0).abs() < 0.001,
+            "total_consvtn: expected 1.0, got {}",
+            stats.total_consvtn
+        );
+
+        // Check counts
+        assert_eq!(clipping.intersections.len(), 3, "Expected 3 intersections");
+        assert_eq!(clipping.remaining.len(), 0, "Expected 0 remaining");
+    }
+
+    /// Test based on projection_multi.rs example
+    /// multiple.obj, shape[0].face[5], projection (-1, 0, 0)
+    #[test]
+    fn projection_multi() {
+        let geoms = Geom::load("./examples/data/multiple.obj").unwrap();
+        let mut geom = geoms[0].clone();
+
+        assert_eq!(geom.shapes.len(), 2);
+        assert_eq!(geom.shapes[0].faces.len(), 8);
+        assert_eq!(geom.shapes[1].faces.len(), 8);
+
+        let mut clip = geom.shapes[0].faces.remove(5);
+        let projection = Vector3::new(-1.0, 0.0, 0.0);
+
+        let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
+        clipping.clip(AREA_THRESHOLD).unwrap();
+
+        let stats = clipping.stats.as_ref().unwrap();
+
+        // Expected values from old implementation
+        assert!(
+            (stats.clipping_area - 49.999989).abs() < 0.01,
+            "clipping_area: expected 49.999989, got {}",
+            stats.clipping_area
+        );
+        assert!(
+            (stats.intersection_area - 41.416775).abs() < 0.1,
+            "intersection_area: expected 41.416775, got {}",
+            stats.intersection_area
+        );
+        assert!(
+            (stats.remaining_area - 8.583215).abs() < 0.1,
+            "remaining_area: expected 8.583215, got {}",
+            stats.remaining_area
+        );
+        assert!(
+            (stats.total_consvtn - 1.0).abs() < 0.001,
+            "total_consvtn: expected 1.0, got {}",
+            stats.total_consvtn
+        );
+
+        // Check counts
+        assert_eq!(clipping.intersections.len(), 3, "Expected 3 intersections");
+        assert_eq!(clipping.remaining.len(), 2, "Expected 2 remaining");
+    }
+
+    /// Test based on clip_test.rs example
+    /// clip_test.obj, shape[1].face[1], projection (1, 1, 0)
+    #[test]
+    fn clip_test_two_shapes() {
+        let geoms = Geom::load("./examples/data/clip_test.obj").unwrap();
+        let mut geom = geoms[0].clone();
+
+        assert_eq!(geom.shapes.len(), 2);
+        assert_eq!(geom.shapes[0].faces.len(), 6);
+        assert_eq!(geom.shapes[1].faces.len(), 6);
+
+        let mut clip = geom.shapes[1].faces.remove(1);
+        let projection = Vector3::new(1.0, 1.0, 0.0);
+
+        let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
+        clipping.clip(AREA_THRESHOLD).unwrap();
+
+        let stats = clipping.stats.as_ref().unwrap();
+
+        // Expected values from old implementation
+        assert!(
+            (stats.clipping_area - 2.828427).abs() < 0.01,
+            "clipping_area: expected 2.828427, got {}",
+            stats.clipping_area
+        );
+        assert!(
+            (stats.intersection_area - 2.828427).abs() < 0.01,
+            "intersection_area: expected 2.828427, got {}",
+            stats.intersection_area
+        );
+        assert!(
+            (stats.total_consvtn - 1.0).abs() < 0.001,
+            "total_consvtn: expected 1.0, got {}",
+            stats.total_consvtn
+        );
+
+        // Check counts
+        assert_eq!(clipping.intersections.len(), 3, "Expected 3 intersections");
+        assert_eq!(clipping.remaining.len(), 0, "Expected 0 remaining");
+    }
+
+    /// Test based on remainder.rs example
+    /// multiple.obj with custom rectangular clip at z=10, projection (0, 0, -1)
+    #[test]
+    fn remainder_custom_clip() {
+        let geoms = Geom::load("./examples/data/multiple.obj").unwrap();
+        let mut geom = geoms[0].clone();
+
+        assert_eq!(geom.shapes.len(), 2);
+
+        let projection = Vector3::new(0.0, 0.0, -1.0);
+
+        // Create custom clip rectangle (vertices reversed for correct normal)
+        let mut clip_vertices = vec![
+            Point3::new(-19.0, 3.0, 10.0),
+            Point3::new(-19.0, -3.0, 10.0),
+            Point3::new(10.0, -3.0, 10.0),
+            Point3::new(10.0, 3.0, 10.0),
+        ];
+        clip_vertices.reverse();
+        let mut clip = Face::new_simple(clip_vertices, None, None).unwrap();
+
+        let mut clipping = Clipping::new(&mut geom, &mut clip, &projection);
+        clipping.clip(AREA_THRESHOLD).unwrap();
+
+        let stats = clipping.stats.as_ref().unwrap();
+
+        // Expected values from old implementation
+        assert!(
+            (stats.clipping_area - 174.0).abs() < 0.1,
+            "clipping_area: expected 174.0, got {}",
+            stats.clipping_area
+        );
+        assert!(
+            (stats.intersection_area - 107.045547).abs() < 0.5,
+            "intersection_area: expected 107.045547, got {}",
+            stats.intersection_area
+        );
+        assert!(
+            (stats.remaining_area - 66.954453).abs() < 0.5,
+            "remaining_area: expected 66.954453, got {}",
+            stats.remaining_area
+        );
+        assert!(
+            (stats.total_consvtn - 1.0).abs() < 0.001,
+            "total_consvtn: expected 1.0, got {}",
+            stats.total_consvtn
+        );
+
+        // Check counts
+        assert_eq!(clipping.intersections.len(), 4, "Expected 4 intersections");
+        assert_eq!(clipping.remaining.len(), 4, "Expected 4 remaining");
+    }
 }
 trait Point3Extensions {
     fn ray_cast_z(&self, plane: &Plane) -> f32;
