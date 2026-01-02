@@ -63,7 +63,27 @@ Seeds the random number generator for reproducibility.
 **Parameter:** `seed`  
 **Default:** `None`
 
-## Angular Binning
+## Zones
+
+Zones define a set of query points to evaluate the far-field scattering at. By default, GOAD creates three zones:
+
+1. **Full zone** - The full scattering sphere from θ=0° to θ=180°. Used for computing integrated parameters like asymmetry, scattering cross-section, and albedo.
+2. **Forward zone** - A single point at θ=0.01° (slightly off-axis for numerical stability). Used for computing extinction cross-section via the optical theorem.
+3. **Backward zone** - A single point at θ=180°. Used for computing backscatter cross-section, lidar ratio, and depolarization ratio.
+
+You can add additional zones as needed for your application. For backscattering-only applications, you can exclude the full zone and compute only at forward and backward scattering for faster computations.
+
+Note: GOAD automatically determines the zone type based on the theta range of your binning scheme. If the theta range covers 0° to 180°, it is classified as a Full zone and integrated parameters (asymmetry, scattering cross-section, etc.) will be computed. If the range is partial, it is classified as a Custom zone and these parameters will not be computed.
+
+Different parameters are computed depending on the zone type - see [Integrated Parameters](results.md#integrated-parameters) for more details.
+
+Each zone is specified by a binning scheme and an optional label. See [Binning Schemes](#binning-schemes) for more info about binning schemes.
+
+{{code_block('examples/settings', 'zones')}}
+
+**Default:** A single full zone with interval binning (high resolution at forward and backward angles).
+
+## Binning Schemes
 
 Control the angular resolution of scattering calculation in the far-field. As particle size increases, the width of peaks in the scattering decreases. GOAD currently requires the user to choose a sufficiently fine binning scheme to resolve the peaks. For `phi` angles, a relatively course binning scheme can be used, but for `theta` angles, care should be taken to ensure sufficient resolution, otherwise the integrated parameters lose accuracy. The compute time approximately scales with the number of bins, which for `simple` and `interval` binning schemes is just the product of the number of bins in each dimension.
 
@@ -183,7 +203,7 @@ Set to `True` to silence progress messages.
 | [`medium_refr_index_re`](#refractive-indices) | `float` | `1.0` | Real part of medium refractive index |
 | [`medium_refr_index_im`](#refractive-indices) | `float` | `0.0` | Imaginary part of medium refractive index |
 | [`orientation`](#orientation-distribution) | `Orientation` | `Orientation.uniform(1)` | Orientation distribution |
-| [`binning`](#angular-binning) | `BinningScheme` | `interval(...)` | Angular binning scheme (high-res forward/back) |
+| [`zones`](#zones) | `list[ZoneConfig]` | Single full zone with interval binning | Zone configurations for far-field evaluation |
 | [`mapping`](#mapping-method) | `Mapping` | `Mapping('ad')` | Near-to-far field mapping method |
 | [`beam_power_threshold`](#beam-thresholds) | `float` | `0.005` | Beam power truncation threshold |
 | [`beam_area_threshold_fac`](#beam-thresholds) | `float` | `0.1` | Beam area truncation factor |
