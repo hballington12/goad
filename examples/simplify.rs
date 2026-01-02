@@ -14,7 +14,7 @@ fn main() {
 
     println!("Original MultiPolygon: {:?}", multipolygon);
 
-    let cleaned = multipolygon.simplify(&0.01);
+    let cleaned = multipolygon.simplify(0.01);
 
     // Print the cleaned polygon
     println!("Cleaned MultiPolygon: {:?}", cleaned);

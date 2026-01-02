@@ -16,7 +16,7 @@ use tobj::{self, Model};
 mod tests {
 
     use super::*;
-    use geo_clipper::Clipper;
+    use geo::BooleanOps;
     use geo_types::{Coord, LineString, Polygon};
 
     #[test]
@@ -216,7 +216,7 @@ mod tests {
 
         let clip = Polygon::new(LineString(exterior), vec![]);
 
-        let result = subject.intersection(&clip, 100000.0);
+        let result = subject.intersection(&clip);
 
         assert!(!result.0.is_empty());
     }
