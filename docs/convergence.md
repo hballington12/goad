@@ -4,6 +4,8 @@
 
 When computing orientation averaged scattering, it's not usually known beforehand exactly how many orientations are required to converge on the desired result. GOAD's solution to this is called a `Convergence`, which uses Welford's algorithm to track the mean and variance of one or more prescribed convergence variables. The simulation runs until the convergence criteria are met, or some maximum number of orientations is reached. A simple example runs until the standard error in the mean asymmetry parameter has an error less than 2%:
 
+> **Tip:** GOAD simulations can be compute-intensive. Always call `save()` after `solve()` to write results to disk for later analysis, avoiding the need to re-run expensive simulations.
+
 {{code_block('examples/convergence', 'basic')}}
 
 which produces the following output:
