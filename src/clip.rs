@@ -2,7 +2,7 @@ use super::geom::{Face, Geom, Plane};
 use super::settings;
 use crate::geom::PolygonExtensions;
 use anyhow::Result;
-use geo::{Area, BooleanOps, Simplify};
+use geo::{Area, BooleanOps, BoundingRect, Simplify};
 
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
@@ -886,7 +886,28 @@ pub fn clip_faces<'a>(
         let subject_poly = subject.to_polygon();
         let mut next_clips = Vec::new();
 
+        // Compute subject bounding rect once per subject
+        let subject_bounds = subject_poly.bounding_rect();
+
         for clip in &remaining_clips {
+            // Early exit: if bounding boxes don't overlap, no intersection possible
+            let clip_bounds = clip.bounding_rect();
+            let boxes_overlap = match (&subject_bounds, &clip_bounds) {
+                (Some(sb), Some(cb)) => {
+                    sb.min().x <= cb.max().x
+                        && sb.max().x >= cb.min().x
+                        && sb.min().y <= cb.max().y
+                        && sb.max().y >= cb.min().y
+                }
+                _ => true, // If we can't compute bounds, assume overlap
+            };
+
+            if !boxes_overlap {
+                // No overlap - clip passes through unchanged
+                next_clips.push(clip.clone());
+                continue;
+            }
+
             let mut intersection = Simplify::simplify(
                 &subject_poly.intersection(clip),
                 settings::VERTEX_MERGE_DISTANCE,
