@@ -8,9 +8,10 @@
 //! provides a command line interface for running a general problem. To get
 //! started, have a look at the [quick start guide][_quickstart].
 
-// Use jemalloc as the global allocator on non-Windows platforms
+// Use jemalloc as the global allocator on macOS only
 // This avoids memory corruption issues with the macOS system allocator
-#[cfg(not(target_env = "msvc"))]
+// On Linux, jemalloc can cause TLS allocation errors when loaded as a Python extension
+#[cfg(all(target_os = "macos", not(target_env = "msvc")))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
