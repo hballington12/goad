@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_deque::{Injector, Steal};
 use rand::rngs::StdRng;
@@ -32,10 +32,17 @@ use rand::{Rng, SeedableRng};
 
 const MAX_CONVERGENCE_ORIENTATIONS: usize = 100_000;
 
-/// Default batch size for worker-local accumulation.
-/// Workers accumulate this many results before sending to master.
-/// Larger values reduce master overhead but increase latency.
-const DEFAULT_BATCH_SIZE: usize = 10;
+/// Minimum batch size to avoid excessive overhead.
+const MIN_BATCH_SIZE: usize = 2;
+
+/// Maximum batch size to maintain load balancing and convergence responsiveness.
+const MAX_BATCH_SIZE: usize = 1024;
+
+/// Number of samples to run during prognosis for timing measurements.
+const PROGNOSIS_SAMPLES: usize = 3;
+
+/// Fallback batch size if prognosis fails or produces invalid results.
+const FALLBACK_BATCH_SIZE: usize = 10;
 
 /// A convergence target for a specific parameter.
 #[derive(Clone, Debug)]
@@ -212,6 +219,96 @@ impl Convergence {
             .collect()
     }
 
+    /// Runs a prognosis to determine optimal batch size based on actual timing.
+    ///
+    /// Measures:
+    /// - compute_time: average time to run one orientation
+    /// - merge_time: average time to merge one tracker into the master
+    ///
+    /// The optimal batch size ensures the master can keep up with all workers:
+    ///   batch_size = ceil(num_workers * merge_time / compute_time)
+    ///
+    /// Returns the computed batch size, clamped to [MIN_BATCH_SIZE, MAX_BATCH_SIZE].
+    fn run_prognosis(&mut self, problems_base: &[Problem], num_workers: usize) -> usize {
+        let result_template = init_result(&self.settings);
+
+        // Measure compute time: run PROGNOSIS_SAMPLES orientations
+        let mut compute_times = Vec::with_capacity(PROGNOSIS_SAMPLES);
+
+        for _ in 0..PROGNOSIS_SAMPLES {
+            let Some(task) = self.sample_next_problem() else {
+                break;
+            };
+
+            let mut problem = problems_base[task.problem_idx].clone();
+            let start = Instant::now();
+            if problem.run(Some(&task.euler)).is_ok() {
+                compute_times.push(start.elapsed());
+            }
+        }
+
+        if compute_times.is_empty() {
+            warn!("Prognosis: no successful compute samples, using fallback batch size");
+            return FALLBACK_BATCH_SIZE;
+        }
+
+        let avg_compute_time = compute_times.iter().sum::<Duration>() / compute_times.len() as u32;
+
+        // Measure merge time: create sample trackers and merge them
+        let mut merge_times = Vec::with_capacity(PROGNOSIS_SAMPLES);
+        let mut dummy_tracker = ConvergenceTracker::new(&result_template);
+
+        for _ in 0..PROGNOSIS_SAMPLES {
+            // Create a tracker with one sample (simulates what workers send)
+            let mut sample_tracker = ConvergenceTracker::new(&result_template);
+            let Some(task) = self.sample_next_problem() else {
+                break;
+            };
+
+            let mut problem = problems_base[task.problem_idx].clone();
+            if problem.run(Some(&task.euler)).is_ok() {
+                sample_tracker.update(&problem.result);
+
+                let start = Instant::now();
+                dummy_tracker.merge(&sample_tracker);
+                merge_times.push(start.elapsed());
+            }
+        }
+
+        if merge_times.is_empty() {
+            warn!("Prognosis: no successful merge samples, using fallback batch size");
+            return FALLBACK_BATCH_SIZE;
+        }
+
+        let avg_merge_time = merge_times.iter().sum::<Duration>() / merge_times.len() as u32;
+
+        // Calculate optimal batch size:
+        // Workers produce at rate: num_workers / compute_time
+        // Master can handle at rate: 1 / merge_time
+        // To balance: batch_size * (1 / merge_time) >= num_workers / compute_time
+        // => batch_size >= num_workers * merge_time / compute_time
+        let batch_size = if avg_compute_time.as_nanos() > 0 {
+            let ratio = (num_workers as f64 * avg_merge_time.as_nanos() as f64)
+                / avg_compute_time.as_nanos() as f64;
+            // Add 20% headroom to keep master comfortably ahead
+            (ratio * 1.2).ceil() as usize
+        } else {
+            warn!(
+                "Prognosis: compute time was zero (too fast to measure), using fallback batch size"
+            );
+            return FALLBACK_BATCH_SIZE;
+        };
+
+        let clamped = batch_size.clamp(MIN_BATCH_SIZE, MAX_BATCH_SIZE);
+
+        info!(
+            "Prognosis: compute={:?}, merge={:?}, workers={}, optimal_batch={}",
+            avg_compute_time, avg_merge_time, num_workers, clamped
+        );
+
+        clamped
+    }
+
     /// Runs the work-stealing solver with worker threads.
     ///
     /// Workers accumulate results locally into a ConvergenceTracker, then send
@@ -222,10 +319,13 @@ impl Convergence {
         F: FnMut() -> bool,
     {
         let num_workers = Self::num_workers();
-        // Batch size must not exceed max_orientations, otherwise workers wait forever
-        let batch_size = DEFAULT_BATCH_SIZE.min(self.max_orientations);
         let progress = ConvergenceProgress::new(self.targets.len(), self.max_orientations);
         let problems_base = self.create_base_problems();
+
+        // Run prognosis to determine optimal batch size based on actual timing
+        let batch_size = self
+            .run_prognosis(&problems_base, num_workers)
+            .min(self.max_orientations);
         let injector: Injector<OrientationTask> = Injector::new();
 
         // Template for workers to create their local trackers

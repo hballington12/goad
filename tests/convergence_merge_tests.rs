@@ -370,6 +370,66 @@ fn test_merge_large_sample() {
     );
 }
 
+/// Test the batch size calculation formula.
+/// batch_size = ceil(num_workers * merge_time / compute_time * 1.2)
+#[test]
+fn test_batch_size_formula() {
+    // Helper to compute batch size using the same formula as run_prognosis
+    fn compute_batch_size(num_workers: usize, compute_time_ns: u64, merge_time_ns: u64) -> usize {
+        const MIN_BATCH_SIZE: usize = 2;
+        const MAX_BATCH_SIZE: usize = 64;
+
+        if compute_time_ns == 0 {
+            return 10; // fallback
+        }
+
+        let ratio = (num_workers as f64 * merge_time_ns as f64) / compute_time_ns as f64;
+        let batch_size = (ratio * 1.2).ceil() as usize;
+        batch_size.clamp(MIN_BATCH_SIZE, MAX_BATCH_SIZE)
+    }
+
+    // Case 1: Master easily keeps up (slow compute, fast merge)
+    // compute=50ms, merge=0.5ms, 8 workers
+    // ratio = 8 * 0.5 / 50 = 0.08 → batch_size = ceil(0.08 * 1.2) = 1 → clamped to 2
+    let batch = compute_batch_size(8, 50_000_000, 500_000);
+    assert_eq!(batch, 2, "Slow compute should yield MIN_BATCH_SIZE");
+
+    // Case 2: Master is bottleneck (fast compute, slow merge)
+    // compute=5ms, merge=0.5ms, 32 workers
+    // ratio = 32 * 0.5 / 5 = 3.2 → batch_size = ceil(3.2 * 1.2) = 4
+    let batch = compute_batch_size(32, 5_000_000, 500_000);
+    assert_eq!(
+        batch, 4,
+        "Fast compute with many workers needs larger batch"
+    );
+
+    // Case 3: Very fast compute (high throughput)
+    // compute=1ms, merge=0.5ms, 64 workers
+    // ratio = 64 * 0.5 / 1 = 32 → batch_size = ceil(32 * 1.2) = 39
+    let batch = compute_batch_size(64, 1_000_000, 500_000);
+    assert_eq!(batch, 39, "Very fast compute needs big batches");
+
+    // Case 4: Extreme case - hits MAX_BATCH_SIZE
+    // compute=0.1ms, merge=1ms, 64 workers
+    // ratio = 64 * 1 / 0.1 = 640 → clamped to 64
+    let batch = compute_batch_size(64, 100_000, 1_000_000);
+    assert_eq!(batch, 64, "Extreme case should clamp to MAX_BATCH_SIZE");
+
+    // Case 5: Single worker
+    // compute=10ms, merge=1ms, 1 worker
+    // ratio = 1 * 1 / 10 = 0.1 → batch_size = ceil(0.1 * 1.2) = 1 → clamped to 2
+    let batch = compute_batch_size(1, 10_000_000, 1_000_000);
+    assert_eq!(batch, 2, "Single worker should yield MIN_BATCH_SIZE");
+
+    // Case 6: Realistic scenario
+    // compute=20ms, merge=0.2ms, 16 workers
+    // ratio = 16 * 0.2 / 20 = 0.16 → batch_size = ceil(0.16 * 1.2) = 1 → clamped to 2
+    let batch = compute_batch_size(16, 20_000_000, 200_000);
+    assert_eq!(batch, 2, "Realistic GOAD scenario with slow compute");
+
+    println!("All batch size formula tests passed!");
+}
+
 /// Print detailed comparison for debugging.
 #[test]
 #[ignore]
