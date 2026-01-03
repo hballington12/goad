@@ -196,8 +196,8 @@ impl Params {
     /// Returns a weighted version of Params for convergence tracking.
     /// - asymmetry becomes asymmetry * scat_cross
     /// - albedo becomes albedo * ext_cross
-    /// - lidar_ratio becomes lidar_ratio * ext_cross
-    /// - depolarization_ratio becomes depolarization_ratio * backscatter_cross
+    /// - lidar_ratio becomes lidar_ratio * backscatter_cross (= ext_cross_ot)
+    /// - depolarization_ratio becomes depolarization_ratio * s11_plus_s22
     /// - scat_cross, ext_cross, backscatter_cross stay the same (weight = 1)
     pub fn to_weighted(&self) -> Self {
         let mut result = self.clone();
@@ -212,10 +212,14 @@ impl Params {
             if let (Some(alb), Some(ec)) = (self.albedo(&component), self.ext_cross(&component)) {
                 result.set_param(Param::Albedo, component, alb * ec);
             }
-            // LidarRatio weighted by ExtCross
-            if let (Some(lr), Some(ec)) = (self.lidar_ratio(&component), self.ext_cross(&component))
-            {
-                result.set_param(Param::LidarRatio, component, lr * ec);
+            // LidarRatio weighted by BackscatterCross
+            // LR = ext_cross / bs_cross, so LR * bs_cross = ext_cross
+            // This gives sum(ext_cross) / sum(bs_cross) = correct averaged LR
+            if let (Some(lr), Some(bs)) = (
+                self.lidar_ratio(&component),
+                self.backscatter_cross(&component),
+            ) {
+                result.set_param(Param::LidarRatio, component, lr * bs);
             }
             // DepolarizationRatio weighted by S11+S22
             if let (Some(dr), Some(s11s22)) = (
@@ -231,8 +235,8 @@ impl Params {
     /// Returns a Params struct containing the weights for each field.
     /// - asymmetry slot contains scat_cross
     /// - albedo slot contains ext_cross
-    /// - lidar_ratio slot contains ext_cross
-    /// - depolarization_ratio slot contains backscatter_cross
+    /// - lidar_ratio slot contains backscatter_cross
+    /// - depolarization_ratio slot contains s11_plus_s22
     /// - scat_cross, ext_cross, backscatter_cross slots contain 1.0
     pub fn weights(&self) -> Self {
         let mut result = Params::new();
@@ -245,10 +249,10 @@ impl Params {
             if let Some(ec) = self.ext_cross(&component) {
                 result.set_param(Param::Albedo, component, ec);
             }
-            // LidarRatio weight is ExtCross
-            if let Some(ec) = self.ext_cross(&component) {
+            // LidarRatio weight is BackscatterCross
+            if let Some(bs) = self.backscatter_cross(&component) {
                 if self.lidar_ratio(&component).is_some() {
-                    result.set_param(Param::LidarRatio, component, ec);
+                    result.set_param(Param::LidarRatio, component, bs);
                 }
             }
             // DepolarizationRatio weight is S11+S22
