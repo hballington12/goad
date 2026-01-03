@@ -17,7 +17,7 @@ use rand::rngs::StdRng;
 use crate::{
     geom::Geom,
     multiproblem::{init_result, load_and_init_geoms, load_settings_or_default},
-    orientation::{Euler, OrientationSampler},
+    orientation::{Euler, OrientationSampler, Scheme},
     output,
     params::Param,
     problem::Problem,
@@ -93,8 +93,13 @@ impl Convergence {
             rand::rngs::StdRng::from_rng(&mut rand::rng())
         };
 
-        // Convergence always uses uniform random sampling (infinite supply)
-        let sampler = OrientationSampler::uniform(settings.seed);
+        // Create sampler based on scheme setting
+        let sampler = match &settings.orientation.scheme {
+            Scheme::Uniform { .. } => OrientationSampler::uniform(settings.seed),
+            Scheme::Discrete { eulers } => OrientationSampler::discrete(eulers.clone()),
+            Scheme::Sobol { .. } => OrientationSampler::sobol(settings.seed),
+            Scheme::Halton { .. } => OrientationSampler::halton(),
+        };
 
         Ok(Self {
             geoms,

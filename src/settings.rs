@@ -175,9 +175,9 @@ impl Settings {
                 max_tir
             )));
         }
-        // Create default orientation if none provided (single random orientation)
+        // Create default orientation if none provided (single Sobol orientation)
         let orientation = orientation.unwrap_or_else(|| Orientation {
-            scheme: Scheme::Uniform { num_orients: 1 },
+            scheme: Scheme::Sobol { num_orients: 1 },
             euler_convention: DEFAULT_EULER_ORDER,
         });
 

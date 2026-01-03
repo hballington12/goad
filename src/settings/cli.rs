@@ -109,6 +109,14 @@ pub struct OrientationArgs {
     #[arg(long, value_parser = parse_euler_angles, num_args = 1.., value_delimiter = ' ', group = "orientation")]
     pub discrete: Option<Vec<Euler>>,
 
+    /// Use Sobol quasi-random orientation scheme (faster convergence).
+    #[arg(long, group = "orientation")]
+    pub sobol: Option<usize>,
+
+    /// Use Halton quasi-random orientation scheme (faster convergence).
+    #[arg(long, group = "orientation")]
+    pub halton: Option<usize>,
+
     /// Specify Euler angle convention for orientation.
     #[arg(long, value_parser = parse_euler_convention)]
     pub euler: Option<EulerConvention>,
@@ -289,6 +297,24 @@ pub fn update_settings_from_cli(config: &mut Settings) {
         );
         config.orientation = Orientation {
             scheme: Scheme::Discrete { eulers },
+            euler_convention,
+        };
+    } else if let Some(num_orients) = args.orientation.sobol {
+        trace!(
+            "config updated from cli arg: orientation = Sobol {{ num_orients: {} }}",
+            num_orients
+        );
+        config.orientation = Orientation {
+            scheme: Scheme::Sobol { num_orients },
+            euler_convention,
+        };
+    } else if let Some(num_orients) = args.orientation.halton {
+        trace!(
+            "config updated from cli arg: orientation = Halton {{ num_orients: {} }}",
+            num_orients
+        );
+        config.orientation = Orientation {
+            scheme: Scheme::Halton { num_orients },
             euler_convention,
         };
     } else if let Some(convention) = args.orientation.euler {

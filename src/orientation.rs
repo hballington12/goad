@@ -22,6 +22,12 @@ pub enum Scheme {
     /// Solve the problem by averaging over a discrete set of angles (in degrees).
     /// Example: `discrete 0,0,0 20,30,40`
     Discrete { eulers: Vec<Euler> },
+    /// Solve the problem using Sobol quasi-random sequence for faster convergence.
+    /// Example: `sobol 100`
+    Sobol { num_orients: usize },
+    /// Solve the problem using Halton quasi-random sequence for faster convergence.
+    /// Example: `halton 100`
+    Halton { num_orients: usize },
 }
 
 /// Euler angle order for the discrete orientation scheme.
@@ -298,12 +304,44 @@ impl Orientation {
         }
     }
 
+    #[staticmethod]
+    #[pyo3(name = "sobol", signature = (num_orients, euler_convention = None))]
+    fn py_sobol(num_orients: usize, euler_convention: Option<EulerConvention>) -> Self {
+        Orientation {
+            scheme: Scheme::Sobol { num_orients },
+            euler_convention: euler_convention.unwrap_or(DEFAULT_EULER_ORDER),
+        }
+    }
+
+    #[staticmethod]
+    #[pyo3(name = "halton", signature = (num_orients, euler_convention = None))]
+    fn py_halton(num_orients: usize, euler_convention: Option<EulerConvention>) -> Self {
+        Orientation {
+            scheme: Scheme::Halton { num_orients },
+            euler_convention: euler_convention.unwrap_or(DEFAULT_EULER_ORDER),
+        }
+    }
+
     fn __repr__(&self) -> String {
         format!(
             "Orientation(scheme={:?}, euler_convention={:?})",
             self.scheme, self.euler_convention
         )
     }
+}
+
+/// Compute the Halton sequence value for a given index and base.
+/// Returns a value in [0, 1).
+fn halton_sequence(index: u32, base: u32) -> f32 {
+    let mut result = 0.0;
+    let mut f = 1.0 / base as f32;
+    let mut i = index;
+    while i > 0 {
+        result += f * (i % base) as f32;
+        i /= base;
+        f /= base as f32;
+    }
+    result
 }
 
 /// Orientation sampler that generates orientations on demand.
@@ -315,6 +353,10 @@ pub enum OrientationSampler {
     },
     /// Iterates over a discrete set of orientations.
     Discrete { eulers: Vec<Euler>, index: usize },
+    /// Generates orientations using Sobol quasi-random sequence (never exhausts).
+    Sobol { seed: u32, index: u32 },
+    /// Generates orientations using Halton quasi-random sequence (never exhausts).
+    Halton { index: u32 },
 }
 
 impl OrientationSampler {
@@ -331,6 +373,19 @@ impl OrientationSampler {
     /// Create a discrete sampler from a list of Euler angles.
     pub fn discrete(eulers: Vec<Euler>) -> Self {
         Self::Discrete { eulers, index: 0 }
+    }
+
+    /// Create a Sobol quasi-random sampler.
+    pub fn sobol(seed: Option<u64>) -> Self {
+        Self::Sobol {
+            seed: seed.unwrap_or(0) as u32,
+            index: 0,
+        }
+    }
+
+    /// Create a Halton quasi-random sampler.
+    pub fn halton() -> Self {
+        Self::Halton { index: 0 }
     }
 
     /// Get the next orientation. Returns None if exhausted (for discrete samplers).
@@ -351,6 +406,29 @@ impl OrientationSampler {
                     None
                 }
             }
+            Self::Sobol { seed, index } => {
+                let u1 = sobol_burley::sample(*index, 0, *seed);
+                let u2 = sobol_burley::sample(*index, 1, *seed);
+                let u3 = sobol_burley::sample(*index, 2, *seed);
+                *index += 1;
+
+                let alpha = u1 * 360.0;
+                let beta = (1.0_f32 - u2 * 2.0).acos() * 180.0 / PI;
+                let gamma = u3 * 360.0;
+                Some(Euler::new(alpha, beta, gamma))
+            }
+            Self::Halton { index } => {
+                // Use primes 2, 3, 5 for the three dimensions
+                let u1 = halton_sequence(*index, 2);
+                let u2 = halton_sequence(*index, 3);
+                let u3 = halton_sequence(*index, 5);
+                *index += 1;
+
+                let alpha = u1 * 360.0;
+                let beta = (1.0 - u2 * 2.0).acos() * 180.0 / PI;
+                let gamma = u3 * 360.0;
+                Some(Euler::new(alpha, beta, gamma))
+            }
         }
     }
 
@@ -365,6 +443,9 @@ impl OrientationSampler {
                 };
             }
             Self::Discrete { index, .. } => {
+                *index = 0;
+            }
+            Self::Sobol { index, .. } | Self::Halton { index } => {
                 *index = 0;
             }
         }
@@ -391,6 +472,47 @@ impl Orientations {
                 let gammas: Vec<f32> = eulers.iter().map(|e| e.gamma).collect();
                 Orientations::new_discrete(alphas, betas, gammas).unwrap()
             }
+            Scheme::Sobol { num_orients } => Orientations::sobol(*num_orients, seed),
+            Scheme::Halton { num_orients } => Orientations::halton(*num_orients),
+        }
+    }
+
+    /// Generate orientations using Sobol quasi-random sequence.
+    pub fn sobol(num_orient: usize, seed: Option<u64>) -> Orientations {
+        let seed = seed.unwrap_or(0) as u32;
+        let eulers: Vec<(f32, f32, f32)> = (0..num_orient as u32)
+            .map(|i| {
+                let u1 = sobol_burley::sample(i, 0, seed);
+                let u2 = sobol_burley::sample(i, 1, seed);
+                let u3 = sobol_burley::sample(i, 2, seed);
+                let alpha = u1 * 360.0;
+                let beta = (1.0_f32 - u2 * 2.0).acos() * 180.0 / PI;
+                let gamma = u3 * 360.0;
+                (alpha, beta, gamma)
+            })
+            .collect();
+        Orientations {
+            num_orientations: num_orient,
+            eulers,
+        }
+    }
+
+    /// Generate orientations using Halton quasi-random sequence.
+    pub fn halton(num_orient: usize) -> Orientations {
+        let eulers: Vec<(f32, f32, f32)> = (0..num_orient as u32)
+            .map(|i| {
+                let u1 = halton_sequence(i, 2);
+                let u2 = halton_sequence(i, 3);
+                let u3 = halton_sequence(i, 5);
+                let alpha = u1 * 360.0;
+                let beta = (1.0 - u2 * 2.0).acos() * 180.0 / PI;
+                let gamma = u3 * 360.0;
+                (alpha, beta, gamma)
+            })
+            .collect();
+        Orientations {
+            num_orientations: num_orient,
+            eulers,
         }
     }
 

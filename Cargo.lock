@@ -765,6 +765,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "sobol_burley",
  "tikv-jemallocator",
  "tobj",
  "toml 0.8.23",
@@ -1992,6 +1993,12 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+
+[[package]]
+name = "sobol_burley"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09f37cae1d97c4078377153ede7a26f7813b689ad5c6b76ff45dc52e53afe1d1"
 
 [[package]]
 name = "spade"
