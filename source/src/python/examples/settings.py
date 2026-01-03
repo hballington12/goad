@@ -60,37 +60,66 @@ mp = MultiProblem(settings)
 mp.solve()
 # --8<-- [end:orientation_discrete]
 
+# --8<-- [start:zones]
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+
+# Default: single full zone with interval binning (high-res forward/back)
+settings = Settings(geom_path="path/to/geometry.obj")
+
+# Custom full zone with simple binning
+settings = Settings(
+    geom_path="path/to/geometry.obj",
+    zones=[ZoneConfig(BinningScheme.simple(180, 48))],
+)
+
+# Labeled zone
+settings = Settings(
+    geom_path="path/to/geometry.obj",
+    zones=[ZoneConfig(BinningScheme.simple(90, 24), label="coarse")],
+)
+
+# Backscatter-only (no full zone, just forward + backward)
+settings = Settings(geom_path="path/to/geometry.obj", zones=[])
+
+mp = MultiProblem(settings)
+mp.solve()
+# --8<-- [end:zones]
+
 # --8<-- [start:binning]
-from goad import BinningScheme, MultiProblem, Settings
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
 
 # Configure angular binning for scattering output
 settings = Settings(
     geom_path="path/to/geometry.obj",
-    binning=BinningScheme.simple(num_theta=180, num_phi=360),
+    zones=[ZoneConfig(BinningScheme.simple(num_theta=180, num_phi=48))],
 )
 mp = MultiProblem(settings)
 mp.solve()
 # --8<-- [end:binning]
 
 # --8<-- [start:binning_interval]
-from goad import BinningScheme, MultiProblem, Settings
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
 
 # Use variable angular resolution
 settings = Settings(
     geom_path="path/to/geometry.obj",
-    binning=BinningScheme.interval(
-        thetas=[0, 90, 180],
-        theta_spacings=[1, 2],  # 1° steps up to 90°, then 2° steps
-        phis=[0, 360],
-        phi_spacings=[2],
-    ),
+    zones=[
+        ZoneConfig(
+            BinningScheme.interval(
+                thetas=[0, 90, 180],
+                theta_spacings=[1, 2],  # 1° steps up to 90°, then 2° steps
+                phis=[0, 360],
+                phi_spacings=[2],
+            )
+        )
+    ],
 )
 mp = MultiProblem(settings)
 mp.solve()
 # --8<-- [end:binning_interval]
 
 # --8<-- [start:binning_custom]
-from goad import BinningScheme, MultiProblem, Settings
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
 
 # Specify arbitrary bin edges
 binning = BinningScheme.custom(
@@ -100,7 +129,7 @@ binning = BinningScheme.custom(
         [[170, 180], [0, 360]],  # Backscattering cone
     ]
 )
-settings = Settings(geom_path="path/to/geometry.obj", binning=binning)
+settings = Settings(geom_path="path/to/geometry.obj", zones=[ZoneConfig(binning)])
 mp = MultiProblem(settings)
 mp.solve()
 # --8<-- [end:binning_custom]
@@ -145,7 +174,7 @@ mp.solve()
 # --8<-- [end:recursion]
 
 # --8<-- [start:advanced]
-from goad import BinningScheme, Mapping, MultiProblem, Orientation, Settings
+from goad import BinningScheme, Mapping, MultiProblem, Orientation, Settings, ZoneConfig
 
 # Complete configuration example
 settings = Settings(
@@ -156,7 +185,7 @@ settings = Settings(
     medium_refr_index_re=1.0,
     medium_refr_index_im=0.0,
     orientation=Orientation.uniform(num_orients=100),
-    binning=BinningScheme.simple(num_theta=180, num_phi=360),
+    zones=[ZoneConfig(BinningScheme.simple(num_theta=180, num_phi=48))],
     mapping=Mapping("ad"),
     beam_power_threshold=1e-6,
     beam_area_threshold_fac=1e-3,

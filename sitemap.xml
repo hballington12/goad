@@ -2,22 +2,30 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://hballington12.github.io/goad/</loc>
-         <lastmod>2025-11-21</lastmod>
+         <lastmod>2026-01-03</lastmod>
+    </url>
+    <url>
+         <loc>https://hballington12.github.io/goad/api/</loc>
+         <lastmod>2026-01-03</lastmod>
     </url>
     <url>
          <loc>https://hballington12.github.io/goad/checks/</loc>
-         <lastmod>2025-11-21</lastmod>
+         <lastmod>2026-01-03</lastmod>
     </url>
     <url>
          <loc>https://hballington12.github.io/goad/convergence/</loc>
-         <lastmod>2025-11-21</lastmod>
+         <lastmod>2026-01-03</lastmod>
     </url>
     <url>
          <loc>https://hballington12.github.io/goad/results/</loc>
-         <lastmod>2025-11-21</lastmod>
+         <lastmod>2026-01-03</lastmod>
     </url>
     <url>
          <loc>https://hballington12.github.io/goad/settings/</loc>
-         <lastmod>2025-11-21</lastmod>
+         <lastmod>2026-01-03</lastmod>
+    </url>
+    <url>
+         <loc>https://hballington12.github.io/goad/examples/backscattering/</loc>
+         <lastmod>2026-01-03</lastmod>
     </url>
 </urlset>

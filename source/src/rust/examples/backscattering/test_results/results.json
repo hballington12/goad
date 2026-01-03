@@ -1,0 +1,44 @@
+{
+  "powers": {
+    "input": 993.41156,
+    "output": 980.0746,
+    "absorbed": 0.0,
+    "trnc_ref": 1.7762088,
+    "trnc_rec": 0.0,
+    "trnc_clip": -0.9165286,
+    "trnc_energy": 9.462226,
+    "clip_err": 0.00019571367,
+    "trnc_area": 2.0984838,
+    "trnc_cop": 0.0,
+    "ext_diff": 993.41156
+  },
+  "zones": [
+    {
+      "label": "forward",
+      "zone_type": "Forward",
+      "num_bins": 1,
+      "params": {
+        "ExtCrossOpticalTheorem_Total": 2127.9678
+      },
+      "mueller_dir": "forward"
+    },
+    {
+      "label": "backward",
+      "zone_type": "Backward",
+      "num_bins": 1,
+      "params": {
+        "DepolarizationRatio_ExtDiff": 698933200.0,
+        "BackscatterS11S22_Beam": 2165.0989,
+        "DepolarizationRatio_Total": 0.31863287,
+        "BackscatterCross_Total": 128.6012,
+        "BackscatterS11S22_ExtDiff": 1.4565127e-10,
+        "DepolarizationRatio_Beam": 0.31863287,
+        "BackscatterCross_Beam": 128.6012,
+        "LidarRatio_Total": 16.54703,
+        "BackscatterS11S22_Total": 2165.0989,
+        "BackscatterCross_ExtDiff": 1.0137864e-13
+      },
+      "mueller_dir": "backward"
+    }
+  ]
+}

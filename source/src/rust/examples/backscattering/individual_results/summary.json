@@ -1,0 +1,37 @@
+[
+  {
+    "particle": 1,
+    "file": "roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_a297ca.obj",
+    "lidar_ratio": 21.176218,
+    "depol_ratio": 0.28448233,
+    "backscatter_cross": 99.424835
+  },
+  {
+    "particle": 2,
+    "file": "roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_d50855.obj",
+    "lidar_ratio": 21.323538,
+    "depol_ratio": 0.25089264,
+    "backscatter_cross": 99.587944
+  },
+  {
+    "particle": 3,
+    "file": "roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_de1216.obj",
+    "lidar_ratio": 23.566732,
+    "depol_ratio": 0.23279805,
+    "backscatter_cross": 92.2694
+  },
+  {
+    "particle": 4,
+    "file": "roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_e26dea.obj",
+    "lidar_ratio": 22.940842,
+    "depol_ratio": 0.2753884,
+    "backscatter_cross": 94.27679
+  },
+  {
+    "particle": 5,
+    "file": "roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_fee9e7.obj",
+    "lidar_ratio": 19.385496,
+    "depol_ratio": 0.22458956,
+    "backscatter_cross": 110.804955
+  }
+]

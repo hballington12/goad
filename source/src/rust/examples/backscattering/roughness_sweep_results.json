@@ -1,0 +1,122 @@
+[
+  {
+    "sigma": 0.25,
+    "lidar_ratio": 22.498547,
+    "depol_ratio": 0.20829143,
+    "backscatter_cross": 94.76164
+  },
+  {
+    "sigma": 0.5,
+    "lidar_ratio": 26.522055,
+    "depol_ratio": 0.25953898,
+    "backscatter_cross": 79.85746
+  },
+  {
+    "sigma": 0.75,
+    "lidar_ratio": 23.879301,
+    "depol_ratio": 0.2994794,
+    "backscatter_cross": 85.57009
+  },
+  {
+    "sigma": 1.0,
+    "lidar_ratio": 25.363354,
+    "depol_ratio": 0.34570414,
+    "backscatter_cross": 80.427155
+  },
+  {
+    "sigma": 1.25,
+    "lidar_ratio": 23.357605,
+    "depol_ratio": 0.33585182,
+    "backscatter_cross": 87.43097
+  },
+  {
+    "sigma": 1.5,
+    "lidar_ratio": 23.648876,
+    "depol_ratio": 0.36817253,
+    "backscatter_cross": 86.476
+  },
+  {
+    "sigma": 1.75,
+    "lidar_ratio": 23.260954,
+    "depol_ratio": 0.3737686,
+    "backscatter_cross": 88.75872
+  },
+  {
+    "sigma": 2.0,
+    "lidar_ratio": 21.469776,
+    "depol_ratio": 0.36599955,
+    "backscatter_cross": 95.10469
+  },
+  {
+    "sigma": 2.25,
+    "lidar_ratio": 21.076868,
+    "depol_ratio": 0.38007644,
+    "backscatter_cross": 99.141975
+  },
+  {
+    "sigma": 2.5,
+    "lidar_ratio": 21.300167,
+    "depol_ratio": 0.41723135,
+    "backscatter_cross": 96.079765
+  },
+  {
+    "sigma": 2.75,
+    "lidar_ratio": 21.470217,
+    "depol_ratio": 0.38782278,
+    "backscatter_cross": 95.17993
+  },
+  {
+    "sigma": 3.0,
+    "lidar_ratio": 22.206444,
+    "depol_ratio": 0.40477437,
+    "backscatter_cross": 95.44336
+  },
+  {
+    "sigma": 3.25,
+    "lidar_ratio": 19.99997,
+    "depol_ratio": 0.39942396,
+    "backscatter_cross": 107.42972
+  },
+  {
+    "sigma": 3.5,
+    "lidar_ratio": 20.714617,
+    "depol_ratio": 0.41416875,
+    "backscatter_cross": 106.20994
+  },
+  {
+    "sigma": 3.75,
+    "lidar_ratio": 21.650911,
+    "depol_ratio": 0.410206,
+    "backscatter_cross": 102.04778
+  },
+  {
+    "sigma": 4.0,
+    "lidar_ratio": 21.093803,
+    "depol_ratio": 0.38647133,
+    "backscatter_cross": 102.2636
+  },
+  {
+    "sigma": 4.25,
+    "lidar_ratio": 22.843645,
+    "depol_ratio": 0.35916415,
+    "backscatter_cross": 97.48464
+  },
+  {
+    "sigma": 4.5,
+    "lidar_ratio": 19.515501,
+    "depol_ratio": 0.44532725,
+    "backscatter_cross": 115.03586
+  },
+  {
+    "sigma": 4.75,
+    "lidar_ratio": 22.48709,
+    "depol_ratio": 0.35366204,
+    "backscatter_cross": 100.4733
+  },
+  {
+    "sigma": 5.0,
+    "lidar_ratio": 21.128103,
+    "depol_ratio": 0.42818367,
+    "backscatter_cross": 109.99095
+  }
+]
