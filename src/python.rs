@@ -36,6 +36,20 @@ fn discrete_orientation(eulers: Vec<Euler>) -> PyResult<Scheme> {
     Ok(Scheme::Discrete { eulers })
 }
 
+/// Create a Sobol quasi-random orientation scheme (faster convergence)
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
+#[pyfunction]
+fn sobol_orientation(num_orients: usize) -> PyResult<Scheme> {
+    Ok(Scheme::Sobol { num_orients })
+}
+
+/// Create a Halton quasi-random orientation scheme (faster convergence)
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
+#[pyfunction]
+fn halton_orientation(num_orients: usize) -> PyResult<Scheme> {
+    Ok(Scheme::Halton { num_orients })
+}
+
 /// Create an Orientation with uniform scheme and default convention
 #[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
 #[pyfunction]
@@ -60,6 +74,34 @@ fn create_discrete_orientation(
 ) -> PyResult<Orientation> {
     Ok(Orientation {
         scheme: Scheme::Discrete { eulers },
+        euler_convention: euler_convention.unwrap_or(EulerConvention::ZYZ),
+    })
+}
+
+/// Create an Orientation with Sobol quasi-random scheme (faster convergence)
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
+#[pyfunction]
+#[pyo3(signature = (num_orients, euler_convention = None))]
+fn create_sobol_orientation(
+    num_orients: usize,
+    euler_convention: Option<EulerConvention>,
+) -> PyResult<Orientation> {
+    Ok(Orientation {
+        scheme: Scheme::Sobol { num_orients },
+        euler_convention: euler_convention.unwrap_or(EulerConvention::ZYZ),
+    })
+}
+
+/// Create an Orientation with Halton quasi-random scheme (faster convergence)
+#[cfg_attr(feature = "stub-gen", gen_stub_pyfunction(module = "goad._goad"))]
+#[pyfunction]
+#[pyo3(signature = (num_orients, euler_convention = None))]
+fn create_halton_orientation(
+    num_orients: usize,
+    euler_convention: Option<EulerConvention>,
+) -> PyResult<Orientation> {
+    Ok(Orientation {
+        scheme: Scheme::Halton { num_orients },
         euler_convention: euler_convention.unwrap_or(EulerConvention::ZYZ),
     })
 }
@@ -108,8 +150,12 @@ fn _goad_py(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Helper functions for orientations
     m.add_function(wrap_pyfunction!(uniform_orientation, m)?)?;
     m.add_function(wrap_pyfunction!(discrete_orientation, m)?)?;
+    m.add_function(wrap_pyfunction!(sobol_orientation, m)?)?;
+    m.add_function(wrap_pyfunction!(halton_orientation, m)?)?;
     m.add_function(wrap_pyfunction!(create_uniform_orientation, m)?)?;
     m.add_function(wrap_pyfunction!(create_discrete_orientation, m)?)?;
+    m.add_function(wrap_pyfunction!(create_sobol_orientation, m)?)?;
+    m.add_function(wrap_pyfunction!(create_halton_orientation, m)?)?;
 
     Ok(())
 }

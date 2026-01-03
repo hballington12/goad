@@ -5,7 +5,7 @@ use rand::SeedableRng;
 
 use crate::geom::Geom;
 use crate::multiproblem::init_result;
-use crate::orientation::OrientationSampler;
+use crate::orientation::{OrientationSampler, Scheme};
 use crate::params::Param;
 use crate::problem::init_geom;
 use crate::result::Results;
@@ -38,8 +38,13 @@ impl Convergence {
 
         let template = init_result(&settings);
 
-        // Convergence always uses uniform random sampling (infinite supply)
-        let sampler = OrientationSampler::uniform(settings.seed);
+        // Create sampler based on scheme setting
+        let sampler = match &settings.orientation.scheme {
+            Scheme::Uniform { .. } => OrientationSampler::uniform(settings.seed),
+            Scheme::Discrete { eulers } => OrientationSampler::discrete(eulers.clone()),
+            Scheme::Sobol { .. } => OrientationSampler::sobol(settings.seed),
+            Scheme::Halton { .. } => OrientationSampler::halton(),
+        };
 
         let rng = if let Some(seed) = settings.seed {
             rand::rngs::StdRng::seed_from_u64(seed)
