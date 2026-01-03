@@ -116,4 +116,50 @@ impl<T: Convergeable> ConvergenceTracker<T> {
             .div_elem(&w_sq)
             .sqrt_elem()
     }
+
+    /// Merge another tracker into this one using Chan's parallel algorithm.
+    ///
+    /// This enables batched/parallel Welford computation. Workers can accumulate
+    /// results locally, then the master merges the partial trackers.
+    ///
+    /// Mathematical basis (Chan et al.):
+    ///   n = n_a + n_b
+    ///   delta = mean_b - mean_a
+    ///   mean = mean_a + delta * (n_b / n)
+    ///   M2 = M2_a + M2_b + delta^2 * (n_a * n_b / n)
+    pub fn merge(&mut self, other: &Self) {
+        if other.i == 0 {
+            return;
+        }
+        if self.i == 0 {
+            self.i = other.i;
+            self.m = other.m.clone();
+            self.s = other.s.clone();
+            self.w = other.w.clone();
+            return;
+        }
+
+        let n_a = self.i as f32;
+        let n_b = other.i as f32;
+        let n = n_a + n_b;
+
+        // delta = mean_b - mean_a (for weighted values)
+        let delta = other.m.sub_elem(&self.m);
+
+        // mean = mean_a + delta * (n_b / n)
+        self.m = self.m.add_elem(&delta.scale(n_b / n));
+
+        // M2 = M2_a + M2_b + delta^2 * (n_a * n_b / n)
+        let delta_sq = delta.mul_elem(&delta);
+        self.s = self
+            .s
+            .add_elem(&other.s)
+            .add_elem(&delta_sq.scale(n_a * n_b / n));
+
+        // Same formula for weights
+        let dw = other.w.sub_elem(&self.w);
+        self.w = self.w.add_elem(&dw.scale(n_b / n));
+
+        self.i = (n_a + n_b) as usize;
+    }
 }

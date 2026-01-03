@@ -32,6 +32,11 @@ use rand::{Rng, SeedableRng};
 
 const MAX_CONVERGENCE_ORIENTATIONS: usize = 100_000;
 
+/// Default batch size for worker-local accumulation.
+/// Workers accumulate this many results before sending to master.
+/// Larger values reduce master overhead but increase latency.
+const DEFAULT_BATCH_SIZE: usize = 10;
+
 /// A convergence target for a specific parameter.
 #[derive(Clone, Debug)]
 pub struct ParamConvergenceTarget {
@@ -208,27 +213,40 @@ impl Convergence {
     }
 
     /// Runs the work-stealing solver with worker threads.
+    ///
+    /// Workers accumulate results locally into a ConvergenceTracker, then send
+    /// the tracker to the master for merging. This reduces master thread overhead
+    /// when many workers are active.
     fn run<F>(&mut self, mut check_interrupt: F)
     where
         F: FnMut() -> bool,
     {
         let num_workers = Self::num_workers();
+        // Batch size must not exceed max_orientations, otherwise workers wait forever
+        let batch_size = DEFAULT_BATCH_SIZE.min(self.max_orientations);
         let progress = ConvergenceProgress::new(self.targets.len(), self.max_orientations);
         let problems_base = self.create_base_problems();
         let injector: Injector<OrientationTask> = Injector::new();
 
-        // Initial task queue fill
-        let buffer_size = (num_workers * 2).min(self.max_orientations);
+        // Template for workers to create their local trackers
+        let result_template = init_result(&self.settings);
+
+        // Initial task queue fill - enough for all workers to have a full batch
+        let buffer_size = (num_workers * batch_size * 2).min(self.max_orientations);
         self.fill_initial_tasks(&injector, buffer_size);
 
-        // Channel for results: workers send, master receives
-        let (tx, rx): (Sender<Results>, Receiver<Results>) = mpsc::channel();
+        // Channel for batched results: workers send trackers, master merges
+        let (tx, rx): (
+            Sender<ConvergenceTracker<Results>>,
+            Receiver<ConvergenceTracker<Results>>,
+        ) = mpsc::channel();
 
         // Shutdown flag for workers
         let done = Arc::new(AtomicBool::new(false));
 
         let injector_ref = &injector;
         let problems_ref = &problems_base;
+        let template_ref = &result_template;
 
         thread::scope(|s| {
             // Spawn workers
@@ -236,7 +254,14 @@ impl Convergence {
                 let tx = tx.clone();
                 let done = Arc::clone(&done);
                 s.spawn(move || {
-                    Self::worker_loop(injector_ref, problems_ref, tx, &done);
+                    Self::worker_loop_batched(
+                        injector_ref,
+                        problems_ref,
+                        template_ref,
+                        batch_size,
+                        tx,
+                        &done,
+                    );
                 });
             }
 
@@ -252,7 +277,9 @@ impl Convergence {
             while self.tracker.count() < self.max_orientations && !converged && !interrupted {
                 // Use timeout so we can periodically check for interrupts
                 match rx.recv_timeout(Duration::from_millis(100)) {
-                    Ok(result) => self.update(&progress, &injector, &mut converged, result),
+                    Ok(batch_tracker) => {
+                        self.update_from_batch(&progress, &injector, &mut converged, batch_tracker)
+                    }
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                         // Check for interrupt (e.g., Ctrl-C from Python)
                         if check_interrupt() {
@@ -286,16 +313,19 @@ impl Convergence {
         }
     }
 
-    fn update(
+    /// Update from a batch of results (merged tracker from a worker).
+    fn update_from_batch(
         &mut self,
         progress: &ConvergenceProgress,
         injector: &Injector<OrientationTask>,
         converged: &mut bool,
-        result: Results,
+        batch_tracker: ConvergenceTracker<Results>,
     ) {
-        self.tracker.update(&result);
+        let batch_count = batch_tracker.count();
+        self.tracker.merge(&batch_tracker);
         let count = self.tracker.count();
         progress.update_info(count);
+
         // Update per-target progress bars
         if count >= MIN_ORIENTATIONS {
             let mean_results = self.tracker.mean();
@@ -304,13 +334,17 @@ impl Convergence {
                 self.update_target(progress, i, target, &mean_results, &sem_results);
             }
         }
-        // Check convergence periodically (every orientation after minimum)
+
+        // Check convergence periodically (every batch after minimum)
         if self.tracker.count() >= MIN_ORIENTATIONS {
             *converged = self.is_converged();
         }
-        // Replenish task queue if not converged and more orientations available
+
+        // Replenish task queue with as many tasks as we just processed
         if !*converged && self.tracker.count() < self.max_orientations {
-            self.push_task(injector);
+            for _ in 0..batch_count {
+                self.push_task(injector);
+            }
         }
     }
 
@@ -359,42 +393,92 @@ impl Convergence {
         Ok(())
     }
 
-    /// Worker loop: steal tasks, compute, send results.
-    fn worker_loop(
+    /// Worker loop with batching: steal batch_size tasks, process them, send tracker to master.
+    ///
+    /// This reduces master thread overhead by having workers perform local
+    /// reduction using Welford's algorithm, then sending the accumulated
+    /// statistics for merging.
+    fn worker_loop_batched(
         injector: &Injector<OrientationTask>,
         problems_base: &[Problem],
-        tx: Sender<Results>,
+        result_template: &Results,
+        batch_size: usize,
+        tx: Sender<ConvergenceTracker<Results>>,
         done: &AtomicBool,
     ) {
         loop {
-            // Try to steal a task
+            // Try to steal a batch of tasks
+            let tasks = Self::steal_batch(injector, batch_size, done);
+
+            if tasks.is_empty() {
+                // No tasks and done signal received
+                if done.load(Ordering::Relaxed) {
+                    break;
+                }
+                // Otherwise keep waiting
+                std::hint::spin_loop();
+                continue;
+            }
+
+            // Process all stolen tasks, accumulating into local tracker
+            let mut local_tracker = ConvergenceTracker::new(result_template);
+
+            for task in tasks {
+                let mut problem = problems_base[task.problem_idx].clone();
+
+                if let Err(err) = problem.run(Some(&task.euler)) {
+                    error!("Error running problem (will skip this iteration): {}", err);
+                    continue;
+                }
+
+                local_tracker.update(&problem.result);
+            }
+
+            // Send batch to master (if we accumulated any results)
+            if local_tracker.count() > 0 {
+                if tx.send(local_tracker).is_err() {
+                    // Channel closed, master is done
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Steal up to `batch_size` tasks from the injector.
+    /// Returns early if done signal is set and no tasks are available.
+    fn steal_batch(
+        injector: &Injector<OrientationTask>,
+        batch_size: usize,
+        done: &AtomicBool,
+    ) -> Vec<OrientationTask> {
+        let mut tasks = Vec::with_capacity(batch_size);
+
+        while tasks.len() < batch_size {
             match injector.steal() {
                 Steal::Success(task) => {
-                    // Clone the base problem for this task
-                    let mut problem = problems_base[task.problem_idx].clone();
-
-                    // Run the simulation
-                    if let Err(err) = problem.run(Some(&task.euler)) {
-                        error!("Error running problem (will skip this iteration): {}", err);
-                    }
-
-                    // Send result back to master (ignore send errors on shutdown)
-                    let _ = tx.send(problem.result);
+                    tasks.push(task);
                 }
                 Steal::Empty => {
-                    // Check if we should exit
+                    // No more tasks available right now
+                    if !tasks.is_empty() {
+                        // Return what we have (partial batch)
+                        break;
+                    }
+                    // Nothing stolen yet - check if we should exit
                     if done.load(Ordering::Relaxed) {
                         break;
                     }
-                    // Otherwise wait for more work
+                    // Wait a bit for more tasks
                     std::hint::spin_loop();
                 }
                 Steal::Retry => {
-                    // Contention, try again
+                    // Contention, try again immediately
                     std::hint::spin_loop();
                 }
             }
         }
+
+        tasks
     }
 
     fn update_target(
