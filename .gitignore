@@ -17,3 +17,10 @@ site/
 uv.lock
 *.dat
 examples/backscattering/.venv/
+examples/backscattering/ensemble/
+examples/backscattering/ensemble_results/
+examples/backscattering/individual_results/
+examples/backscattering/roughness_*/
+examples/backscattering/test_results/
+examples/backscattering/*_results.json
+examples/backscattering/*.png
