@@ -94,10 +94,10 @@ fn get_config_file() -> Result<PathBuf, anyhow::Error> {
         let local_config = goad_dir.join("config/local.toml");
 
         if local_config.exists() {
-            println!("Using local configuration: {:?}", local_config);
+            log::info!("Using local configuration: {:?}", local_config);
             local_config
         } else {
-            println!("Using default configuration: {:?}", default_config_file);
+            log::info!("Using default configuration: {:?}", default_config_file);
             default_config_file
         }
     };

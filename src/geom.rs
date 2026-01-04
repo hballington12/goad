@@ -1011,10 +1011,7 @@ impl Shape {
             let face_vertices: Vec<_> = usize_indices.iter().map(|&i| shape.vertices[i]).collect();
             match Face::new_simple(face_vertices, id, Some(usize_indices)) {
                 Ok(face) => shape.add_face(face),
-                Err(err) => println!(
-                    "warn: skipping face (possibly degenerate) with error: {}",
-                    err
-                ),
+                Err(err) => log::warn!("skipping face (possibly degenerate) with error: {}", err),
             }
 
             next_face = end;
@@ -1348,8 +1345,8 @@ impl Geom {
     /// Uses Mishchenko's Euler rotation matrix convention.
     pub fn euler_rotate(&mut self, euler: &Euler, convention: EulerConvention) -> Result<()> {
         if let Err(err) = self.is_centered() {
-            println!(
-                "Warning: Geometry is not centered. Rotation may not be accurate. offset: {}",
+            log::warn!(
+                "Geometry is not centered. Rotation may not be accurate. offset: {}",
                 err
             );
         }

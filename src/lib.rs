@@ -25,6 +25,7 @@ pub mod diff;
 pub mod diff2;
 pub mod distortion;
 pub mod field;
+pub mod filelog;
 pub mod fresnel;
 pub mod geom;
 pub mod multiproblem;

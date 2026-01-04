@@ -180,14 +180,14 @@ impl Problem {
         };
 
         if let Err(err) = self.run(Some(&euler)) {
-            eprintln!("Error running problem (will skip this solve): {}", err);
+            log::error!("Error running problem (will skip this solve): {}", err);
         }
 
         Ok(())
     }
 
     pub fn py_print_stats(&self) -> PyResult<()> {
-        println!("{}", self.result.powers);
+        log::info!("{}", self.result.powers);
         Ok(())
     }
 
@@ -503,7 +503,7 @@ impl Problem {
             BeamVariant::Default(..) => self.propagate_default(&mut beam),
             BeamVariant::Initial => self.propagate_initial(&mut beam),
             _ => {
-                println!("Unknown beam type, returning empty outputs.");
+                log::warn!("Unknown beam type, returning empty outputs.");
                 Vec::new()
             }
         };

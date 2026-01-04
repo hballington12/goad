@@ -118,7 +118,7 @@ pub fn default_directory() -> PathBuf {
 
         // Safety check to prevent infinite loops in extreme cases
         if run_number > 99999 {
-            eprintln!("Warning: Exceeded maximum run number. Using timestamp instead.");
+            log::warn!("Exceeded maximum run number. Using timestamp instead.");
             let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
             run_dir = current_dir.join(format!("run_{}", timestamp));
             break;

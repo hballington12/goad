@@ -106,7 +106,7 @@ impl ConvergenceProgress {
 
         let param_name = format!("{:?}", param);
         self.target_pbs[index].set_message(format!(
-            "{:<9} {:>10.4e} ± {:<10.4e} [{:>5.2}% / {:>5.2}%]",
+            "{:<22} {:>10.4e} ± {:<10.4e} [{:>5.2}% / {:>5.2}%]",
             param_name,
             mean_val,
             sem_val,

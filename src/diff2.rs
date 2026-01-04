@@ -6,8 +6,12 @@ use nalgebra::{Complex, Matrix3, Matrix4, Point3, Vector3};
 use crate::beam::Beam;
 use crate::bins::SolidAngleBin;
 use crate::field::Ampl;
-use crate::geom::{self, Face};
-use crate::settings::constants::{COLINEAR_THRESHOLD, PLANARITY_TOLERANCE};
+#[cfg(debug_assertions)]
+use crate::geom::Face;
+use crate::geom::{self};
+use crate::settings::constants::COLINEAR_THRESHOLD;
+#[cfg(debug_assertions)]
+use crate::settings::constants::PLANARITY_TOLERANCE;
 
 /// Incident beam parameters for the prerotation matrix.
 /// These define the reference frame of the original illumination source.
@@ -456,7 +460,7 @@ pub fn n2f_aperture_diffraction(
         let e_perp = beam.field.e_perp();
         let normal = beam.face.data().normal;
         if beam.field.prop().dot(&beam.face.data().normal) < 0.0 {
-            println!("warn: prop should be pointing away from the face but the dot product with face normal is {}",
+            log::warn!("prop should be pointing away from the face but the dot product with face normal is {}",
                 beam.field.prop().dot(&beam.face.data().normal)
                 );
         };

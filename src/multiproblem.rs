@@ -128,6 +128,11 @@ impl MultiProblem {
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
+        // Initialize file-based logging (avoids conflicts with indicatif progress bar)
+        if let Err(e) = crate::filelog::init(&self.settings.directory) {
+            log::warn!("Could not initialize file logging: {}", e);
+        }
+
         let n = self.orientations.num_orientations;
 
         // Initialize progress display only if not in quiet mode
@@ -206,7 +211,7 @@ impl MultiProblem {
                 let euler = Euler::new(*a, *b, *g);
 
                 if let Err(err) = problem.run(Some(&euler)) {
-                    eprintln!("Error running problem (will skip this iteration): {}", err);
+                    log::error!("Error running problem (will skip this iteration): {}", err);
                 }
 
                 pb.inc(1);
