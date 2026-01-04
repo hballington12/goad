@@ -38,6 +38,8 @@ pub const INTERVAL_IGNORE_TOLERANCE: f32 = 0.0001;
 pub const CENTERED_GEOMETRY_TOLERANCE: f32 = 0.001;
 /// Offset from 0 and 180 degrees for forward/backward zone bins to avoid singularities
 pub const ZONE_THETA_OFFSET: f32 = 0.01;
+/// Tolerance for bounding box overlap check in clipping to handle floating-point precision
+pub const BBOX_TOLERANCE: f32 = 0.01;
 
 // =============================
 // Default Values for Python API

@@ -854,11 +854,13 @@ impl<'a> Clipping<'a> {
 /// Determines if a subject face can possibly intersect the clip face.
 /// Returns false if:
 /// - The subject is entirely behind the clip (in z-coordinate)
-/// - The 2D bounding boxes (x,y) don't overlap
+/// - The 2D bounding boxes (x,y) don't overlap (with tolerance)
 fn can_subject_clip(subject: &Face, clip_in: &Face) -> bool {
+    use crate::settings::constants::BBOX_TOLERANCE;
+
     // Check z-coordinate: subject must not be entirely behind clip
     let z_ok = match (subject.data().vert_min(2), clip_in.data().vert_max(2)) {
-        (Ok(subj_min), Ok(clip_max)) => subj_min <= clip_max,
+        (Ok(subj_min), Ok(clip_max)) => subj_min <= clip_max + BBOX_TOLERANCE,
         _ => return false,
     };
     if !z_ok {
@@ -886,9 +888,11 @@ fn can_subject_clip(subject: &Face, clip_in: &Face) -> bool {
         _ => return true,
     };
 
-    // Check if bounding boxes overlap
-    let x_overlap = subj_x_min <= clip_x_max && subj_x_max >= clip_x_min;
-    let y_overlap = subj_y_min <= clip_y_max && subj_y_max >= clip_y_min;
+    // Check if bounding boxes overlap (with tolerance for floating-point precision)
+    let x_overlap =
+        subj_x_min <= clip_x_max + BBOX_TOLERANCE && subj_x_max >= clip_x_min - BBOX_TOLERANCE;
+    let y_overlap =
+        subj_y_min <= clip_y_max + BBOX_TOLERANCE && subj_y_max >= clip_y_min - BBOX_TOLERANCE;
 
     x_overlap && y_overlap
 }
