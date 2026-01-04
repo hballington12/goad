@@ -66,7 +66,7 @@ impl Geom {
                 // If no self-intersections or max attempts reached, break the loop
                 if !distort_failed || attempt >= max_attempts {
                     if distort_failed && attempt >= max_attempts {
-                        println!(
+                        log::warn!(
                             "Maximum retries ({}) reached. Reverting to original shape.",
                             max_attempts
                         );
@@ -270,7 +270,9 @@ fn perturb_normals(
 
 fn shape_can_be_distorted(vertex_to_faces: &HashMap<usize, Vec<usize>>) -> bool {
     if vertex_to_faces.values().any(|faces| faces.len() != 3) {
-        println!("Shape has vertices that do not belong to exactly 3 faces. Skipping distortion.");
+        log::warn!(
+            "Shape has vertices that do not belong to exactly 3 faces. Skipping distortion."
+        );
         false
     } else {
         true

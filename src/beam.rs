@@ -576,8 +576,8 @@ impl Beam {
                 .unwrap_or_default();
                 result.into_iter().collect()
             }
-            Face::Complex { .. } => {
-                println!("complex face not supported yet...");
+            Face::Complex { interiors, .. } => {
+                log::warn!("face with {} holes not supported yet", interiors.len());
                 vec![]
             }
         }

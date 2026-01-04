@@ -337,6 +337,11 @@ impl Convergence {
     where
         F: FnMut() -> bool,
     {
+        // Initialize file-based logging (avoids conflicts with indicatif progress bar)
+        if let Err(e) = crate::filelog::init(&self.settings.directory) {
+            warn!("Could not initialize file logging: {}", e);
+        }
+
         // Validation
         if self.targets.is_empty() {
             anyhow::bail!("No convergence targets set. Use add_target() before solving.");

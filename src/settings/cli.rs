@@ -139,7 +139,7 @@ pub struct BinningArgs {
 }
 
 fn parse_euler_angles(s: &str) -> Result<Euler, String> {
-    println!("Parsing Euler angles: '{}'", s);
+    log::debug!("Parsing Euler angles: '{}'", s);
 
     let angles: Vec<&str> = s.split(',').collect();
     if angles.len() != 3 {
@@ -159,7 +159,7 @@ fn parse_euler_angles(s: &str) -> Result<Euler, String> {
         .parse::<f32>()
         .map_err(|_| format!("Failed to parse gamma angle: {}", angles[2]))?;
 
-    println!("Parsed Euler angles: {}, {}, {}", alpha, beta, gamma);
+    log::debug!("Parsed Euler angles: {}, {}, {}", alpha, beta, gamma);
 
     Ok(Euler::new(alpha, beta, gamma))
 }
