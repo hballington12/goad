@@ -5,6 +5,9 @@ mod python;
 pub use convergeable::{Convergeable, ConvergenceTracker};
 use log::{error, info, warn};
 
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
@@ -79,6 +82,8 @@ pub struct Convergence {
     tracker: ConvergenceTracker<Results>,
     sampler: OrientationSampler,
     rng: StdRng,
+    /// Optional path to log file for mean values during convergence
+    pub log_file: Option<PathBuf>,
 }
 
 impl Convergence {
@@ -109,6 +114,7 @@ impl Convergence {
             tracker: ConvergenceTracker::new(&result),
             sampler,
             rng,
+            log_file: None,
         })
     }
 
@@ -122,6 +128,12 @@ impl Convergence {
     /// Clear all convergence targets.
     pub fn clear_targets(&mut self) {
         self.targets.clear();
+    }
+
+    /// Set the log file path for logging mean values during convergence.
+    /// The file will be created/truncated when solve() is called.
+    pub fn set_log_file(&mut self, path: impl Into<PathBuf>) {
+        self.log_file = Some(path.into());
     }
 
     /// Get the number of orientations computed so far.
@@ -327,6 +339,21 @@ impl Convergence {
         let progress = ConvergenceProgress::new(self.targets.len(), self.max_orientations);
         let problems_base = self.create_base_problems();
 
+        // Initialize log file if configured
+        let mut log_file: Option<File> = self.log_file.as_ref().and_then(|path| {
+            match File::create(path) {
+                Ok(mut f) => {
+                    // Write header
+                    let _ = writeln!(f, "count,lidar_ratio,lidar_ratio_sem,relative_sem_pct");
+                    Some(f)
+                }
+                Err(e) => {
+                    warn!("Failed to create log file {:?}: {}", path, e);
+                    None
+                }
+            }
+        });
+
         // Run prognosis to determine optimal batch size based on actual timing
         let batch_size = self
             .run_prognosis(&problems_base, num_workers)
@@ -382,9 +409,13 @@ impl Convergence {
             while self.tracker.count() < self.max_orientations && !converged && !interrupted {
                 // Use timeout so we can periodically check for interrupts
                 match rx.recv_timeout(Duration::from_millis(100)) {
-                    Ok(batch_tracker) => {
-                        self.update_from_batch(&progress, &injector, &mut converged, batch_tracker)
-                    }
+                    Ok(batch_tracker) => self.update_from_batch(
+                        &progress,
+                        &injector,
+                        &mut converged,
+                        batch_tracker,
+                        &mut log_file,
+                    ),
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                         // Check for interrupt (e.g., Ctrl-C from Python)
                         if check_interrupt() {
@@ -425,18 +456,41 @@ impl Convergence {
         injector: &Injector<OrientationTask>,
         converged: &mut bool,
         batch_tracker: ConvergenceTracker<Results>,
+        log_file: &mut Option<File>,
     ) {
         let batch_count = batch_tracker.count();
         self.tracker.merge(&batch_tracker);
         let count = self.tracker.count();
         progress.update_info(count);
 
-        // Update per-target progress bars
+        // Update per-target progress bars and log mean values
         if count >= MIN_ORIENTATIONS {
             let mean_results = self.tracker.mean();
             let sem_results = self.tracker.sem();
             for (i, target) in self.targets.iter().enumerate() {
                 self.update_target(progress, i, target, &mean_results, &sem_results);
+            }
+
+            // Log mean values to file if configured
+            if let Some(ref mut file) = log_file {
+                let lidar = mean_results
+                    .params
+                    .lidar_ratio(&GOComponent::Total)
+                    .unwrap_or(0.0);
+                let lidar_sem = sem_results
+                    .params
+                    .lidar_ratio(&GOComponent::Total)
+                    .unwrap_or(0.0);
+                let relative_sem = if lidar.abs() > 1e-10 {
+                    (lidar_sem / lidar.abs()) * 100.0
+                } else {
+                    0.0
+                };
+                let _ = writeln!(
+                    file,
+                    "{},{:.6},{:.6},{:.4}",
+                    count, lidar, lidar_sem, relative_sem
+                );
             }
         }
 

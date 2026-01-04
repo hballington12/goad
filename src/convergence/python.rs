@@ -60,6 +60,7 @@ impl Convergence {
             tracker: ConvergenceTracker::new(&template),
             sampler,
             rng,
+            log_file: None,
         })
     }
 
