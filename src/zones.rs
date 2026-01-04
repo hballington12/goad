@@ -22,6 +22,7 @@ use crate::params::{Param, Params};
 use crate::result::{
     integrate_theta_weighted_component, GOComponent, ScattResult1D, ScattResult2D,
 };
+use crate::settings::constants::ZONE_THETA_OFFSET;
 
 /// The type of zone, which determines what parameters can be computed.
 #[cfg_attr(feature = "stub-gen", gen_stub_pyclass_enum)]
@@ -207,10 +208,10 @@ impl Zone {
     }
 
     /// Create a forward scattering zone (single bin at theta≈0).
-    /// Uses theta=0.01 to match legacy behavior and avoid singularity at exact zero.
+    /// Uses theta=ZONE_THETA_OFFSET to avoid singularity at exact zero.
     pub fn forward() -> Self {
         let scheme = Scheme::Custom {
-            bins: vec![[[0.01, 0.01], [0.0, 0.0]]],
+            bins: vec![[[ZONE_THETA_OFFSET, ZONE_THETA_OFFSET], [0.0, 0.0]]],
             file: None,
         };
         let bins = scheme.generate();
@@ -229,10 +230,12 @@ impl Zone {
         }
     }
 
-    /// Create a backscatter zone (single bin at theta=180).
+    /// Create a backscatter zone (single bin at theta≈180).
+    /// Uses theta=180-ZONE_THETA_OFFSET to avoid singularity at exact 180.
     pub fn backward() -> Self {
+        let theta = 180.0 - ZONE_THETA_OFFSET;
         let scheme = Scheme::Custom {
-            bins: vec![[[180.0, 180.0], [0.0, 0.0]]],
+            bins: vec![[[theta, theta], [0.0, 0.0]]],
             file: None,
         };
         let bins = scheme.generate();

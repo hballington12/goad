@@ -36,6 +36,8 @@ pub const PLANARITY_TOLERANCE: f32 = 1e-2;
 pub const INTERVAL_IGNORE_TOLERANCE: f32 = 0.0001;
 /// Tolerance for centered geometry
 pub const CENTERED_GEOMETRY_TOLERANCE: f32 = 0.001;
+/// Offset from 0 and 180 degrees for forward/backward zone bins to avoid singularities
+pub const ZONE_THETA_OFFSET: f32 = 0.01;
 
 // =============================
 // Default Values for Python API
