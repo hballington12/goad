@@ -1,9 +1,10 @@
 <div align="center">
 
 <!-- badges: start -->
-![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
-![minimum rustc 1.85](https://img.shields.io/badge/rustc-1.85+-red.svg)
-[![Rust](https://github.com/hballington12/goad/actions/workflows/rust.yml/badge.svg)](https://github.com/hballington12/goad/actions/workflows/rust.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Crates.io](https://img.shields.io/crates/v/goad)](https://crates.io/crates/goad)
+[![docs.rs](https://img.shields.io/docsrs/goad)](https://docs.rs/goad)
+[![PyPI](https://img.shields.io/pypi/v/goad-py)](https://pypi.org/project/goad-py/)
 <!-- badges: end -->
 
 </div>
@@ -24,4 +25,4 @@ GOAD is a Rust-based physical-optics hybrid light scattering model based on geom
 
 ---
 
-For documentation, installation instructions, and usage examples, see the [GOAD Wiki](https://hballington12.github.io/goad/).
+For documentation, see the [wiki](https://hballington12.github.io/goad/).
