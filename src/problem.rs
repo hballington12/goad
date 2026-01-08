@@ -252,16 +252,17 @@ impl Problem {
     }
 
     /// Illuminates the problem with a basic initial beam.
-    pub fn illuminate(&mut self) {
+    pub fn illuminate(&mut self) -> Result<()> {
         let scaled_wavelength = self.settings.wavelength * self.settings.scale;
 
         let beam = basic_initial_beam(
             &self.geom,
             scaled_wavelength,
             self.settings.medium_refr_index,
-        );
+        )?;
 
         self.beam_queue.push(beam);
+        Ok(())
     }
 
     /// Creates a new `Problem` from a `Geom` and an initial `Beam`.
@@ -457,7 +458,7 @@ impl Problem {
                 // No rotation
             }
         }
-        self.illuminate();
+        self.illuminate()?;
         self.solve();
         Ok(())
     }
@@ -652,7 +653,11 @@ fn get_position_by_power(value: f32, queue: &Vec<Beam>, ascending: bool) -> usiz
 }
 
 /// Creates a basic initial beam for full illumination of the geometry along the z-axis.
-fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Complex<f32>) -> Beam {
+fn basic_initial_beam(
+    geom: &Geom,
+    wavelength: f32,
+    medium_refractive_index: Complex<f32>,
+) -> Result<Beam> {
     const FAC: f32 = 1.1; // scale factor to stretch beam to cover geometry
     let bounds = geom.bounds();
     let (min, max) = (bounds.0.map(|v| v * FAC), bounds.1.map(|v| v * FAC));
@@ -664,9 +669,9 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
         Point3::new(min[0], max[1], max[2]),
     ];
 
-    let mut clip = Face::new_simple(clip_vertices, None, None).unwrap();
+    let mut clip = Face::new_simple(clip_vertices, None, None)?;
     clip.data_mut().area = Some((max[0] - min[0]) * (max[1] - min[1]));
-    let mut field = Field::new_identity(default_e_perp(), default_prop()).unwrap();
+    let mut field = Field::new_identity(default_e_perp(), default_prop())?;
 
     // propagate field backwards so its as if the beam comes from z=0
     let dist = bounds.1[2] * FAC;
@@ -675,7 +680,7 @@ fn basic_initial_beam(geom: &Geom, wavelength: f32, medium_refractive_index: Com
     field.wind(arg);
 
     let beam = Beam::new_from_field(clip, medium_refractive_index, field, wavelength);
-    beam
+    Ok(beam)
 }
 
 /// Initialises the geometry with the refractive indices from the settings.

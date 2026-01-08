@@ -16,7 +16,7 @@ fn main() {
     println!("Initializing problem...");
     problem.init();
     println!("Illuminating problem...");
-    problem.illuminate();
+    problem.illuminate().unwrap();
     println!("Solving problem...");
     problem.solve();
     println!("Writing up results...");
