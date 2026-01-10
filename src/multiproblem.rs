@@ -101,6 +101,12 @@ impl MultiProblem {
     /// If geoms not provided, load from file
     pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
         let settings = load_settings_or_default(settings);
+
+        // Initialize file-based logging early so geometry load warnings are captured
+        if let Err(e) = crate::filelog::init(&settings.directory) {
+            log::warn!("Could not initialize file logging: {}", e);
+        }
+
         let geoms = load_and_init_geoms(geoms, &settings)?;
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let result = init_result(&settings);
@@ -128,11 +134,6 @@ impl MultiProblem {
 
     /// Solves a `MultiOrientProblem` by averaging over the problems.
     pub fn solve(&mut self) {
-        // Initialize file-based logging (avoids conflicts with indicatif progress bar)
-        if let Err(e) = crate::filelog::init(&self.settings.directory) {
-            log::warn!("Could not initialize file logging: {}", e);
-        }
-
         let n = self.orientations.num_orientations;
 
         // Initialize progress display only if not in quiet mode

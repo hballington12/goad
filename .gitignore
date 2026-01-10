@@ -24,3 +24,4 @@ examples/backscattering/roughness_*/
 examples/backscattering/test_results/
 examples/backscattering/*_results.json
 examples/backscattering/*.png
+sideplanes_rough_*/

@@ -2,6 +2,7 @@ use crate::containment::{ContainmentGraph, AABB};
 use crate::orientation::*;
 use crate::settings::{self, CENTERED_GEOMETRY_TOLERANCE};
 use anyhow::Result;
+use log::warn;
 use geo::{Area, TriangulateEarcut};
 use geo_types::{Coord, LineString, Polygon};
 use nalgebra::{self as na, Complex, Isometry3, Matrix4, Point3, Vector3, Vector4};
@@ -1175,12 +1176,46 @@ impl Geom {
         let mut geoms = vec![];
 
         if resolved_path.is_dir() {
-            // Load all .obj files from directory
+            // Load all .obj files from directory, collecting failures
+            let mut failed_files: Vec<(String, String)> = vec![];
+
             for entry in std::fs::read_dir(&resolved_path)? {
                 let entry = entry?;
                 if entry.path().extension() == Some(std::ffi::OsStr::new("obj")) {
-                    geoms.push(load_geom(&entry.path().display().to_string())?);
+                    let path_str = entry.path().display().to_string();
+                    match load_geom(&path_str) {
+                        Ok(geom) => geoms.push(geom),
+                        Err(e) => failed_files.push((path_str, e.to_string())),
+                    }
                 }
+            }
+
+            // Log warning if some geometries failed to load
+            if !failed_files.is_empty() {
+                warn!(
+                    "Failed to load {}/{} geometry files:",
+                    failed_files.len(),
+                    failed_files.len() + geoms.len()
+                );
+                for (filepath, error) in &failed_files {
+                    let filename = Path::new(filepath)
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| filepath.clone());
+                    warn!("  {}: {}", filename, error);
+                }
+            }
+
+            // If all geometries failed, return error with details
+            if geoms.is_empty() && !failed_files.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "All geometry files failed to load:\n{}",
+                    failed_files
+                        .iter()
+                        .map(|(f, e)| format!("  {}: {}", f, e))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                ));
             }
         } else if resolved_path.is_file() {
             // Load single file

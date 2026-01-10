@@ -90,6 +90,12 @@ impl Convergence {
     /// Creates a new Convergence solver from geometries and settings.
     pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
         let settings = load_settings_or_default(settings);
+
+        // Initialize file-based logging early so geometry load warnings are captured
+        if let Err(e) = crate::filelog::init(&settings.directory) {
+            log::warn!("Could not initialize file logging: {}", e);
+        }
+
         let geoms = load_and_init_geoms(geoms, &settings)?;
         let result = init_result(&settings);
         let rng = if let Some(seed) = settings.seed {
@@ -531,11 +537,6 @@ impl Convergence {
     where
         F: FnMut() -> bool,
     {
-        // Initialize file-based logging (avoids conflicts with indicatif progress bar)
-        if let Err(e) = crate::filelog::init(&self.settings.directory) {
-            warn!("Could not initialize file logging: {}", e);
-        }
-
         // Validation
         if self.targets.is_empty() {
             anyhow::bail!("No convergence targets set. Use add_target() before solving.");

@@ -7,7 +7,6 @@ use goad::{
 };
 
 fn main() {
-    env_logger::init();
     let settings = settings::load_config().unwrap();
     let mut multiproblem =
         MultiProblem::new(None, Some(settings)).expect("Failed to create MultiProblem");
