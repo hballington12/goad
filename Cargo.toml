@@ -5,6 +5,8 @@
     license = "GPL-3.0"
     description = "Compute the single scattering properties of particles much larger than the wavelength of light with geometric optics and aperture diffraction theory."
     default-run = "goad"
+    exclude = ["docs/", "test_regression/", "site/"]
+
 
 [dependencies]
     anyhow = "1.0.95"
