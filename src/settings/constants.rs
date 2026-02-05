@@ -40,6 +40,9 @@ pub const CENTERED_GEOMETRY_TOLERANCE: f32 = 0.001;
 pub const ZONE_THETA_OFFSET: f32 = 0.01;
 /// Tolerance for bounding box overlap check in clipping to handle floating-point precision
 pub const BBOX_TOLERANCE: f32 = 0.01;
+/// Multiplier for rayon thread count to determine near-field parallel batch size.
+/// Larger values give rayon more work to steal but make cutoff checks less granular.
+pub const BATCH_SIZE_MULTIPLIER: usize = 4;
 
 // =============================
 // Default Values for Python API

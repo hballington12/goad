@@ -4,7 +4,8 @@ use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
 use crate::multiproblem::{init_result, load_settings_or_default};
-use crate::settings::{default_e_perp, default_prop};
+use crate::powers::Powers;
+use crate::settings::{default_e_perp, default_prop, BATCH_SIZE_MULTIPLIER};
 use crate::{
     beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
     diff::Mapping,
@@ -122,6 +123,14 @@ mod tests {
 
         problem.propagate_next();
     }
+}
+
+/// Output from propagating a single beam, used to collect results from parallel propagation.
+struct PropagationOutput {
+    powers: Powers,
+    new_beams: Vec<Beam>,
+    out_beams: Vec<Beam>,
+    ext_diff_beams: Vec<Beam>,
 }
 
 /// A solvable physics problem.
@@ -463,27 +472,200 @@ impl Problem {
         Ok(())
     }
 
-    /// Trace beams to solve the near-field problem.
+    /// Trace beams to solve the near-field problem using parallel batch propagation.
     pub fn solve_near(&mut self) {
+        let batch_size = rayon::current_num_threads() * BATCH_SIZE_MULTIPLIER;
+
         loop {
-            if self.beam_queue.len() == 0 {
+            if self.beam_queue.is_empty() || self.cutoff_reached() {
+                self.tally_remaining();
                 break;
             }
 
-            let input_power = self.result.powers.input;
-            let output_power = self.result.powers.output;
+            let batch = self.drain_batch(batch_size);
+            let results = self.propagate_batch(batch);
+            self.merge_batch(results);
+        }
+    }
 
-            if output_power / input_power > self.settings.cutoff {
-                // add remaining power in beam queue to missing power due to cutoff
-                self.result.powers.trnc_cop += self
-                    .beam_queue
-                    .iter()
-                    .map(|beam| beam.power() / self.settings.scale.powi(2))
-                    .sum::<f32>();
-                break;
+    /// Check if the output/input power ratio exceeds the cutoff.
+    fn cutoff_reached(&self) -> bool {
+        let input = self.result.powers.input;
+        let output = self.result.powers.output;
+        input > 0.0 && output / input > self.settings.cutoff
+    }
+
+    /// Add remaining beam queue power to truncation tally.
+    fn tally_remaining(&mut self) {
+        self.result.powers.trnc_cop += self
+            .beam_queue
+            .iter()
+            .map(|b| b.power() / self.settings.scale.powi(2))
+            .sum::<f32>();
+    }
+
+    /// Pop up to `n` highest-power beams from the queue.
+    fn drain_batch(&mut self, n: usize) -> Vec<Beam> {
+        let start = self.beam_queue.len().saturating_sub(n);
+        self.beam_queue.split_off(start)
+    }
+
+    /// Propagate a batch of beams in parallel using per-thread geom clones.
+    fn propagate_batch(&self, batch: Vec<Beam>) -> Vec<PropagationOutput> {
+        let geom = &self.geom;
+        let settings = &self.settings;
+
+        batch
+            .into_par_iter()
+            .map_init(
+                || geom.clone(),
+                |thread_geom, mut beam| Self::propagate_single(&mut beam, thread_geom, settings),
+            )
+            .collect()
+    }
+
+    /// Propagate a single beam and return categorised outputs.
+    fn propagate_single(
+        beam: &mut Beam,
+        geom: &mut Geom,
+        settings: &Settings,
+    ) -> PropagationOutput {
+        let scale2 = settings.scale.powi(2);
+        let mut powers = Powers::new();
+
+        let outputs = Self::propagate_with_checks(beam, geom, settings, &mut powers);
+
+        powers.absorbed += beam.absorbed_power / scale2;
+        powers.trnc_clip += (beam.clipping_area - beam.csa()) * beam.power() / scale2;
+
+        Self::categorise_outputs(beam, outputs, powers, scale2)
+    }
+
+    /// Apply threshold checks, then propagate if the beam passes.
+    fn propagate_with_checks(
+        beam: &mut Beam,
+        geom: &mut Geom,
+        settings: &Settings,
+        powers: &mut Powers,
+    ) -> Vec<Beam> {
+        let scale2 = settings.scale.powi(2);
+
+        if let BeamVariant::Initial = beam.variant {
+            return match beam.propagate(
+                geom,
+                settings.medium_refr_index,
+                settings.beam_area_threshold(),
+            ) {
+                Ok((outputs, ..)) => outputs,
+                Err(_) => Vec::new(),
+            };
+        }
+
+        if beam.power() < settings.beam_power_threshold * scale2 {
+            powers.trnc_energy += beam.power() / scale2;
+            return Vec::new();
+        }
+
+        if beam.face.data().area.unwrap() < settings.beam_area_threshold() {
+            powers.trnc_area += beam.power() / scale2;
+            return Vec::new();
+        }
+
+        if let BeamVariant::Default(DefaultBeamVariant::Tir) = beam.variant {
+            if beam.tir_count >= settings.max_tir {
+                powers.trnc_ref += beam.power() / scale2;
+                return Vec::new();
             }
+            // TIR beams below max propagate immediately, skipping rec_count check
+            return match beam.propagate(
+                geom,
+                settings.medium_refr_index,
+                settings.beam_area_threshold(),
+            ) {
+                Ok((outputs, area_loss)) => {
+                    powers.trnc_area += area_loss / scale2;
+                    outputs
+                }
+                Err(_) => {
+                    powers.clip_err += beam.power() / scale2;
+                    Vec::new()
+                }
+            };
+        }
 
-            self.propagate_next();
+        if beam.rec_count > settings.max_rec {
+            powers.trnc_rec += beam.power() / scale2;
+            return Vec::new();
+        }
+
+        match beam.propagate(
+            geom,
+            settings.medium_refr_index,
+            settings.beam_area_threshold(),
+        ) {
+            Ok((outputs, area_loss)) => {
+                powers.trnc_area += area_loss / scale2;
+                outputs
+            }
+            Err(_) => {
+                powers.clip_err += beam.power() / scale2;
+                Vec::new()
+            }
+        }
+    }
+
+    /// Sort output beams into internal, outgoing, and ext-diff categories.
+    fn categorise_outputs(
+        input_beam: &Beam,
+        outputs: Vec<Beam>,
+        mut powers: Powers,
+        scale2: f32,
+    ) -> PropagationOutput {
+        let mut new_beams = Vec::new();
+        let mut out_beams = Vec::new();
+        let mut ext_diff_beams = Vec::new();
+
+        for output in outputs {
+            let p = output.power() / scale2;
+            match (&input_beam.variant, &output.variant) {
+                (BeamVariant::Default(..), BeamVariant::Default(..)) => {
+                    new_beams.push(output);
+                }
+                (BeamVariant::Default(..), BeamVariant::OutGoing) => {
+                    powers.output += p;
+                    out_beams.push(output);
+                }
+                (BeamVariant::Initial, BeamVariant::Default(..)) => {
+                    powers.input += p;
+                    new_beams.push(output);
+                }
+                (BeamVariant::Initial, BeamVariant::ExternalDiff) => {
+                    powers.ext_diff += p;
+                    ext_diff_beams.push(output);
+                }
+                _ => {}
+            }
+        }
+
+        PropagationOutput {
+            powers,
+            new_beams,
+            out_beams,
+            ext_diff_beams,
+        }
+    }
+
+    /// Merge parallel propagation results back into the problem state.
+    fn merge_batch(&mut self, results: Vec<PropagationOutput>) {
+        for result in results {
+            self.result.powers += result.powers;
+            for beam in result.new_beams {
+                self.insert_beam(beam);
+            }
+            for beam in result.out_beams {
+                self.insert_outbeam(beam);
+            }
+            self.ext_diff_beam_queue.extend(result.ext_diff_beams);
         }
     }
 
