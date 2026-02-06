@@ -254,7 +254,7 @@ impl Problem {
         }
         // Apply distortion if set
         if let Some(distortion) = self.settings.distortion {
-            self.geom.distort(distortion, self.settings.seed);
+            let _ = self.geom.distort(distortion, self.settings.seed);
         }
         self.geom.recentre();
         self.settings.scale = self.geom.rescale();

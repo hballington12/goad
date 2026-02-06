@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::Result;
 use nalgebra::{Matrix3, Vector3};
 use rand::{Rng, SeedableRng};
 use rand_distr::{Distribution, Normal};
@@ -10,9 +11,9 @@ use crate::{
 };
 
 impl Geom {
-    pub fn distort(&mut self, sigma: f32, seed: Option<u64>) {
+    pub fn distort(&mut self, sigma: f32, seed: Option<u64>) -> Result<()> {
         if sigma <= MIN_DISTORTION {
-            return;
+            return Ok(());
         }
 
         // For each shape in geometry:
@@ -21,22 +22,34 @@ impl Geom {
             if shape.aabb.is_none() {
                 shape.set_aabb();
             }
-            let aabb = shape.aabb.clone().unwrap();
-            let max_dim = (aabb.max - aabb.min).norm();
+
+            // Compute face areas if missing
+            for face in shape.faces.iter_mut() {
+                if face.data().area.is_none() {
+                    face.compute_area();
+                }
+            }
+
+            // get the total surface area of the shape
+            let total_area = shape
+                .faces
+                .iter()
+                .map(|face| face.data().area.unwrap())
+                .sum::<f32>();
 
             // Prescan to hold a list of which vertices are in which faces
             let vertex_to_faces = build_vertex_to_face_map(shape);
 
             // Check if the shape can be distorted
             if !shape_can_be_distorted(&vertex_to_faces) {
-                return;
+                return Err(anyhow::anyhow!("Shape cannot be distorted"));
             }
 
             // Keep original vertices in case we need to restore them
             let original_vertices = shape.vertices.clone();
 
-            // Try distortion up to 25 times
-            let max_attempts = 25;
+            // Try distortion up to 100 times
+            let max_attempts = 100;
             let mut attempt = 0;
 
             loop {
@@ -84,13 +97,25 @@ impl Geom {
             // Get new AABB after distortion
             shape.set_aabb();
 
-            // Get new max dimension after distortion
-            let new_aabb = shape.aabb.clone().unwrap();
-            let new_max_dim = (new_aabb.max - new_aabb.min).norm();
+            // recompute stuff
+            for face in shape.faces.iter_mut() {
+                face.compute_area();
+                face.data_mut().set_normal()?;
+                face.data_mut().set_midpoint();
+            }
 
-            let rescale_fac = max_dim / new_max_dim;
-            shape.rescale(rescale_fac);
+            // Get new surface area after distortion
+            let new_area = shape
+                .faces
+                .iter()
+                .map(|face| face.data().area.unwrap())
+                .sum::<f32>();
+
+            // Rescale the shape to maintain the same surface area
+            let area_fac = new_area / total_area;
+            shape.rescale(area_fac);
         }
+        Ok(())
     }
 }
 
@@ -207,7 +232,8 @@ fn perturb_normals(
             rand::rngs::StdRng::from_rng(&mut rand::rng())
         };
         let norm_dist = Normal::new(0.0, sigma).unwrap();
-        let dtheta = norm_dist.sample(&mut rng); // Normal distribution for polar angle
+        let tan_dtheta = norm_dist.sample(&mut rng); // Normal distribution for tan(polar angle)
+        let dtheta = tan_dtheta.atan();
         let dphi = rng.random_range(0.0..std::f32::consts::PI * 2.0); // Uniform for azimuth
 
         // Create the perturbation in the local frame where normal is z-axis

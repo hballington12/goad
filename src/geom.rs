@@ -2,9 +2,9 @@ use crate::containment::{ContainmentGraph, AABB};
 use crate::orientation::*;
 use crate::settings::{self, CENTERED_GEOMETRY_TOLERANCE};
 use anyhow::Result;
-use log::warn;
 use geo::{Area, TriangulateEarcut};
 use geo_types::{Coord, LineString, Polygon};
+use log::warn;
 use nalgebra::{self as na, Complex, Isometry3, Matrix4, Point3, Vector3, Vector4};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -364,6 +364,7 @@ impl FaceData {
 
         face.set_midpoint();
         face.set_normal()?; // midpoint should be set first
+        face.compute_area();
 
         Ok(face)
     }
@@ -432,7 +433,7 @@ impl FaceData {
     }
 
     /// Compute the midpoint of the facet.
-    fn set_midpoint(&mut self) {
+    pub fn set_midpoint(&mut self) {
         let vertices = &self.exterior;
         let len = vertices.len() as f32;
         // let mut mid = vertices.iter().copied();
@@ -453,6 +454,30 @@ impl FaceData {
             normal: self.normal,
             offset: -self.normal.dot(&self.exterior[0].coords),
         }
+    }
+
+    /// Compute the face area by projecting vertices along the face normal
+    /// onto a local 2D basis.
+    pub fn compute_area(&mut self) {
+        let ref_vec = if self.normal.x.abs() < 0.9 {
+            Vector3::x()
+        } else {
+            Vector3::y()
+        };
+        let u = self.normal.cross(&ref_vec).normalize();
+        let v = self.normal.cross(&u);
+
+        let coords: Vec<Coord<f32>> = self
+            .exterior
+            .iter()
+            .map(|p| Coord {
+                x: p.coords.dot(&u),
+                y: p.coords.dot(&v),
+            })
+            .collect();
+
+        let polygon = Polygon::new(LineString(coords), vec![]);
+        self.area = Some(polygon.unsigned_area());
     }
 
     /// Computes the z-distance from one facet to another.
@@ -850,6 +875,15 @@ impl Face {
         match self {
             Face::Simple(data) => data.area = Some(area),
             Face::Complex { data, .. } => data.area = Some(area),
+        }
+    }
+
+    /// Compute and store the face area by projecting vertices along the face
+    /// normal onto a local 2D basis.
+    pub fn compute_area(&mut self) {
+        match self {
+            Face::Simple(data) => data.compute_area(),
+            Face::Complex { data, .. } => data.compute_area(),
         }
     }
 
