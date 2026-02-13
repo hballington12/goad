@@ -137,7 +137,7 @@ pub fn default_directory() -> PathBuf {
 
 pub fn default_output_config() -> OutputConfig {
     OutputConfig {
-        settings_json: false,
+        settings_json: true,
         mueller_2d: true,
         mueller_1d: true,
         mueller_components: MuellerComponentConfig {
