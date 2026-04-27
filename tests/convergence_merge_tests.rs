@@ -6,6 +6,7 @@
 //! Run with: cargo test --release -p goad --test convergence_merge_tests -- --ignored
 
 use goad::{
+    cancel::CancelToken,
     convergence::ConvergenceTracker,
     orientation::Euler,
     problem::Problem,
@@ -31,7 +32,7 @@ fn generate_results(count: usize) -> Vec<Results> {
         .iter()
         .map(|euler| {
             let mut problem = Problem::new(None, Some(settings.clone())).unwrap();
-            problem.run(Some(euler)).unwrap();
+            problem.run(Some(euler), &CancelToken::noop()).unwrap();
             problem.result
         })
         .collect()

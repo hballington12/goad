@@ -1,6 +1,7 @@
 // use std::time::Instant;
 
 use crate::{
+    cancel::CancelToken,
     convergence::Convergeable,
     geom::Geom,
     orientation::{Euler, Orientations},
@@ -211,7 +212,7 @@ impl MultiProblem {
                 let mut problem = problems_base[problem_idx].clone();
                 let euler = Euler::new(*a, *b, *g);
 
-                if let Err(err) = problem.run(Some(&euler)) {
+                if let Err(err) = problem.run(Some(&euler), &CancelToken::noop()) {
                     log::error!("Error running problem (will skip this iteration): {}", err);
                 }
 

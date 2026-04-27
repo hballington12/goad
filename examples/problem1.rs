@@ -1,3 +1,4 @@
+use goad::cancel::CancelToken;
 use goad::geom::{self};
 use goad::problem::Problem;
 
@@ -10,5 +11,5 @@ fn main() {
 
     let mut problem = Problem::new(Some(geom), None).unwrap();
 
-    problem.solve_near();
+    problem.solve_near(&CancelToken::noop()).unwrap();
 }

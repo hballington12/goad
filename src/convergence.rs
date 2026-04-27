@@ -8,16 +8,16 @@ use log::{error, info, warn};
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use anyhow::Result;
 use crossbeam_deque::{Injector, Steal};
 use rand::rngs::StdRng;
 
 use crate::{
+    cancel::CancelToken,
     geom::Geom,
     multiproblem::{init_result, load_and_init_geoms, load_settings_or_default},
     orientation::{Euler, OrientationSampler, Scheme},
@@ -265,7 +265,7 @@ impl Convergence {
 
             let mut problem = problems_base[task.problem_idx].clone();
             let start = Instant::now();
-            if problem.run(Some(&task.euler)).is_ok() {
+            if problem.run(Some(&task.euler), &CancelToken::noop()).is_ok() {
                 compute_times.push(start.elapsed());
             }
         }
@@ -289,7 +289,7 @@ impl Convergence {
             };
 
             let mut problem = problems_base[task.problem_idx].clone();
-            if problem.run(Some(&task.euler)).is_ok() {
+            if problem.run(Some(&task.euler), &CancelToken::noop()).is_ok() {
                 sample_tracker.update(&problem.result);
 
                 let start = Instant::now();
@@ -379,26 +379,26 @@ impl Convergence {
             Receiver<ConvergenceTracker<Results>>,
         ) = mpsc::channel();
 
-        // Shutdown flag for workers
-        let done = Arc::new(AtomicBool::new(false));
+        // Cancellation token shared with workers (tripped on convergence/interrupt).
+        let cancel = CancelToken::new();
 
         let injector_ref = &injector;
         let problems_ref = &problems_base;
         let template_ref = &result_template;
+        let cancel_ref = &cancel;
 
         thread::scope(|s| {
             // Spawn workers
             for _ in 0..num_workers {
                 let tx = tx.clone();
-                let done = Arc::clone(&done);
                 s.spawn(move || {
-                    Self::worker_loop_batched(
+                    let _ = Self::worker_loop_batched(
                         injector_ref,
                         problems_ref,
                         template_ref,
                         batch_size,
                         tx,
-                        &done,
+                        cancel_ref,
                     );
                 });
             }
@@ -436,7 +436,7 @@ impl Convergence {
             }
 
             // Signal workers to exit and set status to FINALISING
-            done.store(true, Ordering::Relaxed);
+            cancel.cancel();
             progress.set_finalising();
         });
 
@@ -569,53 +569,38 @@ impl Convergence {
         result_template: &Results,
         batch_size: usize,
         tx: Sender<ConvergenceTracker<Results>>,
-        done: &AtomicBool,
-    ) {
+        cancel: &CancelToken,
+    ) -> Result<()> {
         loop {
-            // Try to steal a batch of tasks
-            let tasks = Self::steal_batch(injector, batch_size, done);
-
-            if tasks.is_empty() {
-                // No tasks and done signal received
-                if done.load(Ordering::Relaxed) {
-                    break;
-                }
-                // Otherwise keep waiting
-                std::hint::spin_loop();
-                continue;
-            }
-
-            // Process all stolen tasks, accumulating into local tracker
+            let tasks = Self::steal_batch(injector, batch_size, cancel)?;
             let mut local_tracker = ConvergenceTracker::new(result_template);
 
             for task in tasks {
+                cancel.check()?;
                 let mut problem = problems_base[task.problem_idx].clone();
-
-                if let Err(err) = problem.run(Some(&task.euler)) {
+                if let Err(err) = problem.run(Some(&task.euler), cancel) {
+                    cancel.check()?;
                     error!("Error running problem (will skip this iteration): {}", err);
                     continue;
                 }
-
                 local_tracker.update(&problem.result);
             }
 
-            // Send batch to master (if we accumulated any results)
-            if local_tracker.count() > 0 {
-                if tx.send(local_tracker).is_err() {
-                    // Channel closed, master is done
-                    break;
-                }
+            cancel.check()?;
+            if local_tracker.count() > 0 && tx.send(local_tracker).is_err() {
+                // Channel closed, master is done
+                return Ok(());
             }
         }
     }
 
     /// Steal up to `batch_size` tasks from the injector.
-    /// Returns early if done signal is set and no tasks are available.
+    /// Returns `Err` if the cancel token trips while waiting for tasks with nothing in hand.
     fn steal_batch(
         injector: &Injector<OrientationTask>,
         batch_size: usize,
-        done: &AtomicBool,
-    ) -> Vec<OrientationTask> {
+        cancel: &CancelToken,
+    ) -> Result<Vec<OrientationTask>> {
         let mut tasks = Vec::with_capacity(batch_size);
 
         while tasks.len() < batch_size {
@@ -629,10 +614,7 @@ impl Convergence {
                         // Return what we have (partial batch)
                         break;
                     }
-                    // Nothing stolen yet - check if we should exit
-                    if done.load(Ordering::Relaxed) {
-                        break;
-                    }
+                    cancel.check()?;
                     // Wait a bit for more tasks
                     std::hint::spin_loop();
                 }
@@ -643,7 +625,7 @@ impl Convergence {
             }
         }
 
-        tasks
+        Ok(tasks)
     }
 
     fn update_target(

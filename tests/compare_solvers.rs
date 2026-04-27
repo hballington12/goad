@@ -113,6 +113,7 @@ fn dump_1d_mueller_comparison() {
 #[test]
 #[ignore] // Run with: cargo test --release -- --ignored
 fn test_tracker_5_orientations() {
+    use goad::cancel::CancelToken;
     use goad::convergence::ConvergenceTracker;
     use goad::orientation::Euler;
     use goad::problem::Problem;
@@ -130,7 +131,7 @@ fn test_tracker_5_orientations() {
 
     for (i, euler) in eulers.iter().enumerate() {
         let mut problem = Problem::new(None, Some(settings.clone())).unwrap();
-        problem.run(Some(euler)).unwrap();
+        problem.run(Some(euler), &CancelToken::noop()).unwrap();
 
         let asym = problem
             .result

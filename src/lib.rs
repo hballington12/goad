@@ -18,6 +18,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 pub mod _quickstart;
 pub mod beam;
 pub mod bins;
+pub mod cancel;
 pub mod clip;
 pub mod containment;
 pub mod convergence;

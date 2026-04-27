@@ -1,3 +1,4 @@
+use goad::cancel::CancelToken;
 use goad::problem::Problem;
 use nalgebra::base;
 
@@ -17,7 +18,7 @@ fn main() {
         let mut settings = base_settings.clone();
         settings.distortion = Some(distortion);
         let mut problem = Problem::new(None, Some(settings)).unwrap();
-        let _ = problem.run(None);
+        let _ = problem.run(None, &CancelToken::noop());
         let _ = problem.geom.write_obj(format!("file_{}.obj", distortion));
         let _ = problem.writeup();
     }

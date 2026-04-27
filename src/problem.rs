@@ -1,5 +1,6 @@
 use std::f32::consts::PI;
 
+use crate::cancel::CancelToken;
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
 use crate::geom::load_geom;
@@ -42,7 +43,7 @@ mod tests {
 
         let mut problem = Problem::new(Some(geom), Some(settings)).unwrap();
         let euler = crate::orientation::Euler::new(30.0, 30.0, 0.0);
-        problem.run(Some(&euler)).expect("run");
+        problem.run(Some(&euler), &CancelToken::noop()).expect("run");
 
         let result = &problem.result;
 
@@ -188,7 +189,7 @@ impl Problem {
             }
         };
 
-        if let Err(err) = self.run(Some(&euler)) {
+        if let Err(err) = self.run(Some(&euler), &CancelToken::noop()) {
             log::error!("Error running problem (will skip this solve): {}", err);
         }
 
@@ -428,25 +429,28 @@ impl Problem {
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.
-    pub fn solve_far(&mut self) {
+    pub fn solve_far(&mut self, cancel: &CancelToken) -> Result<()> {
         // Process each zone
         let num_zones = self.result.zones.len();
         for zone_idx in 0..num_zones {
+            cancel.check()?;
             self.solve_far_zone(GOComponent::ExtDiff, zone_idx);
             self.solve_far_zone(GOComponent::Beam, zone_idx);
             self.combine_far_zone(zone_idx);
         }
+        Ok(())
     }
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
-    pub fn solve(&mut self) {
+    pub fn solve(&mut self, cancel: &CancelToken) -> Result<()> {
         debug!("solving near-field problem");
-        self.solve_near();
+        self.solve_near(cancel)?;
         debug!("solving far-field problem");
-        self.solve_far();
+        self.solve_far(cancel)?;
         debug!("computing 1d-mueller matrices");
         self.mueller_to_1d();
         debug!("computing parameters");
         self.compute_params();
+        Ok(())
     }
 
     pub fn compute_params(&mut self) {
@@ -457,7 +461,7 @@ impl Problem {
         self.result.mueller_to_1d();
     }
 
-    pub fn run(&mut self, euler: Option<&orientation::Euler>) -> Result<()> {
+    pub fn run(&mut self, euler: Option<&orientation::Euler>, cancel: &CancelToken) -> Result<()> {
         self.init();
         match euler {
             Some(euler) => {
@@ -468,15 +472,16 @@ impl Problem {
             }
         }
         self.illuminate()?;
-        self.solve();
+        self.solve(cancel)?;
         Ok(())
     }
 
     /// Trace beams to solve the near-field problem using parallel batch propagation.
-    pub fn solve_near(&mut self) {
+    pub fn solve_near(&mut self, cancel: &CancelToken) -> Result<()> {
         let batch_size = rayon::current_num_threads() * BATCH_SIZE_MULTIPLIER;
 
         loop {
+            cancel.check()?;
             if self.beam_queue.is_empty() || self.cutoff_reached() {
                 self.tally_remaining();
                 break;
@@ -486,6 +491,7 @@ impl Problem {
             let results = self.propagate_batch(batch);
             self.merge_batch(results);
         }
+        Ok(())
     }
 
     /// Check if the output/input power ratio exceeds the cutoff.
