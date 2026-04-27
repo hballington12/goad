@@ -185,7 +185,7 @@ impl Beam {
         let mut outputs = Vec::new();
         for face in &intersections {
             let normal = face.data().normal;
-            let theta_i = normal.dot(&self.field.prop()).abs().acos();
+            let theta_i = normal.dot(&self.field.prop()).abs().clamp(-1.0, 1.0).acos();
             let n2 = self.get_n2(geom, face, normal, medium_refr_index);
             let e_perp = self.get_e_perp(&normal);
             let mut field = self.field.new_from_e_perp(&e_perp);
