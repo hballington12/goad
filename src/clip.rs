@@ -4,6 +4,7 @@ use crate::geom::PolygonExtensions;
 use anyhow::Result;
 use geo::{Area, BooleanOps, Simplify};
 
+use log::trace;
 use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
 use std::fmt;
@@ -833,7 +834,9 @@ impl<'a> Clipping<'a> {
             panic!("Method clip() called, but the clipping was already done previously.");
         }
 
+        trace!("initialising clip");
         let (clip, mut subjects) = self.init_clip()?;
+        trace!("clip initialized");
 
         // compute remapped intersections, converting to Intersection structs
         let (intersection, remaining) = clip_faces(&clip, &mut subjects, area_threshold)?;

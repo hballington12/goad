@@ -18,7 +18,7 @@ use crate::{
 };
 
 use anyhow::Result;
-use log::debug;
+use log::{debug, warn};
 use nalgebra::{Complex, Point3};
 use pyo3::prelude::*;
 #[cfg(feature = "stub-gen")]
