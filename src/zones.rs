@@ -328,14 +328,21 @@ impl Zone {
                 });
 
             self.params.set_param(Param::ScatCross, component, scatt);
-            self.params
-                .set_param(Param::Asymmetry, component, asymmetry_scatt / scatt);
+            // Guard 0/0: only store Asymmetry / Albedo when their normalisation is non-zero.
+            // Missing entries are handled by the cascading fallbacks in `Params::weighted_add`,
+            // so degenerate orientations don't poison the running mean.
+            if scatt > 0.0 {
+                self.params
+                    .set_param(Param::Asymmetry, component, asymmetry_scatt / scatt);
+            }
 
             // ext_cross and albedo only for Total component
             if component == GOComponent::Total {
                 let ext = scatt + absorbed;
                 self.params.set_param(Param::ExtCross, component, ext);
-                self.params.set_param(Param::Albedo, component, scatt / ext);
+                if ext > 0.0 {
+                    self.params.set_param(Param::Albedo, component, scatt / ext);
+                }
             }
         }
     }
