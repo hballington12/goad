@@ -1,4 +1,5 @@
 use goad::problem::Problem;
+use nalgebra::base;
 
 // --8<-- [start:multiproblem]
 fn main() {
@@ -7,9 +8,10 @@ fn main() {
     // Setup and run a multi-orientation problem with default settings
     let mut base_settings = settings::load_default_config().unwrap();
     base_settings.quiet = true;
+    // base_settings.geom_scale = Some(vec![2.622, 2.622, 3.745]);
     base_settings.geom_name = "examples/data/hex.obj".to_string();
 
-    let distortions = vec![0.0, 0.1, 0.2, 0.3, 0.4, 0.5];
+    let distortions = vec![0.1];
 
     for distortion in distortions {
         let mut settings = base_settings.clone();
