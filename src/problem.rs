@@ -488,7 +488,7 @@ impl Problem {
             }
 
             let batch = self.drain_batch(batch_size);
-            let results = self.propagate_batch(batch);
+            let results = self.propagate_batch(batch)?;
             self.merge_batch(results);
         }
         Ok(())
@@ -517,7 +517,9 @@ impl Problem {
     }
 
     /// Propagate a batch of beams in parallel using per-thread geom clones.
-    fn propagate_batch(&self, batch: Vec<Beam>) -> Vec<PropagationOutput> {
+    /// Returns `Err` if the Initial illumination beam fails to propagate, so the
+    /// caller can abandon the orientation rather than silently producing zero-power results.
+    fn propagate_batch(&self, batch: Vec<Beam>) -> Result<Vec<PropagationOutput>> {
         let geom = &self.geom;
         let settings = &self.settings;
 
@@ -527,7 +529,7 @@ impl Problem {
                 || geom.clone(),
                 |thread_geom, mut beam| Self::propagate_single(&mut beam, thread_geom, settings),
             )
-            .collect()
+            .collect::<Result<Vec<_>>>()
     }
 
     /// Propagate a single beam and return categorised outputs.
@@ -535,55 +537,57 @@ impl Problem {
         beam: &mut Beam,
         geom: &mut Geom,
         settings: &Settings,
-    ) -> PropagationOutput {
+    ) -> Result<PropagationOutput> {
         let scale2 = settings.scale.powi(2);
         let mut powers = Powers::new();
 
-        let outputs = Self::propagate_with_checks(beam, geom, settings, &mut powers);
+        let outputs = Self::propagate_with_checks(beam, geom, settings, &mut powers)?;
 
         powers.absorbed += beam.absorbed_power / scale2;
         powers.trnc_clip += (beam.clipping_area - beam.csa()) * beam.power() / scale2;
 
-        Self::categorise_outputs(beam, outputs, powers, scale2)
+        Ok(Self::categorise_outputs(beam, outputs, powers, scale2))
     }
 
     /// Apply threshold checks, then propagate if the beam passes.
+    /// Errors from the Initial beam's propagation are propagated as `Err` so the
+    /// orientation can be marked as failed; errors from default/TIR beams are
+    /// absorbed into the `clip_err` truncation counter, since per-beam clip
+    /// failures shouldn't kill an otherwise-successful orientation.
     fn propagate_with_checks(
         beam: &mut Beam,
         geom: &mut Geom,
         settings: &Settings,
         powers: &mut Powers,
-    ) -> Vec<Beam> {
+    ) -> Result<Vec<Beam>> {
         let scale2 = settings.scale.powi(2);
 
         if let BeamVariant::Initial = beam.variant {
-            return match beam.propagate(
+            let (outputs, ..) = beam.propagate(
                 geom,
                 settings.medium_refr_index,
                 settings.beam_area_threshold(),
-            ) {
-                Ok((outputs, ..)) => outputs,
-                Err(_) => Vec::new(),
-            };
+            )?;
+            return Ok(outputs);
         }
 
         if beam.power() < settings.beam_power_threshold * scale2 {
             powers.trnc_energy += beam.power() / scale2;
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
         if beam.face.data().area.unwrap() < settings.beam_area_threshold() {
             powers.trnc_area += beam.power() / scale2;
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
         if let BeamVariant::Default(DefaultBeamVariant::Tir) = beam.variant {
             if beam.tir_count >= settings.max_tir {
                 powers.trnc_ref += beam.power() / scale2;
-                return Vec::new();
+                return Ok(Vec::new());
             }
             // TIR beams below max propagate immediately, skipping rec_count check
-            return match beam.propagate(
+            return Ok(match beam.propagate(
                 geom,
                 settings.medium_refr_index,
                 settings.beam_area_threshold(),
@@ -596,15 +600,15 @@ impl Problem {
                     powers.clip_err += beam.power() / scale2;
                     Vec::new()
                 }
-            };
+            });
         }
 
         if beam.rec_count > settings.max_rec {
             powers.trnc_rec += beam.power() / scale2;
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
-        match beam.propagate(
+        Ok(match beam.propagate(
             geom,
             settings.medium_refr_index,
             settings.beam_area_threshold(),
@@ -617,7 +621,7 @@ impl Problem {
                 powers.clip_err += beam.power() / scale2;
                 Vec::new()
             }
-        }
+        })
     }
 
     /// Sort output beams into internal, outgoing, and ext-diff categories.
