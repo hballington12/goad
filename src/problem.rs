@@ -43,7 +43,9 @@ mod tests {
 
         let mut problem = Problem::new(Some(geom), Some(settings)).unwrap();
         let euler = crate::orientation::Euler::new(30.0, 30.0, 0.0);
-        problem.run(Some(&euler), &CancelToken::noop()).expect("run");
+        problem
+            .run(Some(&euler), &CancelToken::noop())
+            .expect("run");
 
         let result = &problem.result;
 
@@ -587,7 +589,31 @@ impl Problem {
                 return Ok(Vec::new());
             }
             // TIR beams below max propagate immediately, skipping rec_count check
-            return Ok(match beam.propagate(
+            return Ok(
+                match beam.propagate(
+                    geom,
+                    settings.medium_refr_index,
+                    settings.beam_area_threshold(),
+                ) {
+                    Ok((outputs, area_loss)) => {
+                        powers.trnc_area += area_loss / scale2;
+                        outputs
+                    }
+                    Err(_) => {
+                        powers.clip_err += beam.power() / scale2;
+                        Vec::new()
+                    }
+                },
+            );
+        }
+
+        if beam.rec_count > settings.max_rec {
+            powers.trnc_rec += beam.power() / scale2;
+            return Ok(Vec::new());
+        }
+
+        Ok(
+            match beam.propagate(
                 geom,
                 settings.medium_refr_index,
                 settings.beam_area_threshold(),
@@ -600,28 +626,8 @@ impl Problem {
                     powers.clip_err += beam.power() / scale2;
                     Vec::new()
                 }
-            });
-        }
-
-        if beam.rec_count > settings.max_rec {
-            powers.trnc_rec += beam.power() / scale2;
-            return Ok(Vec::new());
-        }
-
-        Ok(match beam.propagate(
-            geom,
-            settings.medium_refr_index,
-            settings.beam_area_threshold(),
-        ) {
-            Ok((outputs, area_loss)) => {
-                powers.trnc_area += area_loss / scale2;
-                outputs
-            }
-            Err(_) => {
-                powers.clip_err += beam.power() / scale2;
-                Vec::new()
-            }
-        })
+            },
+        )
     }
 
     /// Sort output beams into internal, outgoing, and ext-diff categories.
