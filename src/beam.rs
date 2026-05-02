@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 
 use geo::Coord;
 
-use nalgebra::{Complex, Matrix2, Matrix4, Point3, Vector3};
+use nalgebra::{Complex, Matrix4, Point3, Vector3};
 
 use crate::{
     bins::SolidAngleBin,
@@ -359,28 +359,23 @@ impl Beam {
         debug_assert!((field.prop().dot(&normal) - theta_i.cos()) < settings::COLINEAR_THRESHOLD);
         debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
 
+        let fresnel = fresnel::refl(n1, n2, theta_i);
+        field.matmul(&fresnel);
+        debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
+
+        debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
+
         if theta_i > (n2.re / n1.re).asin() {
-            // if total internal reflection
-            let fresnel = -Matrix2::identity().map(|x| nalgebra::Complex::new(x, 0.0));
-            field.matmul(&fresnel);
-
-            debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
-
             Ok(Some(Beam::new(
                 face.clone(),
                 n1,
-                self.rec_count, // same recursion count, aligns with Macke 1996
+                self.rec_count,
                 self.tir_count + 1,
                 field,
                 BeamVariant::Default(DefaultBeamVariant::Tir),
                 self.wavelength,
             )))
         } else {
-            let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
-            let fresnel = fresnel::refl(n1, n2, theta_i, theta_t);
-
-            field.matmul(&fresnel);
-
             Ok(Some(Beam::new(
                 face.clone(),
                 n1,
@@ -410,7 +405,7 @@ impl Beam {
         } else {
             let theta_t = get_theta_t(theta_i, n1, n2)?; // sin(theta_t)
             let prop = self.get_refraction_vector(&normal, theta_i, theta_t);
-            let fresnel = fresnel::refr(n1, n2, theta_i, theta_t);
+            let fresnel = fresnel::refr(n1, n2, theta_i);
 
             field.set_prop(prop);
             field.matmul(&fresnel);
