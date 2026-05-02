@@ -40,6 +40,8 @@ tikv-jemallocator = "0.6"
 
 [dev-dependencies]
 plotters = { version = "0.3", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "line_series", "point_series", "ttf"] }
+inventory = "0.3"
+paste = "1"
 
 [features]
 default = []
@@ -59,3 +61,7 @@ required-features = ["stub-gen"]
 [[example]]
 name = "backscattering"
 path = "examples/backscattering/main.rs"
+
+[[example]]
+name = "regen_mueller_refs"
+path = "examples/regen_mueller_refs/main.rs"
