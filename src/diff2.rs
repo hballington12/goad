@@ -515,11 +515,6 @@ pub fn n2f_aperture_diffraction(
     let mut ampl = beam_aperture.field.ampl();
     ampl *= Complex::new(wavenumber, 0.0);
 
-    // Apply amplitude sign flip if needed (matches original diff.rs)
-    if e_par2.z > COLINEAR_THRESHOLD {
-        ampl = -ampl;
-    }
-
     // Get aperture vertices and prop in aperture system
     let aperture_verts = &beam_aperture.face.data().exterior;
     let prop_aperture = beam_aperture.field.prop();
