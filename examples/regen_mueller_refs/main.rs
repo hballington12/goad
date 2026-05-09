@@ -22,7 +22,7 @@ use std::{
 #[macro_use]
 #[path = "../../tests/helpers.rs"]
 mod helpers;
-#[path = "../../tests/cases.rs"]
+#[path = "../../tests/common/cases.rs"]
 mod cases;
 
 use helpers::MuellerCase;
