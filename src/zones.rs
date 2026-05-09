@@ -353,7 +353,7 @@ impl Zone {
         };
 
         let s2 = field_fs.ampl_total[(0, 0)];
-        let ext_cross = s2.im * 4.0 * PI / k.powi(2);
+        let ext_cross = -s2.im * 4.0 * PI / k.powi(2);
         self.params
             .set_param(Param::ExtCrossOpticalTheorem, GOComponent::Total, ext_cross);
     }
@@ -370,7 +370,7 @@ impl Zone {
         ] {
             let s11 = mueller[(0, 0)];
             let s22 = mueller[(1, 1)];
-            let bs_cross = s11 / k.powi(2);  // Cb = S11^(2D)(180°) / k²
+            let bs_cross = s11 / k.powi(2); // Cb = S11^(2D)(180°) / k²
 
             self.params
                 .set_param(Param::BackscatterCross, component, bs_cross);
