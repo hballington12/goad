@@ -490,12 +490,6 @@ pub fn n2f_aperture_diffraction(
     let rot3_e_perp_to_y: Matrix3<f32> = rot_e_perp_to_y.fixed_view::<3, 3>(0, 0).into_owned();
     let rot3 = rot3_e_perp_to_y * rot3_to_xy;
 
-    // Check for amplitude sign flip (matches original diff.rs)
-    let e_perp = beam.field.e_perp();
-    let perp2 = rot3 * e_perp;
-    let prop2 = rot3 * prop;
-    let e_par2 = perp2.cross(&prop2).normalize();
-
     #[cfg(debug_assertions)]
     {
         let aperture_verts = &beam_aperture.face.data().exterior;
