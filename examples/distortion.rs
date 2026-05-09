@@ -1,6 +1,5 @@
 use goad::cancel::CancelToken;
 use goad::problem::Problem;
-use nalgebra::base;
 
 // --8<-- [start:multiproblem]
 fn main() {
