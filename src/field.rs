@@ -121,7 +121,7 @@ impl AmplMatrix for Ampl {
         (self[(0, 0)] * self[(1, 1)].conj() + self[(0, 1)] * self[(1, 0)].conj()).re
     }
     fn s34(&self) -> f32 {
-        (self[(0, 0)] * self[(1, 1)].conj() + self[(0, 1)] * self[(1, 0)].conj()).im
+        (self[(0, 0)] * self[(1, 1)].conj() + self[(1, 0)] * self[(0, 1)].conj()).im
     }
     fn s41(&self) -> f32 {
         (self[(1, 0)] * self[(0, 0)].conj() + self[(1, 1)] * self[(0, 1)].conj()).im
