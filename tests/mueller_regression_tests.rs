@@ -9,4 +9,5 @@
 #[macro_use]
 pub mod helpers;
 
+#[path = "common/cases.rs"]
 mod cases;

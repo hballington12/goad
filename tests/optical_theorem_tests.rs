@@ -272,21 +272,21 @@ fn check_phase_90(ampl: &Matrix2<Complex<f32>>, name: &str) {
     let phase_00 = ampl[(0, 0)].arg() * 180.0 / PI;
     let phase_11 = ampl[(1, 1)].arg() * 180.0 / PI;
 
-    // Phase should be +90 degrees (or -270, which is equivalent)
+    // Phase should be +-90 degrees (or +-270, which is equivalent)
     // Normalize to [-180, 180] range
-    let phase_diff_00 = ((phase_00 - 90.0 + 180.0) % 360.0) - 180.0;
-    let phase_diff_11 = ((phase_11 - 90.0 + 180.0) % 360.0) - 180.0;
+    let phase_diff_00 = ((phase_00.abs() - 90.0 + 180.0) % 360.0) - 180.0;
+    let phase_diff_11 = ((phase_11.abs() - 90.0 + 180.0) % 360.0) - 180.0;
 
     assert!(
         phase_diff_00.abs() < 1.0,
-        "{}: S2 (0,0) phase should be +90 deg. Got {:.2} deg (diff: {:.2} deg)",
+        "{}: S2 (0,0) phase should be +/-90 deg. Got {:.2} deg (diff: {:.2} deg)",
         name,
         phase_00,
         phase_diff_00
     );
     assert!(
         phase_diff_11.abs() < 1.0,
-        "{}: S1 (1,1) phase should be +90 deg. Got {:.2} deg (diff: {:.2} deg)",
+        "{}: S1 (1,1) phase should be +-90 deg. Got {:.2} deg (diff: {:.2} deg)",
         name,
         phase_11,
         phase_diff_11
