@@ -190,13 +190,14 @@ impl Beam {
             let e_perp = self.get_e_perp(&normal);
             let mut field = self.field.new_from_e_perp(&e_perp);
 
-            let dist = (face.midpoint() - self.face.data().midpoint).dot(&self.field.prop()); // z-distance
+            let dist = (face.midpoint() - self.face.data().midpoint)
+                .dot(&self.field.prop())
+                .abs(); // z-distance
             let wavenumber = self.wavenumber();
             field.wind(dist * wavenumber * n1.re); // increment phase
-            let dist_sqrt = dist.abs().sqrt(); // TODO: improve this
             let absorbed_intensity =
-                field.intensity() * (1.0 - (-2.0 * wavenumber * n1.im * dist_sqrt).exp().powi(2));
-            let exp_absorption = (-2.0 * wavenumber * n1.im * dist_sqrt).exp(); // absorption
+                field.intensity() * (1.0 - (-wavenumber * n1.im * dist).exp().powi(2));
+            let exp_absorption = (-wavenumber * n1.im * dist).exp(); // absorption
             field.mul(exp_absorption); // multiply both ampl and ampl0 by exp_absorption factor
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
