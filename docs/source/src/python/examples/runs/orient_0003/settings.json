@@ -1,0 +1,77 @@
+{
+  "wavelength": 0.532,
+  "beam_power_threshold": 0.001,
+  "beam_area_threshold_fac": 0.001,
+  "cutoff": 0.99999,
+  "medium_refr_index": [
+    1.0,
+    0.0
+  ],
+  "particle_refr_index": [
+    [
+      1.31,
+      0.0
+    ]
+  ],
+  "orientation": {
+    "scheme": {
+      "Discrete": {
+        "eulers": [
+          {
+            "alpha": 0.0,
+            "beta": 30.0,
+            "gamma": 30.0
+          }
+        ]
+      }
+    },
+    "euler_convention": "ZYZ"
+  },
+  "geom_name": "hex.obj",
+  "max_rec": 10,
+  "max_tir": 20,
+  "zones": [
+    {
+      "label": null,
+      "scheme": {
+        "Interval": {
+          "thetas": [
+            0.0,
+            90.0,
+            180.0
+          ],
+          "theta_spacings": [
+            0.5,
+            1.0
+          ],
+          "phis": [
+            0.0,
+            360.0
+          ],
+          "phi_spacings": [
+            2.0
+          ]
+        }
+      }
+    }
+  ],
+  "seed": null,
+  "scale": 1.0,
+  "distortion": null,
+  "geom_scale": null,
+  "directory": "runs/orient_0003",
+  "fov_factor": null,
+  "mapping": "ApertureDiffraction",
+  "output": {
+    "settings_json": true,
+    "mueller_2d": true,
+    "mueller_1d": true,
+    "mueller_components": {
+      "total": true,
+      "beam": true,
+      "external": true
+    }
+  },
+  "coherence": true,
+  "quiet": false
+}

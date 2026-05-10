@@ -1,6 +1,7 @@
 site_name: GOAD
 nav:
   - index.md
+  - installation.md
   - settings.md
   - results.md
   - checks.md
@@ -8,6 +9,7 @@ nav:
   - api.md
   - Examples:
       - examples/backscattering.md
+      - examples/fixed-orientation-patterns.md
 
 site_url: https://hballington12.github.io/goad/
 repo_url: https://github.com/hballington12/goad

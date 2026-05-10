@@ -20,6 +20,7 @@ You can usually use GOAD when the following conditions are met:
 ## Contents
 
 ### User Guide
+- [Installation](installation.md)
 - [Settings](settings.md)
 - [Results](results.md)
 - [Checks](checks.md)
