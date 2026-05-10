@@ -1,3 +1,4 @@
+use goad::cancel::CancelToken;
 use goad::geom::{self};
 use goad::problem::Problem;
 
@@ -16,9 +17,9 @@ fn main() {
     println!("Initializing problem...");
     problem.init();
     println!("Illuminating problem...");
-    problem.illuminate();
+    problem.illuminate().unwrap();
     println!("Solving problem...");
-    problem.solve();
+    problem.solve(&CancelToken::noop()).unwrap();
     println!("Writing up results...");
     problem.writeup();
 }
