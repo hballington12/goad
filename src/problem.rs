@@ -8,11 +8,12 @@ use crate::multiproblem::{init_result, load_settings_or_default};
 use crate::powers::Powers;
 use crate::settings::{default_e_perp, default_prop, BATCH_SIZE_MULTIPLIER};
 use crate::{
-    beam::{Beam, BeamPropagation, BeamVariant, DefaultBeamVariant},
+    beam::{Beam, BeamVariant, DefaultBeamVariant},
     diff::Mapping,
     field::Field,
     geom::{Face, Geom},
     orientation, output,
+    recording::{BeamEvent, RecordedOutput, Recording},
     result::{GOComponent, Mueller, Results},
     settings::Settings,
     zones::ZoneType,
@@ -30,7 +31,6 @@ use rayon::prelude::*;
 mod tests {
 
     use super::*;
-    use nalgebra::Complex;
 
     #[test]
     fn backscatter_params_computed() {
@@ -103,29 +103,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn cube_inside_ico() {
-        let geoms = Geom::load("./examples/data/cube_inside_ico.obj").unwrap();
-        let mut geom = geoms[0].clone();
-        geom.shapes[0].refr_index = Complex {
-            // modify the refractive index of the outer shape
-            re: 2.0,
-            im: 0.1,
-        };
-        geom.shapes[1].parent_id = Some(0); // set the parent of the second shape to be the first
-        assert_ne!(geom.shapes[0].refr_index, geom.shapes[1].refr_index);
-        assert_eq!(
-            geom.shapes[0],
-            geom.shapes[geom.shapes[1].parent_id.unwrap()]
-        );
-
-        // Use default config to avoid loading local.toml which may have test-breaking settings
-        let default_settings =
-            crate::settings::load_default_config().expect("Failed to load default config");
-        let mut problem = Problem::new(Some(geom), Some(default_settings)).unwrap();
-
-        problem.propagate_next();
-    }
 }
 
 /// Output from propagating a single beam, used to collect results from parallel propagation.
@@ -643,23 +620,22 @@ impl Problem {
 
         for output in outputs {
             let p = output.power() / scale2;
-            match (&input_beam.variant, &output.variant) {
-                (BeamVariant::Default(..), BeamVariant::Default(..)) => {
+            match crate::beam::classify_output(&input_beam.variant, &output.variant) {
+                Some(crate::beam::OutputKind::Internal) => {
+                    if matches!(input_beam.variant, BeamVariant::Initial) {
+                        powers.input += p;
+                    }
                     new_beams.push(output);
                 }
-                (BeamVariant::Default(..), BeamVariant::OutGoing) => {
+                Some(crate::beam::OutputKind::OutGoing) => {
                     powers.output += p;
                     out_beams.push(output);
                 }
-                (BeamVariant::Initial, BeamVariant::Default(..)) => {
-                    powers.input += p;
-                    new_beams.push(output);
-                }
-                (BeamVariant::Initial, BeamVariant::ExternalDiff) => {
+                Some(crate::beam::OutputKind::ExternalDiff) => {
                     powers.ext_diff += p;
                     ext_diff_beams.push(output);
                 }
-                _ => {}
+                None => {}
             }
         }
 
@@ -690,114 +666,102 @@ impl Problem {
         let _ = output_manager.write_all();
     }
 
-    /// Propagates the next beam in the queue.
-    pub fn propagate_next(&mut self) -> Option<BeamPropagation> {
-        // Try to pop the next beam from the queue
-        let Some(mut beam) = self.beam_queue.pop() else {
-            return None;
-        };
+    /// Single-threaded near-field solve that captures every propagation
+    /// event into a `Recording`. Populates `self.result.powers`,
+    /// `self.out_beam_queue` and `self.ext_diff_beam_queue` exactly like
+    /// `solve_near` — so a subsequent `solve_far` + `mueller_to_1d` +
+    /// `compute_params` produces a full `Results` on top.
+    ///
+    /// Truncated beams (below thresholds, over caps, or producing no
+    /// outputs) are accounted for in `Powers` but not recorded as events;
+    /// their fate is implicit in the producing parent's `RecordedOutput`
+    /// having no follow-up event.
+    pub fn solve_near_with_recording(&mut self, cancel: &CancelToken) -> Result<Recording> {
+        let mut recording = Recording::new();
+        let scale2 = self.settings.scale.powi(2);
 
-        // Compute the outputs by propagating the beam
-        let outputs = match &mut beam.variant {
-            BeamVariant::Default(..) => self.propagate_default(&mut beam),
-            BeamVariant::Initial => self.propagate_initial(&mut beam),
-            _ => {
-                log::warn!("Unknown beam type, returning empty outputs.");
-                Vec::new()
+        loop {
+            cancel.check()?;
+            if self.beam_queue.is_empty() || self.cutoff_reached() {
+                self.tally_remaining();
+                break;
             }
-        };
 
-        self.result.powers.absorbed += beam.absorbed_power / self.settings.scale.powi(2);
-        self.result.powers.trnc_clip +=
-            (beam.clipping_area - beam.csa()) * beam.power() / self.settings.scale.powi(2);
+            let mut beam = self.beam_queue.pop().unwrap(); // strongest first
+            let input_snapshot = beam.clone(); // before propagate mutates it
 
-        // Process each output beam
-        for output in outputs.iter() {
-            let output_power = output.power() / self.settings.scale.powi(2);
-            match (&beam.variant, &output.variant) {
-                (BeamVariant::Default(..), BeamVariant::Default(..)) => {
-                    self.insert_beam(output.clone())
-                }
-                (BeamVariant::Default(..), BeamVariant::OutGoing) => {
-                    self.result.powers.output += output_power;
-                    self.insert_outbeam(output.clone());
-                }
-                (BeamVariant::Initial, BeamVariant::Default(..)) => {
-                    self.result.powers.input += output_power;
-                    self.insert_beam(output.clone());
-                }
-                (BeamVariant::Initial, BeamVariant::ExternalDiff) => {
-                    self.result.powers.ext_diff += output_power;
-                    self.ext_diff_beam_queue.push(output.clone());
-                }
-                _ => {}
+            // Reuse production thresholding + propagation.
+            let mut powers = Powers::new();
+            let outputs = Self::propagate_with_checks(
+                &mut beam,
+                &mut self.geom,
+                &self.settings,
+                &mut powers,
+            )?;
+            powers.absorbed += beam.absorbed_power / scale2;
+            powers.trnc_clip += (beam.clipping_area - beam.csa()) * beam.power() / scale2;
+
+            // Truncated / clip-err / produced-nothing beams: charge powers
+            // but record no event.
+            if outputs.is_empty() {
+                self.result.powers += powers;
+                continue;
             }
+
+            // Tag each output in emission order for the recording, before
+            // categorise_outputs consumes the vec into the production queues.
+            let recorded_outputs: Vec<RecordedOutput> = outputs
+                .iter()
+                .filter_map(|o| {
+                    crate::beam::classify_output(&input_snapshot.variant, &o.variant)
+                        .map(|kind| RecordedOutput {
+                            beam: o.clone(),
+                            kind,
+                        })
+                })
+                .collect();
+
+            let categorised = Self::categorise_outputs(&beam, outputs, powers, scale2);
+
+            recording.events.push(BeamEvent {
+                id: recording.events.len(),
+                input: input_snapshot,
+                outputs: recorded_outputs,
+            });
+
+            // Merge — same dispatch as merge_batch, just for one result.
+            self.result.powers += categorised.powers;
+            for b in categorised.new_beams {
+                self.insert_beam(b);
+            }
+            for b in categorised.out_beams {
+                self.insert_outbeam(b);
+            }
+            self.ext_diff_beam_queue.extend(categorised.ext_diff_beams);
         }
-        Some(BeamPropagation::new(beam, outputs))
+        Ok(recording)
     }
 
-    fn propagate_initial(&mut self, beam: &mut Beam) -> Vec<Beam> {
-        match beam.propagate(
-            &mut self.geom,
-            self.settings.medium_refr_index,
-            self.settings.beam_area_threshold(),
-        ) {
-            Ok((outputs, ..)) => outputs,
-
-            Err(_) => Vec::new(),
+    /// Full recorded equivalent of `run`. Mirrors the production pipeline
+    /// (init → orient → illuminate → solve_near → solve_far → mueller_to_1d
+    /// → compute_params), substituting the recording-aware near-field
+    /// solve. On success `self.result` is a complete `Results` and the
+    /// returned `Recording` holds the captured beam tree.
+    pub fn run_with_recording(
+        &mut self,
+        euler: Option<&orientation::Euler>,
+        cancel: &CancelToken,
+    ) -> Result<Recording> {
+        self.init();
+        if let Some(e) = euler {
+            self.orient(e)?;
         }
-    }
-
-    /// Propagates a beam with the default settings.
-    /// Cycles through checks to decide whether to propagate the beam or not.
-    fn propagate_default(&mut self, beam: &mut Beam) -> Vec<Beam> {
-        // beam power is below threshold
-        if beam.power() < self.settings.beam_power_threshold * self.settings.scale.powi(2) {
-            self.result.powers.trnc_energy += beam.power() / self.settings.scale.powi(2);
-            return Vec::new();
-        }
-
-        // beam area is below threshold
-        if beam.face.data().area.unwrap() < self.settings.beam_area_threshold() {
-            self.result.powers.trnc_area += beam.power() / self.settings.scale.powi(2);
-            return Vec::new();
-        }
-
-        // total internal reflection considerations
-        if let BeamVariant::Default(DefaultBeamVariant::Tir) = beam.variant {
-            if beam.tir_count >= self.settings.max_tir {
-                self.result.powers.trnc_ref += beam.power() / self.settings.scale.powi(2);
-                return Vec::new();
-            } else {
-                return self.propagate(beam);
-            }
-        }
-
-        // beam recursion over the maximum
-        if beam.rec_count > self.settings.max_rec {
-            self.result.powers.trnc_rec += beam.power() / self.settings.scale.powi(2);
-            return Vec::new();
-        }
-
-        // else, propagate the beam
-        self.propagate(beam)
-    }
-
-    fn propagate(&mut self, beam: &mut Beam) -> Vec<Beam> {
-        match beam.propagate(
-            &mut self.geom,
-            self.settings.medium_refr_index,
-            self.settings.beam_area_threshold(),
-        ) {
-            Ok((outputs, area_power_loss)) => {
-                self.result.powers.trnc_area += area_power_loss / self.settings.scale.powi(2);
-                outputs
-            }
-            Err(_) => {
-                self.result.powers.clip_err += beam.power() / self.settings.scale.powi(2);
-                Vec::new()
-            }
-        }
+        self.illuminate()?;
+        let recording = self.solve_near_with_recording(cancel)?;
+        self.solve_far(cancel)?;
+        self.mueller_to_1d();
+        self.compute_params();
+        Ok(recording)
     }
 
     /// Inserts a beam into the beam queue such that beams with greatest power

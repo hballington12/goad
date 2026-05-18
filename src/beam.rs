@@ -1,9 +1,8 @@
 use anyhow::Result;
 use std::f32::consts::PI;
+use std::sync::atomic::{AtomicU64, Ordering};
 
-use geo::Coord;
-
-use nalgebra::{Complex, Matrix4, Point3, Vector3};
+use nalgebra::{Complex, Matrix4, Vector3};
 
 use crate::{
     bins::SolidAngleBin,
@@ -16,53 +15,38 @@ use crate::{
     snell::get_theta_t,
 };
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct BeamPropagation {
-    pub input: Beam,
-    pub refr_index: Complex<f32>,
-    pub outputs: Vec<Beam>,
+/// Process-unique identifier for a beam. Assigned at construction in
+/// `Beam::new`; preserved across `Clone` (a clone is the same logical beam).
+pub type BeamId = u64;
+
+static BEAM_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+fn next_beam_id() -> BeamId {
+    BEAM_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
-impl BeamPropagation {
-    /// Makes a new `BeamPropagation` struct, which represents a beam propagation.
-    pub fn new(input: Beam, outputs: Vec<Beam>) -> Self {
-        let refr_index = input.refr_index.clone();
-        Self {
-            input,
-            refr_index,
-            outputs,
-        }
-    }
-    #[allow(dead_code)]
-    fn get_line(point: &Point3<f32>, input: &Beam) -> Vec<Coord<f32>> {
-        let output_mid = point;
-        let input_mid = input.face.data().midpoint;
-        let vec = input_mid - output_mid;
-        let input_normal = input.face.data().normal;
-        let norm_dist_to_plane = vec.dot(&input_normal);
-        let dist_to_plane = norm_dist_to_plane / (input_normal.dot(&input.field.prop()));
-        // ray cast along propagation direction
-        let intsn = output_mid + dist_to_plane * input.field.prop();
-        vec![
-            Coord {
-                x: output_mid.coords.x,
-                y: output_mid.coords.y,
-            },
-            Coord {
-                x: intsn.coords.x,
-                y: intsn.coords.y,
-            },
-        ]
-    }
+/// Where an output beam goes after a propagation event. Shared by the
+/// production batch path (via `categorise_outputs`) and the recording path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputKind {
+    /// Re-propagated as a new internal beam.
+    Internal,
+    /// Exits geometry — feeds the far-field diffraction stage.
+    OutGoing,
+    /// External (silhouette) diffraction beam from the initial pass.
+    ExternalDiff,
+}
 
-    pub fn input_power(&self) -> f32 {
-        self.input.power()
-    }
-
-    pub fn output_power(&self) -> f32 {
-        let total = self.outputs.iter().fold(0.0, |acc, x| acc + x.power());
-
-        total
+/// Pure classification of an (input, output) variant pair. Returns None for
+/// combinations the solver drops on the floor (e.g. anything emitted by an
+/// OutGoing beam — which never happens but the match must be total).
+pub fn classify_output(input: &BeamVariant, output: &BeamVariant) -> Option<OutputKind> {
+    match (input, output) {
+        (BeamVariant::Default(..), BeamVariant::Default(..))
+        | (BeamVariant::Initial, BeamVariant::Default(..)) => Some(OutputKind::Internal),
+        (BeamVariant::Default(..), BeamVariant::OutGoing) => Some(OutputKind::OutGoing),
+        (BeamVariant::Initial, BeamVariant::ExternalDiff) => Some(OutputKind::ExternalDiff),
+        _ => None,
     }
 }
 
@@ -468,8 +452,11 @@ impl Beam {
 }
 
 /// Contains information about a beam.
-#[derive(Debug, Clone, PartialEq)] // Added Default derive
+#[derive(Debug, Clone)]
 pub struct Beam {
+    /// Process-unique identity. Set in `new`; preserved by `Clone` so cross-
+    /// thread / cross-batch clones are recognised as the same logical beam.
+    pub id: BeamId,
     pub face: Face,
     pub refr_index: Complex<f32>,
     pub rec_count: i32,
@@ -479,6 +466,23 @@ pub struct Beam {
     pub clipping_area: f32,   // total area accounted for by intersections and remainders
     pub variant: BeamVariant, // type of beam, e.g. initial, default, outgoing, external diff
     pub wavelength: f32,
+}
+
+// Equality is over physical content; identity (`id`) is excluded so a clone
+// (which intentionally shares the parent's id) still compares equal to its
+// source.
+impl PartialEq for Beam {
+    fn eq(&self, other: &Self) -> bool {
+        self.face == other.face
+            && self.refr_index == other.refr_index
+            && self.rec_count == other.rec_count
+            && self.tir_count == other.tir_count
+            && self.field == other.field
+            && self.absorbed_power == other.absorbed_power
+            && self.clipping_area == other.clipping_area
+            && self.variant == other.variant
+            && self.wavelength == other.wavelength
+    }
 }
 
 /// Creates a new beam
@@ -493,6 +497,7 @@ impl Beam {
         wavelength: f32,
     ) -> Self {
         Self {
+            id: next_beam_id(),
             face,
             refr_index,
             rec_count,
@@ -538,6 +543,7 @@ impl Beam {
         let new_field = self.field.rotated(&rot3);
 
         Ok(Self {
+            id: self.id,
             face: new_face,
             refr_index: self.refr_index,
             rec_count: self.rec_count,
