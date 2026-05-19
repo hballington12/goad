@@ -331,6 +331,24 @@ pub struct Plane {
     pub offset: f32,
 }
 
+/// World → view transform that aligns `prop` with the -z axis. This is the
+/// same convention used by the near-field clipping algorithm: after the
+/// transform is applied to a scene, anything moving along `prop` in the
+/// world is moving along -z in the transformed frame, which makes 2D
+/// polygon clipping in xy straightforward.
+pub fn look_along(prop: Vector3<f32>) -> Matrix4<f32> {
+    let model = Isometry3::new(Vector3::zeros(), na::zero());
+    let origin = Point3::origin();
+    let target = Point3::new(prop.x, prop.y, prop.z);
+    let up: Vector3<f32> = if prop.cross(&Vector3::y()).norm() < settings::COLINEAR_THRESHOLD {
+        Vector3::x()
+    } else {
+        Vector3::y()
+    };
+    let view = Isometry3::look_at_rh(&origin, &target, &up);
+    (view * model).to_homogeneous()
+}
+
 /// Represents a closed line of exterior points of a polygon 3D.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FaceData {
@@ -1355,16 +1373,17 @@ impl Geom {
         Ok(())
     }
 
-    /// Rescales the geometry so that the largest dimension is 1. Returns the
-    /// scaling factor.
-    pub fn rescale(&mut self) -> f32 {
-        let scale = self.compute_scale_factor();
+    /// Rescales the geometry. If `scale_in` is `Some(s)`, uses `s` directly;
+    /// if `None`, computes the factor that maps the largest dimension to 1
+    /// and writes it back through `scale_in` so the caller can record it.
+    pub fn rescale(&mut self, scale_in: &mut Option<f32>) {
+        let scale = scale_in.unwrap_or_else(|| self.compute_scale_factor());
 
         for shape in self.shapes.iter_mut() {
             shape.rescale(scale);
         }
 
-        scale
+        *scale_in = Some(scale);
     }
 
     /// Recentres the geometry so that the centre of mass is at the origin.

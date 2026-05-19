@@ -102,7 +102,6 @@ mod tests {
             depol
         );
     }
-
 }
 
 /// Output from propagating a single beam, used to collect results from parallel propagation.
@@ -237,12 +236,13 @@ impl Problem {
             let _ = self.geom.distort(distortion, self.settings.seed);
         }
         self.geom.recentre();
-        self.settings.scale = self.geom.rescale();
+        self.geom.rescale(&mut self.settings.scale);
     }
 
     /// Illuminates the problem with a basic initial beam.
     pub fn illuminate(&mut self) -> Result<()> {
-        let scaled_wavelength = self.settings.wavelength * self.settings.scale;
+        let scale = self.settings.get_scale()?;
+        let scaled_wavelength = self.settings.wavelength * scale;
 
         let beam = basic_initial_beam(
             &self.geom,
@@ -462,7 +462,7 @@ impl Problem {
         loop {
             cancel.check()?;
             if self.beam_queue.is_empty() || self.cutoff_reached() {
-                self.tally_remaining();
+                self.tally_remaining()?;
                 break;
             }
 
@@ -481,12 +481,14 @@ impl Problem {
     }
 
     /// Add remaining beam queue power to truncation tally.
-    fn tally_remaining(&mut self) {
+    fn tally_remaining(&mut self) -> Result<()> {
+        let scale = self.settings.get_scale()?;
         self.result.powers.trnc_cop += self
             .beam_queue
             .iter()
-            .map(|b| b.power() / self.settings.scale.powi(2))
+            .map(|b| b.power() / scale.powi(2))
             .sum::<f32>();
+        Ok(())
     }
 
     /// Pop up to `n` highest-power beams from the queue.
@@ -517,7 +519,8 @@ impl Problem {
         geom: &mut Geom,
         settings: &Settings,
     ) -> Result<PropagationOutput> {
-        let scale2 = settings.scale.powi(2);
+        let scale = settings.get_scale()?;
+        let scale2 = scale.powi(2);
         let mut powers = Powers::new();
 
         let outputs = Self::propagate_with_checks(beam, geom, settings, &mut powers)?;
@@ -539,13 +542,17 @@ impl Problem {
         settings: &Settings,
         powers: &mut Powers,
     ) -> Result<Vec<Beam>> {
-        let scale2 = settings.scale.powi(2);
+        let Some(scale) = settings.scale else {
+            return Err(anyhow::anyhow!("scale is not set"));
+        };
+
+        let scale2 = scale.powi(2);
 
         if let BeamVariant::Initial = beam.variant {
             let (outputs, ..) = beam.propagate(
                 geom,
                 settings.medium_refr_index,
-                settings.beam_area_threshold(),
+                settings.beam_area_threshold()?,
             )?;
             return Ok(outputs);
         }
@@ -555,7 +562,7 @@ impl Problem {
             return Ok(Vec::new());
         }
 
-        if beam.face.data().area.unwrap() < settings.beam_area_threshold() {
+        if beam.face.data().area.unwrap() < settings.beam_area_threshold()? {
             powers.trnc_area += beam.power() / scale2;
             return Ok(Vec::new());
         }
@@ -570,7 +577,7 @@ impl Problem {
                 match beam.propagate(
                     geom,
                     settings.medium_refr_index,
-                    settings.beam_area_threshold(),
+                    settings.beam_area_threshold()?,
                 ) {
                     Ok((outputs, area_loss)) => {
                         powers.trnc_area += area_loss / scale2;
@@ -593,7 +600,7 @@ impl Problem {
             match beam.propagate(
                 geom,
                 settings.medium_refr_index,
-                settings.beam_area_threshold(),
+                settings.beam_area_threshold()?,
             ) {
                 Ok((outputs, area_loss)) => {
                     powers.trnc_area += area_loss / scale2;
@@ -678,12 +685,13 @@ impl Problem {
     /// having no follow-up event.
     pub fn solve_near_with_recording(&mut self, cancel: &CancelToken) -> Result<Recording> {
         let mut recording = Recording::new();
-        let scale2 = self.settings.scale.powi(2);
+        let scale = self.settings.get_scale()?;
+        let scale2 = scale.powi(2);
 
         loop {
             cancel.check()?;
             if self.beam_queue.is_empty() || self.cutoff_reached() {
-                self.tally_remaining();
+                self.tally_remaining()?;
                 break;
             }
 
@@ -713,11 +721,12 @@ impl Problem {
             let recorded_outputs: Vec<RecordedOutput> = outputs
                 .iter()
                 .filter_map(|o| {
-                    crate::beam::classify_output(&input_snapshot.variant, &o.variant)
-                        .map(|kind| RecordedOutput {
+                    crate::beam::classify_output(&input_snapshot.variant, &o.variant).map(|kind| {
+                        RecordedOutput {
                             beam: o.clone(),
                             kind,
-                        })
+                        }
+                    })
                 })
                 .collect();
 

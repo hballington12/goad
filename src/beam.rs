@@ -178,11 +178,12 @@ impl Beam {
                 .dot(&self.field.prop())
                 .abs(); // z-distance
             let wavenumber = self.wavenumber();
-            field.wind(dist * wavenumber * n1.re); // increment phase
+            // Compute absorbed_intensity before applying the attenuation —
+            // intensity is invariant under phase winding so it can be read
+            // after `propagate` increments phase but before it attenuates.
             let absorbed_intensity =
                 field.intensity() * (1.0 - (-wavenumber * n1.im * dist).exp().powi(2));
-            let exp_absorption = (-wavenumber * n1.im * dist).exp(); // absorption
-            field.mul(exp_absorption); // multiply both ampl and ampl0 by exp_absorption factor
+            field.propagate(dist, wavenumber, n1);
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 

@@ -15,6 +15,7 @@ use crate::diff::Mapping;
 use crate::orientation::Euler;
 use crate::orientation::*;
 use crate::zones::ZoneConfig;
+use anyhow::Result;
 
 /// Provides a default empty zones vec.
 fn default_zones() -> Vec<ZoneConfig> {
@@ -74,7 +75,7 @@ pub struct Settings {
     pub seed: Option<u64>,
     /// Problem scaling factor - scales the entire problem (geometry, wavelength, and beam area thresholds)
     #[serde(default = "constants::default_scale_factor")]
-    pub scale: f32,
+    pub scale: Option<f32>,
     pub distortion: Option<f32>,
     /// Per-axis geometry scaling [x, y, z] - scales only the geometry in each dimension
     #[serde(default = "constants::default_geom_scale")]
@@ -132,7 +133,7 @@ impl Settings {
         cutoff: f32,
         max_rec: i32,
         max_tir: i32,
-        scale: f32,
+        scale: Option<f32>,
         distortion: Option<f32>,
         directory: &str,
         mapping: Mapping,
@@ -459,7 +460,16 @@ impl Settings {
 }
 
 impl Settings {
-    pub fn beam_area_threshold(&self) -> f32 {
-        self.wavelength * self.wavelength * self.beam_area_threshold_fac * self.scale.powi(2)
+    pub fn get_scale(&self) -> Result<f32> {
+        if let Some(scale) = self.scale {
+            Ok(scale)
+        } else {
+            Err(anyhow::anyhow!("scale is not set"))
+        }
+    }
+
+    pub fn beam_area_threshold(&self) -> Result<f32> {
+        let scale = self.get_scale()?;
+        Ok(self.wavelength * self.wavelength * self.beam_area_threshold_fac * scale.powi(2))
     }
 }

@@ -5,7 +5,7 @@ use anyhow::Result;
 use geo::{Area, BooleanOps, Simplify};
 
 use log::trace;
-use nalgebra::{self as na, Isometry3, Matrix4, Point3, Vector3};
+use nalgebra::{Matrix4, Point3, Vector3};
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -753,21 +753,8 @@ impl<'a> Clipping<'a> {
 
     /// Sets the forward and inverse transform for the clipping
     fn set_transform(&mut self) {
-        let model = Isometry3::new(Vector3::zeros(), na::zero()); // do some sort of projection - set to nothing
-        let origin = Point3::origin(); // camera location
-        let target = Point3::new(self.proj.x, self.proj.y, self.proj.z); // projection direction, defines negative z-axis in new coords
-
-        let up: Vector3<f32> =
-            if self.proj.cross(&Vector3::y()).norm() < settings::COLINEAR_THRESHOLD {
-                Vector3::x()
-            } else {
-                Vector3::y()
-            };
-
-        let view = Isometry3::look_at_rh(&origin, &target, &up);
-
-        self.transform = (view * model).to_homogeneous(); // transform to clipping system
-        self.itransform = self.transform.try_inverse().unwrap(); // inverse transform
+        self.transform = crate::geom::look_along(*self.proj);
+        self.itransform = self.transform.try_inverse().unwrap();
     }
 
     pub fn init_clip(&mut self) -> Result<(&Face, Vec<&Face>)> {

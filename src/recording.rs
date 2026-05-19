@@ -13,11 +13,12 @@
 //! exposes iterators over the filtered set. Materialise into owned data
 //! via the `collect_*` methods when handing across an FFI boundary.
 
-use nalgebra::{Point3, Vector3};
+use geo::Contains;
+use nalgebra::{Matrix4, Point3, Vector3};
 
 use crate::beam::{Beam, BeamId, BeamVariant, OutputKind};
-use crate::field::Ampl;
-use crate::geom::{Face, Plane};
+use crate::field::Field;
+use crate::geom::{look_along, Face, Plane};
 
 pub type EventId = usize;
 
@@ -93,6 +94,28 @@ impl BeamEvent {
     }
 }
 
+/// One beam's contribution to the field at a query point. Produced by
+/// `BeamView::field_at` / `fields_at`. The `field` is the parent beam's
+/// field propagated forward to the query point through the beam's medium.
+#[derive(Debug, Clone)]
+pub struct FieldContribution {
+    /// Event that produced this contribution (the parent beam being
+    /// propagated through the query point's location).
+    pub event_id: EventId,
+    /// Index into `event.outputs` of the region whose prism the query
+    /// point fell inside — useful for attributing the contribution to a
+    /// specific downstream branch (e.g. refracted vs reflected).
+    pub output_index: usize,
+    /// Kind of the output region (mirrors `event.outputs[output_index].kind`).
+    pub kind: OutputKind,
+    /// Parent beam's field, propagated forward by `distance` through its
+    /// medium.
+    pub field: Field,
+    /// Signed propagation distance from the back-face midpoint to the
+    /// query point, along the parent beam's prop direction.
+    pub distance: f32,
+}
+
 /// Exterior ring plus any interior (hole) rings of a polygon in 3D.
 #[derive(Debug, Clone)]
 pub struct PolygonRings {
@@ -164,6 +187,24 @@ fn back_project_ring(ring: &[Point3<f32>], plane: &Plane, dir: Vector3<f32>) -> 
             *p + dir * t
         })
         .collect()
+}
+
+/// Build a 2D polygon in the clip frame from a 3D `PolygonRings` by
+/// transforming each vertex through `transform` and dropping the z
+/// coordinate. Used for point-in-polygon tests against the back cap of a
+/// decomposed region.
+fn ring_to_polygon_2d(rings: &PolygonRings, transform: &Matrix4<f32>) -> geo::Polygon<f32> {
+    let to_coord = |p: &Point3<f32>| {
+        let pc = transform.transform_point(p);
+        geo::Coord { x: pc.x, y: pc.y }
+    };
+    let exterior: Vec<_> = rings.exterior.iter().map(to_coord).collect();
+    let interiors: Vec<_> = rings
+        .interiors
+        .iter()
+        .map(|ring| geo::LineString(ring.iter().map(to_coord).collect()))
+        .collect();
+    geo::Polygon::new(geo::LineString(exterior), interiors)
 }
 
 fn push_ring_quads(back: &[Point3<f32>], front: &[Point3<f32>], out: &mut Vec<[Point3<f32>; 4]>) {
@@ -364,11 +405,95 @@ impl<'a> BeamView<'a> {
 
     // --- aggregation ---
 
-    /// Sum the field at `point` over the filtered beams.
-    /// TODO: physics — pick a convention (naive GO plane-wave evaluation
-    /// vs Kirchhoff/Green-theorem). Stub for now.
-    pub fn field_at(&self, _point: Point3<f32>) -> Option<Ampl> {
-        todo!("field-at-point evaluation not yet implemented")
+    /// Evaluate the field at a single query point, summing contributions
+    /// from every beam in the filtered view whose column contains `point`.
+    /// Returns one entry per contributing beam — callers can inspect them
+    /// individually or sum after rotating to a common reference frame.
+    /// See `fields_at` for the batch entry point.
+    pub fn field_at(&self, point: Point3<f32>) -> Vec<FieldContribution> {
+        self.fields_at(&[point]).pop().unwrap_or_default()
+    }
+
+    /// Batch field evaluation. Returns one `Vec<FieldContribution>` per
+    /// query point, in input order. Iterates events once and tests every
+    /// point against each event's prism regions, which is `O(events ×
+    /// points)`. No spatial index yet; revisit if it becomes hot.
+    ///
+    /// For each event, a point lies inside an output's prism when:
+    /// 1. The point is downstream of the back (input) face along the
+    ///    event's prop direction; for non-OutGoing outputs, also upstream
+    ///    of the front (output) face. OutGoing prisms are semi-infinite
+    ///    forward (geometric-optics column, no diffraction smearing).
+    /// 2. The point, rotated into the event's clip frame, falls inside
+    ///    the back polygon's xy footprint.
+    ///
+    /// When both hold, the parent beam's field is propagated forward by
+    /// the prop-direction distance from the back-face midpoint to the
+    /// query point using `Field::propagate`, and pushed onto the result
+    /// for that point.
+    pub fn fields_at(&self, points: &[Point3<f32>]) -> Vec<Vec<FieldContribution>> {
+        let mut out = vec![Vec::<FieldContribution>::new(); points.len()];
+
+        for event in self.events() {
+            let prop = event.input.field.prop();
+            let n = event.input.refr_index;
+            let k = event.input.wavenumber();
+            let input_mid = event.input.face.data().midpoint;
+            let transform = look_along(prop);
+
+            // Pre-transform query points into the clip frame once per
+            // event so the per-region inner loop only does the xy test.
+            let points_clip: Vec<Point3<f32>> = points
+                .iter()
+                .map(|p| transform.transform_point(p))
+                .collect();
+
+            for region in event.decompose() {
+                let semi_infinite = matches!(region.kind, OutputKind::OutGoing);
+                let back_mid = if semi_infinite {
+                    // OutGoing remainder is coplanar with the input —
+                    // its own midpoint sits on the input plane and is
+                    // the appropriate reference for the slab test.
+                    event.outputs[region.output_index].beam.face.data().midpoint
+                } else {
+                    input_mid
+                };
+                let front_mid = event.outputs[region.output_index].beam.face.data().midpoint;
+                let back_poly_2d = ring_to_polygon_2d(&region.back, &transform);
+
+                for (i, &x) in points.iter().enumerate() {
+                    let dist_from_back = (x - back_mid).dot(&prop);
+                    if dist_from_back < 0.0 {
+                        continue;
+                    }
+                    if !semi_infinite {
+                        let dist_from_front = (x - front_mid).dot(&prop);
+                        if dist_from_front > 0.0 {
+                            continue;
+                        }
+                    }
+
+                    let x_clip = points_clip[i];
+                    let p2d = geo::Point::new(x_clip.x, x_clip.y);
+                    if !back_poly_2d.contains(&p2d) {
+                        continue;
+                    }
+
+                    let mut field = event.input.field.clone();
+                    field.propagate(dist_from_back, k, n);
+
+                    out[i].push(FieldContribution {
+                        event_id: event.id,
+                        output_index: region.output_index,
+                        kind: region.kind,
+                        field,
+                        distance: dist_from_back,
+                    });
+                }
+            }
+        }
+
+        out
     }
 
     // --- internals ---

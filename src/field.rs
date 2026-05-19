@@ -210,6 +210,15 @@ impl Field {
         self.phase += arg;
     }
 
+    /// Propagate this field forward by `distance` through a medium of
+    /// (possibly complex) refractive index `n` at wavenumber `k`. Phase
+    /// is wound by `distance · k · n.re`; amplitude is attenuated by
+    /// `exp(-k · n.im · distance)`.
+    pub fn propagate(&mut self, distance: f32, wavenumber: f32, n: Complex<f32>) {
+        self.wind(distance * wavenumber * n.re);
+        self.mul((-wavenumber * n.im * distance).exp());
+    }
+
     // Getters
 
     /// Returns the propagation vector of the field

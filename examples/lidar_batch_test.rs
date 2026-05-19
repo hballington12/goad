@@ -66,7 +66,7 @@ fn run_single_config(
             euler_convention: EulerConvention::ZYZ,
         },
         seed: None,
-        scale: 1.0,
+        scale: Some(1.0),
         distortion: None,
         geom_scale: None,
         fov_factor: None,

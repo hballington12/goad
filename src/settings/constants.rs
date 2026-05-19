@@ -85,8 +85,8 @@ pub const MIN_ORIENTATIONS: usize = 10;
 // Default Functions
 // =================
 
-pub fn default_scale_factor() -> f32 {
-    1.0
+pub fn default_scale_factor() -> Option<f32> {
+    None
 }
 
 pub fn default_e_perp() -> Vector3<f32> {
