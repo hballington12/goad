@@ -628,7 +628,7 @@ impl Problem {
         for output in outputs {
             let p = output.power() / scale2;
             match crate::beam::classify_output(&input_beam.variant, &output.variant) {
-                Some(crate::beam::OutputKind::Internal) => {
+                Some(crate::beam::OutputKind::NearField) => {
                     if matches!(input_beam.variant, BeamVariant::Initial) {
                         powers.input += p;
                     }

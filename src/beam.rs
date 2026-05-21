@@ -30,7 +30,7 @@ fn next_beam_id() -> BeamId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputKind {
     /// Re-propagated as a new internal beam.
-    Internal,
+    NearField,
     /// Exits geometry — feeds the far-field diffraction stage.
     OutGoing,
     /// External (silhouette) diffraction beam from the initial pass.
@@ -43,7 +43,7 @@ pub enum OutputKind {
 pub fn classify_output(input: &BeamVariant, output: &BeamVariant) -> Option<OutputKind> {
     match (input, output) {
         (BeamVariant::Default(..), BeamVariant::Default(..))
-        | (BeamVariant::Initial, BeamVariant::Default(..)) => Some(OutputKind::Internal),
+        | (BeamVariant::Initial, BeamVariant::Default(..)) => Some(OutputKind::NearField),
         (BeamVariant::Default(..), BeamVariant::OutGoing) => Some(OutputKind::OutGoing),
         (BeamVariant::Initial, BeamVariant::ExternalDiff) => Some(OutputKind::ExternalDiff),
         _ => None,

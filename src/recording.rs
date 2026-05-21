@@ -74,7 +74,7 @@ impl BeamEvent {
                 let front = polygon_rings_of(&ro.beam.face);
                 let back = match ro.kind {
                     OutputKind::OutGoing => front.clone(),
-                    OutputKind::Internal | OutputKind::ExternalDiff => PolygonRings {
+                    OutputKind::NearField | OutputKind::ExternalDiff => PolygonRings {
                         exterior: back_project_ring(&front.exterior, &input_plane, dir),
                         interiors: front
                             .interiors
@@ -479,8 +479,8 @@ impl<'a> BeamView<'a> {
                     // Slab test using plane equations. `t` is the signed
                     // distance from the plane to X along prop — positive
                     // means X is downstream of the plane.
-                    let t_back = (x.coords.dot(&back_plane.normal) + back_plane.offset)
-                        / n_b_dot_prop;
+                    let t_back =
+                        (x.coords.dot(&back_plane.normal) + back_plane.offset) / n_b_dot_prop;
                     if t_back < 0.0 {
                         continue;
                     }
