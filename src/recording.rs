@@ -111,8 +111,10 @@ pub struct FieldContribution {
     /// Parent beam's field, propagated forward by `distance` through its
     /// medium.
     pub field: Field,
-    /// Signed propagation distance from the back-face midpoint to the
-    /// query point, along the parent beam's prop direction.
+    /// Signed propagation distance from the input-face midpoint to the
+    /// query point, along the parent beam's prop direction. This is the
+    /// argument passed to `Field::propagate` when computing the
+    /// contribution.
     pub distance: f32,
 }
 
@@ -420,17 +422,24 @@ impl<'a> BeamView<'a> {
     /// points)`. No spatial index yet; revisit if it becomes hot.
     ///
     /// For each event, a point lies inside an output's prism when:
-    /// 1. The point is downstream of the back (input) face along the
-    ///    event's prop direction; for non-OutGoing outputs, also upstream
-    ///    of the front (output) face. OutGoing prisms are semi-infinite
-    ///    forward (geometric-optics column, no diffraction smearing).
-    /// 2. The point, rotated into the event's clip frame, falls inside
-    ///    the back polygon's xy footprint.
+    /// 1. It is downstream of the back (input) face *plane* and (for
+    ///    non-OutGoing outputs) upstream of the front (output) face
+    ///    *plane*, both measured along prop. The plane equation is used
+    ///    rather than a midpoint-along-prop projection so the test holds
+    ///    at oblique incidence — at the back plane the boundary cuts
+    ///    obliquely across the prism's columnar interior.
+    ///    OutGoing prisms are semi-infinite forward (geometric-optics
+    ///    column, no diffraction smearing).
+    /// 2. It falls inside the back polygon's xy footprint in the event's
+    ///    clip frame.
     ///
     /// When both hold, the parent beam's field is propagated forward by
-    /// the prop-direction distance from the back-face midpoint to the
-    /// query point using `Field::propagate`, and pushed onto the result
-    /// for that point.
+    /// `(X - input_mid)·prop` — the natural plane-wave phase variation
+    /// from the reference midpoint where `event.input.field` is wound to.
+    /// This is distinct from the slab-test distance above; at oblique
+    /// incidence the back plane and prop are not aligned, so "distance
+    /// along prop from the plane" and "distance along prop from a point
+    /// on the plane" disagree.
     pub fn fields_at(&self, points: &[Point3<f32>]) -> Vec<Vec<FieldContribution>> {
         let mut out = vec![Vec::<FieldContribution>::new(); points.len()];
 
@@ -441,6 +450,12 @@ impl<'a> BeamView<'a> {
             let input_mid = event.input.face.data().midpoint;
             let transform = look_along(prop);
 
+            // Back plane = input face's plane. True for every output kind:
+            // OutGoing remainders lie on the input plane by construction;
+            // Internal / ExternalDiff regions are back-projected onto it.
+            let back_plane = event.input.face.plane();
+            let n_b_dot_prop = back_plane.normal.dot(&prop);
+
             // Pre-transform query points into the clip frame once per
             // event so the per-region inner loop only does the xy test.
             let points_clip: Vec<Point3<f32>> = points
@@ -450,25 +465,28 @@ impl<'a> BeamView<'a> {
 
             for region in event.decompose() {
                 let semi_infinite = matches!(region.kind, OutputKind::OutGoing);
-                let back_mid = if semi_infinite {
-                    // OutGoing remainder is coplanar with the input —
-                    // its own midpoint sits on the input plane and is
-                    // the appropriate reference for the slab test.
-                    event.outputs[region.output_index].beam.face.data().midpoint
+                // Front plane info — None for OutGoing (no downstream cap).
+                let front_plane_info = if semi_infinite {
+                    None
                 } else {
-                    input_mid
+                    let plane = event.outputs[region.output_index].beam.face.plane();
+                    let n_f_dot_prop = plane.normal.dot(&prop);
+                    Some((plane, n_f_dot_prop))
                 };
-                let front_mid = event.outputs[region.output_index].beam.face.data().midpoint;
                 let back_poly_2d = ring_to_polygon_2d(&region.back, &transform);
 
                 for (i, &x) in points.iter().enumerate() {
-                    let dist_from_back = (x - back_mid).dot(&prop);
-                    if dist_from_back < 0.0 {
+                    // Slab test using plane equations. `t` is the signed
+                    // distance from the plane to X along prop — positive
+                    // means X is downstream of the plane.
+                    let t_back = (x.coords.dot(&back_plane.normal) + back_plane.offset)
+                        / n_b_dot_prop;
+                    if t_back < 0.0 {
                         continue;
                     }
-                    if !semi_infinite {
-                        let dist_from_front = (x - front_mid).dot(&prop);
-                        if dist_from_front > 0.0 {
+                    if let Some((ref fp, n_f_dot_prop)) = front_plane_info {
+                        let t_front = (x.coords.dot(&fp.normal) + fp.offset) / n_f_dot_prop;
+                        if t_front > 0.0 {
                             continue;
                         }
                     }
@@ -479,15 +497,19 @@ impl<'a> BeamView<'a> {
                         continue;
                     }
 
+                    // Phase distance = signed projection of (X - input_mid)
+                    // onto prop. Always relative to input_mid (where
+                    // event.input.field is wound to) regardless of kind.
+                    let dist = (x - input_mid).dot(&prop);
                     let mut field = event.input.field.clone();
-                    field.propagate(dist_from_back, k, n);
+                    field.propagate(dist, k, n);
 
                     out[i].push(FieldContribution {
                         event_id: event.id,
                         output_index: region.output_index,
                         kind: region.kind,
                         field,
-                        distance: dist_from_back,
+                        distance: dist,
                     });
                 }
             }
