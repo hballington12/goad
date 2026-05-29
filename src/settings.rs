@@ -60,9 +60,9 @@ pub struct Settings {
     pub beam_area_threshold_fac: f32,
     pub cutoff: f32,
     pub medium_refr_index: Complex<f32>,
-    pub particle_refr_index: Vec<Complex<f32>>,
+    // pub particle_refr_index: Vec<Complex<f32>>,
     pub orientation: Orientation,
-    pub geom_name: String,
+    // pub geom_name: String,
     pub max_rec: i32,
     pub max_tir: i32,
     /// Zones for binning (new format). Takes precedence over `binning`.
@@ -98,12 +98,10 @@ pub struct Settings {
 impl Settings {
     #[new]
     #[pyo3(signature = (
-        geom_path,
+        // geom_path,
         wavelength = DEFAULT_WAVELENGTH,
-        particle_refr_index_re = DEFAULT_PARTICLE_REFR_INDEX_RE,
-        particle_refr_index_im = DEFAULT_PARTICLE_REFR_INDEX_IM,
-        medium_refr_index_re = DEFAULT_MEDIUM_REFR_INDEX_RE,
-        medium_refr_index_im = DEFAULT_MEDIUM_REFR_INDEX_IM,
+        // particle_refr_index = vec![DEFAULT_MEDIUM_REFR_INDEX],
+        medium_refr_index = DEFAULT_MEDIUM_REFR_INDEX,
         orientation = None,
         zones = None,
         beam_power_threshold = DEFAULT_BEAM_POWER_THRESHOLD,
@@ -120,12 +118,10 @@ impl Settings {
         seed = None,
     ))]
     fn py_new(
-        geom_path: String,
+        // geom_path: String,
         wavelength: f32,
-        particle_refr_index_re: f32,
-        particle_refr_index_im: f32,
-        medium_refr_index_re: f32,
-        medium_refr_index_im: f32,
+        // particle_refr_index: Vec<Complex<f32>>,
+        medium_refr_index: Complex<f32>,
         orientation: Option<Orientation>,
         zones: Option<Vec<ZoneConfig>>,
         beam_power_threshold: f32,
@@ -149,12 +145,12 @@ impl Settings {
             )));
         }
 
-        if !std::path::Path::new(&geom_path).exists() {
-            return Err(pyo3::exceptions::PyFileNotFoundError::new_err(format!(
-                "Geometry file not found: {}",
-                geom_path
-            )));
-        }
+        // if !std::path::Path::new(&geom_path).exists() {
+        //     return Err(pyo3::exceptions::PyFileNotFoundError::new_err(format!(
+        //         "Geometry file not found: {}",
+        //         geom_path
+        //     )));
+        // }
 
         if cutoff < 0.0 || cutoff > 1.0 {
             return Err(pyo3::exceptions::PyValueError::new_err(format!(
@@ -197,10 +193,10 @@ impl Settings {
             beam_power_threshold,
             beam_area_threshold_fac,
             cutoff,
-            medium_refr_index: Complex::new(medium_refr_index_re, medium_refr_index_im),
-            particle_refr_index: vec![Complex::new(particle_refr_index_re, particle_refr_index_im)],
+            medium_refr_index,
+            // particle_refr_index,
             orientation,
-            geom_name: geom_path,
+            // geom_name: geom_path,
             max_rec,
             max_tir,
             zones,
@@ -254,17 +250,17 @@ impl Settings {
         self.orientation.clone()
     }
 
-    /// Set the geometry file path
-    #[setter]
-    fn set_geom_path(&mut self, geom_path: String) {
-        self.geom_name = geom_path;
-    }
+    // /// Set the geometry file path
+    // #[setter]
+    // fn set_geom_path(&mut self, geom_path: String) {
+    //     self.geom_name = geom_path;
+    // }
 
-    /// Get the geometry file path
-    #[getter]
-    fn get_geom_path(&self) -> String {
-        self.geom_name.clone()
-    }
+    // /// Get the geometry file path
+    // #[getter]
+    // fn get_geom_path(&self) -> String {
+    //     self.geom_name.clone()
+    // }
 
     /// Set the wavelength
     #[setter]
@@ -278,41 +274,41 @@ impl Settings {
         self.wavelength
     }
 
-    /// Set the particle refractive index (real part)
-    #[setter]
-    fn set_particle_refr_index_re(&mut self, re: f32) {
-        if !self.particle_refr_index.is_empty() {
-            self.particle_refr_index[0].re = re;
-        }
-    }
+    // /// Set the particle refractive index (real part)
+    // #[setter]
+    // fn set_particle_refr_index_re(&mut self, re: f32) {
+    //     if !self.particle_refr_index.is_empty() {
+    //         self.particle_refr_index[0].re = re;
+    //     }
+    // }
 
-    /// Get the particle refractive index (real part)
-    #[getter]
-    fn get_particle_refr_index_re(&self) -> f32 {
-        if !self.particle_refr_index.is_empty() {
-            self.particle_refr_index[0].re
-        } else {
-            0.0
-        }
-    }
+    // /// Get the particle refractive index (real part)
+    // #[getter]
+    // fn get_particle_refr_index_re(&self) -> f32 {
+    //     if !self.particle_refr_index.is_empty() {
+    //         self.particle_refr_index[0].re
+    //     } else {
+    //         0.0
+    //     }
+    // }
 
-    /// Set the particle refractive index (imaginary part)
-    #[setter]
-    fn set_particle_refr_index_im(&mut self, im: f32) {
-        if !self.particle_refr_index.is_empty() {
-            self.particle_refr_index[0].im = im;
-        }
-    }
+    // /// Set the particle refractive index (imaginary part)
+    // #[setter]
+    // fn set_particle_refr_index_im(&mut self, im: f32) {
+    //     if !self.particle_refr_index.is_empty() {
+    //         self.particle_refr_index[0].im = im;
+    //     }
+    // }
 
-    /// Get the particle refractive index (imaginary part)
-    #[getter]
-    fn get_particle_refr_index_im(&self) -> f32 {
-        if !self.particle_refr_index.is_empty() {
-            self.particle_refr_index[0].im
-        } else {
-            0.0
-        }
-    }
+    // /// Get the particle refractive index (imaginary part)
+    // #[getter]
+    // fn get_particle_refr_index_im(&self) -> f32 {
+    //     if !self.particle_refr_index.is_empty() {
+    //         self.particle_refr_index[0].im
+    //     } else {
+    //         0.0
+    //     }
+    // }
 
     /// Set the medium refractive index (real part)
     #[setter]

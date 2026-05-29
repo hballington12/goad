@@ -1,4 +1,4 @@
-use nalgebra::Vector3;
+use nalgebra::{Complex, Vector3};
 
 use super::{MuellerComponentConfig, OutputConfig};
 use crate::{diff::Mapping, orientation::EulerConvention};
@@ -59,9 +59,16 @@ pub const DEFAULT_CUTOFF: f32 = 0.99;
 /// Default medium refractive index (vacuum/air)
 pub const DEFAULT_MEDIUM_REFR_INDEX_RE: f32 = 1.0;
 pub const DEFAULT_MEDIUM_REFR_INDEX_IM: f32 = 0.0;
+pub const DEFAULT_MEDIUM_REFR_INDEX: Complex<f32> =
+    Complex::new(DEFAULT_MEDIUM_REFR_INDEX_RE, DEFAULT_MEDIUM_REFR_INDEX_IM);
 /// Default particle refractive index (typical glass)
 pub const DEFAULT_PARTICLE_REFR_INDEX_RE: f32 = 1.31;
 pub const DEFAULT_PARTICLE_REFR_INDEX_IM: f32 = 0.0;
+pub const DEFAULT_PARTICLE_REFR_INDEX: Complex<f32> = Complex::new(
+    DEFAULT_PARTICLE_REFR_INDEX_RE,
+    DEFAULT_PARTICLE_REFR_INDEX_IM,
+);
+
 /// Default maximum recursion depth
 pub const DEFAULT_MAX_REC: i32 = 10;
 /// Default maximum total internal reflections

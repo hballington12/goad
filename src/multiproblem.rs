@@ -30,26 +30,23 @@ pub fn load_settings_or_default(settings: Option<Settings>) -> Settings {
 }
 
 /// Loads and initializes geometries. Used by MultiProblem and Convergence.
-pub fn load_and_init_geoms(
-    geoms: Option<Vec<Geom>>,
-    settings: &Settings,
-) -> anyhow::Result<Vec<Geom>> {
-    let mut geoms = match geoms {
-        Some(g) => g,
-        None => Geom::load(&settings.geom_name).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to load geometry file '{}': {}\n\
-                Hint: This may be caused by degenerate faces (zero cross product), \
-                faces that are too small, or non-planar geometry. \
-                Please check and fix the geometry file.",
-                settings.geom_name,
-                e
-            )
-        })?,
-    };
+pub fn load_and_init_geoms(mut geoms: Vec<Geom>) -> anyhow::Result<Vec<Geom>> {
+    // let mut geoms = match geoms {
+    //     Some(g) => g,
+    //     None => Geom::load(&settings.geom_name).map_err(|e| {
+    //         anyhow::anyhow!(
+    //             "Failed to load geometry file '{}': {}\n\
+    //             Hint: This may be caused by degenerate faces (zero cross product), \
+    //             faces that are too small, or non-planar geometry. \
+    //             Please check and fix the geometry file.",
+    //             settings.geom_name,
+    //             e
+    //         )
+    //     })?,
+    // };
 
     for geom in geoms.iter_mut() {
-        problem::init_geom(settings, geom);
+        problem::init_geom(geom); // to be moved to class method
     }
 
     Ok(geoms)
@@ -97,10 +94,9 @@ pub struct MultiProblem {
 }
 
 impl MultiProblem {
-    /// Creates a new `MultiProblem` from optional `Geom` and `Settings`.
+    /// Creates a new `MultiProblem` from `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
-    /// If geoms not provided, load from file
-    pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
+    pub fn new(geoms: Vec<Geom>, settings: Option<Settings>) -> anyhow::Result<Self> {
         let settings = load_settings_or_default(settings);
 
         // Initialize file-based logging early so geometry load warnings are captured
@@ -108,7 +104,7 @@ impl MultiProblem {
             log::warn!("Could not initialize file logging: {}", e);
         }
 
-        let geoms = load_and_init_geoms(geoms, &settings)?;
+        let geoms = load_and_init_geoms(geoms)?;
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let result = init_result(&settings);
 
@@ -185,7 +181,7 @@ impl MultiProblem {
             .geoms
             .iter()
             .map(|geom| {
-                Problem::new(Some(geom.clone()), Some(self.settings.clone()))
+                Problem::new(geom.clone(), Some(self.settings.clone()))
                     .expect("Failed to create Problem")
             })
             .collect();
@@ -317,24 +313,24 @@ impl MultiProblem {
 #[pymethods]
 impl MultiProblem {
     #[new]
-    #[pyo3(signature = (settings, geoms = None))]
-    fn py_new(settings: Settings, geoms: Option<Vec<Geom>>) -> PyResult<Self> {
-        // Load geometries from file if not provided
-        let mut geoms = match geoms {
-            Some(g) => g,
-            None => Geom::load(&settings.geom_name).map_err(|e| {
-                pyo3::exceptions::PyValueError::new_err(format!(
-                    "Failed to load geometry file '{}': {}\n\
-                    Hint: This may be caused by degenerate faces (zero cross product), \
-                    faces that are too small, or non-planar geometry. \
-                    Please check and fix the geometry file.",
-                    settings.geom_name, e
-                ))
-            })?,
-        };
+    #[pyo3(signature = (settings, geoms))]
+    fn py_new(settings: Settings, mut geoms: Vec<Geom>) -> PyResult<Self> {
+        // // Load geometries from file if not provided
+        // let mut geoms = match geoms {
+        //     Some(g) => g,
+        //     None => Geom::load(&settings.geom_name).map_err(|e| {
+        //         pyo3::exceptions::PyValueError::new_err(format!(
+        //             "Failed to load geometry file '{}': {}\n\
+        //             Hint: This may be ca(zero cross product), \
+        //             faces that are too small, or non-planar geometry. \
+        //             Please check and fix the geometry file.",
+        //             settings.geom_name, e
+        //         ))
+        //     })?,
+        // };
 
         for geom in geoms.iter_mut() {
-            problem::init_geom(&settings, geom);
+            problem::init_geom(geom);
         }
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let result = init_result(&settings);

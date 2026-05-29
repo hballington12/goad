@@ -25,7 +25,7 @@ fn main() {
 
     let geoms = Geom::load("./examples/data/hex.obj").expect("load hex");
     let geom = geoms[0].clone();
-    let mut problem = Problem::new(Some(geom), Some(settings)).expect("build problem");
+    let mut problem = Problem::new(geom, Some(settings)).expect("build problem");
 
     // 2. Run the full recorded pipeline (init → orient → illuminate →
     //    near-field with recording → far-field → mueller → params).

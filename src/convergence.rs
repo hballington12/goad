@@ -88,7 +88,7 @@ pub struct Convergence {
 
 impl Convergence {
     /// Creates a new Convergence solver from geometries and settings.
-    pub fn new(geoms: Option<Vec<Geom>>, settings: Option<Settings>) -> anyhow::Result<Self> {
+    pub fn new(geoms: Vec<Geom>, settings: Option<Settings>) -> anyhow::Result<Self> {
         let settings = load_settings_or_default(settings);
 
         // Initialize file-based logging early so geometry load warnings are captured
@@ -96,7 +96,7 @@ impl Convergence {
             log::warn!("Could not initialize file logging: {}", e);
         }
 
-        let geoms = load_and_init_geoms(geoms, &settings)?;
+        let geoms = load_and_init_geoms(geoms)?;
         let result = init_result(&settings);
         let rng = if let Some(seed) = settings.seed {
             rand::rngs::StdRng::seed_from_u64(seed)
@@ -236,7 +236,7 @@ impl Convergence {
         self.geoms
             .iter()
             .map(|geom| {
-                Problem::new(Some(geom.clone()), Some(self.settings.clone()))
+                Problem::new(geom.clone(), Some(self.settings.clone()))
                     .expect("Failed to create Problem")
             })
             .collect()

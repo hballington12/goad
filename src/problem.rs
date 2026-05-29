@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use crate::cancel::CancelToken;
 use crate::diff::n2f_go;
 use crate::field::{Ampl, AmplMatrix};
-use crate::geom::load_geom;
+// use crate::geom::load_geom;
 use crate::multiproblem::{init_result, load_settings_or_default};
 use crate::powers::Powers;
 use crate::settings::{default_e_perp, default_prop, BATCH_SIZE_MULTIPLIER};
@@ -39,9 +39,9 @@ mod tests {
             crate::settings::load_default_config().expect("Failed to load default config");
         let geoms = Geom::load("./examples/data/hex.obj").expect("load geom");
         let mut geom = geoms[0].clone();
-        init_geom(&settings, &mut geom);
+        init_geom(&mut geom);
 
-        let mut problem = Problem::new(Some(geom), Some(settings)).unwrap();
+        let mut problem = Problem::new(geom, Some(settings)).unwrap();
         let euler = crate::orientation::Euler::new(30.0, 30.0, 0.0);
         problem
             .run(Some(&euler), &CancelToken::noop())
@@ -130,8 +130,8 @@ pub struct Problem {
 #[pymethods]
 impl Problem {
     #[new]
-    #[pyo3(signature = (settings = None, geom = None))]
-    fn py_new(settings: Option<Settings>, geom: Option<Geom>) -> PyResult<Self> {
+    #[pyo3(signature = (geom, settings = None))]
+    fn py_new(geom: Geom, settings: Option<Settings>) -> PyResult<Self> {
         Problem::new(geom, settings).map_err(|e| {
             pyo3::exceptions::PyValueError::new_err(format!("Failed to create Problem: {}", e))
         })
@@ -190,19 +190,19 @@ impl Problem {
     /// Creates a new `Problem` from optional `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
     /// If geom not provided, loads from file using settings.geom_name.
-    pub fn new(geom: Option<Geom>, settings: Option<Settings>) -> Result<Self> {
+    pub fn new(mut geom: Geom, settings: Option<Settings>) -> Result<Self> {
         let settings = load_settings_or_default(settings);
-        let mut geom = match geom {
-            Some(g) => g,
-            None => load_geom(&settings.geom_name).map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to load geometry file '{}': {}",
-                    settings.geom_name,
-                    e
-                )
-            })?,
-        };
-        init_geom(&settings, &mut geom);
+        // let mut geom = match geom {
+        //     Some(g) => g,
+        //     None => load_geom(&settings.geom_name).map_err(|e| {
+        //         anyhow::anyhow!(
+        //             "Failed to load geometry file '{}': {}",
+        //             settings.geom_name,
+        //             e
+        //         )
+        //     })?,
+        // };
+        init_geom(&mut geom);
         let result = init_result(&settings);
 
         Ok(Self {
@@ -857,15 +857,16 @@ fn basic_initial_beam(
 /// Initialises the geometry with the refractive indices from the settings.
 /// In the future, this function will be extended to provide additional checks
 /// to ensure the geometry is well-defined.
-pub fn init_geom(settings: &Settings, geom: &mut Geom) {
-    for shape in geom.shapes.iter_mut() {
-        shape.refr_index = settings.particle_refr_index[0]; // default refr index is first value
-    }
-    for (i, refr_index) in settings.particle_refr_index.iter().enumerate() {
-        if i >= geom.shapes.len() {
-            break;
-        }
-        geom.shapes[i].refr_index = *refr_index;
-    }
+/// TO be moved to class method
+pub fn init_geom(geom: &mut Geom) {
+    // for shape in geom.shapes.iter_mut() {
+    //     shape.refr_index = settings.particle_refr_index[0]; // default refr index is first value
+    // }
+    // for (i, refr_index) in settings.particle_refr_index.iter().enumerate() {
+    //     if i >= geom.shapes.len() {
+    //         break;
+    //     }
+    //     geom.shapes[i].refr_index = *refr_index;
+    // }
     geom.recentre();
 }

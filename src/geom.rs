@@ -1021,20 +1021,20 @@ pub struct Shape {
 }
 
 impl Shape {
-    pub fn new(id: Option<usize>, parent_id: Option<usize>) -> Self {
+    pub fn new(id: Option<usize>, parent_id: Option<usize>, refr_index: Complex<f32>) -> Self {
         Self {
             vertices: Vec::new(),
             num_vertices: 0,
             faces: Vec::new(),
             num_faces: 0,
-            refr_index: Complex { re: 1.31, im: 0.0 },
+            refr_index,
             id,
             parent_id,
             aabb: None,
         }
     }
 
-    fn from_model(model: Model, id: Option<usize>) -> Result<Shape> {
+    fn from_model(model: Model, id: Option<usize>, refr_index: Complex<f32>) -> Result<Shape> {
         let mesh = &model.mesh;
 
         let vertices = mesh
@@ -1043,7 +1043,7 @@ impl Shape {
             .map(|v| Point3::new(v[0] as f32, v[1] as f32, v[2] as f32))
             .collect::<Vec<_>>();
 
-        let mut shape = Shape::new(id, None);
+        let mut shape = Shape::new(id, None, refr_index); // parent is resolved later when containment graph is constructed
         shape.num_vertices = vertices.len();
         shape.vertices = vertices;
 
@@ -1245,7 +1245,7 @@ pub struct Geom {
 }
 
 impl Geom {
-    pub fn load(filename: &str) -> Result<Vec<Self>> {
+    pub fn load(filename: &str, refr_indices: Vec<Complex<f32>>) -> Result<Vec<Self>> {
         let path = Path::new(filename);
         let resolved_path = if path.is_absolute() {
             path.to_path_buf()
@@ -1263,7 +1263,7 @@ impl Geom {
                 let entry = entry?;
                 if entry.path().extension() == Some(std::ffi::OsStr::new("obj")) {
                     let path_str = entry.path().display().to_string();
-                    match load_geom(&path_str) {
+                    match load_geom(&path_str, refr_indices.clone()) {
                         Ok(geom) => geoms.push(geom),
                         Err(e) => failed_files.push((path_str, e.to_string())),
                     }
@@ -1299,7 +1299,10 @@ impl Geom {
             }
         } else if resolved_path.is_file() {
             // Load single file
-            geoms.push(load_geom(&resolved_path.display().to_string())?);
+            geoms.push(load_geom(
+                &resolved_path.display().to_string(),
+                refr_indices,
+            )?);
         } else {
             return Err(anyhow::anyhow!(
                 "Path is neither a file nor directory: {}",
@@ -1310,11 +1313,15 @@ impl Geom {
         Ok(geoms)
     }
 
-    fn shapes_from_models(models: Vec<Model>) -> Result<Vec<Shape>> {
+    fn shapes_from_models(
+        models: Vec<Model>,
+        refr_indices: Vec<Complex<f32>>,
+    ) -> Result<Vec<Shape>> {
         models
             .into_iter()
+            .zip(refr_indices.into_iter())
             .enumerate()
-            .map(|(i, model)| Shape::from_model(model, Some(i)))
+            .map(|(i, (model, refr_index))| Shape::from_model(model, Some(i), refr_index))
             .collect()
     }
 
@@ -1695,13 +1702,16 @@ impl Geom {
 }
 
 /// Load a single geometry
-pub fn load_geom(resolved_filename: &String) -> Result<Geom, anyhow::Error> {
+pub fn load_geom(
+    resolved_filename: &String,
+    refr_indices: Vec<Complex<f32>>,
+) -> Result<Geom, anyhow::Error> {
     let (models, _) = tobj::load_obj(&resolved_filename, &tobj::LoadOptions::default())
         .map_err(|e| anyhow::anyhow!("Failed to load OBJ file '{}': {}", resolved_filename, e))?;
     if models.is_empty() {
         return Err(anyhow::anyhow!("No models found in OBJ file"));
     }
-    let shapes = Geom::shapes_from_models(models)?;
+    let shapes = Geom::shapes_from_models(models, refr_indices)?;
     let mut containment_graph = ContainmentGraph::new(shapes.len());
     let shapes_with_ids: Vec<_> = shapes
         .iter()
@@ -1799,15 +1809,12 @@ impl Geom {
     /// Refractive index of shape `idx` as a Python complex.
     #[pyo3(name = "refr_index")]
     fn py_refr_index(&self, idx: usize) -> PyResult<Complex<f32>> {
-        self.shapes
-            .get(idx)
-            .map(|s| s.refr_index)
-            .ok_or_else(|| {
-                PyErr::new::<PyRuntimeError, _>(format!(
-                    "shape index {} out of range (num_shapes = {})",
-                    idx, self.num_shapes
-                ))
-            })
+        self.shapes.get(idx).map(|s| s.refr_index).ok_or_else(|| {
+            PyErr::new::<PyRuntimeError, _>(format!(
+                "shape index {} out of range (num_shapes = {})",
+                idx, self.num_shapes
+            ))
+        })
     }
 
     /// Set the refractive index of shape `idx` from a Python complex.

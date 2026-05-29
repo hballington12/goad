@@ -17,23 +17,23 @@ use super::{Convergence, ConvergenceTracker, MAX_CONVERGENCE_ORIENTATIONS};
 #[pymethods]
 impl Convergence {
     #[new]
-    #[pyo3(signature = (settings, geoms = None))]
-    fn py_new(settings: Settings, geoms: Option<Vec<Geom>>) -> PyResult<Self> {
-        let mut geoms = match geoms {
-            Some(g) => g,
-            None => Geom::load(&settings.geom_name).map_err(|e| {
-                pyo3::exceptions::PyValueError::new_err(format!(
-                    "Failed to load geometry file '{}': {}\n\
-                    Hint: This may be caused by degenerate faces (zero cross product), \
-                    faces that are too small, or non-planar geometry. \
-                    Please check and fix the geometry file.",
-                    settings.geom_name, e
-                ))
-            })?,
-        };
+    #[pyo3(signature = (settings, geoms))]
+    fn py_new(settings: Settings, mut geoms: Vec<Geom>) -> PyResult<Self> {
+        // let mut geoms = match geoms {
+        //     Some(g) => g,
+        //     None => Geom::load(&settings.geom_name).map_err(|e| {
+        //         pyo3::exceptions::PyValueError::new_err(format!(
+        //             "Failed to load geometry file '{}': {}\n\
+        //             Hint: This may be caused by degenerate faces (zero cross product), \
+        //             faces that are too small, or non-planar geometry. \
+        //             Please check and fix the geometry file.",
+        //             settings.geom_name, e
+        //         ))
+        //     })?,
+        // };
 
         for geom in geoms.iter_mut() {
-            init_geom(&settings, geom);
+            init_geom(geom);
         }
 
         let template = init_result(&settings);

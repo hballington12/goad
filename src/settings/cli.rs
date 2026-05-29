@@ -244,17 +244,17 @@ pub fn update_settings_from_cli(config: &mut Settings) {
         );
         config.medium_refr_index = medium;
     }
-    if let Some(particle) = args.material.ri.clone() {
-        trace!(
-            "config updated from cli arg: particle_refr_index = {:?}",
-            particle
-        );
-        config.particle_refr_index = particle;
-    }
-    if let Some(geo) = args.material.geo.clone() {
-        trace!("config updated from cli arg: geom_name = {}", geo);
-        config.geom_name = geo;
-    }
+    // if let Some(particle) = args.material.ri.clone() {
+    //     trace!(
+    //         "config updated from cli arg: particle_refr_index = {:?}",
+    //         particle
+    //     );
+    //     config.particle_refr_index = particle;
+    // }
+    // if let Some(geo) = args.material.geo.clone() {
+    //     trace!("config updated from cli arg: geom_name = {}", geo);
+    //     config.geom_name = geo;
+    // }
     if let Some(mp) = args.propagation.bp {
         trace!("config updated from cli arg: beam_power_threshold = {}", mp);
         config.beam_power_threshold = mp;
