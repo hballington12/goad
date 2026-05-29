@@ -753,7 +753,7 @@ dependencies = [
 
 [[package]]
 name = "goad"
-version = "1.2.3"
+version = "1.2.4"
 dependencies = [
  "anyhow",
  "chrono",
