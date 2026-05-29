@@ -8,10 +8,11 @@
 use goad::{
     cancel::CancelToken,
     convergence::ConvergenceTracker,
+    geom::Geom,
     orientation::Euler,
     problem::Problem,
     result::{GOComponent, Results},
-    settings,
+    settings::{self, DEFAULT_PARTICLE_REFR_INDEX},
 };
 
 /// Generate deterministic results using fixed orientations.
@@ -31,7 +32,12 @@ fn generate_results(count: usize) -> Vec<Results> {
     eulers
         .iter()
         .map(|euler| {
-            let mut problem = Problem::new(None, Some(settings.clone())).unwrap();
+            let geom = Geom::load("examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX])
+                .unwrap()
+                .into_iter()
+                .next()
+                .unwrap();
+            let mut problem = Problem::new(geom, Some(settings.clone())).unwrap();
             problem.run(Some(euler), &CancelToken::noop()).unwrap();
             problem.result
         })

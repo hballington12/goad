@@ -35,6 +35,6 @@ mueller_case! {
             scheme: Scheme::Discrete { eulers: vec![Euler::new(30.0, 20.0, 20.0)] },
             euler_convention: EulerConvention::ZYZ,
         };
-        s.particle_refr_index = vec![Complex32::new(1.3117, 0.1)];
-    }
+    },
+    refr_index: vec![Complex32::new(1.3117, 0.1)],
 }

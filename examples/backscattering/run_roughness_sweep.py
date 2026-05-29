@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from goad import Convergence, Param, Settings
+from goad import Convergence, Geom, Param, Settings
 
 base_dir = Path(__file__).parent
 
@@ -20,11 +20,9 @@ for sigma in roughness_levels:
     print(f"Running ensemble for sigma={sigma}")
     print(f"{'=' * 60}")
 
+    geoms = Geom.from_file(str(ensemble_dir), [1.31 + 0j])
     settings = Settings(
-        geom_path=str(ensemble_dir),
         wavelength=0.532,
-        particle_refr_index_re=1.31,
-        particle_refr_index_im=0.0,
         zones=[],
         max_tir=20,
         directory=str(results_dir),
@@ -33,7 +31,7 @@ for sigma in roughness_levels:
         cutoff=0.999,
     )
 
-    convergence = Convergence(settings)
+    convergence = Convergence(settings, geoms)
     convergence.add_target(Param.LidarRatio, 0.025)
     convergence.add_target(Param.DepolarizationRatio, 0.025)
     convergence.add_target(Param.BackscatterCross, 0.025)

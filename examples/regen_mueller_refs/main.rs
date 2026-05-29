@@ -43,7 +43,8 @@ fn main() {
         }
         wrote_any = true;
         let settings = (case.build_settings)();
-        let mut mp = MultiProblem::new(None, Some(settings))
+        let geoms = (case.build_geoms)();
+        let mut mp = MultiProblem::new(geoms, Some(settings))
             .expect("Failed to create MultiProblem");
         mp.solve();
 

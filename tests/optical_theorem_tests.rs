@@ -12,6 +12,7 @@
 
 use goad::{
     bins::Scheme,
+    geom::Geom,
     multiproblem::MultiProblem,
     orientation::{Euler, Orientation, Scheme as OrientationScheme},
     params::Param,
@@ -36,17 +37,17 @@ struct ExtinctionResults {
 fn run_plane_simulation(geom_name: &str, wavelength: f32) -> ExtinctionResults {
     let mut settings = settings::load_default_config().unwrap();
 
-    // Set geometry and wavelength
-    settings.geom_name = geom_name.to_string();
     settings.wavelength = wavelength;
 
     // Disable geometric optics (only external diffraction)
     settings.max_rec = 0;
     settings.max_tir = 0;
 
-    // Set refractive indices
+    // Set the medium refractive index (particle's lives on the loaded Geom)
     settings.medium_refr_index = Complex32::new(1.0, 0.0);
-    settings.particle_refr_index = vec![Complex32::new(1.31, 0.0)];
+
+    // Load geometry with the particle refractive index
+    let geoms = Geom::load(geom_name, vec![Complex32::new(1.31, 0.0)]).expect("load geom");
 
     // Set up zone scheme with fine resolution near forward direction
     settings.zones = vec![ZoneConfig::new(Scheme::Interval {
@@ -66,7 +67,7 @@ fn run_plane_simulation(geom_name: &str, wavelength: f32) -> ExtinctionResults {
 
     // Run simulation
     let mut multiproblem =
-        MultiProblem::new(None, Some(settings)).expect("Failed to create MultiProblem");
+        MultiProblem::new(geoms, Some(settings)).expect("Failed to create MultiProblem");
     multiproblem.solve();
 
     // Extract results
@@ -200,17 +201,17 @@ fn test_optical_theorem_plane_extinction() {
 fn get_forward_amplitude(geom_name: &str) -> Matrix2<Complex<f32>> {
     let mut settings = settings::load_default_config().unwrap();
 
-    // Set geometry
-    settings.geom_name = geom_name.to_string();
     settings.wavelength = 0.532;
 
     // Disable geometric optics (only external diffraction)
     settings.max_rec = 0;
     settings.max_tir = 0;
 
-    // Set refractive indices
+    // Set the medium refractive index (particle's lives on the loaded Geom)
     settings.medium_refr_index = Complex32::new(1.0, 0.0);
-    settings.particle_refr_index = vec![Complex32::new(1.31, 0.0)];
+
+    // Load geometry with the particle refractive index
+    let geoms = Geom::load(geom_name, vec![Complex32::new(1.31, 0.0)]).expect("load geom");
 
     // Set up zone scheme with fine resolution near forward direction
     settings.zones = vec![ZoneConfig::new(Scheme::Interval {
@@ -230,7 +231,7 @@ fn get_forward_amplitude(geom_name: &str) -> Matrix2<Complex<f32>> {
 
     // Run simulation
     let mut multiproblem =
-        MultiProblem::new(None, Some(settings)).expect("Failed to create MultiProblem");
+        MultiProblem::new(geoms, Some(settings)).expect("Failed to create MultiProblem");
     multiproblem.solve();
 
     // Get forward zone amplitude

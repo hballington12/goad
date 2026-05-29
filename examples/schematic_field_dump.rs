@@ -56,11 +56,9 @@ fn main() {
     settings.scale = Some(1.0); // bypass auto-rescale-to-unit-cube
     settings.wavelength = WAVELENGTH;
     settings.medium_refr_index = Complex::new(1.0, 0.0);
-    settings.particle_refr_index = vec![Complex::new(N_REFR_RE, 0.0)];
 
     let s = HALF_SIDE_TARGET / CUBE_HALF_NATIVE;
     settings.geom_scale = Some(vec![s, s, s]);
-    settings.geom_name = "./examples/data/cube.obj".to_string();
     settings.orientation = Orientation {
         scheme: Scheme::Discrete {
             eulers: vec![Euler::new(0.0, EULER_BETA_DEG, 0.0)],
@@ -69,7 +67,8 @@ fn main() {
     };
 
     // 2. Build problem and run the recorded pipeline.
-    let geoms = Geom::load(&settings.geom_name).expect("load cube.obj");
+    let geom_path = "./examples/data/cube.obj";
+    let geoms = Geom::load(geom_path, vec![Complex::new(N_REFR_RE, 0.0)]).expect("load cube.obj");
     let geom = geoms[0].clone();
     let mut problem = Problem::new(geom, Some(settings)).expect("build problem");
 

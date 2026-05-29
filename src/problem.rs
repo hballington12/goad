@@ -37,7 +37,11 @@ mod tests {
         // Use default config
         let settings =
             crate::settings::load_default_config().expect("Failed to load default config");
-        let geoms = Geom::load("./examples/data/hex.obj").expect("load geom");
+        let geoms = Geom::load(
+            "./examples/data/hex.obj",
+            vec![crate::settings::DEFAULT_PARTICLE_REFR_INDEX],
+        )
+        .expect("load geom");
         let mut geom = geoms[0].clone();
         init_geom(&mut geom);
 

@@ -3,10 +3,11 @@
 
 fn main() {
     use goad::convergence::Convergence;
+    use goad::geom::Geom;
     use goad::orientation::{Orientation, Scheme};
     use goad::params::Param;
     use goad::result::GOComponent;
-    use goad::settings;
+    use goad::settings::{self, DEFAULT_PARTICLE_REFR_INDEX};
 
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
@@ -23,8 +24,11 @@ fn main() {
         euler_convention: settings.orientation.euler_convention,
     };
 
+    // Load default geometry separately (geom no longer lives in Settings)
+    let geoms = Geom::load("examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
+
     // Create a convergence solver
-    let mut convergence = Convergence::new(None, Some(settings)).unwrap();
+    let mut convergence = Convergence::new(geoms, Some(settings)).unwrap();
 
     // Enable logging of mean values during convergence
     convergence.set_log_file("lidar_convergence_running.csv");

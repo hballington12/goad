@@ -6,7 +6,7 @@ use goad::geom::{Face, Geom};
 use goad::orientation::Euler;
 use goad::problem::Problem;
 use goad::recording::Recording;
-use goad::settings::load_default_config;
+use goad::settings::{load_default_config, DEFAULT_PARTICLE_REFR_INDEX};
 use serde_json::json;
 use std::fs::File;
 use std::io::Write;
@@ -85,7 +85,8 @@ fn main() {
     let mut settings = load_default_config().expect("load default config");
     settings.scale = Some(1.0);
 
-    let geoms = Geom::load("./examples/data/hex.obj").expect("load hex");
+    let geoms = Geom::load("./examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX])
+        .expect("load hex");
     let geom = geoms[0].clone();
     let mut problem = Problem::new(geom, Some(settings)).expect("build problem");
 

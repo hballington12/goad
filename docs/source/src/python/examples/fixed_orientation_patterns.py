@@ -5,6 +5,7 @@ from goad import (
     BinningScheme,
     Euler,
     EulerConvention,
+    Geom,
     Mapping,
     MultiProblem,
     Orientation,
@@ -49,13 +50,12 @@ zones = [
 GEOM_PATH = "hex.obj"
 OUTPUT_ROOT = Path("runs")
 
+# Load the particle geometry once with its refractive index.
+geoms = Geom.from_file(GEOM_PATH, [1.31 + 0j])
+
 settings = Settings(
-    geom_path=GEOM_PATH,
     wavelength=0.532,
-    particle_refr_index_re=1.31,
-    particle_refr_index_im=0.0,
-    medium_refr_index_re=1.0,
-    medium_refr_index_im=0.0,
+    medium_refr_index=1.0 + 0j,
     zones=zones,
     mapping=Mapping("ad"),
     beam_power_threshold=0.001,
@@ -83,7 +83,7 @@ for i, (alpha, beta, gamma) in enumerate(EULERS):
     out_dir = OUTPUT_ROOT / f"orient_{i:04d}"
     out_dir.mkdir(exist_ok=True)
 
-    mp = MultiProblem(settings)
+    mp = MultiProblem(settings, geoms)
     mp.solve()
     mp.save(str(out_dir))
 # --8<-- [end:loop]

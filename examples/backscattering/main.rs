@@ -3,6 +3,7 @@
 //! Run with: cargo run --release --example backscattering
 
 use goad::convergence::Convergence;
+use goad::geom::Geom;
 use goad::params::Param;
 use goad::settings;
 use std::path::PathBuf;
@@ -16,9 +17,7 @@ fn main() -> anyhow::Result<()> {
 
     // Load settings from defaults and override
     let mut settings = settings::load_default_config()?;
-    settings.geom_name = geometry_file.to_string_lossy().to_string();
     settings.wavelength = 0.532;
-    settings.particle_refr_index = vec![nalgebra::Complex::new(1.31, 0.0)];
     settings.zones = vec![]; // empty zones for backscatter only
     settings.max_tir = 20;
     settings.beam_area_threshold_fac = 0.01;
@@ -27,8 +26,14 @@ fn main() -> anyhow::Result<()> {
     settings.directory = output_dir.clone();
     settings.quiet = false;
 
+    // Load geometry with its refractive index
+    let geoms = Geom::load(
+        geometry_file.to_str().expect("non-utf8 geometry path"),
+        vec![nalgebra::Complex::new(1.31, 0.0)],
+    )?;
+
     // Create convergence solver
-    let mut convergence = Convergence::new(None, Some(settings))?;
+    let mut convergence = Convergence::new(geoms, Some(settings))?;
 
     // Add targets: 5% error on lidar ratio and depolarization ratio
     convergence.add_target(Param::LidarRatio, 0.05);

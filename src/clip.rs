@@ -16,7 +16,14 @@ mod tests {
     use geo::{CoordsIter, MultiPolygon, Simplify};
 
     use super::*;
+    use crate::settings::DEFAULT_PARTICLE_REFR_INDEX;
+    use nalgebra::Complex;
     const AREA_THRESHOLD: f32 = 0.01;
+
+    /// Test geometries don't care about refractive index — broadcast a default.
+    fn ri() -> Vec<Complex<f32>> {
+        vec![DEFAULT_PARTICLE_REFR_INDEX]
+    }
 
     /// Helper to verify vertices match expected values in cyclic order.
     /// Finds the first expected vertex in `actual`, then checks that subsequent
@@ -110,7 +117,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn concave_clip() {
-        let geoms = Geom::load("./examples/data/concave1.obj").unwrap();
+        let geoms = Geom::load("./examples/data/concave1.obj", ri()).unwrap();
         let mut geom = geoms[0].clone();
 
         let clip_index = 4; // the index of the face to be used as the clip
@@ -156,7 +163,7 @@ mod tests {
     /// hex.obj, face 4, projection (0,0,-1)
     #[test]
     fn projection_debug_hex() {
-        let geoms = Geom::load("./examples/data/hex.obj").unwrap();
+        let geoms = Geom::load("./examples/data/hex.obj", ri()).unwrap();
         let mut geom = geoms[0].clone();
 
         assert_eq!(geom.shapes.len(), 1);
@@ -245,7 +252,7 @@ mod tests {
     /// concave1.obj, face 4, projection (-0.3, 0, -1)
     #[test]
     fn projection1_concave() {
-        let geoms = Geom::load("./examples/data/concave1.obj").unwrap();
+        let geoms = Geom::load("./examples/data/concave1.obj", ri()).unwrap();
         let mut geom = geoms[0].clone();
 
         assert_eq!(geom.shapes.len(), 1);
@@ -321,7 +328,7 @@ mod tests {
     /// cube_inside_ico.obj, face 5 from shape 0, projection (-0.2, 0, -1)
     #[test]
     fn projection2_cube_inside_ico() {
-        let geoms = Geom::load("./examples/data/cube_inside_ico.obj").unwrap();
+        let geoms = Geom::load("./examples/data/cube_inside_ico.obj", ri()).unwrap();
         let mut geom = geoms[0].clone();
 
         assert_eq!(geom.shapes.len(), 2);
@@ -393,7 +400,7 @@ mod tests {
     /// multiple.obj, shape[0].face[5], projection (-1, 0, 0)
     #[test]
     fn projection_multi() {
-        let geoms = Geom::load("./examples/data/multiple.obj").unwrap();
+        let geoms = Geom::load("./examples/data/multiple.obj", ri()).unwrap();
         let mut geom = geoms[0].clone();
 
         assert_eq!(geom.shapes.len(), 2);
@@ -478,7 +485,7 @@ mod tests {
     /// clip_test.obj, shape[1].face[1], projection (1, 1, 0)
     #[test]
     fn clip_test_two_shapes() {
-        let geoms = Geom::load("./examples/data/clip_test.obj").unwrap();
+        let geoms = Geom::load("./examples/data/clip_test.obj", ri()).unwrap();
         let mut geom = geoms[0].clone();
 
         assert_eq!(geom.shapes.len(), 2);
@@ -551,7 +558,7 @@ mod tests {
     /// multiple.obj with custom rectangular clip at z=10, projection (0, 0, -1)
     #[test]
     fn remainder_custom_clip() {
-        let geoms = Geom::load("./examples/data/multiple.obj").unwrap();
+        let geoms = Geom::load("./examples/data/multiple.obj", ri()).unwrap();
         let mut geom = geoms[0].clone();
 
         assert_eq!(geom.shapes.len(), 2);

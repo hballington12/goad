@@ -82,7 +82,7 @@ pub fn load_config_with_cli(apply_cli_updates: bool) -> Result<Settings> {
     Ok(config)
 }
 
-fn get_config_file() -> Result<PathBuf, anyhow::Error> {
+pub(crate) fn get_config_file() -> Result<PathBuf, anyhow::Error> {
     let current_dir_config = std::env::current_dir()
         .map(|dir| dir.join("local.toml"))
         .unwrap();

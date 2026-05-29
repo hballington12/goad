@@ -64,16 +64,16 @@ The wavelength of incident light in micrometers:
 
 ### Refractive Indices
 
-Specify the complex refractive index for both the particle and surrounding medium:
+The particle refractive index is supplied per-shape when the geometry is loaded (`Geom.from_file(path, [n1, n2, ...])`). A single complex value is broadcast to every shape; otherwise pass one entry per shape. The medium refractive index is set on `Settings`:
 
 {{code_block('examples/settings', 'refractive')}}
 
 **Defaults:**
 
-- `particle_refr_index_re`: `1.31` (typical glass)
-- `particle_refr_index_im`: `0.0`
-- `medium_refr_index_re`: `1.0` (vacuum/air)
-- `medium_refr_index_im`: `0.0`
+- Particle refractive index (broadcast): `1.31 + 0j` (typical glass)
+- `medium_refr_index`: `1.0 + 0j` (vacuum/air)
+
+See [Containment Tree](#containment-tree) for inspecting and overriding per-shape refractive indices on a loaded `Geom`.
 
 ### Particle Scaling
 
@@ -234,14 +234,12 @@ Set to `True` to silence progress messages.
 
 ## Parameter Reference
 
+Note: geometry loading is no longer part of `Settings`. Load geometry with `Geom.from_file(path, refr_indices)` and pass the result as the second argument to `MultiProblem` / `Convergence`.
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| [`geom_path`](#basic-usage) | `str` | **Required** | Path to geometry file |
 | [`wavelength`](#wavelength) | `float` | `0.532` | Wavelength in geometry units |
-| [`particle_refr_index_re`](#refractive-indices) | `float` | `1.31` | Real part of particle refractive index |
-| [`particle_refr_index_im`](#refractive-indices) | `float` | `0.0` | Imaginary part of particle refractive index |
-| [`medium_refr_index_re`](#refractive-indices) | `float` | `1.0` | Real part of medium refractive index |
-| [`medium_refr_index_im`](#refractive-indices) | `float` | `0.0` | Imaginary part of medium refractive index |
+| [`medium_refr_index`](#refractive-indices) | `complex` | `1.0 + 0j` | Refractive index of the surrounding medium |
 | [`orientation`](#orientation-distribution) | `Orientation` | `Orientation.uniform(1)` | Orientation distribution |
 | [`zones`](#zones) | `list[ZoneConfig]` | Single full zone with interval binning | Zone configurations for far-field evaluation |
 | [`mapping`](#mapping-method) | `Mapping` | `Mapping('ad')` | Near-to-far field mapping method |

@@ -162,8 +162,9 @@ impl MultiProblem {
             // Phase 1: Initialization
             status_pb.set_message("Initializing geometry and solver...");
             info_pb.set_message(format!(
-                "Geometry: {} | Orientations: {}",
-                self.settings.geom_name, n
+                "Geometries: {} | Orientations: {}",
+                self.geoms.len(),
+                n
             ));
 
             (status_pb, pb, info_pb)

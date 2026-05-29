@@ -1,15 +1,17 @@
 // --8<-- [start:convergence]
 fn main() {
     use goad::convergence::Convergence;
+    use goad::geom::Geom;
     use goad::params::Param;
     use goad::result::GOComponent;
-    use goad::settings;
+    use goad::settings::{self, DEFAULT_PARTICLE_REFR_INDEX};
 
-    // Load default settings
+    // Load default settings and geometry
     let settings = settings::load_default_config().unwrap();
+    let geoms = Geom::load("./examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
 
     // Create a convergence solver
-    let mut convergence = Convergence::new(None, Some(settings)).unwrap();
+    let mut convergence = Convergence::new(geoms, Some(settings)).unwrap();
 
     // Set convergence target: 1% relative SEM on asymmetry parameter
     convergence.add_target(Param::Asymmetry, 0.03);

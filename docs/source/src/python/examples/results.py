@@ -1,16 +1,18 @@
 # --8<-- [start:basic]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
 # Solve the problem and access results
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 results = mp.results
 # --8<-- [end:basic]
 
 # --8<-- [start:mueller_2d]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 # Get the 2D Mueller matrix
@@ -20,9 +22,10 @@ print(f"Mueller matrix elements per bin: {len(mueller[0])}")  # 16 elements
 # --8<-- [end:mueller_2d]
 
 # --8<-- [start:mueller_1d]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 # Get the 1D phi-integrated Mueller matrix
@@ -31,9 +34,10 @@ print(f"Number of theta bins: {len(mueller_1d)}")
 # --8<-- [end:mueller_1d]
 
 # --8<-- [start:mueller_components]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 # Access different scattering components
@@ -48,9 +52,10 @@ mueller_1d_ext = mp.results.mueller_1d_ext
 # --8<-- [end:mueller_components]
 
 # --8<-- [start:bins]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 # Get 2D bins (theta, phi pairs)
@@ -65,9 +70,10 @@ if bins_1d:
 # --8<-- [end:bins]
 
 # --8<-- [start:scat_cross]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 scat_cross = mp.results.scat_cross
@@ -75,9 +81,10 @@ print(f"Scattering cross section: {scat_cross}")
 # --8<-- [end:scat_cross]
 
 # --8<-- [start:ext_cross]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 ext_cross = mp.results.ext_cross
@@ -85,9 +92,10 @@ print(f"Extinction cross section: {ext_cross}")
 # --8<-- [end:ext_cross]
 
 # --8<-- [start:asymmetry]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 g = mp.results.asymmetry
@@ -95,9 +103,10 @@ print(f"Asymmetry parameter: {g}")
 # --8<-- [end:asymmetry]
 
 # --8<-- [start:albedo]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 albedo = mp.results.albedo
@@ -105,9 +114,10 @@ print(f"Single scattering albedo: {albedo}")
 # --8<-- [end:albedo]
 
 # --8<-- [start:powers]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 powers = mp.results.powers
@@ -130,9 +140,10 @@ print(f"Energy conservation error: {powers['input'] - total_accounted}")
 # --8<-- [end:powers]
 
 # --8<-- [start:zones]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 # Access all zones
@@ -150,9 +161,10 @@ print(f"Backward zone: {backward_zone.name}, bins: {backward_zone.num_bins}")
 # --8<-- [end:zones]
 
 # --8<-- [start:zone_params]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 # Full zone parameters (requires full theta coverage)
@@ -177,9 +189,10 @@ print(f"Extinction (optical theorem): {fwd_params['ext_cross_optical_theorem']}"
 # --8<-- [end:zone_params]
 
 # --8<-- [start:zone_mueller]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
-mp = MultiProblem(Settings(geom_path="path/to/geometry.obj"))
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+mp = MultiProblem(Settings(), geoms)
 mp.solve()
 
 # Access Mueller matrix for a specific zone
@@ -195,16 +208,16 @@ print(f"Mueller matrix shape: {mueller.shape}")
 
 # --8<-- [start:complete]
 import numpy as np
-from goad import BinningScheme, MultiProblem, Orientation, Settings, ZoneConfig
+from goad import BinningScheme, Geom, MultiProblem, Orientation, Settings, ZoneConfig
 
 # Configure and solve
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     wavelength=0.532,
     orientation=Orientation.uniform(num_orients=100),
     zones=[ZoneConfig(BinningScheme.simple(num_theta=180, num_phi=48))],
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 
 # Access all results

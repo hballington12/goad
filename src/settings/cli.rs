@@ -1,12 +1,17 @@
+use anyhow::Result;
 use clap::{Args, Parser};
+use config::{Config, Environment, File};
 use log::{trace, warn};
 use nalgebra::Complex;
+use serde::Deserialize;
 use std::path::PathBuf;
 
 use crate::bins::{self};
 use crate::diff::Mapping;
+use crate::geom::Geom;
 use crate::orientation::{Euler, EulerConvention, Orientation, Scheme};
-use crate::settings::{Settings, DEFAULT_EULER_ORDER};
+use crate::settings::loading;
+use crate::settings::{Settings, DEFAULT_EULER_ORDER, DEFAULT_PARTICLE_REFR_INDEX};
 use crate::zones::ZoneConfig;
 
 #[derive(Parser, Debug)]
@@ -427,4 +432,49 @@ pub fn update_settings_from_cli(config: &mut Settings) {
             config.geom_scale = Some(geom_scale);
         }
     }
+}
+
+/// Geometry inputs read independently from `Settings` — the geom path and
+/// per-shape refractive-index list now live alongside `Settings` rather than
+/// inside it.
+#[derive(Deserialize, Default)]
+struct GeomInput {
+    #[serde(default)]
+    geom_name: Option<String>,
+    #[serde(default)]
+    particle_refr_index: Vec<Complex<f32>>,
+}
+
+/// Resolves the geometry path and per-shape refractive indices from the same
+/// layered sources as `Settings` (config file → env > CLI), then loads and
+/// returns the geometries. Use this from `main.rs` to obtain `Vec<Geom>` for
+/// `MultiProblem::new(..)`.
+pub fn load_geoms() -> Result<Vec<Geom>> {
+    let args = CliArgs::parse();
+    let config_file = loading::get_config_file()?;
+
+    let cfg = Config::builder()
+        .add_source(File::from(config_file).required(true))
+        .add_source(Environment::with_prefix("goad"))
+        .build()?;
+
+    let mut input: GeomInput = cfg.try_deserialize().unwrap_or_default();
+
+    if let Some(path) = args.material.geo {
+        input.geom_name = Some(path);
+    }
+    if let Some(ri) = args.material.ri {
+        input.particle_refr_index = ri;
+    }
+    if input.particle_refr_index.is_empty() {
+        input.particle_refr_index = vec![DEFAULT_PARTICLE_REFR_INDEX];
+    }
+
+    let path = input.geom_name.ok_or_else(|| {
+        anyhow::anyhow!(
+            "no geometry path supplied (set GOAD_GEOM_NAME, --geo, or `geom_name` in the config file)"
+        )
+    })?;
+
+    Geom::load(&path, input.particle_refr_index)
 }

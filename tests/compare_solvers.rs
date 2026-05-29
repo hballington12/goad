@@ -8,15 +8,21 @@
 use goad::{
     bins,
     convergence::Convergence,
+    geom::Geom,
     multiproblem::MultiProblem,
     orientation::{EulerConvention, Orientation, Scheme as OrientScheme},
     params::Param,
     result::MuellerMatrix,
-    settings,
+    settings::{self, DEFAULT_PARTICLE_REFR_INDEX},
     zones::ZoneConfig,
 };
 use std::fs::File;
 use std::io::Write;
+
+/// Default geometry + refractive index used by every test in this file.
+fn default_geoms() -> Vec<Geom> {
+    Geom::load("examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).expect("load default geom")
+}
 
 /// Compare Convergence vs MultiProblem and dump 1D Mueller results to files.
 #[test]
@@ -35,12 +41,12 @@ fn dump_1d_mueller_comparison() {
 
     // Solve with MultiProblem
     let mut multiproblem =
-        MultiProblem::new(None, Some(settings.clone())).expect("Failed to create MultiProblem");
+        MultiProblem::new(default_geoms(), Some(settings.clone())).expect("Failed to create MultiProblem");
     multiproblem.solve();
 
     // Solve with Convergence
     let mut convergence =
-        Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
+        Convergence::new(default_geoms(), Some(settings)).expect("Failed to create Convergence");
     convergence.add_target(Param::Asymmetry, 0.001); // tight target to ensure all 3 run
     convergence.max_orientations = 3;
     convergence.solve().unwrap();
@@ -130,7 +136,7 @@ fn test_tracker_5_orientations() {
     let mut tracker: Option<ConvergenceTracker<goad::result::Results>> = None;
 
     for (i, euler) in eulers.iter().enumerate() {
-        let mut problem = Problem::new(None, Some(settings.clone())).unwrap();
+        let mut problem = Problem::new(default_geoms().into_iter().next().unwrap(), Some(settings.clone())).unwrap();
         problem.run(Some(euler), &CancelToken::noop()).unwrap();
 
         let asym = problem
@@ -199,7 +205,7 @@ fn test_convergence_with_target() {
     settings.quiet = true;
 
     let mut convergence =
-        Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
+        Convergence::new(default_geoms(), Some(settings)).expect("Failed to create Convergence");
 
     // Set target: 90% relative SEM on asymmetry (relaxed for fewer orientations)
     convergence.add_target(Param::Asymmetry, 0.90);
@@ -259,14 +265,14 @@ fn benchmark_convergence_vs_multiproblem() {
     // Time MultiProblem
     let start_mp = Instant::now();
     let mut multiproblem =
-        MultiProblem::new(None, Some(settings.clone())).expect("Failed to create MultiProblem");
+        MultiProblem::new(default_geoms(), Some(settings.clone())).expect("Failed to create MultiProblem");
     multiproblem.solve();
     let elapsed_mp = start_mp.elapsed();
 
     // Time Convergence
     let start_conv = Instant::now();
     let mut convergence =
-        Convergence::new(None, Some(settings)).expect("Failed to create Convergence");
+        Convergence::new(default_geoms(), Some(settings)).expect("Failed to create Convergence");
     convergence.add_target(Param::Asymmetry, 0.001); // tight target to run all 3
     convergence.max_orientations = 3;
     convergence.solve().unwrap();
