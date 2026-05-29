@@ -8,9 +8,49 @@ At a minimum, you must specify the path to a geometry file or directory containi
 
 {{code_block('examples/settings', 'basic')}}
 
+### Geometry
+
 The geometry defines the units of the problem. If your geometry file is in microns, then you should also specify the wavelength in microns. All faces in the geometry must be planar and have some non-zero area. GOAD will return with an error if there are faces with zero area (ie. extremely thin triangles), since it needs to compute normals of each face by a cross product of 2 non-colinear edge vectors. You can make geometries in the open-source [Blender](https://www.blender.org/) software, or use some example geometries straight from Python [here](https://github.com/hballington12/bpy-geometries).
 
 If you specify a directory, GOAD will attempt to load all files with the `.obj` extension in the directory. It will then choose geometries at random for each orientation in the simulation. See [Orientation Distribution](#orientation-distribution) for more details.
+
+Internally, the geometry (or list of geometries, if a directory was specified) holds a list of `Shape` objects. For simple particles, like a cube, there is just a single `Shape` object. If the scattering geometry is made up of multiple surfaces, then there will be one `Shape` for each surface. For example, a cube within a cube yields a single geometry with 2 constituent cube shapes.
+
+### Containment Tree
+
+It is possible to show the hierarchy of shapes in a geometry by printing its containment graph:
+
+{{code_block('examples/settings', 'containment_tree')}}
+
+Output:
+
+```
+medium : 1.0000 + 0.0000i
+├── shape 0 : 1.3100 + 0.0000i
+│   ├── shape 1 : 1.3100 + 0.0000i
+│   │   └── shape 3 : 1.3100 + 0.0000i
+│   │       └── shape 5 : 1.3100 + 0.0000i
+│   └── shape 2 : 1.3100 + 0.0000i
+└── shape 4 : 1.3100 + 0.0000i
+```
+
+The top line shows the surrounding medium and each subsequent line shows a shape, indented by its containment depth. Sibling shapes share a parent.
+
+When running computations on particles with multiple layers, particles with embeddings, or other so-called poly-particle cases, you will probably need to set the refractive index of each shape directly (otherwise all constituents will have the same refractive index). Use `geom.refr_index(idx)` to read and `geom.set_refr_index(idx, n)` to write, where `n` is a Python `complex`:
+
+{{code_block('examples/settings', 'shape_refr_index')}}
+
+Output:
+
+```
+medium : 1.0000 + 0.0000i
+├── shape 0 : 1.5000 + 0.0000i
+│   ├── shape 1 : 1.3300 + 0.0100i
+│   │   └── shape 3 : 1.3100 + 0.0000i
+│   │       └── shape 5 : 1.3100 + 0.0000i
+│   └── shape 2 : 1.3100 + 0.0000i
+└── shape 4 : 1.3100 + 0.0000i
+```
 
 ## Physical Parameters
 

@@ -7,6 +7,25 @@ mp = MultiProblem(settings)
 mp.solve()
 # --8<-- [end:basic]
 
+# --8<-- [start:containment_tree]
+from goad import Geom
+
+geom = Geom.from_file("path/to/multi_shape.obj")[0]
+print(geom.containment_tree())
+# --8<-- [end:containment_tree]
+
+# --8<-- [start:shape_refr_index]
+from goad import Geom
+
+geom = Geom.from_file("path/to/multi_shape.obj")[0]
+
+# Override the refractive index of individual shapes
+geom.set_refr_index(0, 1.5 + 0.0j)  # Set shape 0 to 1.5
+geom.set_refr_index(1, 1.33 + 0.01j)  # Set shape 1 to 1.33 + 0.01j
+
+print(geom.containment_tree())
+# --8<-- [end:shape_refr_index]
+
 # --8<-- [start:wavelength]
 from goad import MultiProblem, Settings
 
