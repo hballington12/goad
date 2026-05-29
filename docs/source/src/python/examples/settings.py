@@ -2,7 +2,8 @@
 from goad import Geom, MultiProblem, Settings
 
 # Basic settings with minimal configuration
-geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+REFR_INDEX = 1.31 + 0j
+geoms = Geom.from_file("path/to/geometry.obj", [REFR_INDEX])
 settings = Settings()
 mp = MultiProblem(settings, geoms)
 mp.solve()
@@ -52,7 +53,13 @@ mp.solve()
 # --8<-- [end:refractive]
 
 # --8<-- [start:orientation]
-from goad import EulerConvention, Geom, MultiProblem, Orientation, Settings  # noqa: E402
+from goad import (  # noqa: E402
+    EulerConvention,
+    Geom,
+    MultiProblem,
+    Orientation,
+    Settings,
+)
 
 # Configure particle orientation distribution
 geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])

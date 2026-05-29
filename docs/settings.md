@@ -4,9 +4,11 @@ The `Settings` object configures a GOAD simulation. It controls physical paramet
 
 ## Basic Usage
 
-At a minimum, you must specify the path to a geometry file or directory containing geometry files:
+At a minimum, you must specify the path to a geometry file or directory containing geometry files and give a refractive index:
 
 {{code_block('examples/settings', 'basic')}}
+
+> By default, the refractive index is assigned to all geometries and their constituent shapes. For advanced use, see [Containment Tree](#containment-tree).
 
 ### Geometry
 

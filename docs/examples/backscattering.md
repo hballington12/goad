@@ -97,7 +97,7 @@ Create `run_simulation.py`:
 """Run GOAD backscattering simulation on the roughened hexagonal plate."""
 
 from pathlib import Path
-from goad import Convergence, Param, Settings
+from goad import Convergence, Geom, Param, Settings
 
 output_dir = Path(__file__).parent
 
@@ -106,11 +106,11 @@ geometry_file = (
     / "roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_6904c8.obj"
 )
 
+# Load the geometry with the ice refractive index at 532 nm
+geoms = Geom.from_file(str(geometry_file), [1.31 + 0j])
+
 settings = Settings(
-    geom_path=str(geometry_file),
     wavelength=0.532,
-    particle_refr_index_re=1.31,
-    particle_refr_index_im=0.0,
     zones=[],
     max_tir=20,
     directory=str(output_dir),
@@ -119,7 +119,7 @@ settings = Settings(
     cutoff=0.999,
 )
 
-convergence = Convergence(settings)
+convergence = Convergence(settings, geoms)
 convergence.add_target(Param.LidarRatio, 0.1)
 convergence.add_target(Param.DepolarizationRatio, 0.1)
 convergence.solve()
@@ -129,7 +129,7 @@ convergence.save()
 Key settings:
 
 - **wavelength**: 0.532 µm (green lidar)
-- **particle_refr_index_re**: 1.31 (ice at 532nm)
+- **particle refractive index**: `1.31 + 0j` (ice at 532 nm), passed to `Geom.from_file` and broadcast to every shape
 - **zones**: empty list disables the main scattering zone, leaving just forward and backward for greater speed
 - **max_tir**: 20 (high value for backscattering accuracy)
 - **convergence targets**: 10% error on lidar ratio and depolarization ratio
@@ -190,13 +190,12 @@ for i in range(5):
 
 ![Ensemble of 5 roughened plates](images/plate-ensemble-render.png)
 
-We can run the particles individually like before, or we can pass the directory and let GOAD run an average over the ensemble:
+We can run the particles individually like before, or we can pass the directory to `Geom.from_file` and let GOAD run an average over the ensemble:
 
 ```python
-settings = Settings(
-    geom_path=str(ensemble_dir),  # pass directory instead of single file
-    # ... other settings
-)
+# Load every .obj in the directory; the single refr index is broadcast to all
+geoms = Geom.from_file(str(ensemble_dir), [1.31 + 0j])
+convergence = Convergence(settings, geoms)
 ```
 
 > Note: The ensemble average is not a multiple scattering simulation. GOAD selects a particle from the ensemble at random, then selects a random orientation, then runs the simulation. This repeats as the simulation converges. The result is an orientation-averaged, ensemble-averaged single scattering computation.
