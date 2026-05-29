@@ -8,14 +8,14 @@ mp.solve()
 # --8<-- [end:basic]
 
 # --8<-- [start:containment_tree]
-from goad import Geom
+from goad import Geom  # noqa: E402
 
 geom = Geom.from_file("path/to/multi_shape.obj")[0]
 print(geom.containment_tree())
 # --8<-- [end:containment_tree]
 
 # --8<-- [start:shape_refr_index]
-from goad import Geom
+from goad import Geom  # noqa: E402
 
 geom = Geom.from_file("path/to/multi_shape.obj")[0]
 
@@ -27,7 +27,7 @@ print(geom.containment_tree())
 # --8<-- [end:shape_refr_index]
 
 # --8<-- [start:wavelength]
-from goad import MultiProblem, Settings
+from goad import MultiProblem, Settings  # noqa: E402
 
 # Configure wavelength (in micrometers)
 settings = Settings(
@@ -39,7 +39,7 @@ mp.solve()
 # --8<-- [end:wavelength]
 
 # --8<-- [start:refractive]
-from goad import MultiProblem, Settings
+from goad import MultiProblem, Settings  # noqa: E402
 
 # Configure refractive indices for particle and medium
 settings = Settings(
@@ -54,7 +54,7 @@ mp.solve()
 # --8<-- [end:refractive]
 
 # --8<-- [start:orientation]
-from goad import EulerConvention, MultiProblem, Orientation, Settings
+from goad import EulerConvention, MultiProblem, Orientation, Settings  # noqa: E402
 
 # Configure particle orientation distribution
 settings = Settings(
@@ -68,7 +68,13 @@ mp.solve()
 # --8<-- [end:orientation]
 
 # --8<-- [start:orientation_discrete]
-from goad import Euler, EulerConvention, MultiProblem, Orientation, Settings
+from goad import (  # noqa: E402
+    Euler,
+    EulerConvention,
+    MultiProblem,
+    Orientation,
+    Settings,
+)
 
 # Configure discrete orientations
 orients = Orientation.discrete(
@@ -80,7 +86,7 @@ mp.solve()
 # --8<-- [end:orientation_discrete]
 
 # --8<-- [start:zones]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig  # noqa: E402
 
 # Default: single full zone with interval binning (high-res forward/back)
 settings = Settings(geom_path="path/to/geometry.obj")
@@ -105,7 +111,7 @@ mp.solve()
 # --8<-- [end:zones]
 
 # --8<-- [start:binning]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig  # noqa: E402
 
 # Configure angular binning for scattering output
 settings = Settings(
@@ -117,7 +123,7 @@ mp.solve()
 # --8<-- [end:binning]
 
 # --8<-- [start:binning_interval]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig  # noqa: E402
 
 # Use variable angular resolution
 settings = Settings(
@@ -138,7 +144,7 @@ mp.solve()
 # --8<-- [end:binning_interval]
 
 # --8<-- [start:binning_custom]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, MultiProblem, Settings, ZoneConfig  # noqa: E402
 
 # Specify arbitrary bin edges
 binning = BinningScheme.custom(
@@ -154,7 +160,7 @@ mp.solve()
 # --8<-- [end:binning_custom]
 
 # --8<-- [start:mapping]
-from goad import Mapping, MultiProblem, Settings
+from goad import Mapping, MultiProblem, Settings  # noqa: E402
 
 # Configure near-to-far field mapping method
 settings = Settings(
@@ -166,7 +172,7 @@ mp.solve()
 # --8<-- [end:mapping]
 
 # --8<-- [start:thresholds]
-from goad import MultiProblem, Settings
+from goad import MultiProblem, Settings  # noqa: E402
 
 # Configure beam tracing thresholds
 settings = Settings(
@@ -180,7 +186,7 @@ mp.solve()
 # --8<-- [end:thresholds]
 
 # --8<-- [start:recursion]
-from goad import MultiProblem, Settings
+from goad import MultiProblem, Settings  # noqa: E402
 
 # Configure ray tracing limits
 settings = Settings(
@@ -193,7 +199,14 @@ mp.solve()
 # --8<-- [end:recursion]
 
 # --8<-- [start:advanced]
-from goad import BinningScheme, Mapping, MultiProblem, Orientation, Settings, ZoneConfig
+from goad import (  # noqa: E402
+    BinningScheme,
+    Mapping,
+    MultiProblem,
+    Orientation,
+    Settings,
+    ZoneConfig,
+)
 
 # Complete configuration example
 settings = Settings(
