@@ -1058,17 +1058,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#goad.Settings.geom_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        geom_path
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#goad.Settings.geom_scale" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1128,28 +1117,6 @@
     <span class="md-ellipsis">
       
         orientation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#goad.Settings.particle_refr_index_im" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        particle_refr_index_im
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#goad.Settings.particle_refr_index_re" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        particle_refr_index_re
       
     </span>
   </a>
@@ -2024,6 +1991,17 @@
     <span class="md-ellipsis">
       
         containment_tree
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#goad.Geom.from_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_file
       
     </span>
   </a>
@@ -3555,17 +3533,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#goad.Settings.geom_path" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        geom_path
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#goad.Settings.geom_scale" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3625,28 +3592,6 @@
     <span class="md-ellipsis">
       
         orientation
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#goad.Settings.particle_refr_index_im" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        particle_refr_index_im
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#goad.Settings.particle_refr_index_re" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        particle_refr_index_re
       
     </span>
   </a>
@@ -4521,6 +4466,17 @@
     <span class="md-ellipsis">
       
         containment_tree
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#goad.Geom.from_file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_file
       
     </span>
   </a>
@@ -6277,30 +6233,6 @@ Periodically checks for Python signals (Ctrl-C) and interrupts if needed.</p>
 
 
 
-<h3 id="goad.Settings.geom_path" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">geom_path</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-</h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="n">geom_path</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Set the geometry file path</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
 <h3 id="goad.Settings.geom_scale" class="doc doc-heading">
             <span class="doc doc-object-name doc-attribute-name">geom_scale</span>
 
@@ -6436,54 +6368,6 @@ Periodically checks for Python signals (Ctrl-C) and interrupts if needed.</p>
     <div class="doc doc-contents ">
 
         <p>Set the full orientation object</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="goad.Settings.particle_refr_index_im" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">particle_refr_index_im</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-</h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="n">particle_refr_index_im</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Set the particle refractive index (imaginary part)</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="goad.Settings.particle_refr_index_re" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">particle_refr_index_re</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-</h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="n">particle_refr_index_re</span>
-</code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>Set the particle refractive index (real part)</p>
 
     </div>
 
@@ -8214,6 +8098,33 @@ the parent Geom — use <code>set_refr_index(idx, n)</code> for that.</p>
 
         <p>Render the containment graph as an indented tree. <code>medium</code> defaults to
 vacuum (1+0j).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="goad.Geom.from_file" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_file</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
+  </span>
+
+</h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_file</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">refr_indices</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Load geometry from an OBJ file (or a directory of OBJ files), assigning
+each shape a refractive index from <code>refr_indices</code>.</p>
+<p><code>refr_indices</code> must either have one entry per shape in the loaded
+geometry, or a single entry that is broadcast to every shape.</p>
 
 
     </div>

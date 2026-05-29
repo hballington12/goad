@@ -6,7 +6,7 @@ use goad::geom::{Face, Geom};
 use goad::orientation::Euler;
 use goad::problem::Problem;
 use goad::recording::Recording;
-use goad::settings::load_default_config;
+use goad::settings::{load_default_config, DEFAULT_PARTICLE_REFR_INDEX};
 use serde_json::json;
 use std::fs::File;
 use std::io::Write;
@@ -45,10 +45,18 @@ fn dump_recording(rec: &Recording) -> serde_json::Value {
                 .decompose()
                 .into_iter()
                 .map(|r| {
-                    let back_interiors: Vec<Vec<[f32; 3]>> =
-                        r.back.interiors.iter().map(|ring_pts| ring(ring_pts)).collect();
-                    let front_interiors: Vec<Vec<[f32; 3]>> =
-                        r.front.interiors.iter().map(|ring_pts| ring(ring_pts)).collect();
+                    let back_interiors: Vec<Vec<[f32; 3]>> = r
+                        .back
+                        .interiors
+                        .iter()
+                        .map(|ring_pts| ring(ring_pts))
+                        .collect();
+                    let front_interiors: Vec<Vec<[f32; 3]>> = r
+                        .front
+                        .interiors
+                        .iter()
+                        .map(|ring_pts| ring(ring_pts))
+                        .collect();
                     json!({
                         "output_index": r.output_index,
                         "kind": format!("{:?}", r.kind),
@@ -77,9 +85,10 @@ fn main() {
     let mut settings = load_default_config().expect("load default config");
     settings.scale = Some(1.0);
 
-    let geoms = Geom::load("./examples/data/hex.obj").expect("load hex");
+    let geoms = Geom::load("./examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX])
+        .expect("load hex");
     let geom = geoms[0].clone();
-    let mut problem = Problem::new(Some(geom), Some(settings)).expect("build problem");
+    let mut problem = Problem::new(geom, Some(settings)).expect("build problem");
 
     let euler = Euler::new(0.0, 30.0, 30.0);
     let recording = problem

@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use goad::convergence::Convergence;
+use goad::geom::Geom;
 use goad::orientation::{EulerConvention, Orientation, Scheme};
 use goad::params::Param;
 use goad::result::GOComponent;
@@ -52,8 +53,6 @@ fn run_single_config(
     let settings = Settings {
         wavelength: WAVELENGTH_UM,
         medium_refr_index: Complex::new(1.0, 0.0),
-        particle_refr_index: vec![Complex::new(REFR_INDEX_RE, REFR_INDEX_IM)],
-        geom_name: geom_dir.to_string_lossy().to_string(),
         zones: vec![], // Empty zones = auto Forward/Backward
         max_tir: MAX_TIR,
         max_rec: 10,
@@ -86,8 +85,15 @@ fn run_single_config(
         binning: None,
     };
 
+    // Load all geometries in the directory with the configured refractive index
+    let geoms = Geom::load(
+        geom_dir.to_str().ok_or("non-utf8 geom dir")?,
+        vec![Complex::new(REFR_INDEX_RE, REFR_INDEX_IM)],
+    )
+    .map_err(|e| e.to_string())?;
+
     // Create convergence solver
-    let mut convergence = Convergence::new(None, Some(settings)).map_err(|e| e.to_string())?;
+    let mut convergence = Convergence::new(geoms, Some(settings)).map_err(|e| e.to_string())?;
 
     // Enable logging
     let log_file = results_dir.join("convergence_log.csv");

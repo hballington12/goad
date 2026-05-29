@@ -1027,6 +1027,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
     <span class="n">BinningScheme</span><span class="p">,</span>
     <span class="n">Euler</span><span class="p">,</span>
     <span class="n">EulerConvention</span><span class="p">,</span>
+    <span class="n">Geom</span><span class="p">,</span>
     <span class="n">Mapping</span><span class="p">,</span>
     <span class="n">MultiProblem</span><span class="p">,</span>
     <span class="n">Orientation</span><span class="p">,</span>
@@ -1085,13 +1086,12 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 <div class="highlight"><pre><span></span><code><span class="n">GEOM_PATH</span> <span class="o">=</span> <span class="s2">&quot;hex.obj&quot;</span>
 <span class="n">OUTPUT_ROOT</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;runs&quot;</span><span class="p">)</span>
 
+<span class="c1"># Load the particle geometry once with its refractive index.</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">GEOM_PATH</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
+
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="n">GEOM_PATH</span><span class="p">,</span>
     <span class="n">wavelength</span><span class="o">=</span><span class="mf">0.532</span><span class="p">,</span>
-    <span class="n">particle_refr_index_re</span><span class="o">=</span><span class="mf">1.31</span><span class="p">,</span>
-    <span class="n">particle_refr_index_im</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
-    <span class="n">medium_refr_index_re</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-    <span class="n">medium_refr_index_im</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">medium_refr_index</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">,</span>
     <span class="n">zones</span><span class="o">=</span><span class="n">zones</span><span class="p">,</span>
     <span class="n">mapping</span><span class="o">=</span><span class="n">Mapping</span><span class="p">(</span><span class="s2">&quot;ad&quot;</span><span class="p">),</span>
     <span class="n">beam_power_threshold</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span>
@@ -1127,7 +1127,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
     <span class="n">out_dir</span> <span class="o">=</span> <span class="n">OUTPUT_ROOT</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;orient_</span><span class="si">{</span><span class="n">i</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">&quot;</span>
     <span class="n">out_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+    <span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
     <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
     <span class="n">mp</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">out_dir</span><span class="p">))</span>
 </code></pre></div>

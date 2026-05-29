@@ -1,23 +1,25 @@
 # --8<-- [start:basic]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings
 
 # Basic settings with minimal configuration
-settings = Settings(geom_path="path/to/geometry.obj")
-mp = MultiProblem(settings)
+REFR_INDEX = 1.31 + 0j
+geoms = Geom.from_file("path/to/geometry.obj", [REFR_INDEX])
+settings = Settings()
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:basic]
 
 # --8<-- [start:containment_tree]
-from goad import Geom
+from goad import Geom  # noqa: E402
 
-geom = Geom.from_file("path/to/multi_shape.obj")[0]
+geom = Geom.from_file("path/to/multi_shape.obj", [1.31 + 0j])[0]
 print(geom.containment_tree())
 # --8<-- [end:containment_tree]
 
 # --8<-- [start:shape_refr_index]
-from goad import Geom
+from goad import Geom  # noqa: E402
 
-geom = Geom.from_file("path/to/multi_shape.obj")[0]
+geom = Geom.from_file("path/to/multi_shape.obj", [1.31 + 0j])[0]
 
 # Override the refractive index of individual shapes
 geom.set_refr_index(0, 1.5 + 0.0j)  # Set shape 0 to 1.5
@@ -27,101 +29,112 @@ print(geom.containment_tree())
 # --8<-- [end:shape_refr_index]
 
 # --8<-- [start:wavelength]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings  # noqa: E402
 
 # Configure wavelength (in micrometers)
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     wavelength=0.532,  # 532 nm
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:wavelength]
 
 # --8<-- [start:refractive]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings  # noqa: E402
 
 # Configure refractive indices for particle and medium
+geoms = Geom.from_file("path/to/geometry.obj", [1.5 + 0.01j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
-    particle_refr_index_re=1.5,  # Real part of particle refractive index
-    particle_refr_index_im=0.01,  # Imaginary part (absorption)
-    medium_refr_index_re=1.33,  # Water as medium
-    medium_refr_index_im=0.0,
+    medium_refr_index=1.33 + 0.0j,
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:refractive]
 
 # --8<-- [start:orientation]
-from goad import EulerConvention, MultiProblem, Orientation, Settings
+from goad import (  # noqa: E402
+    EulerConvention,
+    Geom,
+    MultiProblem,
+    Orientation,
+    Settings,
+)
 
 # Configure particle orientation distribution
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     orientation=Orientation.uniform(
         num_orients=100, euler_convention=EulerConvention("ZYZ")
     ),
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:orientation]
 
 # --8<-- [start:orientation_discrete]
-from goad import Euler, EulerConvention, MultiProblem, Orientation, Settings
+from goad import (  # noqa: E402
+    Euler,
+    EulerConvention,
+    Geom,
+    MultiProblem,
+    Orientation,
+    Settings,
+)
 
 # Configure discrete orientations
 orients = Orientation.discrete(
     eulers=[Euler(0, 0, 0), Euler(45, 90, 0)], euler_convention=EulerConvention("ZYZ")
 )
-settings = Settings(geom_path="path/to/geometry.obj", orientation=orients)
-mp = MultiProblem(settings)
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+settings = Settings(orientation=orients)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:orientation_discrete]
 
 # --8<-- [start:zones]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, Geom, MultiProblem, Settings, ZoneConfig  # noqa: E402
+
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 
 # Default: single full zone with interval binning (high-res forward/back)
-settings = Settings(geom_path="path/to/geometry.obj")
+settings = Settings()
 
 # Custom full zone with simple binning
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     zones=[ZoneConfig(BinningScheme.simple(180, 48))],
 )
 
 # Labeled zone
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     zones=[ZoneConfig(BinningScheme.simple(90, 24), label="coarse")],
 )
 
 # Backscatter-only (no full zone, just forward + backward)
-settings = Settings(geom_path="path/to/geometry.obj", zones=[])
+settings = Settings(zones=[])
 
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:zones]
 
 # --8<-- [start:binning]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, Geom, MultiProblem, Settings, ZoneConfig  # noqa: E402
 
 # Configure angular binning for scattering output
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     zones=[ZoneConfig(BinningScheme.simple(num_theta=180, num_phi=48))],
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:binning]
 
 # --8<-- [start:binning_interval]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, Geom, MultiProblem, Settings, ZoneConfig  # noqa: E402
 
 # Use variable angular resolution
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     zones=[
         ZoneConfig(
             BinningScheme.interval(
@@ -133,12 +146,12 @@ settings = Settings(
         )
     ],
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:binning_interval]
 
 # --8<-- [start:binning_custom]
-from goad import BinningScheme, MultiProblem, Settings, ZoneConfig
+from goad import BinningScheme, Geom, MultiProblem, Settings, ZoneConfig  # noqa: E402
 
 # Specify arbitrary bin edges
 binning = BinningScheme.custom(
@@ -148,61 +161,67 @@ binning = BinningScheme.custom(
         [[170, 180], [0, 360]],  # Backscattering cone
     ]
 )
-settings = Settings(geom_path="path/to/geometry.obj", zones=[ZoneConfig(binning)])
-mp = MultiProblem(settings)
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
+settings = Settings(zones=[ZoneConfig(binning)])
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:binning_custom]
 
 # --8<-- [start:mapping]
-from goad import Mapping, MultiProblem, Settings
+from goad import Geom, Mapping, MultiProblem, Settings  # noqa: E402
 
 # Configure near-to-far field mapping method
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     mapping=Mapping("ad"),  # 'ad' for Aperture Diffraction, 'go' for Geometric Optics
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:mapping]
 
 # --8<-- [start:thresholds]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings  # noqa: E402
 
 # Configure beam tracing thresholds
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     beam_power_threshold=1e-6,  # Stop tracking beams below this power
     beam_area_threshold_fac=1e-3,  # Stop tracking beams smaller than this fraction
     cutoff=1e-10,  # Global energy cutoff
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:thresholds]
 
 # --8<-- [start:recursion]
-from goad import MultiProblem, Settings
+from goad import Geom, MultiProblem, Settings  # noqa: E402
 
 # Configure ray tracing limits
+geoms = Geom.from_file("path/to/geometry.obj", [1.31 + 0j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
     max_rec=10,  # Maximum internal reflections
     max_tir=5,  # Maximum total internal reflections
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:recursion]
 
 # --8<-- [start:advanced]
-from goad import BinningScheme, Mapping, MultiProblem, Orientation, Settings, ZoneConfig
+from goad import (  # noqa: E402
+    BinningScheme,
+    Geom,
+    Mapping,
+    MultiProblem,
+    Orientation,
+    Settings,
+    ZoneConfig,
+)
 
 # Complete configuration example
+geoms = Geom.from_file("path/to/geometry.obj", [1.5 + 0.01j])
 settings = Settings(
-    geom_path="path/to/geometry.obj",
+    medium_refr_index=1.0 + 0.0j,
     wavelength=0.532,
-    particle_refr_index_re=1.5,
-    particle_refr_index_im=0.01,
-    medium_refr_index_re=1.0,
-    medium_refr_index_im=0.0,
     orientation=Orientation.uniform(num_orients=100),
     zones=[ZoneConfig(BinningScheme.simple(num_theta=180, num_phi=48))],
     mapping=Mapping("ad"),
@@ -215,6 +234,6 @@ settings = Settings(
     quiet=False,
     directory="output/",
 )
-mp = MultiProblem(settings)
+mp = MultiProblem(settings, geoms)
 mp.solve()
 # --8<-- [end:advanced]

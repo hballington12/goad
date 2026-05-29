@@ -13,7 +13,7 @@ use goad::beam::BeamVariant;
 use goad::cancel::CancelToken;
 use goad::geom::Geom;
 use goad::problem::Problem;
-use goad::settings::load_default_config;
+use goad::settings::{load_default_config, DEFAULT_PARTICLE_REFR_INDEX};
 use nalgebra::Point3;
 
 fn main() {
@@ -23,9 +23,10 @@ fn main() {
     let mut settings = load_default_config().expect("load default config");
     settings.scale = Some(1.0);
 
-    let geoms = Geom::load("./examples/data/hex.obj").expect("load hex");
+    let geoms = Geom::load("./examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX])
+        .expect("load hex");
     let geom = geoms[0].clone();
-    let mut problem = Problem::new(Some(geom), Some(settings)).expect("build problem");
+    let mut problem = Problem::new(geom, Some(settings)).expect("build problem");
 
     // 2. Run the full recorded pipeline (init → orient → illuminate →
     //    near-field with recording → far-field → mueller → params).

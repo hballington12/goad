@@ -56,11 +56,9 @@ fn main() {
     settings.scale = Some(1.0); // bypass auto-rescale-to-unit-cube
     settings.wavelength = WAVELENGTH;
     settings.medium_refr_index = Complex::new(1.0, 0.0);
-    settings.particle_refr_index = vec![Complex::new(N_REFR_RE, 0.0)];
 
     let s = HALF_SIDE_TARGET / CUBE_HALF_NATIVE;
     settings.geom_scale = Some(vec![s, s, s]);
-    settings.geom_name = "./examples/data/cube.obj".to_string();
     settings.orientation = Orientation {
         scheme: Scheme::Discrete {
             eulers: vec![Euler::new(0.0, EULER_BETA_DEG, 0.0)],
@@ -69,9 +67,10 @@ fn main() {
     };
 
     // 2. Build problem and run the recorded pipeline.
-    let geoms = Geom::load(&settings.geom_name).expect("load cube.obj");
+    let geom_path = "./examples/data/cube.obj";
+    let geoms = Geom::load(geom_path, vec![Complex::new(N_REFR_RE, 0.0)]).expect("load cube.obj");
     let geom = geoms[0].clone();
-    let mut problem = Problem::new(Some(geom), Some(settings)).expect("build problem");
+    let mut problem = Problem::new(geom, Some(settings)).expect("build problem");
 
     let euler = Euler::new(0.0, EULER_BETA_DEG, 0.0);
     let recording = problem
@@ -202,8 +201,7 @@ fn main() {
     //    (e_perp = x̂, prop = -ẑ), the wave is TM-polarized w.r.t. the
     //    facets whose normals lie in (x, z), so E lives in the (x, z)
     //    plane and E_x is the natural scalar to plot.
-    let depth3_set: std::collections::HashSet<usize> =
-        depth3_event_ids.iter().copied().collect();
+    let depth3_set: std::collections::HashSet<usize> = depth3_event_ids.iter().copied().collect();
     let in_pathway = |event_id: usize, output_index: usize| -> bool {
         (event_id == initial_id && output_index == tl_output_idx)
             || Some(event_id) == child_id
@@ -375,8 +373,7 @@ fn main() {
 
     // 7e. Depth-3 events -- one decomposition entry per descendant of a
     //     depth-2 event.
-    let depth3_events_decomp: Vec<_> =
-        depth3_event_ids.iter().copied().map(dump_event).collect();
+    let depth3_events_decomp: Vec<_> = depth3_event_ids.iter().copied().map(dump_event).collect();
 
     let dump = json!({
         "geometry": { "shapes": shapes },

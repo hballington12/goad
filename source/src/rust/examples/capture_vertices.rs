@@ -1,5 +1,6 @@
 use goad::clip::Clipping;
-use goad::geom::{Geom, Face};
+use goad::geom::{Face, Geom};
+use goad::settings::DEFAULT_PARTICLE_REFR_INDEX;
 use nalgebra::{Point3, Vector3};
 
 fn main() {
@@ -23,7 +24,7 @@ fn main() {
 }
 
 fn test_projection_debug() {
-    let geoms = Geom::load("./examples/data/hex.obj").unwrap();
+    let geoms = Geom::load("./examples/data/hex.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
     let mut geom = geoms[0].clone();
     let mut clip = geom.shapes[0].faces.remove(4);
     let projection = Vector3::new(0.0, 0.0, -1.0);
@@ -35,7 +36,7 @@ fn test_projection_debug() {
 }
 
 fn test_projection1() {
-    let geoms = Geom::load("./examples/data/concave1.obj").unwrap();
+    let geoms = Geom::load("./examples/data/concave1.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
     let mut geom = geoms[0].clone();
     let mut clip = geom.shapes[0].faces.remove(4);
     let projection = Vector3::new(-0.3, 0.0, -1.0);
@@ -47,7 +48,7 @@ fn test_projection1() {
 }
 
 fn test_projection2() {
-    let geoms = Geom::load("./examples/data/cube_inside_ico.obj").unwrap();
+    let geoms = Geom::load("./examples/data/cube_inside_ico.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
     let mut geom = geoms[0].clone();
     let mut clip = geom.shapes[0].faces.remove(5);
     let projection = Vector3::new(-0.2, 0.0, -1.0);
@@ -59,7 +60,7 @@ fn test_projection2() {
 }
 
 fn test_projection_multi() {
-    let geoms = Geom::load("./examples/data/multiple.obj").unwrap();
+    let geoms = Geom::load("./examples/data/multiple.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
     let mut geom = geoms[0].clone();
     let mut clip = geom.shapes[0].faces.remove(5);
     let projection = Vector3::new(-1.0, 0.0, 0.0);
@@ -71,7 +72,7 @@ fn test_projection_multi() {
 }
 
 fn test_clip_test() {
-    let geoms = Geom::load("./examples/data/clip_test.obj").unwrap();
+    let geoms = Geom::load("./examples/data/clip_test.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
     let mut geom = geoms[0].clone();
     let mut clip = geom.shapes[1].faces.remove(1);
     let projection = Vector3::new(1.0, 1.0, 0.0);
@@ -83,7 +84,7 @@ fn test_clip_test() {
 }
 
 fn test_remainder() {
-    let geoms = Geom::load("./examples/data/multiple.obj").unwrap();
+    let geoms = Geom::load("./examples/data/multiple.obj", vec![DEFAULT_PARTICLE_REFR_INDEX]).unwrap();
     let mut geom = geoms[0].clone();
     let projection = Vector3::new(0.0, 0.0, -1.0);
     

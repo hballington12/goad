@@ -1429,20 +1429,25 @@
 <h1 id="settings">Settings</h1>
 <p>The <code>Settings</code> object configures a GOAD simulation. It controls physical parameters, numerical methods, and output options.</p>
 <h2 id="basic-usage">Basic Usage</h2>
-<p>At a minimum, you must specify the path to a geometry file or directory containing geometry files:</p>
+<p>At a minimum, you must specify the path to a geometry file or directory containing geometry files and give a refractive index:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:1"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>
 
 <span class="c1"># Basic settings with minimal configuration</span>
-<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">REFR_INDEX</span> <span class="o">=</span> <span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">REFR_INDEX</span><span class="p">])</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">()</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
 </div>
 </div>
+<blockquote>
+<p>By default, the refractive index is assigned to all geometries and their constituent shapes. For advanced use, see <a href="#containment-tree">Containment Tree</a>.</p>
+</blockquote>
 <h3 id="geometry">Geometry</h3>
 <p>The geometry defines the units of the problem. If your geometry file is in microns, then you should also specify the wavelength in microns. All faces in the geometry must be planar and have some non-zero area. GOAD will return with an error if there are faces with zero area (ie. extremely thin triangles), since it needs to compute normals of each face by a cross product of 2 non-colinear edge vectors. You can make geometries in the open-source <a href="https://www.blender.org/">Blender</a> software, or use some example geometries straight from Python <a href="https://github.com/hballington12/bpy-geometries">here</a>.</p>
 <p>If you specify a directory, GOAD will attempt to load all files with the <code>.obj</code> extension in the directory. It will then choose geometries at random for each orientation in the simulation. See <a href="#orientation-distribution">Orientation Distribution</a> for more details.</p>
@@ -1452,9 +1457,9 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="2:1"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span>  <span class="c1"># noqa: E402</span>
 
-<span class="n">geom</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/multi_shape.obj&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">geom</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/multi_shape.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">geom</span><span class="o">.</span><span class="n">containment_tree</span><span class="p">())</span>
 </code></pre></div>
 </div>
@@ -1474,9 +1479,9 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="3:1"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span>  <span class="c1"># noqa: E402</span>
 
-<span class="n">geom</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/multi_shape.obj&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">geom</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/multi_shape.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])[</span><span class="mi">0</span><span class="p">]</span>
 
 <span class="c1"># Override the refractive index of individual shapes</span>
 <span class="n">geom</span><span class="o">.</span><span class="n">set_refr_index</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.5</span> <span class="o">+</span> <span class="mf">0.0</span><span class="n">j</span><span class="p">)</span>  <span class="c1"># Set shape 0 to 1.5</span>
@@ -1502,14 +1507,14 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="4:1"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Configure wavelength (in micrometers)</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">wavelength</span><span class="o">=</span><span class="mf">0.532</span><span class="p">,</span>  <span class="c1"># 532 nm</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1517,21 +1522,18 @@
 </div>
 <p><strong>Default:</strong> <code>0.532</code> (532 nm, green laser)</p>
 <h3 id="refractive-indices">Refractive Indices</h3>
-<p>Specify the complex refractive index for both the particle and surrounding medium:</p>
+<p>The particle refractive index is supplied per-shape when the geometry is loaded (<code>Geom.from_file(path, [n1, n2, ...])</code>). A single complex value is broadcast to every shape; otherwise pass one entry per shape. The medium refractive index is set on <code>Settings</code>:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="5:1"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Configure refractive indices for particle and medium</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.5</span> <span class="o">+</span> <span class="mf">0.01</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
-    <span class="n">particle_refr_index_re</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span>  <span class="c1"># Real part of particle refractive index</span>
-    <span class="n">particle_refr_index_im</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>  <span class="c1"># Imaginary part (absorption)</span>
-    <span class="n">medium_refr_index_re</span><span class="o">=</span><span class="mf">1.33</span><span class="p">,</span>  <span class="c1"># Water as medium</span>
-    <span class="n">medium_refr_index_im</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+    <span class="n">medium_refr_index</span><span class="o">=</span><span class="mf">1.33</span> <span class="o">+</span> <span class="mf">0.0</span><span class="n">j</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1539,11 +1541,10 @@
 </div>
 <p><strong>Defaults:</strong></p>
 <ul>
-<li><code>particle_refr_index_re</code>: <code>1.31</code> (typical glass)</li>
-<li><code>particle_refr_index_im</code>: <code>0.0</code></li>
-<li><code>medium_refr_index_re</code>: <code>1.0</code> (vacuum/air)</li>
-<li><code>medium_refr_index_im</code>: <code>0.0</code></li>
+<li>Particle refractive index (broadcast): <code>1.31 + 0j</code> (typical glass)</li>
+<li><code>medium_refr_index</code>: <code>1.0 + 0j</code> (vacuum/air)</li>
 </ul>
+<p>See <a href="#containment-tree">Containment Tree</a> for inspecting and overriding per-shape refractive indices on a loaded <code>Geom</code>.</p>
 <h3 id="particle-scaling">Particle Scaling</h3>
 <p>Scales the entire problem, including geometry and wavelength. Does not change the physics, only used for improving clipping algorithm accuracy. The default value is usually sufficient.</p>
 <p><strong>Parameter:</strong> <code>scale</code><br />
@@ -1553,16 +1554,22 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="6:1"><input checked="checked" id="__tabbed_6_1" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="__tabbed_6_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">EulerConvention</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Orientation</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: E402</span>
+    <span class="n">EulerConvention</span><span class="p">,</span>
+    <span class="n">Geom</span><span class="p">,</span>
+    <span class="n">MultiProblem</span><span class="p">,</span>
+    <span class="n">Orientation</span><span class="p">,</span>
+    <span class="n">Settings</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="c1"># Configure particle orientation distribution</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">orientation</span><span class="o">=</span><span class="n">Orientation</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span>
         <span class="n">num_orients</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">euler_convention</span><span class="o">=</span><span class="n">EulerConvention</span><span class="p">(</span><span class="s2">&quot;ZYZ&quot;</span><span class="p">)</span>
     <span class="p">),</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1573,14 +1580,22 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="7:1"><input checked="checked" id="__tabbed_7_1" name="__tabbed_7" type="radio" /><div class="tabbed-labels"><label for="__tabbed_7_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Euler</span><span class="p">,</span> <span class="n">EulerConvention</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Orientation</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: E402</span>
+    <span class="n">Euler</span><span class="p">,</span>
+    <span class="n">EulerConvention</span><span class="p">,</span>
+    <span class="n">Geom</span><span class="p">,</span>
+    <span class="n">MultiProblem</span><span class="p">,</span>
+    <span class="n">Orientation</span><span class="p">,</span>
+    <span class="n">Settings</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="c1"># Configure discrete orientations</span>
 <span class="n">orients</span> <span class="o">=</span> <span class="n">Orientation</span><span class="o">.</span><span class="n">discrete</span><span class="p">(</span>
     <span class="n">eulers</span><span class="o">=</span><span class="p">[</span><span class="n">Euler</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">Euler</span><span class="p">(</span><span class="mi">45</span><span class="p">,</span> <span class="mi">90</span><span class="p">,</span> <span class="mi">0</span><span class="p">)],</span> <span class="n">euler_convention</span><span class="o">=</span><span class="n">EulerConvention</span><span class="p">(</span><span class="s2">&quot;ZYZ&quot;</span><span class="p">)</span>
 <span class="p">)</span>
-<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="n">orientation</span><span class="o">=</span><span class="n">orients</span><span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">orientation</span><span class="o">=</span><span class="n">orients</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1607,27 +1622,27 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="8:1"><input checked="checked" id="__tabbed_8_1" name="__tabbed_8" type="radio" /><div class="tabbed-labels"><label for="__tabbed_8_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>  <span class="c1"># noqa: E402</span>
+
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 
 <span class="c1"># Default: single full zone with interval binning (high-res forward/back)</span>
-<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">)</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">()</span>
 
 <span class="c1"># Custom full zone with simple binning</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">zones</span><span class="o">=</span><span class="p">[</span><span class="n">ZoneConfig</span><span class="p">(</span><span class="n">BinningScheme</span><span class="o">.</span><span class="n">simple</span><span class="p">(</span><span class="mi">180</span><span class="p">,</span> <span class="mi">48</span><span class="p">))],</span>
 <span class="p">)</span>
 
 <span class="c1"># Labeled zone</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">zones</span><span class="o">=</span><span class="p">[</span><span class="n">ZoneConfig</span><span class="p">(</span><span class="n">BinningScheme</span><span class="o">.</span><span class="n">simple</span><span class="p">(</span><span class="mi">90</span><span class="p">,</span> <span class="mi">24</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;coarse&quot;</span><span class="p">)],</span>
 <span class="p">)</span>
 
 <span class="c1"># Backscatter-only (no full zone, just forward + backward)</span>
-<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="n">zones</span><span class="o">=</span><span class="p">[])</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">zones</span><span class="o">=</span><span class="p">[])</span>
 
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1641,14 +1656,14 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="9:1"><input checked="checked" id="__tabbed_9_1" name="__tabbed_9" type="radio" /><div class="tabbed-labels"><label for="__tabbed_9_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Configure angular binning for scattering output</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">zones</span><span class="o">=</span><span class="p">[</span><span class="n">ZoneConfig</span><span class="p">(</span><span class="n">BinningScheme</span><span class="o">.</span><span class="n">simple</span><span class="p">(</span><span class="n">num_theta</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span> <span class="n">num_phi</span><span class="o">=</span><span class="mi">48</span><span class="p">))],</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1660,11 +1675,11 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="10:1"><input checked="checked" id="__tabbed_10_1" name="__tabbed_10" type="radio" /><div class="tabbed-labels"><label for="__tabbed_10_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Use variable angular resolution</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">zones</span><span class="o">=</span><span class="p">[</span>
         <span class="n">ZoneConfig</span><span class="p">(</span>
             <span class="n">BinningScheme</span><span class="o">.</span><span class="n">interval</span><span class="p">(</span>
@@ -1676,7 +1691,7 @@
         <span class="p">)</span>
     <span class="p">],</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1688,7 +1703,7 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="11:1"><input checked="checked" id="__tabbed_11_1" name="__tabbed_11" type="radio" /><div class="tabbed-labels"><label for="__tabbed_11_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Specify arbitrary bin edges</span>
 <span class="n">binning</span> <span class="o">=</span> <span class="n">BinningScheme</span><span class="o">.</span><span class="n">custom</span><span class="p">(</span>
@@ -1698,8 +1713,9 @@
         <span class="p">[[</span><span class="mi">170</span><span class="p">,</span> <span class="mi">180</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">360</span><span class="p">]],</span>  <span class="c1"># Backscattering cone</span>
     <span class="p">]</span>
 <span class="p">)</span>
-<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="n">zones</span><span class="o">=</span><span class="p">[</span><span class="n">ZoneConfig</span><span class="p">(</span><span class="n">binning</span><span class="p">)])</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span><span class="n">zones</span><span class="o">=</span><span class="p">[</span><span class="n">ZoneConfig</span><span class="p">(</span><span class="n">binning</span><span class="p">)])</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1711,14 +1727,14 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="12:1"><input checked="checked" id="__tabbed_12_1" name="__tabbed_12" type="radio" /><div class="tabbed-labels"><label for="__tabbed_12_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Configure near-to-far field mapping method</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">mapping</span><span class="o">=</span><span class="n">Mapping</span><span class="p">(</span><span class="s2">&quot;ad&quot;</span><span class="p">),</span>  <span class="c1"># &#39;ad&#39; for Aperture Diffraction, &#39;go&#39; for Geometric Optics</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1743,16 +1759,16 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="13:1"><input checked="checked" id="__tabbed_13_1" name="__tabbed_13" type="radio" /><div class="tabbed-labels"><label for="__tabbed_13_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Configure beam tracing thresholds</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">beam_power_threshold</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">,</span>  <span class="c1"># Stop tracking beams below this power</span>
     <span class="n">beam_area_threshold_fac</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span>  <span class="c1"># Stop tracking beams smaller than this fraction</span>
     <span class="n">cutoff</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span>  <span class="c1"># Global energy cutoff</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1770,15 +1786,15 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="14:1"><input checked="checked" id="__tabbed_14_1" name="__tabbed_14" type="radio" /><div class="tabbed-labels"><label for="__tabbed_14_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
 
 <span class="c1"># Configure ray tracing limits</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
     <span class="n">max_rec</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>  <span class="c1"># Maximum internal reflections</span>
     <span class="n">max_tir</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>  <span class="c1"># Maximum total internal reflections</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
@@ -1809,16 +1825,21 @@
 <div class="tabbed-set tabbed-alternate" data-tabs="15:1"><input checked="checked" id="__tabbed_15_1" name="__tabbed_15" type="radio" /><div class="tabbed-labels"><label for="__tabbed_15_1"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg></span> Python</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">BinningScheme</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">MultiProblem</span><span class="p">,</span> <span class="n">Orientation</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">ZoneConfig</span>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: E402</span>
+    <span class="n">BinningScheme</span><span class="p">,</span>
+    <span class="n">Geom</span><span class="p">,</span>
+    <span class="n">Mapping</span><span class="p">,</span>
+    <span class="n">MultiProblem</span><span class="p">,</span>
+    <span class="n">Orientation</span><span class="p">,</span>
+    <span class="n">Settings</span><span class="p">,</span>
+    <span class="n">ZoneConfig</span><span class="p">,</span>
+<span class="p">)</span>
 
 <span class="c1"># Complete configuration example</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.5</span> <span class="o">+</span> <span class="mf">0.01</span><span class="n">j</span><span class="p">])</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="s2">&quot;path/to/geometry.obj&quot;</span><span class="p">,</span>
+    <span class="n">medium_refr_index</span><span class="o">=</span><span class="mf">1.0</span> <span class="o">+</span> <span class="mf">0.0</span><span class="n">j</span><span class="p">,</span>
     <span class="n">wavelength</span><span class="o">=</span><span class="mf">0.532</span><span class="p">,</span>
-    <span class="n">particle_refr_index_re</span><span class="o">=</span><span class="mf">1.5</span><span class="p">,</span>
-    <span class="n">particle_refr_index_im</span><span class="o">=</span><span class="mf">0.01</span><span class="p">,</span>
-    <span class="n">medium_refr_index_re</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-    <span class="n">medium_refr_index_im</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
     <span class="n">orientation</span><span class="o">=</span><span class="n">Orientation</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="n">num_orients</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
     <span class="n">zones</span><span class="o">=</span><span class="p">[</span><span class="n">ZoneConfig</span><span class="p">(</span><span class="n">BinningScheme</span><span class="o">.</span><span class="n">simple</span><span class="p">(</span><span class="n">num_theta</span><span class="o">=</span><span class="mi">180</span><span class="p">,</span> <span class="n">num_phi</span><span class="o">=</span><span class="mi">48</span><span class="p">))],</span>
     <span class="n">mapping</span><span class="o">=</span><span class="n">Mapping</span><span class="p">(</span><span class="s2">&quot;ad&quot;</span><span class="p">),</span>
@@ -1831,13 +1852,14 @@
     <span class="n">quiet</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="n">directory</span><span class="o">=</span><span class="s2">&quot;output/&quot;</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">mp</span> <span class="o">=</span> <span class="n">MultiProblem</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">mp</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
 </code></pre></div>
 </div>
 </div>
 </div>
 <h2 id="parameter-reference">Parameter Reference</h2>
+<p>Note: geometry loading is no longer part of <code>Settings</code>. Load geometry with <code>Geom.from_file(path, refr_indices)</code> and pass the result as the second argument to <code>MultiProblem</code> / <code>Convergence</code>.</p>
 <table>
 <thead>
 <tr>
@@ -1849,40 +1871,16 @@
 </thead>
 <tbody>
 <tr>
-<td><a href="#basic-usage"><code>geom_path</code></a></td>
-<td><code>str</code></td>
-<td><strong>Required</strong></td>
-<td>Path to geometry file</td>
-</tr>
-<tr>
 <td><a href="#wavelength"><code>wavelength</code></a></td>
 <td><code>float</code></td>
 <td><code>0.532</code></td>
 <td>Wavelength in geometry units</td>
 </tr>
 <tr>
-<td><a href="#refractive-indices"><code>particle_refr_index_re</code></a></td>
-<td><code>float</code></td>
-<td><code>1.31</code></td>
-<td>Real part of particle refractive index</td>
-</tr>
-<tr>
-<td><a href="#refractive-indices"><code>particle_refr_index_im</code></a></td>
-<td><code>float</code></td>
-<td><code>0.0</code></td>
-<td>Imaginary part of particle refractive index</td>
-</tr>
-<tr>
-<td><a href="#refractive-indices"><code>medium_refr_index_re</code></a></td>
-<td><code>float</code></td>
-<td><code>1.0</code></td>
-<td>Real part of medium refractive index</td>
-</tr>
-<tr>
-<td><a href="#refractive-indices"><code>medium_refr_index_im</code></a></td>
-<td><code>float</code></td>
-<td><code>0.0</code></td>
-<td>Imaginary part of medium refractive index</td>
+<td><a href="#refractive-indices"><code>medium_refr_index</code></a></td>
+<td><code>complex</code></td>
+<td><code>1.0 + 0j</code></td>
+<td>Refractive index of the surrounding medium</td>
 </tr>
 <tr>
 <td><a href="#orientation-distribution"><code>orientation</code></a></td>

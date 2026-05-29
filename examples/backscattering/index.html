@@ -1042,7 +1042,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 <div class="highlight"><pre><span></span><code><span class="sd">&quot;&quot;&quot;Run GOAD backscattering simulation on the roughened hexagonal plate.&quot;&quot;&quot;</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Convergence</span><span class="p">,</span> <span class="n">Param</span><span class="p">,</span> <span class="n">Settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">goad</span><span class="w"> </span><span class="kn">import</span> <span class="n">Convergence</span><span class="p">,</span> <span class="n">Geom</span><span class="p">,</span> <span class="n">Param</span><span class="p">,</span> <span class="n">Settings</span>
 
 <span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span>
 
@@ -1051,11 +1051,11 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
     <span class="o">/</span> <span class="s2">&quot;roughened_edge15.0_sigma0p1_merge1p0_hexagonal_column_l5.0_r25.0_6904c8.obj&quot;</span>
 <span class="p">)</span>
 
+<span class="c1"># Load the geometry with the ice refractive index at 532 nm</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">geometry_file</span><span class="p">),</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
+
 <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">geometry_file</span><span class="p">),</span>
     <span class="n">wavelength</span><span class="o">=</span><span class="mf">0.532</span><span class="p">,</span>
-    <span class="n">particle_refr_index_re</span><span class="o">=</span><span class="mf">1.31</span><span class="p">,</span>
-    <span class="n">particle_refr_index_im</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
     <span class="n">zones</span><span class="o">=</span><span class="p">[],</span>
     <span class="n">max_tir</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
     <span class="n">directory</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">output_dir</span><span class="p">),</span>
@@ -1064,7 +1064,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
     <span class="n">cutoff</span><span class="o">=</span><span class="mf">0.999</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">convergence</span> <span class="o">=</span> <span class="n">Convergence</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span>
+<span class="n">convergence</span> <span class="o">=</span> <span class="n">Convergence</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 <span class="n">convergence</span><span class="o">.</span><span class="n">add_target</span><span class="p">(</span><span class="n">Param</span><span class="o">.</span><span class="n">LidarRatio</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
 <span class="n">convergence</span><span class="o">.</span><span class="n">add_target</span><span class="p">(</span><span class="n">Param</span><span class="o">.</span><span class="n">DepolarizationRatio</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
 <span class="n">convergence</span><span class="o">.</span><span class="n">solve</span><span class="p">()</span>
@@ -1073,7 +1073,7 @@ uv<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </s
 <p>Key settings:</p>
 <ul>
 <li><strong>wavelength</strong>: 0.532 µm (green lidar)</li>
-<li><strong>particle_refr_index_re</strong>: 1.31 (ice at 532nm)</li>
+<li><strong>particle refractive index</strong>: <code>1.31 + 0j</code> (ice at 532 nm), passed to <code>Geom.from_file</code> and broadcast to every shape</li>
 <li><strong>zones</strong>: empty list disables the main scattering zone, leaving just forward and backward for greater speed</li>
 <li><strong>max_tir</strong>: 20 (high value for backscattering accuracy)</li>
 <li><strong>convergence targets</strong>: 10% error on lidar ratio and depolarization ratio</li>
@@ -1139,11 +1139,10 @@ Simulation complete!
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generated particle </span><span class="si">{</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p><img alt="Ensemble of 5 roughened plates" src="../images/plate-ensemble-render.png" /></p>
-<p>We can run the particles individually like before, or we can pass the directory and let GOAD run an average over the ensemble:</p>
-<div class="highlight"><pre><span></span><code><span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">(</span>
-    <span class="n">geom_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">ensemble_dir</span><span class="p">),</span>  <span class="c1"># pass directory instead of single file</span>
-    <span class="c1"># ... other settings</span>
-<span class="p">)</span>
+<p>We can run the particles individually like before, or we can pass the directory to <code>Geom.from_file</code> and let GOAD run an average over the ensemble:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Load every .obj in the directory; the single refr index is broadcast to all</span>
+<span class="n">geoms</span> <span class="o">=</span> <span class="n">Geom</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">ensemble_dir</span><span class="p">),</span> <span class="p">[</span><span class="mf">1.31</span> <span class="o">+</span> <span class="mi">0</span><span class="n">j</span><span class="p">])</span>
+<span class="n">convergence</span> <span class="o">=</span> <span class="n">Convergence</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">geoms</span><span class="p">)</span>
 </code></pre></div>
 <blockquote>
 <p>Note: The ensemble average is not a multiple scattering simulation. GOAD selects a particle from the ensemble at random, then selects a random orientation, then runs the simulation. This repeats as the simulation converges. The result is an orientation-averaged, ensemble-averaged single scattering computation.</p>
