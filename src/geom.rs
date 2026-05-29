@@ -1205,6 +1205,34 @@ impl Shape {
 
         Ok(shape)
     }
+
+    /// Refractive index of this shape as a Python complex number.
+    #[getter]
+    fn get_refr_index(&self) -> Complex<f32> {
+        self.refr_index
+    }
+
+    #[setter]
+    fn set_refr_index(&mut self, value: Complex<f32>) {
+        self.refr_index = value;
+    }
+
+    /// Shape id, if assigned.
+    #[getter]
+    fn get_id(&self) -> Option<usize> {
+        self.id
+    }
+
+    fn __repr__(&self) -> String {
+        let id = self
+            .id
+            .map(|i| i.to_string())
+            .unwrap_or_else(|| "?".to_string());
+        format!(
+            "Shape(id={}, n={:.4}{:+.4}i, faces={}, vertices={})",
+            id, self.refr_index.re, self.refr_index.im, self.num_faces, self.num_vertices
+        )
+    }
 }
 
 #[cfg_attr(feature = "stub-gen", gen_stub_pyclass)]
@@ -1568,6 +1596,58 @@ impl Geom {
         Ok(())
     }
 
+    /// Returns the shape indices directly contained by `parent_id` according
+    /// to the containment graph (i.e. shapes whose immediate parent is
+    /// `parent_id`).
+    pub fn children_of(&self, parent_id: usize) -> Vec<usize> {
+        (0..self.num_shapes)
+            .filter(|&i| self.containment_graph.get_parent(i) == Some(parent_id))
+            .collect()
+    }
+
+    /// Returns the shape indices with no parent in the containment graph.
+    pub fn roots(&self) -> Vec<usize> {
+        (0..self.num_shapes)
+            .filter(|&i| self.containment_graph.get_parent(i).is_none())
+            .collect()
+    }
+
+    /// Render the containment graph as an indented tree using box-drawing
+    /// characters. The top line shows `medium`, then each root shape and
+    /// (recursively) its contents.
+    pub fn containment_tree_string(&self, medium: Complex<f32>) -> String {
+        fn fmt_n(n: Complex<f32>) -> String {
+            let sign = if n.im >= 0.0 { '+' } else { '-' };
+            format!("{:.4} {} {:.4}i", n.re, sign, n.im.abs())
+        }
+
+        fn walk(out: &mut String, geom: &Geom, idx: usize, prefix: &str, is_last: bool) {
+            let connector = if is_last { "└── " } else { "├── " };
+            let n = geom.shapes[idx].refr_index;
+            out.push_str(&format!(
+                "{}{}shape {} : {}\n",
+                prefix,
+                connector,
+                idx,
+                fmt_n(n)
+            ));
+            let next_prefix = format!("{}{}", prefix, if is_last { "    " } else { "│   " });
+            let kids = geom.children_of(idx);
+            let last_kid = kids.len().saturating_sub(1);
+            for (i, &kid) in kids.iter().enumerate() {
+                walk(out, geom, kid, &next_prefix, i == last_kid);
+            }
+        }
+
+        let mut out = format!("medium : {}\n", fmt_n(medium));
+        let roots = self.roots();
+        let last_root = roots.len().saturating_sub(1);
+        for (i, &root) in roots.iter().enumerate() {
+            walk(&mut out, self, root, "", i == last_root);
+        }
+        out
+    }
+
     pub fn vector_scale(&mut self, scale: &Vec<f32>) {
         if scale.len() != 3 {
             panic!("Scale vector must have length 3");
@@ -1701,6 +1781,77 @@ impl Geom {
             Ok(geom) => Ok(geom),
             Err(err) => Err(PyErr::new::<PyRuntimeError, _>(err.to_string())),
         }
+    }
+
+    /// Number of shapes in the geometry.
+    #[getter]
+    fn get_num_shapes(&self) -> usize {
+        self.num_shapes
+    }
+
+    /// All shapes (cloned). Mutating an element of this list does NOT update
+    /// the parent Geom — use `set_refr_index(idx, n)` for that.
+    #[getter]
+    fn get_shapes(&self) -> Vec<Shape> {
+        self.shapes.clone()
+    }
+
+    /// Refractive index of shape `idx` as a Python complex.
+    #[pyo3(name = "refr_index")]
+    fn py_refr_index(&self, idx: usize) -> PyResult<Complex<f32>> {
+        self.shapes
+            .get(idx)
+            .map(|s| s.refr_index)
+            .ok_or_else(|| {
+                PyErr::new::<PyRuntimeError, _>(format!(
+                    "shape index {} out of range (num_shapes = {})",
+                    idx, self.num_shapes
+                ))
+            })
+    }
+
+    /// Set the refractive index of shape `idx` from a Python complex.
+    #[pyo3(name = "set_refr_index")]
+    fn py_set_refr_index(&mut self, idx: usize, value: Complex<f32>) -> PyResult<()> {
+        let n = self.num_shapes;
+        let shape = self.shapes.get_mut(idx).ok_or_else(|| {
+            PyErr::new::<PyRuntimeError, _>(format!(
+                "shape index {} out of range (num_shapes = {})",
+                idx, n
+            ))
+        })?;
+        shape.refr_index = value;
+        Ok(())
+    }
+
+    /// Parent shape index for `shape_id` in the containment graph, if any.
+    #[pyo3(name = "parent_of")]
+    fn py_parent_of(&self, shape_id: usize) -> Option<usize> {
+        self.containment_graph.get_parent(shape_id)
+    }
+
+    /// Shape indices directly contained by `parent_id`.
+    #[pyo3(name = "children_of")]
+    fn py_children_of(&self, parent_id: usize) -> Vec<usize> {
+        self.children_of(parent_id)
+    }
+
+    /// Shape indices with no parent.
+    #[pyo3(name = "roots")]
+    fn py_roots(&self) -> Vec<usize> {
+        self.roots()
+    }
+
+    /// Render the containment graph as an indented tree. `medium` defaults to
+    /// vacuum (1+0j).
+    #[pyo3(name = "containment_tree", signature = (medium = None))]
+    fn py_containment_tree(&self, medium: Option<Complex<f32>>) -> String {
+        let medium = medium.unwrap_or(Complex { re: 1.0, im: 0.0 });
+        self.containment_tree_string(medium)
+    }
+
+    fn __repr__(&self) -> String {
+        self.containment_tree_string(Complex { re: 1.0, im: 0.0 })
     }
 }
 
