@@ -42,4 +42,5 @@ pub mod recording;
 pub mod result;
 pub mod settings;
 pub mod snell;
+pub mod timing;
 pub mod zones;

@@ -1,4 +1,5 @@
 use std::f32::consts::PI;
+use std::time::Instant;
 
 use crate::cancel::CancelToken;
 use crate::diff::n2f_go;
@@ -17,6 +18,7 @@ use crate::{
     recording::{BeamEvent, RecordedOutput, Recording},
     result::{GOComponent, Mueller, Results},
     settings::Settings,
+    timing::StageTimings,
     zones::ZoneType,
 };
 
@@ -134,6 +136,7 @@ pub struct Problem {
     pub ext_diff_beam_queue: Vec<Beam>, // beams awaiting external diffraction
     pub settings: Settings,             // runtime settings
     pub result: Results,                // results of the problem
+    pub timings: StageTimings,          // stage wall times for the last run
 }
 
 #[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
@@ -223,6 +226,7 @@ impl Problem {
             ext_diff_beam_queue: vec![],
             settings,
             result,
+            timings: StageTimings::default(),
         })
     }
 
@@ -233,6 +237,7 @@ impl Problem {
         self.ext_diff_beam_queue.clear();
         self.result = init_result(&self.settings);
         self.geom.clone_from(&self.base_geom);
+        self.timings.reset();
     }
 
     /// Initialises the geometry and scales it.
@@ -277,6 +282,7 @@ impl Problem {
             ext_diff_beam_queue: vec![],
             settings,
             result,
+            timings: StageTimings::default(),
         }
     }
 
@@ -464,13 +470,24 @@ impl Problem {
     /// Solve an entire problem by tracing beams in the near field, then mapping to the far field, and finally converting to 1D mueller matrices
     pub fn solve(&mut self, cancel: &CancelToken) -> Result<()> {
         debug!("solving near-field problem");
+        let start = Instant::now();
         self.solve_near(cancel)?;
+        self.timings.near_field += start.elapsed();
+
         debug!("solving far-field problem");
+        let start = Instant::now();
         self.solve_far(cancel)?;
+        self.timings.far_field += start.elapsed();
+
         debug!("computing 1d-mueller matrices");
+        let start = Instant::now();
         self.mueller_to_1d();
+        self.timings.mueller_1d += start.elapsed();
+
         debug!("computing parameters");
+        let start = Instant::now();
         self.compute_params();
+        self.timings.params += start.elapsed();
         Ok(())
     }
 
@@ -483,6 +500,7 @@ impl Problem {
     }
 
     pub fn run(&mut self, euler: Option<&orientation::Euler>, cancel: &CancelToken) -> Result<()> {
+        self.timings.reset();
         self.init();
         match euler {
             Some(euler) => {

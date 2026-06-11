@@ -1,5 +1,3 @@
-// use std::time::Instant;
-
 use crate::{
     cancel::CancelToken,
     convergence::Convergeable,
@@ -9,6 +7,7 @@ use crate::{
     problem::{self, Problem},
     result::Results,
     settings::Settings,
+    timing::{TimingAccumulator, Timings},
     zones::Zones,
 };
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -18,7 +17,7 @@ use pyo3::prelude::*;
 use pyo3_stub_gen::derive::*;
 use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 // ============================================================================
 // Helper functions for solver initialization
@@ -91,12 +90,14 @@ pub struct MultiProblem {
     pub orientations: Orientations,
     pub settings: Settings, // runtime settings
     pub result: Results,    // averaged result of the problems
+    pub timings: Timings,   // wall-time breakdown of the last solve
 }
 
 impl MultiProblem {
     /// Creates a new `MultiProblem` from `Geom` and `Settings`.
     /// If settings not provided, loads from config file.
     pub fn new(geoms: Vec<Geom>, settings: Option<Settings>) -> anyhow::Result<Self> {
+        let init_start = Instant::now();
         let settings = load_settings_or_default(settings);
 
         // Initialize file-based logging early so geometry load warnings are captured
@@ -108,11 +109,15 @@ impl MultiProblem {
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let result = init_result(&settings);
 
+        let mut timings = Timings::default();
+        timings.wall.init = init_start.elapsed().as_secs_f64();
+
         Ok(Self {
             geoms,
             orientations,
             settings,
             result,
+            timings,
         })
     }
 
@@ -178,6 +183,7 @@ impl MultiProblem {
         };
 
         // init a set of base problems that can be reset
+        let init_start = Instant::now();
         let problems_base: Vec<Problem> = self
             .geoms
             .iter()
@@ -187,11 +193,15 @@ impl MultiProblem {
             })
             .collect();
         let num_problems = problems_base.iter().len();
+        self.timings.wall.init += init_start.elapsed().as_secs_f64();
         // let problem_base = Problem::new(Some(self.geoms.clone()), Some(self.settings.clone()));
 
         // Phase 2: Main computation
         status_pb.set_message("Running orientation averaging...");
         info_pb.set_message(format!("Processing {} orientations in parallel", n));
+
+        let stage_acc = TimingAccumulator::default();
+        let solve_start = Instant::now();
 
         // Solve for each orientation and reduce results on the fly
         self.result = self
@@ -209,9 +219,11 @@ impl MultiProblem {
                 let mut problem = problems_base[problem_idx].clone();
                 let euler = Euler::new(*a, *b, *g);
 
+                let run_start = Instant::now();
                 if let Err(err) = problem.run(Some(&euler), &CancelToken::noop()) {
                     log::error!("Error running problem (will skip this iteration): {}", err);
                 }
+                stage_acc.add(&problem.timings, run_start.elapsed());
 
                 pb.inc(1);
                 problem.result
@@ -221,9 +233,15 @@ impl MultiProblem {
                 |accum, item| self.reduce_results(accum, item),
             );
 
+        self.timings.wall.solve = solve_start.elapsed().as_secs_f64();
+        self.timings.worker = stage_acc.snapshot();
+        self.timings.threads = rayon::current_num_threads();
+
         // Phase 3: Post-processing
         pb.finish_with_message("Orientations complete");
         status_pb.set_message("Post-processing results...");
+
+        let post_start = Instant::now();
 
         // Normalize results by the number of orientations
         info_pb.set_message("Normalizing by orientation count...");
@@ -236,6 +254,8 @@ impl MultiProblem {
         // Compute derived parameters
         info_pb.set_message("Computing scattering parameters...");
         let _ = self.result.compute_params(self.settings.wavelength);
+
+        self.timings.wall.post_process = post_start.elapsed().as_secs_f64();
 
         // Phase 4: Complete
         status_pb.finish_with_message("✓ Computation complete");
@@ -300,13 +320,23 @@ impl MultiProblem {
         status_pb.set_message("Preparing output files...");
 
         // Use the new unified output system
-        let output_manager = output::OutputManager::new(&self.settings, &self.result);
-        let _ = output_manager.write_all();
+        let output_manager =
+            output::OutputManager::new(&self.settings, &self.result).with_timings(&self.timings);
+        let io_elapsed = output_manager.write_all();
 
         status_pb.finish_with_message(format!(
             "✓ Output written to {}",
             self.settings.directory.display()
         ));
+
+        if !self.settings.quiet {
+            let mut timings = self.timings.clone();
+            if let Ok(elapsed) = io_elapsed {
+                timings.wall.file_io = elapsed.as_secs_f64();
+            }
+            println!();
+            timings.print();
+        }
     }
 }
 
@@ -330,17 +360,22 @@ impl MultiProblem {
         //     })?,
         // };
 
+        let init_start = Instant::now();
         for geom in geoms.iter_mut() {
             problem::init_geom(geom);
         }
         let orientations = Orientations::generate(&settings.orientation.scheme, settings.seed);
         let result = init_result(&settings);
 
+        let mut timings = Timings::default();
+        timings.wall.init = init_start.elapsed().as_secs_f64();
+
         Ok(Self {
             geoms,
             orientations,
             settings,
             result,
+            timings,
         })
     }
 
@@ -386,7 +421,8 @@ impl MultiProblem {
         if let Some(dir) = directory {
             let mut settings = self.settings.clone();
             settings.directory = std::path::PathBuf::from(dir);
-            let output_manager = crate::output::OutputManager::new(&settings, &self.result);
+            let output_manager = crate::output::OutputManager::new(&settings, &self.result)
+                .with_timings(&self.timings);
             output_manager.write_all().map_err(|e| {
                 pyo3::exceptions::PyIOError::new_err(format!("Failed to save results: {}", e))
             })?;

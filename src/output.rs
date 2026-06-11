@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 use std::{fs::File, io::BufWriter};
 
 use anyhow::Result;
@@ -9,6 +10,7 @@ use serde::Serialize;
 use crate::bins::SolidAngleBin;
 use crate::result::{Mueller, MuellerMatrix, Results};
 use crate::settings::{OutputConfig, Settings};
+use crate::timing::Timings;
 use crate::zones::Zone;
 
 /// Trait for writing output data to files
@@ -27,35 +29,52 @@ pub trait OutputWriter {
 pub struct OutputManager<'a> {
     pub settings: &'a Settings,
     pub results: &'a Results,
+    pub timings: Option<&'a Timings>,
 }
 
 impl<'a> OutputManager<'a> {
     pub fn new(settings: &'a Settings, results: &'a Results) -> Self {
-        Self { settings, results }
+        Self {
+            settings,
+            results,
+            timings: None,
+        }
     }
 
-    /// Write all enabled outputs based on configuration
-    pub fn write_all(&self) -> Result<()> {
+    /// Attaches a timing report to be included in results.json.
+    pub fn with_timings(mut self, timings: &'a Timings) -> Self {
+        self.timings = Some(timings);
+        self
+    }
+
+    /// Write all enabled outputs based on configuration.
+    /// Returns the total time spent writing files.
+    pub fn write_all(&self) -> Result<Duration> {
+        let io_start = Instant::now();
         let output_dir = &self.settings.directory;
         fs::create_dir_all(output_dir)?;
 
-        // Create all possible output writers
-        let writers: Vec<Box<dyn OutputWriter>> = vec![
-            Box::new(SettingsJsonWriter::new(self.settings)),
-            Box::new(ConsolidatedResultsWriter::new(self.results)),
-        ];
-
-        // Write enabled outputs
-        for writer in writers {
-            if writer.is_enabled(&self.settings.output) {
-                writer.write(output_dir)?;
-            }
+        let settings_writer = SettingsJsonWriter::new(self.settings);
+        if settings_writer.is_enabled(&self.settings.output) {
+            settings_writer.write(output_dir)?;
         }
 
         // Handle Mueller matrix outputs separately (they have custom logic)
         self.write_mueller_matrices()?;
 
-        Ok(())
+        // Write results.json last so its timing section can report the time
+        // spent writing all other output files.
+        let timings = self.timings.map(|t| {
+            let mut t = t.clone();
+            t.wall.file_io = io_start.elapsed().as_secs_f64();
+            t
+        });
+        let results_writer = ConsolidatedResultsWriter::new(self.results, timings);
+        if results_writer.is_enabled(&self.settings.output) {
+            results_writer.write(output_dir)?;
+        }
+
+        Ok(io_start.elapsed())
     }
 
     fn write_mueller_matrices(&self) -> Result<()> {
@@ -271,16 +290,39 @@ struct ZoneOutput {
 struct ConsolidatedResults {
     powers: crate::powers::Powers,
     zones: Vec<ZoneOutput>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    timings: Option<TimingsOutput>,
+}
+
+/// Serializable timing report with derived quantities included.
+#[derive(Serialize)]
+struct TimingsOutput {
+    total_wall: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parallel_efficiency: Option<f64>,
+    #[serde(flatten)]
+    timings: Timings,
+}
+
+impl From<Timings> for TimingsOutput {
+    fn from(timings: Timings) -> Self {
+        Self {
+            total_wall: timings.total_wall(),
+            parallel_efficiency: timings.parallel_efficiency(),
+            timings,
+        }
+    }
 }
 
 /// Writer for consolidated results.json file
 pub struct ConsolidatedResultsWriter<'a> {
     results: &'a Results,
+    timings: Option<Timings>,
 }
 
 impl<'a> ConsolidatedResultsWriter<'a> {
-    pub fn new(results: &'a Results) -> Self {
-        Self { results }
+    pub fn new(results: &'a Results, timings: Option<Timings>) -> Self {
+        Self { results, timings }
     }
 }
 
@@ -305,6 +347,7 @@ impl<'a> OutputWriter for ConsolidatedResultsWriter<'a> {
         let consolidated = ConsolidatedResults {
             powers: self.results.powers.clone(),
             zones,
+            timings: self.timings.clone().map(TimingsOutput::from),
         };
 
         let path = output_path(Some(output_dir), &self.filename())?;

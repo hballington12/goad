@@ -61,6 +61,7 @@ impl Convergence {
             sampler,
             rng,
             log_file: None,
+            timings: crate::timing::Timings::default(),
         })
     }
 
@@ -148,7 +149,8 @@ impl Convergence {
             self.settings.clone()
         };
 
-        let output_manager = crate::output::OutputManager::new(&settings, &result);
+        let output_manager =
+            crate::output::OutputManager::new(&settings, &result).with_timings(&self.timings);
         output_manager.write_all().map_err(|e| {
             pyo3::exceptions::PyIOError::new_err(format!("Failed to save results: {}", e))
         })?;

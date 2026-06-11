@@ -26,6 +26,7 @@ use crate::{
     problem::Problem,
     result::{GOComponent, Results},
     settings::Settings,
+    timing::{TimingAccumulator, Timings},
 };
 use progress::ConvergenceProgress;
 use pyo3::pyclass;
@@ -84,11 +85,14 @@ pub struct Convergence {
     rng: StdRng,
     /// Optional path to log file for mean values during convergence
     pub log_file: Option<PathBuf>,
+    /// Wall-time breakdown of the last solve
+    pub timings: Timings,
 }
 
 impl Convergence {
     /// Creates a new Convergence solver from geometries and settings.
     pub fn new(geoms: Vec<Geom>, settings: Option<Settings>) -> anyhow::Result<Self> {
+        let init_start = Instant::now();
         let settings = load_settings_or_default(settings);
 
         // Initialize file-based logging early so geometry load warnings are captured
@@ -112,6 +116,9 @@ impl Convergence {
             Scheme::Halton { .. } => OrientationSampler::halton(),
         };
 
+        let mut timings = Timings::default();
+        timings.wall.init = init_start.elapsed().as_secs_f64();
+
         Ok(Self {
             geoms,
             settings,
@@ -121,6 +128,7 @@ impl Convergence {
             sampler,
             rng,
             log_file: None,
+            timings,
         })
     }
 
@@ -161,11 +169,25 @@ impl Convergence {
     pub fn writeup(&self) {
         let mut result = self.mean();
         // Recompute params from averaged Mueller matrices
+        let post_start = Instant::now();
         result.mueller_to_1d();
         let _ = result.compute_params(self.settings.wavelength);
-        let output_manager = output::OutputManager::new(&self.settings, &result);
-        let _ = output_manager.write_all();
+
+        let mut timings = self.timings.clone();
+        timings.wall.post_process += post_start.elapsed().as_secs_f64();
+
+        let output_manager =
+            output::OutputManager::new(&self.settings, &result).with_timings(&timings);
+        let io_elapsed = output_manager.write_all();
         info!("Output written to {}", self.settings.directory.display());
+
+        if !self.settings.quiet {
+            if let Ok(elapsed) = io_elapsed {
+                timings.wall.file_io = elapsed.as_secs_f64();
+            }
+            println!();
+            timings.print();
+        }
     }
 
     /// Check if all convergence targets are satisfied.
@@ -361,9 +383,11 @@ impl Convergence {
         });
 
         // Run prognosis to determine optimal batch size based on actual timing
+        let prognosis_start = Instant::now();
         let batch_size = self
             .run_prognosis(&problems_base, num_workers)
             .min(self.max_orientations);
+        self.timings.wall.prognosis = Some(prognosis_start.elapsed().as_secs_f64());
         let injector: Injector<OrientationTask> = Injector::new();
 
         // Template for workers to create their local trackers
@@ -382,10 +406,15 @@ impl Convergence {
         // Cancellation token shared with workers (tripped on convergence/interrupt).
         let cancel = CancelToken::new();
 
+        let stage_acc = TimingAccumulator::default();
+
         let injector_ref = &injector;
         let problems_ref = &problems_base;
         let template_ref = &result_template;
         let cancel_ref = &cancel;
+        let stage_acc_ref = &stage_acc;
+
+        let solve_start = Instant::now();
 
         thread::scope(|s| {
             // Spawn workers
@@ -399,6 +428,7 @@ impl Convergence {
                         batch_size,
                         tx,
                         cancel_ref,
+                        stage_acc_ref,
                     );
                 });
             }
@@ -439,6 +469,10 @@ impl Convergence {
             cancel.cancel();
             progress.set_finalising();
         });
+
+        self.timings.wall.solve = solve_start.elapsed().as_secs_f64();
+        self.timings.worker = stage_acc.snapshot();
+        self.timings.threads = num_workers;
 
         progress.finish();
     }
@@ -570,6 +604,7 @@ impl Convergence {
         batch_size: usize,
         tx: Sender<ConvergenceTracker<Results>>,
         cancel: &CancelToken,
+        stage_acc: &TimingAccumulator,
     ) -> Result<()> {
         loop {
             let tasks = Self::steal_batch(injector, batch_size, cancel)?;
@@ -578,11 +613,13 @@ impl Convergence {
             for task in tasks {
                 cancel.check()?;
                 let mut problem = problems_base[task.problem_idx].clone();
+                let run_start = Instant::now();
                 if let Err(err) = problem.run(Some(&task.euler), cancel) {
                     cancel.check()?;
                     error!("Error running problem (will skip this iteration): {}", err);
                     continue;
                 }
+                stage_acc.add(&problem.timings, run_start.elapsed());
                 local_tracker.update(&problem.result);
             }
 
