@@ -5,13 +5,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use nalgebra::{Complex, Matrix4, Vector3};
 
 use crate::{
-    bins::SolidAngleBin,
     clip::Clipping,
-    diff2::{self, IncidentBeam},
-    field::{Ampl, Field},
+    field::Field,
     fresnel,
     geom::{Face, Geom},
-    settings::{self, default_e_perp, default_prop},
+    settings,
     snell::get_theta_t,
 };
 
@@ -557,34 +555,6 @@ impl Beam {
         })
     }
 
-    pub fn diffract(
-        &self,
-        bins: &[SolidAngleBin],
-        fov_factor: Option<f32>,
-        // incidence_beam: Option<&IncidentBeam>,
-    ) -> Vec<(usize, Ampl)> {
-        match &self.face {
-            Face::Simple(..) => {
-                // TODO: remove match statement
-                let result = diff2::n2f_aperture_diffraction(
-                    &self,
-                    bins,
-                    // reference,
-                    &IncidentBeam {
-                        e_perp: default_e_perp(), // to match basic_initial_beam
-                        prop: default_prop(),
-                    },
-                    fov_factor,
-                )
-                .unwrap_or_default();
-                result.into_iter().collect()
-            }
-            Face::Complex { interiors, .. } => {
-                log::warn!("face with {} holes not supported yet", interiors.len());
-                vec![]
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

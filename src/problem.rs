@@ -2,6 +2,7 @@ use std::f32::consts::PI;
 
 use crate::cancel::CancelToken;
 use crate::diff::n2f_go;
+use crate::diff2::{DiffractionContext, IncidentBeam};
 use crate::field::{Ampl, AmplMatrix};
 // use crate::geom::load_geom;
 use crate::multiproblem::{init_result, load_settings_or_default};
@@ -107,6 +108,11 @@ mod tests {
         );
     }
 }
+
+/// Chunk size for parallel iteration over far-field bins. Sized so small
+/// binning schemes run as a single (effectively sequential) chunk while
+/// large schemes still split into enough chunks to parallelise well.
+const FAR_FIELD_CHUNK: usize = 1024;
 
 /// Output from propagating a single beam, used to collect results from parallel propagation.
 struct PropagationOutput {
@@ -280,114 +286,142 @@ impl Problem {
     /// - Forward zones: always coherent (optical theorem)
     /// - Other zones: respect global coherence setting
     fn solve_far_zone(&mut self, component: GOComponent, zone_idx: usize) {
-        let (queue, mapping, fov_factor) = match component {
-            GOComponent::Beam => (
-                self.out_beam_queue.clone(),
-                self.settings.mapping,
-                self.settings.fov_factor,
-            ),
-            GOComponent::ExtDiff => (
-                self.ext_diff_beam_queue.clone(),
-                Mapping::ApertureDiffraction,
-                None,
-            ),
+        let (mapping, fov_factor) = match component {
+            GOComponent::Beam => (self.settings.mapping, self.settings.fov_factor),
+            GOComponent::ExtDiff => (Mapping::ApertureDiffraction, None),
             GOComponent::Total => {
                 panic!("No such beam queue exists for GOComponent: {:?}", component)
             }
         };
 
-        let zone = &self.result.zones.all()[zone_idx];
-        let zone_type = zone.zone_type;
-        let zone_scheme = zone.scheme.clone();
-        let bins = zone.bins.clone();
-
         // Forward zones are always coherent (optical theorem)
-        let use_coherence = match zone_type {
+        let use_coherence = match self.result.zones.all()[zone_idx].zone_type {
             ZoneType::Forward => true,
             _ => self.settings.coherence,
         };
 
-        // Map beams to this zone's bins
-        let map_beam_to_zone = |beam: &Beam| -> Vec<(usize, Ampl)> {
-            match mapping {
-                Mapping::GeometricOptics => n2f_go(&zone_scheme, &bins, beam),
-                Mapping::ApertureDiffraction => beam.diffract(&bins, fov_factor),
+        match mapping {
+            Mapping::ApertureDiffraction => {
+                self.solve_far_zone_diffraction(component, zone_idx, fov_factor, use_coherence)
+            }
+            Mapping::GeometricOptics => {
+                self.solve_far_zone_go(component, zone_idx, use_coherence)
+            }
+        }
+    }
+
+    /// Far-field aperture diffraction for one zone, iterated bin-major.
+    ///
+    /// Per-beam setup is hoisted into `DiffractionContext`s, then each output
+    /// bin accumulates the contributions of all beams and is written exactly
+    /// once. This keeps memory traffic at O(bins) regardless of beam count
+    /// and avoids allocating per-beam dense buffers.
+    fn solve_far_zone_diffraction(
+        &mut self,
+        component: GOComponent,
+        zone_idx: usize,
+        fov_factor: Option<f32>,
+        use_coherence: bool,
+    ) {
+        let incident = IncidentBeam {
+            e_perp: default_e_perp(), // to match basic_initial_beam
+            prop: default_prop(),
+        };
+        let queue = match component {
+            GOComponent::Beam => &self.out_beam_queue,
+            GOComponent::ExtDiff => &self.ext_diff_beam_queue,
+            GOComponent::Total => {
+                panic!("No such beam queue exists for GOComponent: {:?}", component)
+            }
+        };
+        let contexts: Vec<DiffractionContext> = queue
+            .iter()
+            .filter_map(|beam| match &beam.face {
+                Face::Simple(..) => DiffractionContext::new(beam, &incident, fov_factor).ok(),
+                Face::Complex { interiors, .. } => {
+                    log::warn!("face with {} holes not supported yet", interiors.len());
+                    None
+                }
+            })
+            .collect();
+
+        if contexts.is_empty() {
+            return;
+        }
+
+        let zone = &mut self.result.zones.all_mut()[zone_idx];
+        zone.field_2d
+            .par_chunks_mut(FAR_FIELD_CHUNK)
+            .for_each(|chunk| {
+                for field in chunk {
+                    if use_coherence {
+                        // Coherent: accumulate amplitudes, then convert to Mueller
+                        let mut acc = Ampl::zeros();
+                        for context in &contexts {
+                            acc += context.contribution(&field.bin);
+                        }
+                        match component {
+                            GOComponent::Beam => {
+                                field.ampl_beam += acc;
+                                field.mueller_beam = field.ampl_beam.to_mueller();
+                            }
+                            GOComponent::ExtDiff => {
+                                field.ampl_ext += acc;
+                                field.mueller_ext = field.ampl_ext.to_mueller();
+                            }
+                            GOComponent::Total => unreachable!(),
+                        }
+                    } else {
+                        // Incoherent: convert each beam to Mueller, then sum
+                        let mut acc = Mueller::zeros();
+                        for context in &contexts {
+                            acc += context.contribution(&field.bin).to_mueller();
+                        }
+                        match component {
+                            GOComponent::Beam => field.mueller_beam += acc,
+                            GOComponent::ExtDiff => field.mueller_ext += acc,
+                            GOComponent::Total => unreachable!(),
+                        }
+                    }
+                }
+            });
+    }
+
+    /// Geometric-optics far-field mapping for one zone.
+    ///
+    /// Each beam maps to a single bin, so this is a sparse sequential
+    /// scatter rather than a per-bin gather.
+    fn solve_far_zone_go(&mut self, component: GOComponent, zone_idx: usize, use_coherence: bool) {
+        let queue = match component {
+            GOComponent::Beam => &self.out_beam_queue,
+            GOComponent::ExtDiff => &self.ext_diff_beam_queue,
+            GOComponent::Total => {
+                panic!("No such beam queue exists for GOComponent: {:?}", component)
             }
         };
 
-        if use_coherence {
-            // Coherent: accumulate amplitudes, convert to Mueller at end
-            let zero_ampls: Vec<(usize, Ampl)> =
-                bins.iter().map(|_| Ampl::zeros()).enumerate().collect();
-
-            let ampls: Vec<Ampl> = queue
-                .par_iter()
-                .map(|beam| map_beam_to_zone(beam))
-                .reduce(
-                    || zero_ampls.clone(),
-                    |mut acc, val| {
-                        for (i, ampl) in val.into_iter() {
-                            acc[i].1 += ampl;
+        let zone = &mut self.result.zones.all_mut()[zone_idx];
+        for beam in queue {
+            for (n, ampl) in n2f_go(&zone.scheme, &zone.bins, beam) {
+                let field = &mut zone.field_2d[n];
+                if use_coherence {
+                    match component {
+                        GOComponent::Beam => {
+                            field.ampl_beam += ampl;
+                            field.mueller_beam = field.ampl_beam.to_mueller();
                         }
-                        acc
-                    },
-                )
-                .into_iter()
-                .map(|x| x.1)
-                .collect();
-
-            // Assign to zone's field_2d
-            let zone = &mut self.result.zones.all_mut()[zone_idx];
-            for (field, ampl) in zone.field_2d.iter_mut().zip(ampls) {
-                match component {
-                    GOComponent::Total => {
-                        field.ampl_total += ampl;
-                        field.mueller_total = field.ampl_total.to_mueller();
-                    }
-                    GOComponent::Beam => {
-                        field.ampl_beam += ampl;
-                        field.mueller_beam = field.ampl_beam.to_mueller();
-                    }
-                    GOComponent::ExtDiff => {
-                        field.ampl_ext += ampl;
-                        field.mueller_ext = field.ampl_ext.to_mueller();
-                    }
-                }
-            }
-        } else {
-            // Incoherent: convert each beam to Mueller, then sum
-            let zero_muellers: Vec<(usize, Mueller)> =
-                bins.iter().map(|_| Mueller::zeros()).enumerate().collect();
-
-            let muellers: Vec<Mueller> = queue
-                .par_iter()
-                .map(|beam| {
-                    let ampls = map_beam_to_zone(beam);
-                    ampls
-                        .into_iter()
-                        .map(|(i, a)| (i, a.to_mueller()))
-                        .collect()
-                })
-                .reduce(
-                    || zero_muellers.clone(),
-                    |mut acc, val: Vec<(usize, Mueller)>| {
-                        for (i, mueller) in val.into_iter() {
-                            acc[i].1 += mueller;
+                        GOComponent::ExtDiff => {
+                            field.ampl_ext += ampl;
+                            field.mueller_ext = field.ampl_ext.to_mueller();
                         }
-                        acc
-                    },
-                )
-                .into_iter()
-                .map(|x| x.1)
-                .collect();
-
-            // Assign to zone's field_2d
-            let zone = &mut self.result.zones.all_mut()[zone_idx];
-            for (field, mueller) in zone.field_2d.iter_mut().zip(muellers) {
-                match component {
-                    GOComponent::Total => field.mueller_total += mueller,
-                    GOComponent::Beam => field.mueller_beam += mueller,
-                    GOComponent::ExtDiff => field.mueller_ext += mueller,
+                        GOComponent::Total => unreachable!(),
+                    }
+                } else {
+                    match component {
+                        GOComponent::Beam => field.mueller_beam += ampl.to_mueller(),
+                        GOComponent::ExtDiff => field.mueller_ext += ampl.to_mueller(),
+                        GOComponent::Total => unreachable!(),
+                    }
                 }
             }
         }
@@ -401,14 +435,18 @@ impl Problem {
             _ => self.settings.coherence,
         };
 
-        for field in zone.field_2d.iter_mut() {
-            if use_coherence {
-                field.ampl_total = field.ampl_beam + field.ampl_ext;
-                field.mueller_total = field.ampl_total.to_mueller();
-            } else {
-                field.mueller_total = field.mueller_beam + field.mueller_ext;
-            }
-        }
+        zone.field_2d
+            .par_chunks_mut(FAR_FIELD_CHUNK)
+            .for_each(|chunk| {
+                for field in chunk {
+                    if use_coherence {
+                        field.ampl_total = field.ampl_beam + field.ampl_ext;
+                        field.mueller_total = field.ampl_total.to_mueller();
+                    } else {
+                        field.mueller_total = field.mueller_beam + field.mueller_ext;
+                    }
+                }
+            });
     }
 
     /// Solves the far field problem by mapping the near field either by geometric optics or aperture diffraction. Optionally, choose to consider coherence between beams.

@@ -425,137 +425,161 @@ pub fn get_rotation_matrix(verts: &[Vector3<f32>]) -> Matrix3<f32> {
 }
 
 // =============================================================================
-// Main function
+// Main API
 // =============================================================================
 
-/// Perform near-to-far field aperture diffraction.
+/// Per-beam diffraction context.
 ///
-/// # Arguments
-/// * `beam` - The beam to diffract
-/// * `bins` - List of solid angle bins to compute diffraction for
-/// * `incident` - Incident beam parameters (e_perp and prop of original illumination)
-/// * `fov_factor` - Optional field of view factor for filtering
-///
-/// # Returns
-/// Vector of (bin_index, amplitude_matrix) pairs
-pub fn n2f_aperture_diffraction(
-    beam: &Beam,
-    bins: &[SolidAngleBin],
-    incident: &IncidentBeam,
-    fov_factor: Option<f32>,
-) -> Result<Vec<(usize, Ampl)>> {
-    let verts = &beam.face.data().exterior;
+/// Holds everything that can be computed once per beam, independent of the
+/// observation direction: the aperture-frame transforms, pre-computed edge
+/// data for the Fraunhofer integral, and the scaled amplitude matrix.
+/// Build once with [`DiffractionContext::new`], then evaluate per bin with
+/// [`DiffractionContext::contribution`]. This split lets callers iterate
+/// bin-major (accumulating many beams into each output bin) without paying
+/// the per-beam setup cost inside the bin loop.
+pub struct DiffractionContext {
+    rot3: Matrix3<f32>,
+    edge_data: EdgeData,
+    /// FOV cosine threshold; `None` disables filtering.
+    cos_fov: Option<f32>,
+    kinc_xy: [f32; 2],
+    inv_denom: Complex<f32>,
+    ampl: Ampl,
+    prop_aperture: Vector3<f32>,
+    wavenumber: f32,
+    r_offset: Vector3<f32>,
+    incident_e_perp: Vector3<f32>,
+    incident_prop: Vector3<f32>,
+}
 
-    // Apply small perturbation to prop to reduce numerical errors (matches original diff.rs)
-    let prop = (beam.field.prop()
-        + Vector3::new(
-            settings::constants::PROP_PERTURBATION,
-            settings::constants::PROP_PERTURBATION,
-            settings::constants::PROP_PERTURBATION,
-        ))
-    .normalize();
+impl DiffractionContext {
+    /// Pre-compute the aperture-frame quantities for a beam.
+    ///
+    /// # Arguments
+    /// * `beam` - The beam to diffract
+    /// * `incident` - Incident beam parameters (e_perp and prop of original illumination)
+    /// * `fov_factor` - Optional field of view factor for filtering
+    pub fn new(beam: &Beam, incident: &IncidentBeam, fov_factor: Option<f32>) -> Result<Self> {
+        let verts = &beam.face.data().exterior;
 
-    #[cfg(debug_assertions)]
-    {
-        let e_perp = beam.field.e_perp();
-        let normal = beam.face.data().normal;
-        if beam.field.prop().dot(&beam.face.data().normal) < 0.0 {
-            log::warn!("prop should be pointing away from the face but the dot product with face normal is {}",
-                beam.field.prop().dot(&beam.face.data().normal)
-                );
-        };
+        #[cfg(debug_assertions)]
+        {
+            // Apply small perturbation to prop to reduce numerical errors (matches original diff.rs)
+            let prop = (beam.field.prop()
+                + Vector3::new(
+                    settings::constants::PROP_PERTURBATION,
+                    settings::constants::PROP_PERTURBATION,
+                    settings::constants::PROP_PERTURBATION,
+                ))
+            .normalize();
 
-        assert_face_simple(&beam.face);
-        assert_face_planar(verts);
-        // assert_clockwise_winding(verts, prop);
-        assert_e_perp_perpendicular_to_prop(e_perp, prop);
-        assert_e_perp_perpendicular_to_normal(e_perp, normal);
-    }
+            let e_perp = beam.field.e_perp();
+            let normal = beam.face.data().normal;
+            if beam.field.prop().dot(&beam.face.data().normal) < 0.0 {
+                log::warn!("prop should be pointing away from the face but the dot product with face normal is {}",
+                    beam.field.prop().dot(&beam.face.data().normal)
+                    );
+            };
 
-    // Step 1: Translate beam so face is centered at origin
-    let center_of_mass = geom::calculate_center_of_mass(verts);
-    let beam_centered = beam.transformed(&translation_to_origin(&center_of_mass))?;
+            assert_face_simple(&beam.face);
+            assert_face_planar(verts);
+            // assert_clockwise_winding(verts, prop);
+            assert_e_perp_perpendicular_to_prop(e_perp, prop);
+            assert_e_perp_perpendicular_to_normal(e_perp, normal);
+        }
 
-    // Step 2: Rotate beam into xy plane (vertices are now centered at origin)
-    let rot_to_xy = rotation_to_xy_plane(&beam_centered);
-    let beam_xy = beam_centered.transformed(&rot_to_xy)?;
+        // Step 1: Translate beam so face is centered at origin
+        let center_of_mass = geom::calculate_center_of_mass(verts);
+        let beam_centered = beam.transformed(&translation_to_origin(&center_of_mass))?;
 
-    // Step 3: Rotate around z-axis to put e_perp along +y (aperture system)
-    // This also ensures prop lies in the xz plane since e_perp ⊥ prop
-    let rot_e_perp_to_y = rotation_e_perp_to_y(&beam_xy);
-    let beam_aperture = beam_xy.transformed(&rot_e_perp_to_y)?;
+        // Step 2: Rotate beam into xy plane (vertices are now centered at origin)
+        let rot_to_xy = rotation_to_xy_plane(&beam_centered);
+        let beam_xy = beam_centered.transformed(&rot_to_xy)?;
 
-    // Combined rotation matrix (3x3) for rotating vectors from original to aperture frame
-    let rot3_to_xy: Matrix3<f32> = rot_to_xy.fixed_view::<3, 3>(0, 0).into_owned();
-    let rot3_e_perp_to_y: Matrix3<f32> = rot_e_perp_to_y.fixed_view::<3, 3>(0, 0).into_owned();
-    let rot3 = rot3_e_perp_to_y * rot3_to_xy;
+        // Step 3: Rotate around z-axis to put e_perp along +y (aperture system)
+        // This also ensures prop lies in the xz plane since e_perp ⊥ prop
+        let rot_e_perp_to_y = rotation_e_perp_to_y(&beam_xy);
+        let beam_aperture = beam_xy.transformed(&rot_e_perp_to_y)?;
 
-    #[cfg(debug_assertions)]
-    {
+        // Combined rotation matrix (3x3) for rotating vectors from original to aperture frame
+        let rot3_to_xy: Matrix3<f32> = rot_to_xy.fixed_view::<3, 3>(0, 0).into_owned();
+        let rot3_e_perp_to_y: Matrix3<f32> = rot_e_perp_to_y.fixed_view::<3, 3>(0, 0).into_owned();
+        let rot3 = rot3_e_perp_to_y * rot3_to_xy;
+
+        #[cfg(debug_assertions)]
+        {
+            let aperture_verts = &beam_aperture.face.data().exterior;
+            let aperture_prop = beam_aperture.field.prop();
+            let aperture_e_perp = beam_aperture.field.e_perp();
+            let aperture_normal = beam_aperture.face.data().normal;
+
+            assert_face_simple(&beam_aperture.face);
+            assert_face_planar(aperture_verts);
+            // assert_clockwise_winding(aperture_verts, aperture_prop);
+            assert_e_perp_perpendicular_to_prop(aperture_e_perp, aperture_prop);
+            assert_e_perp_perpendicular_to_normal(aperture_e_perp, aperture_normal);
+        }
+
+        // Get wavenumber from beam and scale amplitude matrix
+        let wavenumber = beam_aperture.wavenumber();
+        let mut ampl = beam_aperture.field.ampl();
+        ampl *= Complex::new(wavenumber, 0.0);
+
+        // Get aperture vertices and prop in aperture system
         let aperture_verts = &beam_aperture.face.data().exterior;
-        let aperture_prop = beam_aperture.field.prop();
-        let aperture_e_perp = beam_aperture.field.e_perp();
-        let aperture_normal = beam_aperture.face.data().normal;
+        let prop_aperture = beam_aperture.field.prop();
 
-        assert_face_simple(&beam_aperture.face);
-        assert_face_planar(aperture_verts);
-        // assert_clockwise_winding(aperture_verts, aperture_prop);
-        assert_e_perp_perpendicular_to_prop(aperture_e_perp, aperture_prop);
-        assert_e_perp_perpendicular_to_normal(aperture_e_perp, aperture_normal);
+        // Pre-compute edge data for Fraunhofer integral
+        let edge_data = EdgeData::from_vertices(aperture_verts);
+
+        // Calculate field of view cosine for filtering
+        let cos_fov =
+            fov_factor.map(|_| calculate_fov_cosine(aperture_verts, wavenumber, fov_factor));
+
+        // Incident wave vector in aperture frame
+        let kinc = prop_aperture * wavenumber;
+
+        Ok(Self {
+            rot3,
+            edge_data,
+            cos_fov,
+            kinc_xy: [kinc.x, kinc.y],
+            inv_denom: Complex::new(wavenumber / (2.0 * PI), 0.0),
+            ampl,
+            prop_aperture,
+            wavenumber,
+            // Phase offset vector: uses ORIGINAL center of mass (before transforms)
+            // This is the displacement from aperture center to far-field reference
+            r_offset: -center_of_mass.coords,
+            incident_e_perp: incident.e_perp,
+            incident_prop: incident.prop,
+        })
     }
 
-    // Get wavenumber from beam and scale amplitude matrix
-    let wavenumber = beam_aperture.wavenumber();
-    let mut ampl = beam_aperture.field.ampl();
-    ampl *= Complex::new(wavenumber, 0.0);
-
-    // Get aperture vertices and prop in aperture system
-    let aperture_verts = &beam_aperture.face.data().exterior;
-    let prop_aperture = beam_aperture.field.prop();
-
-    // Pre-compute edge data for Fraunhofer integral
-    let edge_data = EdgeData::from_vertices(aperture_verts);
-
-    // Calculate field of view cosine for filtering
-    let cos_fov = calculate_fov_cosine(aperture_verts, wavenumber, fov_factor);
-
-    // Incident wave vector in aperture frame
-    let kinc = prop_aperture * wavenumber;
-
-    // Pre-calculate constant for Fraunhofer integral
-    let inv_denom = Complex::new(wavenumber / (2.0 * PI), 0.0);
-
-    // Output amplitude for each bin
-    let mut ampl_cs = vec![Ampl::zeros(); bins.len()];
-
-    // Phase offset vector: uses ORIGINAL center of mass (before transforms)
-    // This is the displacement from aperture center to far-field reference
-    let r_offset = -center_of_mass.coords;
-
-    // Main loop over scattering bins
-    for (index, bin) in bins.iter().enumerate() {
+    /// Far-field amplitude contribution of this beam to a single bin.
+    ///
+    /// Returns zeros for bins outside the field-of-view cone (when enabled).
+    pub fn contribution(&self, bin: &SolidAngleBin) -> Ampl {
         // Calculate observation direction in the original (lab) frame
         // Uses inverted z-axis convention: theta=0 is forward (along -z)
         let k_obs = bin.unit_vector();
 
         // Rotate observation direction into aperture frame
-        let k = rot3 * k_obs;
+        let k = self.rot3 * k_obs;
+
+        // Field of view filtering: skip bins outside the valid scattering cone
+        if let Some(cos_fov) = self.cos_fov {
+            if k.dot(&self.prop_aperture) < cos_fov {
+                return Ampl::zeros();
+            }
+        }
 
         // Phase calculation: path difference times wavenumber
         // Uses k_obs (original frame) with r_offset (original center of mass)
-        let path_difference = k_obs.dot(&r_offset);
-        let bvsk = path_difference * wavenumber;
-
-        // Field of view filtering: skip bins outside the valid scattering cone
-        if fov_factor.is_some() && k.dot(&prop_aperture) < cos_fov {
-            continue;
-        }
-
-        // Get mutable reference to output amplitude for this bin
-        let ampl_far_field = &mut ampl_cs[index];
+        let bvsk = k_obs.dot(&self.r_offset) * self.wavenumber;
 
         // Compute Karczewski polarisation matrix and scattering plane normal
-        let (karczewski_matrix, karczewski_e_perp) = karczewski(&prop_aperture, &k);
+        let (karczewski_matrix, karczewski_e_perp) = karczewski(&self.prop_aperture, &k);
 
         // Precompute sin/cos phi for rotation matrices
         let (sin_phi, cos_phi) = bin.phi.center.to_radians().sin_cos();
@@ -563,46 +587,38 @@ pub fn n2f_aperture_diffraction(
         // rot4: rotation from Karczewski scattering plane to aperture system scattering plane
         // hc is the vector perpendicular to the scattering plane, rotated into aperture system
         let scattering_e_perp = Vector3::new(-sin_phi, cos_phi, 0.0);
-        let hc = rot3 * scattering_e_perp;
+        let hc = self.rot3 * scattering_e_perp;
         let rot4 = crate::field::Field::rotation_matrix(karczewski_e_perp, hc, k);
 
         // prerotation: rotation of initial incidence reference frame
         // Uses the incident beam's e_perp and prop to define the reference frame
-        let prerotation =
-            crate::field::Field::rotation_matrix(incident.e_perp, scattering_e_perp, incident.prop)
-                .transpose();
+        let prerotation = crate::field::Field::rotation_matrix(
+            self.incident_e_perp,
+            scattering_e_perp,
+            self.incident_prop,
+        )
+        .transpose();
 
         // Compute amplitude: rot4 * karczewski * ampl * prerotation
-        let ampl_temp = rot4.map(Complex::from)
+        let ampl_bin = rot4.map(Complex::from)
             * karczewski_matrix.map(Complex::from)
-            * ampl
+            * self.ampl
             * prerotation.map(Complex::from);
-
-        *ampl_far_field = ampl_temp;
 
         // Calculate Fraunhofer factor for this direction
         let mut fraunhofer_sum = Complex::new(0.0, 0.0);
 
-        let (kxx, kyy) = calculate_kxx_kyy(
-            &kinc
-                .fixed_rows::<2>(0)
-                .into_owned()
-                .as_slice()
-                .try_into()
-                .unwrap(),
-            &k,
-            wavenumber,
-        );
+        let (kxx, kyy) = calculate_kxx_kyy(&self.kinc_xy, &k, self.wavenumber);
 
         // Loop over aperture edges
-        let nv = edge_data.x.len();
+        let nv = self.edge_data.x.len();
         for j in 0..nv {
-            let xj = edge_data.x[j];
-            let yj = edge_data.y[j];
-            let dx = edge_data.dx[j];
-            let dy = edge_data.dy[j];
-            let mj = edge_data.m_adj[j];
-            let nj = edge_data.n_adj[j];
+            let xj = self.edge_data.x[j];
+            let yj = self.edge_data.y[j];
+            let dx = self.edge_data.dx[j];
+            let dy = self.edge_data.dy[j];
+            let mj = self.edge_data.m_adj[j];
+            let nj = self.edge_data.n_adj[j];
 
             let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
             let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
@@ -613,7 +629,8 @@ pub fn n2f_aperture_diffraction(
                 continue;
             }
 
-            let summand = calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, inv_denom);
+            let summand =
+                calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, self.inv_denom);
 
             // Final check
             if summand.is_nan() {
@@ -623,17 +640,34 @@ pub fn n2f_aperture_diffraction(
             fraunhofer_sum += summand;
         }
 
-        *ampl_far_field *= fraunhofer_sum;
+        ampl_bin * fraunhofer_sum
     }
+}
 
-    // Collect non-zero results
-    let results: Vec<(usize, Ampl)> = ampl_cs
-        .into_iter()
+/// Perform near-to-far field aperture diffraction for a single beam over all bins.
+///
+/// Beam-major convenience wrapper around [`DiffractionContext`]. For hot
+/// paths that accumulate many beams into the same bins, build the contexts
+/// once and iterate bin-major instead.
+///
+/// # Returns
+/// Vector of (bin_index, amplitude_matrix) pairs, with zero-amplitude bins omitted
+pub fn n2f_aperture_diffraction(
+    beam: &Beam,
+    bins: &[SolidAngleBin],
+    incident: &IncidentBeam,
+    fov_factor: Option<f32>,
+) -> Result<Vec<(usize, Ampl)>> {
+    let context = DiffractionContext::new(beam, incident, fov_factor)?;
+
+    Ok(bins
+        .iter()
         .enumerate()
-        .filter(|(_, a)| a.iter().any(|c| c.norm() > 0.0))
-        .collect();
-
-    Ok(results)
+        .filter_map(|(index, bin)| {
+            let ampl = context.contribution(bin);
+            ampl.iter().any(|c| c.norm() > 0.0).then_some((index, ampl))
+        })
+        .collect())
 }
 
 #[cfg(test)]
