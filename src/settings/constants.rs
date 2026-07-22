@@ -60,8 +60,14 @@ pub const BATCH_SIZE_MULTIPLIER: usize = 4;
 pub const DEFAULT_WAVELENGTH: f32 = 0.532;
 /// Default beam power threshold for ray termination
 pub const DEFAULT_BEAM_POWER_THRESHOLD: f32 = 0.005;
-/// Default beam area threshold factor
-pub const DEFAULT_BEAM_AREA_THRESHOLD_FAC: f32 = 0.1;
+/// Default beam area threshold factor. Beams with cross-sectional area below
+/// `beam_area_threshold_fac * D^2` are truncated, where D is the maximum
+/// dimension of the particle. This makes the truncation criterion scale with
+/// particle size rather than wavelength: small beams are discarded when they
+/// are insignificant relative to the particle as a whole. The default of 1e-5
+/// is conservative, keeping energy conservation above ~90% even for open
+/// aggregate geometries where D^2 greatly exceeds the mean projected area.
+pub const DEFAULT_BEAM_AREA_THRESHOLD_FAC: f32 = 1e-5;
 /// Default power cutoff fraction (0-1)
 pub const DEFAULT_CUTOFF: f32 = 0.99;
 /// Default medium refractive index (vacuum/air)

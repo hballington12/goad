@@ -23,7 +23,7 @@ particle_refr_index = [
 # for each shape, eg. [[1.31,0.0],[1.5,0.001]]
 geom_name = "examples/data/hex.obj" # Geometry file name for the particle
 beam_power_threshold = 0.0001          # Threshold for truncation by beam power
-beam_area_threshold_fac = 0.0001      # Factor for truncating beams by area
+beam_area_threshold_fac = 0.00001     # Truncate beams with area below this fraction of D^2 (D = particle max dimension)
 cutoff = 0.99999                        # Total power cutoff fraction
 max_rec = 10                         # Maximum number of recursions
 max_tir = 10                         # Maximum number of total internal reflections

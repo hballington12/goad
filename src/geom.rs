@@ -1410,6 +1410,26 @@ impl Geom {
         Ok(())
     }
 
+    /// Returns the maximum dimension of the geometry: the largest pairwise
+    /// distance between any two vertices across all shapes. Rotation
+    /// invariant, and matches the intuitive "particle size" a user can
+    /// quote without processing the mesh, e.g. tip-to-tip length.
+    pub fn max_dimension(&self) -> f32 {
+        let verts: Vec<&Point3<f32>> = self
+            .shapes
+            .iter()
+            .flat_map(|shape| shape.vertices.iter())
+            .collect();
+
+        let mut max_sq = 0.0_f32;
+        for i in 0..verts.len() {
+            for j in (i + 1)..verts.len() {
+                max_sq = max_sq.max((verts[j] - verts[i]).norm_squared());
+            }
+        }
+        max_sq.sqrt()
+    }
+
     /// Rescales the geometry. If `scale_in` is `Some(s)`, uses `s` directly;
     /// if `None`, computes the factor that maps the largest dimension to 1
     /// and writes it back through `scale_in` so the caller can record it.

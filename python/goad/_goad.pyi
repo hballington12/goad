@@ -78,7 +78,7 @@ class Convergence:
         r"""
         Set the max orientations (safety cap).
         """
-    def __new__(cls, settings: Settings, geoms: typing.Optional[typing.Sequence[Geom]] = None) -> Convergence: ...
+    def __new__(cls, settings: Settings, geoms: typing.Sequence[Geom]) -> Convergence: ...
     def solve(self) -> None:
         r"""
         Solve the multi-orientation scattering problem using work-stealing.
@@ -137,9 +137,53 @@ class Geom:
         r"""
         Getter for the vertices of the first shape
         """
+    @property
+    def num_shapes(self) -> builtins.int:
+        r"""
+        Number of shapes in the geometry.
+        """
+    @property
+    def shapes(self) -> builtins.list[Shape]:
+        r"""
+        All shapes (cloned). Mutating an element of this list does NOT update
+        the parent Geom — use `set_refr_index(idx, n)` for that.
+        """
     def __new__(cls, shapes: typing.Sequence[Shape]) -> Geom: ...
     @staticmethod
-    def from_file(filename: builtins.str) -> builtins.list[Geom]: ...
+    def from_file(filename: builtins.str, refr_indices: typing.Sequence[builtins.complex]) -> builtins.list[Geom]:
+        r"""
+        Load geometry from an OBJ file (or a directory of OBJ files), assigning
+        each shape a refractive index from `refr_indices`.
+        
+        `refr_indices` must either have one entry per shape in the loaded
+        geometry, or a single entry that is broadcast to every shape.
+        """
+    def refr_index(self, idx: builtins.int) -> builtins.complex:
+        r"""
+        Refractive index of shape `idx` as a Python complex.
+        """
+    def set_refr_index(self, idx: builtins.int, value: builtins.complex) -> None:
+        r"""
+        Set the refractive index of shape `idx` from a Python complex.
+        """
+    def parent_of(self, shape_id: builtins.int) -> typing.Optional[builtins.int]:
+        r"""
+        Parent shape index for `shape_id` in the containment graph, if any.
+        """
+    def children_of(self, parent_id: builtins.int) -> builtins.list[builtins.int]:
+        r"""
+        Shape indices directly contained by `parent_id`.
+        """
+    def roots(self) -> builtins.list[builtins.int]:
+        r"""
+        Shape indices with no parent.
+        """
+    def containment_tree(self, medium: typing.Optional[builtins.complex] = None) -> builtins.str:
+        r"""
+        Render the containment graph as an indented tree. `medium` defaults to
+        vacuum (1+0j).
+        """
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class MultiProblem:
@@ -185,7 +229,7 @@ class MultiProblem:
         r"""
         Get the number of orientations
         """
-    def __new__(cls, settings: Settings, geoms: typing.Optional[typing.Sequence[Geom]] = None) -> MultiProblem: ...
+    def __new__(cls, settings: Settings, geoms: typing.Sequence[Geom]) -> MultiProblem: ...
     def solve(self) -> None:
         r"""
         Solve the multi-orientation scattering problem.
@@ -231,6 +275,10 @@ class Orientation:
     def uniform(num_orients: builtins.int, euler_convention: typing.Optional[EulerConvention] = None) -> Orientation: ...
     @staticmethod
     def discrete(eulers: typing.Sequence[Euler], euler_convention: typing.Optional[EulerConvention] = None) -> Orientation: ...
+    @staticmethod
+    def sobol(num_orients: builtins.int, euler_convention: typing.Optional[EulerConvention] = None) -> Orientation: ...
+    @staticmethod
+    def halton(num_orients: builtins.int, euler_convention: typing.Optional[EulerConvention] = None) -> Orientation: ...
     def __repr__(self) -> builtins.str: ...
 
 @typing.final
@@ -258,7 +306,7 @@ class Problem:
         r"""
         Get the results object
         """
-    def __new__(cls, settings: typing.Optional[Settings] = None, geom: typing.Optional[Geom] = None) -> Problem: ...
+    def __new__(cls, geom: Geom, settings: typing.Optional[Settings] = None) -> Problem: ...
     def py_solve(self) -> None: ...
     def py_print_stats(self) -> None: ...
 
@@ -299,16 +347,6 @@ class Settings:
         Set the full orientation object
         """
     @property
-    def geom_path(self) -> builtins.str:
-        r"""
-        Get the geometry file path
-        """
-    @geom_path.setter
-    def geom_path(self, value: builtins.str) -> None:
-        r"""
-        Set the geometry file path
-        """
-    @property
     def wavelength(self) -> builtins.float:
         r"""
         Get the wavelength
@@ -317,26 +355,6 @@ class Settings:
     def wavelength(self, value: builtins.float) -> None:
         r"""
         Set the wavelength
-        """
-    @property
-    def particle_refr_index_re(self) -> builtins.float:
-        r"""
-        Get the particle refractive index (real part)
-        """
-    @particle_refr_index_re.setter
-    def particle_refr_index_re(self, value: builtins.float) -> None:
-        r"""
-        Set the particle refractive index (real part)
-        """
-    @property
-    def particle_refr_index_im(self) -> builtins.float:
-        r"""
-        Get the particle refractive index (imaginary part)
-        """
-    @particle_refr_index_im.setter
-    def particle_refr_index_im(self, value: builtins.float) -> None:
-        r"""
-        Set the particle refractive index (imaginary part)
         """
     @property
     def medium_refr_index_re(self) -> builtins.float:
@@ -458,14 +476,27 @@ class Settings:
         r"""
         Set quiet mode (suppress progress bars)
         """
-    def __new__(cls, geom_path: builtins.str, wavelength: builtins.float = 0.5320000052452087, particle_refr_index_re: builtins.float = 1.309999942779541, particle_refr_index_im: builtins.float = 0.0, medium_refr_index_re: builtins.float = 1.0, medium_refr_index_im: builtins.float = 0.0, orientation: typing.Optional[Orientation] = None, zones: typing.Optional[typing.Sequence[ZoneConfig]] = None, beam_power_threshold: builtins.float = 0.004999999888241291, beam_area_threshold_fac: builtins.float = 0.10000000149011612, cutoff: builtins.float = 0.9900000095367432, max_rec: builtins.int = 10, max_tir: builtins.int = 10, scale: builtins.float = 1.0, distortion: typing.Optional[builtins.float] = None, directory: builtins.str = 'goad_run', mapping: Mapping = ..., coherence: builtins.bool = True, quiet: builtins.bool = False, seed: typing.Optional[builtins.int] = None) -> Settings: ...
+    def __new__(cls, wavelength: builtins.float = 0.5320000052452087, medium_refr_index: builtins.complex = (1+0j), orientation: typing.Optional[Orientation] = None, zones: typing.Optional[typing.Sequence[ZoneConfig]] = None, beam_power_threshold: builtins.float = 0.004999999888241291, beam_area_threshold_fac: builtins.float = 9.999999747378752e-06, cutoff: builtins.float = 0.9900000095367432, max_rec: builtins.int = 10, max_tir: builtins.int = 10, scale: typing.Optional[builtins.float] = 1.0, distortion: typing.Optional[builtins.float] = None, directory: builtins.str = 'goad_run', mapping: Mapping = ..., coherence: builtins.bool = True, quiet: builtins.bool = True, seed: typing.Optional[builtins.int] = None) -> Settings: ...
 
 @typing.final
 class Shape:
     r"""
     Represents a 3D surface mesh.
     """
-    def __new__(cls, vertices: typing.Sequence[tuple[builtins.float, builtins.float, builtins.float]], face_indices: typing.Sequence[typing.Sequence[builtins.int]], id: builtins.int, refr_index_re: builtins.float, refr_index_im: builtins.float) -> Shape: ...
+    @property
+    def refr_index(self) -> builtins.complex:
+        r"""
+        Refractive index of this shape as a Python complex number.
+        """
+    @refr_index.setter
+    def refr_index(self, value: builtins.complex) -> None: ...
+    @property
+    def id(self) -> typing.Optional[builtins.int]:
+        r"""
+        Shape id, if assigned.
+        """
+    def __new__(cls, vertices: typing.Sequence[tuple[builtins.float, builtins.float, builtins.float]], face_indices: typing.Sequence[typing.Sequence[builtins.int]], id: builtins.int, refr_index: builtins.complex) -> Shape: ...
+    def __repr__(self) -> builtins.str: ...
 
 @typing.final
 class Zone:
@@ -657,6 +688,16 @@ class Scheme(enum.Enum):
     Solve the problem by averaging over a discrete set of angles (in degrees).
     Example: `discrete 0,0,0 20,30,40`
     """
+    Sobol = ...
+    r"""
+    Solve the problem using Sobol quasi-random sequence for faster convergence.
+    Example: `sobol 100`
+    """
+    Halton = ...
+    r"""
+    Solve the problem using Halton quasi-random sequence for faster convergence.
+    Example: `halton 100`
+    """
 
 @typing.final
 class ZoneType(enum.Enum):
@@ -685,6 +726,16 @@ def create_discrete_orientation(eulers: typing.Sequence[Euler], euler_convention
     Create an Orientation with discrete scheme and default convention
     """
 
+def create_halton_orientation(num_orients: builtins.int, euler_convention: typing.Optional[EulerConvention] = None) -> Orientation:
+    r"""
+    Create an Orientation with Halton quasi-random scheme (faster convergence)
+    """
+
+def create_sobol_orientation(num_orients: builtins.int, euler_convention: typing.Optional[EulerConvention] = None) -> Orientation:
+    r"""
+    Create an Orientation with Sobol quasi-random scheme (faster convergence)
+    """
+
 def create_uniform_orientation(num_orients: builtins.int, euler_convention: typing.Optional[EulerConvention] = None) -> Orientation:
     r"""
     Create an Orientation with uniform scheme and default convention
@@ -693,6 +744,16 @@ def create_uniform_orientation(num_orients: builtins.int, euler_convention: typi
 def discrete_orientation(eulers: typing.Sequence[Euler]) -> Scheme:
     r"""
     Create a discrete orientation scheme from a list of Euler angles
+    """
+
+def halton_orientation(num_orients: builtins.int) -> Scheme:
+    r"""
+    Create a Halton quasi-random orientation scheme (faster convergence)
+    """
+
+def sobol_orientation(num_orients: builtins.int) -> Scheme:
+    r"""
+    Create a Sobol quasi-random orientation scheme (faster convergence)
     """
 
 def sum_as_string(a: builtins.int, b: builtins.int) -> builtins.str:

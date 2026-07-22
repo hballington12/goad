@@ -109,7 +109,7 @@ impl Settings {
         cutoff = DEFAULT_CUTOFF,
         max_rec = DEFAULT_MAX_REC,
         max_tir = DEFAULT_MAX_TIR,
-        scale = 1.0,
+        scale = Some(1.0),
         distortion = None,
         directory = "goad_run",
         mapping = DEFAULT_MAPPING,
@@ -464,8 +464,4 @@ impl Settings {
         }
     }
 
-    pub fn beam_area_threshold(&self) -> Result<f32> {
-        let scale = self.get_scale()?;
-        Ok(self.wavelength * self.wavelength * self.beam_area_threshold_fac * scale.powi(2))
-    }
 }

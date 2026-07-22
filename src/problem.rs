@@ -137,6 +137,8 @@ pub struct Problem {
     pub settings: Settings,             // runtime settings
     pub result: Results,                // results of the problem
     pub timings: StageTimings,          // stage wall times for the last run
+    max_dimension: Option<f32>,         // max dimension in working units, cached on first init()
+    beam_area_threshold: f32,           // area truncation threshold, set in init()
 }
 
 #[cfg_attr(feature = "stub-gen", gen_stub_pymethods)]
@@ -227,6 +229,8 @@ impl Problem {
             settings,
             result,
             timings: StageTimings::default(),
+            max_dimension: None,
+            beam_area_threshold: 0.0,
         })
     }
 
@@ -252,6 +256,18 @@ impl Problem {
         }
         self.geom.recentre();
         self.geom.rescale(&mut self.settings.scale);
+
+        // Beam area truncation threshold: a fraction of D^2, where D is the
+        // particle maximum dimension in the rescaled working units. Beams
+        // with face area below this are truncated as insignificant relative
+        // to the particle as a whole. D is identical every run (reset()
+        // restores base_geom and the transforms above are deterministic),
+        // so it is measured once and cached.
+        if self.max_dimension.is_none() {
+            self.max_dimension = Some(self.geom.max_dimension());
+        }
+        let max_dimension = self.max_dimension.unwrap();
+        self.beam_area_threshold = self.settings.beam_area_threshold_fac * max_dimension.powi(2);
     }
 
     /// Illuminates the problem with a basic initial beam.
@@ -273,6 +289,9 @@ impl Problem {
     pub fn new_with_field(geom: Geom, beam: Beam) -> Self {
         let settings = load_settings_or_default(None);
         let result = init_result(&settings);
+        // This constructor bypasses init(), so measure the geometry as given.
+        let max_dimension = geom.max_dimension();
+        let beam_area_threshold = settings.beam_area_threshold_fac * max_dimension.powi(2);
 
         Self {
             base_geom: geom.clone(),
@@ -283,6 +302,8 @@ impl Problem {
             settings,
             result,
             timings: StageTimings::default(),
+            max_dimension: Some(max_dimension),
+            beam_area_threshold,
         }
     }
 
@@ -563,12 +584,15 @@ impl Problem {
     fn propagate_batch(&self, batch: Vec<Beam>) -> Result<Vec<PropagationOutput>> {
         let geom = &self.geom;
         let settings = &self.settings;
+        let area_threshold = self.beam_area_threshold;
 
         batch
             .into_par_iter()
             .map_init(
                 || geom.clone(),
-                |thread_geom, mut beam| Self::propagate_single(&mut beam, thread_geom, settings),
+                |thread_geom, mut beam| {
+                    Self::propagate_single(&mut beam, thread_geom, settings, area_threshold)
+                },
             )
             .collect::<Result<Vec<_>>>()
     }
@@ -612,12 +636,14 @@ impl Problem {
         beam: &mut Beam,
         geom: &mut Geom,
         settings: &Settings,
+        area_threshold: f32,
     ) -> Result<PropagationOutput> {
         let scale = settings.get_scale()?;
         let scale2 = scale.powi(2);
         let mut powers = Powers::new();
 
-        let outputs = Self::propagate_with_checks(beam, geom, settings, &mut powers)?;
+        let outputs =
+            Self::propagate_with_checks(beam, geom, settings, area_threshold, &mut powers)?;
 
         powers.absorbed += beam.absorbed_power / scale2;
         let trnc_clip_contribution = Self::trnc_clip_power(beam, scale2);
@@ -636,6 +662,7 @@ impl Problem {
         beam: &mut Beam,
         geom: &mut Geom,
         settings: &Settings,
+        area_threshold: f32,
         powers: &mut Powers,
     ) -> Result<Vec<Beam>> {
         let Some(scale) = settings.scale else {
@@ -645,11 +672,8 @@ impl Problem {
         let scale2 = scale.powi(2);
 
         if let BeamVariant::Initial = beam.variant {
-            let (outputs, ..) = beam.propagate(
-                geom,
-                settings.medium_refr_index,
-                settings.beam_area_threshold()?,
-            )?;
+            let (outputs, ..) =
+                beam.propagate(geom, settings.medium_refr_index, area_threshold)?;
             return Ok(outputs);
         }
 
@@ -658,7 +682,7 @@ impl Problem {
             return Ok(Vec::new());
         }
 
-        if beam.face.data().area.unwrap() < settings.beam_area_threshold()? {
+        if beam.face.data().area.unwrap() < area_threshold {
             powers.trnc_area += beam.power() / scale2;
             return Ok(Vec::new());
         }
@@ -670,11 +694,7 @@ impl Problem {
             }
             // TIR beams below max propagate immediately, skipping rec_count check
             return Ok(
-                match beam.propagate(
-                    geom,
-                    settings.medium_refr_index,
-                    settings.beam_area_threshold()?,
-                ) {
+                match beam.propagate(geom, settings.medium_refr_index, area_threshold) {
                     Ok((outputs, area_loss)) => {
                         powers.trnc_area += area_loss / scale2;
                         outputs
@@ -693,11 +713,7 @@ impl Problem {
         }
 
         Ok(
-            match beam.propagate(
-                geom,
-                settings.medium_refr_index,
-                settings.beam_area_threshold()?,
-            ) {
+            match beam.propagate(geom, settings.medium_refr_index, area_threshold) {
                 Ok((outputs, area_loss)) => {
                     powers.trnc_area += area_loss / scale2;
                     outputs
@@ -803,10 +819,12 @@ impl Problem {
 
             // Reuse production thresholding + propagation.
             let mut powers = Powers::new();
+            let area_threshold = self.beam_area_threshold;
             let outputs = Self::propagate_with_checks(
                 &mut beam,
                 &mut self.geom,
                 &self.settings,
+                area_threshold,
                 &mut powers,
             )?;
             powers.absorbed += beam.absorbed_power / scale2;

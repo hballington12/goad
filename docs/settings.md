@@ -185,7 +185,7 @@ Control when beams are truncated during ray tracing:
 **Defaults:**
 
 - `beam_power_threshold`: `0.005` (discard beams below 0.5% of incident power).
-- `beam_area_threshold_fac`: `0.1` (factor × λ² determines the physical area threshold, below which beams are discarded. It scales with λ² following the applicability of geometric optics).
+- `beam_area_threshold_fac`: `1e-5` (factor × D² determines the physical area threshold, below which beams are discarded, where D is the maximum dimension of the particle. The criterion scales with particle size so that beams are truncated when they become insignificant relative to the particle as a whole. The default is conservative, keeping energy conservation above ~90% even for open aggregate geometries. Increase for faster, less accurate runs. Before version 1.3.5 this factor multiplied λ² instead, so old configuration values need rescaling by λ²/D²).
 - `cutoff`: `0.99` (trace 99% of energy in the near field, then map. You generally want to use a value of at least 0.95 here, unless you have a good reason to do otherwise).
 
 Lower thresholds and higher cutoff increases accuracy but slows computation.
@@ -246,7 +246,7 @@ Note: geometry loading is no longer part of `Settings`. Load geometry with `Geom
 | [`zones`](#zones) | `list[ZoneConfig]` | Single full zone with interval binning | Zone configurations for far-field evaluation |
 | [`mapping`](#mapping-method) | `Mapping` | `Mapping('ad')` | Near-to-far field mapping method |
 | [`beam_power_threshold`](#beam-thresholds) | `float` | `0.005` | Beam power truncation threshold |
-| [`beam_area_threshold_fac`](#beam-thresholds) | `float` | `0.1` | Beam area truncation factor |
+| [`beam_area_threshold_fac`](#beam-thresholds) | `float` | `1e-5` | Beam area truncation factor (fraction of D²) |
 | [`cutoff`](#beam-thresholds) | `float` | `0.99` | Energy tracking cutoff |
 | [`max_rec`](#recursion-limits) | `int` | `10` | Maximum internal reflections |
 | [`max_tir`](#recursion-limits) | `int` | `10` | Maximum total internal reflections |
