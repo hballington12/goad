@@ -207,8 +207,8 @@ impl Zone {
         }
     }
 
-    /// Create a forward scattering zone (single bin at theta≈0).
-    /// Uses theta=ZONE_THETA_OFFSET to avoid singularity at exact zero.
+    /// Create a forward scattering zone (single bin at theta=ZONE_THETA_OFFSET,
+    /// exactly 0 now that the aperture diffraction edge sum is stable at the pole).
     pub fn forward() -> Self {
         let scheme = Scheme::Custom {
             bins: vec![[[ZONE_THETA_OFFSET, ZONE_THETA_OFFSET], [0.0, 0.0]]],
@@ -230,8 +230,8 @@ impl Zone {
         }
     }
 
-    /// Create a backscatter zone (single bin at theta≈180).
-    /// Uses theta=180-ZONE_THETA_OFFSET to avoid singularity at exact 180.
+    /// Create a backscatter zone (single bin at theta=180-ZONE_THETA_OFFSET,
+    /// exactly 180 now that the aperture diffraction edge sum is stable at the pole).
     pub fn backward() -> Self {
         let theta = 180.0 - ZONE_THETA_OFFSET;
         let scheme = Scheme::Custom {

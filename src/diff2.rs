@@ -149,14 +149,18 @@ fn rotation_to_xy_plane(beam: &Beam) -> Matrix4<f32> {
 use std::f32::consts::PI;
 
 /// Pre-computed edge data for the Fraunhofer integral.
-/// Each edge of the aperture polygon has associated slopes and adjusted values.
+/// Stores raw edge vectors plus the polygon's signed area, first moments,
+/// and maximum vertex radius. See docs/theory/stable_fraunhofer_edge_sum.typ
+/// for the derivation of the stable edge sum these support.
 struct EdgeData {
-    x: Vec<f32>,     // x coordinates of vertices
-    y: Vec<f32>,     // y coordinates of vertices
-    dx: Vec<f32>,    // delta x for each edge
-    dy: Vec<f32>,    // delta y for each edge
-    m_adj: Vec<f32>, // adjusted slope (clamped for numerical stability)
-    n_adj: Vec<f32>, // adjusted inverse slope
+    x: Vec<f32>,      // x coordinates of vertices
+    y: Vec<f32>,      // y coordinates of vertices
+    dx: Vec<f32>,     // delta x for each edge (raw)
+    dy: Vec<f32>,     // delta y for each edge (raw)
+    signed_area: f32, // signed polygon area (sign encodes winding direction)
+    mx: f32,          // first moment integral of x over the polygon
+    my: f32,          // first moment integral of y over the polygon
+    r_max: f32,       // maximum vertex distance from the origin
 }
 
 impl EdgeData {
@@ -169,80 +173,38 @@ impl EdgeData {
 
         let mut dx_vec = Vec::with_capacity(nv);
         let mut dy_vec = Vec::with_capacity(nv);
-        let mut m = Vec::with_capacity(nv);
-        let mut n = Vec::with_capacity(nv);
-        let mut m_adj = Vec::with_capacity(nv);
-        let mut n_adj = Vec::with_capacity(nv);
+        let mut signed_area = 0.0_f32;
+        let mut mx = 0.0_f32;
+        let mut my = 0.0_f32;
+        let mut r_max = 0.0_f32;
 
         for j in 0..nv {
             let next_j = (j + 1) % nv;
-            let mut dx = x[next_j] - x[j];
-            let mut dy = y[next_j] - y[j];
+            dx_vec.push(x[next_j] - x[j]);
+            dy_vec.push(y[next_j] - y[j]);
 
-            // Calculate slope, handling near-zero dx
-            let mj = if dx.abs() < crate::settings::DIFF_DMIN {
-                if dy.signum() == dx.signum() {
-                    1e6
-                } else {
-                    -1e6
-                }
-            } else {
-                dy / dx
-            };
-            m.push(mj);
+            // Shoelace terms for signed area and first moments
+            let cross = x[j] * y[next_j] - x[next_j] * y[j];
+            signed_area += cross;
+            mx += (x[j] + x[next_j]) * cross;
+            my += (y[j] + y[next_j]) * cross;
 
-            // Calculate inverse slope
-            let nj = if mj.abs() < 1e-6 {
-                if mj.signum() > 0.0 {
-                    1e6
-                } else {
-                    -1e6
-                }
-            } else {
-                1.0 / mj
-            };
-            n.push(nj);
-
-            // Adjust dx/dy for numerical stability
-            dx = if dx.abs() < crate::settings::DIFF_DMIN {
-                crate::settings::DIFF_DMIN * dx.signum()
-            } else {
-                dx
-            };
-            dy = if dy.abs() < crate::settings::DIFF_DMIN {
-                crate::settings::DIFF_DMIN * dy.signum()
-            } else {
-                dy
-            };
-            dx_vec.push(dx);
-            dy_vec.push(dy);
-
-            // Pre-calculate adjusted m and n
-            let (adj_mj, adj_nj) = adjust_mj_nj(mj, nj);
-            m_adj.push(adj_mj);
-            n_adj.push(adj_nj);
+            r_max = r_max.max((x[j] * x[j] + y[j] * y[j]).sqrt());
         }
+        signed_area *= 0.5;
+        mx /= 6.0;
+        my /= 6.0;
 
         Self {
             x,
             y,
             dx: dx_vec,
             dy: dy_vec,
-            m_adj,
-            n_adj,
+            signed_area,
+            mx,
+            my,
+            r_max,
         }
-    }
-}
-
-/// Adjust m and n values for numerical stability.
-#[inline]
-fn adjust_mj_nj(mj: f32, nj: f32) -> (f32, f32) {
-    if mj.abs() > 1e6 || nj.abs() < 1e-6 {
-        (1e6, 1e-6)
-    } else if nj.abs() > 1e6 || mj.abs() < 1e-6 {
-        (1e-6, 1e6)
-    } else {
-        (mj, nj)
     }
 }
 
@@ -259,67 +221,57 @@ fn calculate_fov_cosine(verts: &[Point3<f32>], wavenumber: f32, fov_factor: Opti
 use crate::settings;
 use nalgebra::Matrix2;
 
+/// The entire function phi(omega) = (e^{i omega} - 1) / (i omega), phi(0) = 1.
+/// Evaluated by Taylor series for small |omega| where the closed form loses
+/// precision; the series truncation error at the threshold is ~8e-11, far
+/// below f32 resolution.
 #[inline]
-fn calculate_kxx_kyy(kinc: &[f32; 2], k: &Vector3<f32>, wavenumber: f32) -> (f32, f32) {
-    let kxx = kinc[0] - wavenumber * k.x;
-    let kyy = kinc[1] - wavenumber * k.y;
-
-    let kxx = if kxx.abs() < settings::KXY_EPSILON {
-        settings::KXY_EPSILON
+fn phi(omega: f32) -> Complex<f32> {
+    const SERIES_THRESHOLD: f32 = 1e-2;
+    if omega.abs() < SERIES_THRESHOLD {
+        let w2 = omega * omega;
+        Complex::new(1.0 - w2 / 6.0, omega / 2.0 - w2 * omega / 24.0)
     } else {
-        kxx
-    };
-    let kyy = if kyy.abs() < settings::KXY_EPSILON {
-        settings::KXY_EPSILON
+        let (sin_w, cos_w) = omega.sin_cos();
+        Complex::new(sin_w / omega, (1.0 - cos_w) / omega)
+    }
+}
+
+/// Fourier transform of the aperture polygon indicator function,
+/// A(p, q) = integral over the polygon of e^{i (p x + q y)} dx dy,
+/// evaluated by a numerically stable edge sum with no removable
+/// singularities. Derivation: docs/theory/stable_fraunhofer_edge_sum.typ.
+///
+/// Three branches:
+/// - both |p|, |q| small: analytic limit, signed area plus first moments
+/// - |p| >= |q|: Green's-theorem dy-form, divides only by p
+/// - otherwise: Green's-theorem dx-form, divides only by q
+fn polygon_ft(edges: &EdgeData, p: f32, q: f32) -> Complex<f32> {
+    let kappa = p.abs().max(q.abs());
+    if kappa * edges.r_max < settings::POLYGON_FT_SMALL_ARG {
+        // Small-argument limit: A = S + i (p Mx + q My) + O((kappa R)^2)
+        return Complex::new(edges.signed_area, p * edges.mx + q * edges.my);
+    }
+
+    let nv = edges.x.len();
+    let mut sum = Complex::new(0.0, 0.0);
+    if p.abs() >= q.abs() {
+        for j in 0..nv {
+            let delta = p * edges.x[j] + q * edges.y[j];
+            let omega = p * edges.dx[j] + q * edges.dy[j];
+            sum += Complex::cis(delta) * phi(omega) * edges.dy[j];
+        }
+        // A = sum / (i p)
+        Complex::new(sum.im / p, -sum.re / p)
     } else {
-        kyy
-    };
-
-    (kxx, kyy)
-}
-
-#[inline]
-fn calculate_deltas(kxx: f32, kyy: f32, xj: f32, yj: f32, mj: f32, nj: f32) -> (f32, f32, f32) {
-    let delta = kxx * xj + kyy * yj;
-    let delta1 = kyy * mj + kxx;
-    let delta2 = kxx * nj + kyy;
-    (delta, delta1, delta2)
-}
-
-#[inline]
-fn calculate_omegas(dx: f32, dy: f32, delta1: f32, delta2: f32) -> (f32, f32) {
-    let omega1 = dx * delta1;
-    let omega2 = dy * delta2;
-    (omega1, omega2)
-}
-
-#[inline]
-fn calculate_alpha_beta(delta1: f32, delta2: f32, kxx: f32, kyy: f32) -> (f32, f32) {
-    let alpha = 1.0 / (2.0 * kyy * delta1);
-    let beta = 1.0 / (2.0 * kxx * delta2);
-    (alpha, beta)
-}
-
-#[inline]
-fn calculate_summand(
-    bvsk: f32,
-    delta: f32,
-    omega1: f32,
-    omega2: f32,
-    alpha: f32,
-    beta: f32,
-    inv_denom: Complex<f32>,
-) -> Complex<f32> {
-    let (sin_delta, cos_delta) = delta.sin_cos();
-    let (sin_delta_omega1, cos_delta_omega1) = (delta + omega1).sin_cos();
-    let (sin_delta_omega2, cos_delta_omega2) = (delta + omega2).sin_cos();
-
-    let sumim = alpha * (cos_delta - cos_delta_omega1) - beta * (cos_delta - cos_delta_omega2);
-    let sumre = -alpha * (sin_delta - sin_delta_omega1) + beta * (sin_delta - sin_delta_omega2);
-
-    let exp_factor = Complex::cis(bvsk);
-
-    exp_factor * Complex::new(sumre, sumim) * inv_denom
+        for j in 0..nv {
+            let delta = p * edges.x[j] + q * edges.y[j];
+            let omega = p * edges.dx[j] + q * edges.dy[j];
+            sum += Complex::cis(delta) * phi(omega) * edges.dx[j];
+        }
+        // A = -sum / (i q)
+        Complex::new(-sum.im / q, sum.re / q)
+    }
 }
 
 // =============================================================================
@@ -606,40 +558,16 @@ impl DiffractionContext {
             * self.ampl
             * prerotation.map(Complex::from);
 
-        // Calculate Fraunhofer factor for this direction
-        let mut fraunhofer_sum = Complex::new(0.0, 0.0);
+        // Calculate Fraunhofer factor for this direction: the aperture
+        // polygon Fourier transform A(kxx, kyy) times -i, the wavenumber
+        // prefactor, and the reference phase. The stable edge sum inside
+        // polygon_ft has no singularities, so no clamps are needed here.
+        let kxx = self.kinc_xy[0] - self.wavenumber * k.x;
+        let kyy = self.kinc_xy[1] - self.wavenumber * k.y;
 
-        let (kxx, kyy) = calculate_kxx_kyy(&self.kinc_xy, &k, self.wavenumber);
-
-        // Loop over aperture edges
-        let nv = self.edge_data.x.len();
-        for j in 0..nv {
-            let xj = self.edge_data.x[j];
-            let yj = self.edge_data.y[j];
-            let dx = self.edge_data.dx[j];
-            let dy = self.edge_data.dy[j];
-            let mj = self.edge_data.m_adj[j];
-            let nj = self.edge_data.n_adj[j];
-
-            let (delta, delta1, delta2) = calculate_deltas(kxx, kyy, xj, yj, mj, nj);
-            let (omega1, omega2) = calculate_omegas(dx, dy, delta1, delta2);
-            let (alpha, beta) = calculate_alpha_beta(delta1, delta2, kxx, kyy);
-
-            // Skip invalid cases
-            if alpha.is_infinite() || beta.is_infinite() || alpha.is_nan() || beta.is_nan() {
-                continue;
-            }
-
-            let summand =
-                calculate_summand(bvsk, delta, omega1, omega2, alpha, beta, self.inv_denom);
-
-            // Final check
-            if summand.is_nan() {
-                continue;
-            }
-
-            fraunhofer_sum += summand;
-        }
+        let a_pq = polygon_ft(&self.edge_data, kxx, kyy);
+        let fraunhofer_sum =
+            Complex::new(0.0, -1.0) * a_pq * Complex::cis(bvsk) * self.inv_denom;
 
         ampl_bin * fraunhofer_sum
     }

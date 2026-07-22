@@ -36,8 +36,16 @@ pub const PLANARITY_TOLERANCE: f32 = 1e-2;
 pub const INTERVAL_IGNORE_TOLERANCE: f32 = 0.0001;
 /// Tolerance for centered geometry
 pub const CENTERED_GEOMETRY_TOLERANCE: f32 = 0.001;
-/// Offset from 0 and 180 degrees for forward/backward zone bins to avoid singularities
-pub const ZONE_THETA_OFFSET: f32 = 0.01;
+/// Offset from 0 and 180 degrees for forward/backward zone bins.
+/// Historically nonzero to sidestep numerical instability in the clamped
+/// aperture-diffraction edge sum near the poles. The stable edge sum
+/// (docs/theory/stable_fraunhofer_edge_sum.typ) is exact at the poles, so
+/// the bins now sit at exactly 0 and 180 degrees.
+pub const ZONE_THETA_OFFSET: f32 = 0.0;
+/// Threshold on max(|kxx|, |kyy|) * r_max below which the aperture polygon
+/// Fourier transform uses its analytic small-argument limit (signed area plus
+/// first moments). See docs/theory/stable_fraunhofer_edge_sum.typ.
+pub const POLYGON_FT_SMALL_ARG: f32 = 3e-3;
 /// Tolerance for bounding box overlap check in clipping to handle floating-point precision
 pub const BBOX_TOLERANCE: f32 = 0.01;
 /// Multiplier for rayon thread count to determine near-field parallel batch size.
