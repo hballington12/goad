@@ -17,6 +17,9 @@ site/
 uv.lock
 *.dat
 examples/backscattering/.venv/
+examples/bullet_rosette_aggregate/.venv/
+examples/bullet_rosette_aggregate/output/
+tmp/
 examples/backscattering/ensemble/
 examples/backscattering/ensemble_results/
 examples/backscattering/individual_results/

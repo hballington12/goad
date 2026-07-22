@@ -134,10 +134,10 @@ impl Beam {
         let mut clipping = Clipping::new(geom, &mut self.face, &prop);
         clipping.clip(area_threshold)?;
 
-        self.clipping_area = match clipping.stats {
-            Some(stats) => stats.intersection_area + stats.remaining_area,
-            _ => 0.0,
-        };
+        self.clipping_area = clipping
+            .stats
+            .as_ref()
+            .map(|stats| stats.intersection_area + stats.remaining_area);
 
         let (intersections, remainders) = (
             clipping.intersections.into_iter().collect(),
@@ -462,7 +462,10 @@ pub struct Beam {
     pub tir_count: i32,
     pub field: Field,
     pub absorbed_power: f32,  // power absorbed by the medium
-    pub clipping_area: f32,   // total area accounted for by intersections and remainders
+    /// Total area accounted for by intersections and remainders.
+    /// `None` until a clip has successfully completed, so a failed or
+    /// never-run clip cannot masquerade as a real zero-area result.
+    pub clipping_area: Option<f32>,
     pub variant: BeamVariant, // type of beam, e.g. initial, default, outgoing, external diff
     pub wavelength: f32,
 }
@@ -503,7 +506,7 @@ impl Beam {
             tir_count,
             field,
             absorbed_power: 0.0,
-            clipping_area: 0.0,
+            clipping_area: None,
             variant,
             wavelength,
         }

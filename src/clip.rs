@@ -969,10 +969,21 @@ pub fn clip_faces<'a>(
         }
     }
 
+    // Project remainders back onto the clip plane. Degenerate slivers (e.g.
+    // near-duplicate vertices from the boolean ops) can fail normal
+    // computation here; skip them rather than aborting the whole clip - their
+    // power is accounted for downstream via the beam's propagation power loss,
+    // mirroring how failed intersection projections are skipped above.
     let remaining: Vec<_> = remaining_clips
         .into_iter()
-        .map(|poly| poly.project(&clip_in.plane()))
-        .collect::<Result<Vec<_>>>()?;
+        .filter_map(|poly| match poly.project(&clip_in.plane()) {
+            Ok(face) => Some(face),
+            Err(e) => {
+                trace!("skipping degenerate remainder in clip: {e:?}");
+                None
+            }
+        })
+        .collect();
 
     Ok((intersections, remaining))
 }

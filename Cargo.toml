@@ -65,3 +65,7 @@ path = "examples/backscattering/main.rs"
 [[example]]
 name = "regen_mueller_refs"
 path = "examples/regen_mueller_refs/main.rs"
+
+[[example]]
+name = "bullet_rosette_aggregate"
+path = "examples/bullet_rosette_aggregate/main.rs"

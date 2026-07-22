@@ -573,6 +573,40 @@ impl Problem {
             .collect::<Result<Vec<_>>>()
     }
 
+    /// Panic if a beam's clip-area mismatch accounts for more energy than the beam itself
+    /// carried going into clipping - this should never happen since trnc_clip is meant to
+    /// track a small area-accounting discrepancy for that one beam, not manufacture power.
+    fn check_trnc_clip_bound(beam: &Beam, trnc_clip_contribution: f32, scale2: f32) {
+        let beam_power_in = beam.power() / scale2;
+        debug_assert!(
+            trnc_clip_contribution.abs() <= 2.0 * beam_power_in.abs(),
+            "trnc_clip contribution ({}) exceeds 2x beam power in ({}) for beam id={} rec_count={} tir_count={} clipping_area={:?} csa={}",
+            trnc_clip_contribution,
+            beam_power_in,
+            beam.id,
+            beam.rec_count,
+            beam.tir_count,
+            beam.clipping_area,
+            beam.csa(),
+        );
+    }
+
+    /// Power lost to clip-area mismatch: the fraction of the beam's cross
+    /// section that the clip failed to account for, times the beam's power.
+    /// Positive when area went missing, negative when overlapping geometry
+    /// produced surplus area. Returns zero when the clip never completed
+    /// (that beam's power is already fully tallied in `clip_err`).
+    fn trnc_clip_power(beam: &Beam, scale2: f32) -> f32 {
+        let Some(clipping_area) = beam.clipping_area else {
+            return 0.0;
+        };
+        let csa = beam.csa();
+        if csa <= 0.0 {
+            return 0.0;
+        }
+        (csa - clipping_area) / csa * beam.power() / scale2
+    }
+
     /// Propagate a single beam and return categorised outputs.
     fn propagate_single(
         beam: &mut Beam,
@@ -586,7 +620,9 @@ impl Problem {
         let outputs = Self::propagate_with_checks(beam, geom, settings, &mut powers)?;
 
         powers.absorbed += beam.absorbed_power / scale2;
-        powers.trnc_clip += (beam.clipping_area - beam.csa()) * beam.power() / scale2;
+        let trnc_clip_contribution = Self::trnc_clip_power(beam, scale2);
+        Self::check_trnc_clip_bound(beam, trnc_clip_contribution, scale2);
+        powers.trnc_clip += trnc_clip_contribution;
 
         Ok(Self::categorise_outputs(beam, outputs, powers, scale2))
     }
@@ -666,7 +702,14 @@ impl Problem {
                     powers.trnc_area += area_loss / scale2;
                     outputs
                 }
-                Err(_) => {
+                Err(e) => {
+                    log::debug!(
+                        "beam id={} rec_count={} tir_count={} failed to propagate, tallying power to clip_err: {:?}",
+                        beam.id,
+                        beam.rec_count,
+                        beam.tir_count,
+                        e
+                    );
                     powers.clip_err += beam.power() / scale2;
                     Vec::new()
                 }
@@ -767,7 +810,9 @@ impl Problem {
                 &mut powers,
             )?;
             powers.absorbed += beam.absorbed_power / scale2;
-            powers.trnc_clip += (beam.clipping_area - beam.csa()) * beam.power() / scale2;
+            let trnc_clip_contribution = Self::trnc_clip_power(&beam, scale2);
+            Self::check_trnc_clip_bound(&beam, trnc_clip_contribution, scale2);
+            powers.trnc_clip += trnc_clip_contribution;
 
             // Truncated / clip-err / produced-nothing beams: charge powers
             // but record no event.
