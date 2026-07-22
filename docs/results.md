@@ -26,7 +26,7 @@ Phi-integrated Mueller matrix (theta only):
 
 {{code_block('examples/results', 'mueller_1d')}}
 
-The 1D Mueller matrix integrates over all phi angles at each theta, providing an azimuthally-averaged scattering pattern.
+The 1D Mueller matrix integrates over all phi angles at each theta. Note that this is an integral, not an average: the 1D values carry a factor of the phi range in radians relative to the differential (per-direction) 2D values. For an azimuthally symmetric pattern integrated over the full phi range, the 1D value equals 2&pi; times the differential value at the same theta. This convention makes cross sections follow directly from the theta integral of the 1D matrix. When comparing a 1D value against a single-bin zone output (for example the forward or backward zone, which are differential point samples), divide the 1D value by 2&pi;.
 
 ### Mueller Matrix Components
 
