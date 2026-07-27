@@ -253,3 +253,108 @@ $theta = 0 degree$ and $theta = 180 degree$ legitimate and allows
   phase $e^(i dot "bvsk")$.
 - The legacy geometric-optics path in `diff.rs` has its own copy of the
   clamped formulas and is not affected.
+
+= Outlook: generalised incident fields
+
+The formalism so far assumes the incident field is a uniform plane wave
+across the aperture, so that the integrand of @ftdef carries no profile
+factor. This section records which deviations from a plane wave preserve the
+contour reduction. The generalised factor is
+
+$ A_U (p, q) = integral.double_A U(x, y) e^(i (p x + q y)) dif x dif y, $ <ftgen>
+
+where $U$ is the complex field profile on the aperture.
+
+== The structural criterion
+
+The edge-sum derivation uses exactly two operations to produce closed-form
+terms: an antiderivative of the integrand in one Cartesian variable, to
+build the Green's theorem potential, and integration of that potential along
+straight edges. Both stay elementary whenever the integrand of @ftgen
+belongs to the class of exponential polynomials, meaning finite sums of
+
+$ ("polynomial in" x, y) times e^("linear form in" x, y) $
+
+with complex coefficients. This class is closed under both operations:
+antiderivatives of $x^n e^(alpha x)$ remain in the class, and restriction to
+a straight edge gives a polynomial times an exponential in the edge
+parameter $t$. The question of whether the contour integral survives
+therefore reduces to whether $U$ can be written, or well approximated, in
+this class.
+
+== Cases
+
+*Polynomial amplitude profile.* Exact. For a linear profile
+$U = a + b x + c y$,
+
+$ A_U = a A_0 - i b (diff A_0) / (diff p) - i c (diff A_0) / (diff q), $
+
+where $A_0$ is the plane-wave edge sum @stablep. The edge terms are
+closed-form in $p$ and $q$, so their derivatives are too; the result is a
+second edge sum with modified per-edge weights. Higher polynomial orders
+follow from higher derivatives. In the small-argument limit the area is
+replaced by the correspondingly weighted moments.
+
+*Linear phase error, tilted wavefront, or linear absorption gradient.*
+Exact by argument shift. For $U = e^(mu x + nu y)$ with complex $mu, nu$,
+
+$ A_U (p, q) = A_0 (p - i mu, q - i nu). $
+
+The stable form continues analytically since $phi$ is entire. A pure linear
+phase ramp is a redefinition of the incidence direction, as expected.
+
+*Sinusoidal amplitude modulation.* Exact with two evaluations:
+$cos(g dot r)$ splits into two complex exponentials, so $A_U$ is the average
+of $A_0$ at $(p plus.minus g_x, q plus.minus g_y)$.
+
+*Sinusoidal phase modulation.* This is a thin phase grating, handled by the
+Jacobi-Anger expansion:
+
+$ e^(i m sin(g dot r)) = sum_(n = -infinity)^(infinity) J_n (m) e^(i n g dot r), $
+
+so $A_U$ is a sum of shifted edge-sum evaluations weighted by Bessel
+functions. The series truncates fast because $J_n (m)$ collapses
+super-exponentially once $n > m$; for modulation depth $m tilde 1$ about
+five terms suffice. The terms are the grating orders, which provides a free
+validation target.
+
+*Phase noise.* Smooth correlated noise written as a few Fourier modes gives
+a product of Jacobi-Anger expansions, one per mode. This is workable for a
+handful of modes and combinatorial beyond that. The general-purpose
+fallback is subdivision: triangulate the aperture, linearise the phase over
+each element, and apply the argument-shift case per triangle exactly. The
+error is controlled by the quadratic remainder per element, so the element
+count scales with the total phase excursion. Noise that is rough at the
+wavelength scale is a different regime; there the coherent edge sum is the
+wrong tool and a statistical treatment (Strehl-type attenuation of the
+coherent term plus a diffuse pedestal) is more honest.
+
+== Where the reduction breaks
+
+Quadratic phase, meaning wavefront curvature or defocus, is the boundary of
+the method. The antiderivative of a Gaussian along an edge brings in
+$"erf"$ of complex argument, and the subsequent edge integral of
+$"erf" times "Gaussian"$ is not elementary. Curvature therefore requires
+either Fresnel-type special functions per edge or subdivision until the
+phase is locally linear. Everything below quadratic is exact.
+
+== Approach to implementation
+
+A practical route, in order:
+
++ Extend `polygon_ft` to accept complex $(p, q)$ and add the
+  $diff slash diff p$, $diff slash diff q$ variants. Together these cover
+  polynomial amplitude, linear phase, and sinusoidal modulation exactly,
+  with the stability machinery of this note carrying over unchanged.
+
++ Validate against the same brute-force quadrature harness as
+  `fraunhofer_limit_check.py` with a nonuniform $U$.
+
++ Decide how far up the hierarchy is needed. Linear amplitude plus linear
+  phase per beam likely covers most of what beam tracing produces, since
+  beam subdivision already plays the role of piecewise linearisation.
+
+One caveat: a plane wave with a linear amplitude profile is not an exact
+solution of the Helmholtz equation, so $U$ should be understood as a
+Kirchhoff-style boundary field on the aperture rather than a global
+incident field. The near-to-far mapping requires nothing more.

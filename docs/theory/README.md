@@ -6,5 +6,6 @@
   - the small-argument series of the edge function
   - the analytic small-(kxx, kyy) limit (signed area plus first moments)
   - branch selection, error budget, and f32 validation results
+  - outlook: generalised incident fields (polynomial amplitude, linear phase, sinusoidal modulation via Jacobi-Anger, phase noise, and the quadratic-phase limit of the method)
 - Compile with `typst compile stable_fraunhofer_edge_sum.typ`.
 - Validation script: `fraunhofer_limit_check.py` in this directory (needs numpy; e.g. run with the venv in `examples/bullet_rosette_aggregate/.venv`).
