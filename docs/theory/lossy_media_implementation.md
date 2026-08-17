@@ -34,16 +34,16 @@ Status: draft for review, 2026-08-17. Branch: `lossy-media` (off
   dispersion residual `|w.w - n_tilde^2|` below tolerance.
 - `Beam::refr_index` stays: the material index is still needed for
   Fresnel and the dispersion check.
-- Polarisation basis: `e_perp` promoted to a complex vector
-  (bivector), per the Phase A decision. `rotation_matrix` and
-  `new_from_e_perp` extend with complex dot products;
-  `Field::e_par = e_perp x prop` becomes complex.
-  - Performance note: the far-field hot path currently exploits real
-    rotation factors (`real_times_complex`, 40 vs 96 multiplies). For
-    lossless media the bases remain exactly real; keep the real fast
-    path by dispatching on `A == 0` (one branch per beam, not per
-    bin), so lossless runs keep today's kernel cost. Benchmark at
-    stage 6.
+- Polarisation basis (REVISED at implementation time): rather than
+  changing the type of `e_perp` across ~140 call sites, the bivector
+  is represented additively: `e_perp` remains the real part and an
+  `e_perp_im: Vector3<f32>` (zero for homogeneous waves) joins it in
+  stage 2, introduced together with the transfer that first produces
+  nonzero values. Real-basis consumers are exact whenever
+  `e_perp_im == 0`, which structurally provides the lossless fast
+  path: the far-field hot path keeps its real rotation factors
+  (`real_times_complex`, 40 vs 96 multiplies) with one dispatch per
+  beam, not per bin. Benchmark at stage 6.
 - Gate: G1 (nothing observable changed anywhere).
 
 ## Stage 2: interface transfer and Fresnel

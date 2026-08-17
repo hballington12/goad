@@ -494,10 +494,16 @@ impl Beam {
         refr_index: Complex<f32>,
         rec_count: i32,
         tir_count: i32,
-        field: Field,
+        mut field: Field,
         variant: BeamVariant,
         wavelength: f32,
     ) -> Self {
+        // Every beam construction passes through here, so this is the
+        // single place the field's wave state is tied to the beam's
+        // medium. Homogeneous for now; the lossy-media interface
+        // transfer will set the inhomogeneous state before construction
+        // and this sync will become conditional.
+        field.sync_wave_homogeneous(refr_index);
         Self {
             id: next_beam_id(),
             face,

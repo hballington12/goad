@@ -21,6 +21,33 @@ mod tests {
         assert!((field.intensity() - 1.0).abs() < settings::COLINEAR_THRESHOLD);
     }
 
+    /// The homogeneous wave state satisfies the dispersion relation for
+    /// its medium, transforms correctly under rotation, and is zero
+    /// absorption in a lossless medium.
+    #[test]
+    fn wave_state_homogeneous_dispersion() {
+        let prop = Vector3::new(0.6_f32, 0.0, 0.8);
+        let e_perp = Vector3::new(0.0_f32, 1.0, 0.0);
+        let mut field = Field::new_identity(e_perp, prop).unwrap();
+
+        let lossless = Complex::new(1.31, 0.0);
+        field.sync_wave_homogeneous(lossless);
+        assert_eq!(field.absorption(), Vector3::zeros());
+        assert_eq!(field.n_app(), 1.31);
+        assert!(field.dispersion_residual(lossless) < 1e-5);
+
+        let lossy = Complex::new(1.31, 0.1);
+        field.sync_wave_homogeneous(lossy);
+        assert!((field.absorption() - 0.1 * prop).norm() < 1e-7);
+        assert!(field.dispersion_residual(lossy) < 1e-5);
+
+        // Rotation carries the absorption vector with the frame.
+        let rot = nalgebra::Rotation3::from_euler_angles(0.3_f32, 1.1, -0.4);
+        let rotated = field.rotated(rot.matrix());
+        assert!(rotated.dispersion_residual(lossy) < 1e-4);
+        assert!((rotated.absorption() - 0.1 * rotated.prop()).norm() < 1e-6);
+    }
+
     #[test]
     fn field_partial_eq_with_tolerance() {
         let e_perp = Vector3::x();
@@ -173,6 +200,18 @@ pub struct Field {
     e_perp: Vector3<f32>,
     phase: f32,
     prop: Vector3<f32>,
+    /// Apparent refractive index `N` of the wave: the magnitude of the
+    /// real part of the reduced wave vector `w = N e + iA`. For a
+    /// homogeneous wave (the only kind the tracer produces until the
+    /// lossy-media transfer lands) this equals `refr_index.re`.
+    /// See docs/theory/lossy_media_beam_tracing.typ.
+    n_app: f32,
+    /// Absorption vector `A`: the imaginary part of the reduced wave
+    /// vector, i.e. the gradient of the log-amplitude in units of the
+    /// wavenumber. Amplitude varies as `exp(-k A . r)`. Homogeneous
+    /// waves have `A = refr_index.im * prop`; a beam in a lossless
+    /// medium has `A = 0`.
+    absorption: Vector3<f32>,
 }
 
 impl PartialEq for Field {
@@ -242,6 +281,40 @@ impl Field {
         self.phase
     }
 
+    /// Returns the apparent refractive index `N` of the wave (the
+    /// magnitude of the real part of the reduced wave vector).
+    pub fn n_app(&self) -> f32 {
+        self.n_app
+    }
+
+    /// Returns the absorption vector `A` (imaginary part of the reduced
+    /// wave vector): amplitude varies across space as `exp(-k A . r)`.
+    pub fn absorption(&self) -> Vector3<f32> {
+        self.absorption
+    }
+
+    /// Sets the wave state to the homogeneous wave of the given medium:
+    /// `N = n.re`, `A = n.im * prop`. This is exact for every beam the
+    /// tracer currently produces; the lossy-media interface transfer
+    /// will replace these values with the inhomogeneous ones.
+    pub fn sync_wave_homogeneous(&mut self, refr_index: Complex<f32>) {
+        self.n_app = refr_index.re;
+        self.absorption = refr_index.im * self.prop;
+        debug_assert!(self.dispersion_residual(refr_index) < 1e-4);
+    }
+
+    /// Residual of the dispersion relation `w . w = n_tilde^2` for the
+    /// stored wave state, with `w = N prop + i A`. Zero (to rounding)
+    /// for any physical wave in the medium of index `refr_index`.
+    pub fn dispersion_residual(&self, refr_index: Complex<f32>) -> f32 {
+        let re = self.n_app * self.prop;
+        let a = self.absorption;
+        let ww_re = re.dot(&re) - a.dot(&a);
+        let ww_im = 2.0 * re.dot(&a);
+        let n2 = refr_index * refr_index;
+        ((ww_re - n2.re).powi(2) + (ww_im - n2.im).powi(2)).sqrt()
+    }
+
     /// Returns the perpendicular component of the electric field
     pub fn e_perp(&self) -> Vector3<f32> {
         self.e_perp
@@ -296,6 +369,8 @@ impl Field {
             e_perp: new_e_perp,
             ampl: self.ampl,
             phase: self.phase,
+            n_app: self.n_app,
+            absorption: rot * self.absorption,
         }
     }
 
@@ -333,6 +408,10 @@ impl Field {
             e_perp,
             phase: 0.0,
             prop,
+            // Homogeneous vacuum defaults; Beam::new re-syncs the wave
+            // state to its medium via sync_wave_homogeneous.
+            n_app: 1.0,
+            absorption: Vector3::zeros(),
         };
 
         Ok(field)
@@ -371,6 +450,8 @@ impl Field {
             e_perp,
             phase,
             prop,
+            n_app: 1.0,
+            absorption: Vector3::zeros(),
         };
 
         Ok(field)
