@@ -48,6 +48,67 @@ mod tests {
         assert!((rotated.absorption() - 0.1 * rotated.prop()).norm() < 1e-6);
     }
 
+    /// For a homogeneous wave (absorption parallel to prop) and real
+    /// bases, the bivector rotation must agree with the real one: the
+    /// complex factors cancel identically.
+    #[test]
+    fn bivector_rotation_reduces_to_real() {
+        let prop = Vector3::new(0.6_f32, 0.0, 0.8);
+        let e_perp = Vector3::y();
+        let mut field = Field::new_identity(e_perp, prop).unwrap();
+        field.sync_wave_homogeneous(Complex::new(1.31, 0.1));
+        field.set_ampl(Ampl::new(
+            Complex::new(0.8, 0.1),
+            Complex::new(-0.2, 0.05),
+            Complex::new(0.1, -0.3),
+            Complex::new(0.7, 0.2),
+        ));
+
+        // A unit vector perpendicular to prop, distinct from e_perp.
+        let target = prop.cross(&Vector3::y()).normalize();
+
+        let real = field.new_from_e_perp(&target);
+        let biv = field.new_from_bivector_basis(&target, &Vector3::zeros());
+        for (a, b) in real.ampl().iter().zip(biv.ampl().iter()) {
+            assert!((a - b).norm() < 1e-6, "{a} vs {b}");
+        }
+    }
+
+    /// Rotating into a complex bivector basis and straight back must be
+    /// the identity: the rotation matrices are mutually inverse under
+    /// the bilinear algebra.
+    #[test]
+    fn bivector_rotation_round_trip() {
+        // An inhomogeneous wave: oblique propagation, absorption along
+        // the entry normal (the first-entry configuration).
+        let th = 40.0_f32.to_radians();
+        let prop = Vector3::new(th.sin(), 0.0, th.cos());
+        let w = (1.31_f32 * prop, 0.1_f32 * Vector3::<f32>::z());
+
+        // Bivector bases from two facet normals: h = n x w, bilinearly
+        // normalised (h . w = 0 exactly by construction).
+        let make_basis = |n: Vector3<f32>| {
+            let c_re: Vector3<f32> = n.cross(&w.0);
+            let c_im: Vector3<f32> = n.cross(&w.1);
+            let cc = Complex::new(c_re.dot(&c_re) - c_im.dot(&c_im), 2.0 * c_re.dot(&c_im));
+            let inv: Complex<f32> = cc.sqrt().inv();
+            (inv.re * c_re - inv.im * c_im, inv.re * c_im + inv.im * c_re)
+        };
+        let e1 = make_basis(Vector3::new(0.3, 0.2, 0.93).normalize());
+        let e2 = make_basis(Vector3::new(-0.1, 0.5, 0.86).normalize());
+
+        let m12 = Field::rotation_matrix_bivector(e1, e2, w);
+        let m21 = Field::rotation_matrix_bivector(e2, e1, w);
+        let prod = m12 * m21;
+        let id = Matrix2::<Complex<f32>>::identity();
+        for (a, b) in prod.iter().zip(id.iter()) {
+            assert!((a - b).norm() < 1e-5, "round trip not identity: {prod}");
+        }
+        // The bases themselves must be genuinely complex here, or the
+        // test proves nothing.
+        assert!(e1.1.norm() > 1e-3 && e2.1.norm() > 1e-3);
+    }
+
     #[test]
     fn field_partial_eq_with_tolerance() {
         let e_perp = Vector3::x();
@@ -212,6 +273,14 @@ pub struct Field {
     /// waves have `A = refr_index.im * prop`; a beam in a lossless
     /// medium has `A = 0`.
     absorption: Vector3<f32>,
+    /// Imaginary part of the perpendicular polarisation basis vector:
+    /// the full basis is the bivector `e_perp + i e_perp_im`
+    /// (Dupertuis eq. 13, `h1 = n x w / sqrt((n x w).(n x w))`),
+    /// which is genuinely complex when the wave's tangential phase and
+    /// attenuation directions differ at the facet that created it.
+    /// Zero for every homogeneous wave, which is what keeps the real
+    /// fast paths exact for lossless media.
+    e_perp_im: Vector3<f32>,
 }
 
 impl PartialEq for Field {
@@ -344,6 +413,13 @@ impl Field {
 
     pub fn set_e_perp(&mut self, e_perp: &Vector3<f32>) {
         self.e_perp = *e_perp;
+        // A plain (real) basis assignment discards any bivector part.
+        self.e_perp_im = Vector3::zeros();
+    }
+
+    /// Returns the imaginary part of the perpendicular basis bivector.
+    pub fn e_perp_im(&self) -> Vector3<f32> {
+        self.e_perp_im
     }
 
     pub fn set_prop(&mut self, prop: Vector3<f32>) {
@@ -364,6 +440,86 @@ impl Field {
         field
     }
 
+    /// Rotates the amplitude into a new (generally complex) bivector
+    /// basis `e_out = e_out_re + i e_out_im`, the generalisation of
+    /// [`Self::new_from_e_perp`] to inhomogeneous waves. When neither
+    /// the current basis, the target basis, nor the wave carries an
+    /// imaginary part, this reduces exactly to the real path (same
+    /// code, so lossless media stay bit-stable).
+    pub fn new_from_bivector_basis(
+        &self,
+        e_out_re: &Vector3<f32>,
+        e_out_im: &Vector3<f32>,
+    ) -> Self {
+        if self.e_perp_im == Vector3::zeros()
+            && *e_out_im == Vector3::zeros()
+            && self.absorption == Vector3::zeros()
+        {
+            return self.new_from_e_perp(e_out_re);
+        }
+        let rot = Self::rotation_matrix_bivector(
+            (self.e_perp, self.e_perp_im),
+            (*e_out_re, *e_out_im),
+            (self.n_app * self.prop, self.absorption),
+        );
+        let mut field = self.clone();
+        field.e_perp = *e_out_re;
+        field.e_perp_im = *e_out_im;
+        field.matmul(&rot);
+        field
+    }
+
+    /// Bilinear (unconjugated) dot product of two bivectors.
+    fn cdot(
+        a: &(Vector3<f32>, Vector3<f32>),
+        b: &(Vector3<f32>, Vector3<f32>),
+    ) -> Complex<f32> {
+        Complex::new(
+            a.0.dot(&b.0) - a.1.dot(&b.1),
+            a.0.dot(&b.1) + a.1.dot(&b.0),
+        )
+    }
+
+    /// Cross product of two bivectors.
+    fn ccross(
+        a: &(Vector3<f32>, Vector3<f32>),
+        b: &(Vector3<f32>, Vector3<f32>),
+    ) -> (Vector3<f32>, Vector3<f32>) {
+        (
+            a.0.cross(&b.0) - a.1.cross(&b.1),
+            a.0.cross(&b.1) + a.1.cross(&b.0),
+        )
+    }
+
+    /// Scales a bivector by a complex scalar.
+    fn cscale(s: Complex<f32>, v: &(Vector3<f32>, Vector3<f32>)) -> (Vector3<f32>, Vector3<f32>) {
+        (s.re * v.0 - s.im * v.1, s.re * v.1 + s.im * v.0)
+    }
+
+    /// The 2x2 basis-rotation matrix between two bivector bases sharing
+    /// the reduced wave vector `w`, the complex generalisation of
+    /// [`Self::rotation_matrix`]. All products are bilinear (no
+    /// conjugation), per the bivector algebra of Dupertuis paper I.
+    /// The second basis vector is `w x h1`, bilinearly normalised
+    /// (which absorbs the `1/n_tilde` of Dupertuis eq. 13 since
+    /// `(w x h1).(w x h1) = n_tilde^2` for a bilinear-unit `h1`).
+    pub fn rotation_matrix_bivector(
+        e_in: (Vector3<f32>, Vector3<f32>),
+        e_out: (Vector3<f32>, Vector3<f32>),
+        w: (Vector3<f32>, Vector3<f32>),
+    ) -> Matrix2<Complex<f32>> {
+        let evo2_raw = Self::ccross(&w, &e_in);
+        let evo2_norm = Self::cdot(&evo2_raw, &evo2_raw).sqrt();
+        let evo2 = Self::cscale(evo2_norm.inv(), &evo2_raw);
+
+        let dot1 = Self::cdot(&e_out, &e_in);
+        let dot2 = Self::cdot(&e_out, &evo2);
+
+        let result = Matrix2::new(dot1, dot2, -dot2, dot1);
+        let det = dot1 * dot1 + dot2 * dot2;
+        result / det.sqrt()
+    }
+
     /// Returns a new Field with prop and e_perp rotated by the given 3x3 rotation matrix.
     /// The amplitude and phase remain unchanged since they represent the relationship
     /// between polarization components, which is preserved under coordinate rotation.
@@ -378,6 +534,7 @@ impl Field {
             phase: self.phase,
             n_app: self.n_app,
             absorption: rot * self.absorption,
+            e_perp_im: rot * self.e_perp_im,
         }
     }
 
@@ -419,6 +576,7 @@ impl Field {
             // state to its medium via sync_wave_homogeneous.
             n_app: 1.0,
             absorption: Vector3::zeros(),
+            e_perp_im: Vector3::zeros(),
         };
 
         Ok(field)
@@ -459,6 +617,7 @@ impl Field {
             prop,
             n_app: 1.0,
             absorption: Vector3::zeros(),
+            e_perp_im: Vector3::zeros(),
         };
 
         Ok(field)

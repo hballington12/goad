@@ -91,6 +91,41 @@ impl Beam {
         }
     }
 
+    /// The perpendicular basis bivector `h1 = n x w / sqrt((n x w).(n x w))`
+    /// for an intersection at a face: the generalisation of
+    /// [`Self::get_e_perp`] to inhomogeneous waves (Dupertuis eq. 13).
+    /// Complex only when the wave's tangential attenuation direction
+    /// differs from its tangential propagation direction; reduces to
+    /// the real path exactly when the absorption vector is zero,
+    /// keeping lossless media bit-stable. Sign conventions mirror
+    /// [`Self::get_e_perp`].
+    fn get_e_perp_bivector(&self, normal: &Vector3<f32>) -> (Vector3<f32>, Vector3<f32>) {
+        if self.field.absorption() == Vector3::zeros()
+            && self.field.e_perp_im() == Vector3::zeros()
+        {
+            return (self.get_e_perp(normal), Vector3::zeros());
+        }
+        let dot = normal.dot(&self.field.prop());
+        if dot.abs() > 1.0 - settings::COLINEAR_THRESHOLD {
+            return (-self.field.e_perp(), -self.field.e_perp_im());
+        }
+        let c_re = normal.cross(&(self.field.n_app() * self.field.prop()));
+        let c_im = normal.cross(&self.field.absorption());
+        // bilinear normalisation: h = c / sqrt(c . c)
+        let cc = Complex::new(
+            c_re.dot(&c_re) - c_im.dot(&c_im),
+            2.0 * c_re.dot(&c_im),
+        );
+        let inv = cc.sqrt().inv();
+        let h_re = inv.re * c_re - inv.im * c_im;
+        let h_im = inv.re * c_im + inv.im * c_re;
+        if dot > 0.0 {
+            (-h_re, -h_im)
+        } else {
+            (h_re, h_im)
+        }
+    }
+
     /// Creates a new initial field. The amplitude matrix is the identity matrix
     /// with the specified perpendicular field vector.
     pub fn new_initial(
@@ -182,8 +217,13 @@ impl Beam {
             let normal = face.data().normal;
             let theta_i = normal.dot(&self.field.prop()).abs().clamp(-1.0, 1.0).acos();
             let n2 = self.get_n2(geom, face, normal, medium_refr_index);
-            let e_perp = self.get_e_perp(&normal);
-            let mut field = self.field.new_from_e_perp(&e_perp);
+            let mut field = if legacy_interface() {
+                let e_perp = self.get_e_perp(&normal);
+                self.field.new_from_e_perp(&e_perp)
+            } else {
+                let (e_re, e_im) = self.get_e_perp_bivector(&normal);
+                self.field.new_from_bivector_basis(&e_re, &e_im)
+            };
 
             let dist = (face.midpoint() - self.face.data().midpoint)
                 .dot(&self.field.prop())

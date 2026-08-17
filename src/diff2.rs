@@ -437,8 +437,15 @@ impl DiffractionContext {
             assert_face_simple(&beam.face);
             assert_face_planar(verts);
             // assert_clockwise_winding(verts, prop);
-            assert_e_perp_perpendicular_to_prop(e_perp, prop);
-            assert_e_perp_perpendicular_to_normal(e_perp, normal);
+            // The real part of a genuinely complex basis bivector is
+            // not exactly perpendicular to prop (residual O(|A|^2));
+            // the exactness assertions apply to real bases only. The
+            // far field consumes the real part until stage 4 of the
+            // lossy rework handles bivector apertures.
+            if beam.field.e_perp_im() == Vector3::zeros() {
+                assert_e_perp_perpendicular_to_prop(e_perp, prop);
+                assert_e_perp_perpendicular_to_normal(e_perp, normal);
+            }
         }
 
         // Step 1: Translate beam so face is centered at origin
@@ -469,8 +476,10 @@ impl DiffractionContext {
             assert_face_simple(&beam_aperture.face);
             assert_face_planar(aperture_verts);
             // assert_clockwise_winding(aperture_verts, aperture_prop);
-            assert_e_perp_perpendicular_to_prop(aperture_e_perp, aperture_prop);
-            assert_e_perp_perpendicular_to_normal(aperture_e_perp, aperture_normal);
+            if beam_aperture.field.e_perp_im() == Vector3::zeros() {
+                assert_e_perp_perpendicular_to_prop(aperture_e_perp, aperture_prop);
+                assert_e_perp_perpendicular_to_normal(aperture_e_perp, aperture_normal);
+            }
         }
 
         // Get wavenumber from beam and scale amplitude matrix
