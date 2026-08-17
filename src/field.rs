@@ -74,6 +74,45 @@ mod tests {
         }
     }
 
+    /// Vector-displacement propagation must reduce to the legacy
+    /// scalar form for homogeneous waves, and must implement the ramp
+    /// semantics for inhomogeneous ones: transverse displacement
+    /// changes amplitude but not phase when `A` is transverse.
+    #[test]
+    fn propagate_displacement_semantics() {
+        let prop = Vector3::new(0.6_f32, 0.0, 0.8);
+        let e_perp = Vector3::y();
+        let k = 11.8;
+        let n = Complex::new(1.31, 0.01);
+
+        // Homogeneous reduction, displacement along prop.
+        let mut a = Field::new_identity(e_perp, prop).unwrap();
+        a.sync_wave_homogeneous(n);
+        let mut b = a.clone();
+        let dist = 3.7_f32;
+        a.propagate(dist, k, n);
+        b.propagate_displacement(&(dist * prop), k);
+        assert!((a.phase() - b.phase()).abs() < 1e-3);
+        assert!((a.intensity() - b.intensity()).abs() / a.intensity() < 1e-5);
+
+        // Transverse ramp: A perpendicular to prop (an exiting beam).
+        let mut c = Field::new_identity(e_perp, prop).unwrap();
+        let a_vec = 0.02_f32 * Vector3::y();
+        c.set_wave(1.0, a_vec);
+        let i0 = c.intensity();
+        // along prop: pure phase, no attenuation
+        let f = c.propagate_displacement(&(2.0 * prop), k);
+        assert_eq!(f, 1.0);
+        assert!((c.intensity() - i0).abs() < 1e-7);
+        let p0 = c.phase();
+        // transverse: pure amplitude re-reference, no phase
+        let f = c.propagate_displacement(&Vector3::new(0.0, 1.5, 0.0), k);
+        let expected = (-k * 0.02 * 1.5_f32).exp();
+        assert!((f - expected).abs() < 1e-6);
+        assert!((c.intensity() / i0 - expected * expected).abs() < 1e-4);
+        assert!((c.phase() - p0).abs() < 1e-6);
+    }
+
     /// Rotating into a complex bivector basis and straight back must be
     /// the identity: the rotation matrices are mutually inverse under
     /// the bilinear algebra.
@@ -325,6 +364,29 @@ impl Field {
     pub fn propagate(&mut self, distance: f32, wavenumber: f32, n: Complex<f32>) {
         self.wind(distance * wavenumber * n.re);
         self.mul((-wavenumber * n.im * distance).exp());
+    }
+
+    /// Propagate this field by the vector displacement `d` using the
+    /// stored wave state: phase is wound by `k N (prop . d)` and the
+    /// amplitude is scaled by `exp(-k A . d)`. This is the general form
+    /// of [`Self::propagate`]: for a homogeneous wave (`A = n' prop`)
+    /// and `d` along `prop` the two agree, while for an inhomogeneous
+    /// wave the attenuation depends on the full displacement, not just
+    /// its along-`prop` component (`A . d != (A . prop)(prop . d)`).
+    /// Also serves as the amplitude re-referencing when a beam's
+    /// reference point moves within its cross-section (earcut,
+    /// remainders), where a transverse ramp changes the amplitude at
+    /// the new centroid. Returns the amplitude factor applied, which
+    /// callers use for absorbed-power tallies.
+    pub fn propagate_displacement(&mut self, d: &Vector3<f32>, wavenumber: f32) -> f32 {
+        let dist = self.prop.dot(d);
+        self.wind(dist * wavenumber * self.n_app);
+        let a_d = self.absorption.dot(d);
+        let factor = (-wavenumber * a_d).exp();
+        if factor != 1.0 {
+            self.mul(factor);
+        }
+        factor
     }
 
     // Getters

@@ -225,16 +225,24 @@ impl Beam {
                 self.field.new_from_bivector_basis(&e_re, &e_im)
             };
 
-            let dist = (face.midpoint() - self.face.data().midpoint)
-                .dot(&self.field.prop())
-                .abs(); // z-distance
             let wavenumber = self.wavenumber();
-            // Compute absorbed_intensity before applying the attenuation —
-            // intensity is invariant under phase winding so it can be read
-            // after `propagate` increments phase but before it attenuates.
-            let absorbed_intensity =
-                field.intensity() * (1.0 - (-wavenumber * n1.im * dist).exp().powi(2));
-            field.propagate(dist, wavenumber, n1);
+            // Compute absorbed_intensity before applying the attenuation:
+            // intensity is invariant under phase winding, and the
+            // amplitude factor is known ahead of the propagation.
+            let absorbed_intensity;
+            if legacy_interface() {
+                let dist = (face.midpoint() - self.face.data().midpoint)
+                    .dot(&self.field.prop())
+                    .abs(); // z-distance
+                absorbed_intensity =
+                    field.intensity() * (1.0 - (-wavenumber * n1.im * dist).exp().powi(2));
+                field.propagate(dist, wavenumber, n1);
+            } else {
+                let d = face.midpoint() - self.face.data().midpoint;
+                let intensity_before = field.intensity();
+                let factor = field.propagate_displacement(&d, wavenumber);
+                absorbed_intensity = intensity_before * (1.0 - factor * factor);
+            }
             self.absorbed_power +=
                 absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
 
@@ -302,10 +310,16 @@ impl Beam {
             Face::Complex { .. } => {
                 let faces = Face::earcut(&beam.face);
                 for face in faces {
-                    let dist = (face.data().midpoint - midpoint).dot(&beam.field.prop());
-                    let arg = dist * beam.wavenumber() * medium_refr_index.re;
+                    let d = face.data().midpoint - midpoint;
                     let mut field = beam.field.clone();
-                    field.wind(arg);
+                    if legacy_interface() {
+                        let arg = d.dot(&beam.field.prop()) * beam.wavenumber() * medium_refr_index.re;
+                        field.wind(arg);
+                    } else {
+                        // Re-reference phase and (for ramped beams)
+                        // amplitude to the sub-face centroid.
+                        field.propagate_displacement(&d, beam.wavenumber());
+                    }
 
                     let new_beam = Beam::new(
                         face,
@@ -592,10 +606,14 @@ impl Beam {
         let remainder_beams: Vec<_> = remainders
             .into_iter()
             .filter_map(|remainder| {
-                let dist = (remainder.data().midpoint - self_midpoint).dot(&self.field.prop());
-                let arg = dist * self.wavenumber() * medium_refr_index.re;
+                let d = remainder.data().midpoint - self_midpoint;
                 let mut field = self.field.clone();
-                field.wind(arg);
+                if legacy_interface() {
+                    let arg = d.dot(&self.field.prop()) * self.wavenumber() * medium_refr_index.re;
+                    field.wind(arg);
+                } else {
+                    field.propagate_displacement(&d, self.wavenumber());
+                }
 
                 Some(Beam::new(
                     remainder,
