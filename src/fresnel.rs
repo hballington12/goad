@@ -33,12 +33,24 @@ pub fn refr(n1: Complex<f32>, n2: Complex<f32>, theta_i: f32) -> Matrix2<Complex
 }
 
 /// `cos(theta_t)` from Snell's law, as a complex value.
+///
+/// The square root takes the continuation-rule branch (the root with
+/// `re + im > 0`), not the principal branch. Above the critical angle
+/// with an absorbing incident medium the two differ: the principal root
+/// is the complex conjugate of the physical one, which flips the TIR
+/// phase discontinuously between `n' = 0` and any `n' > 0` and thereby
+/// the sign of TIR-driven `S34` structure. The continuation root is the
+/// analytic continuation from the beam's real-angle spectrum and is
+/// continuous with the lossless limit on both sides of the critical
+/// angle. Derivation and spectral validation:
+/// docs/theory/lossy_media_beam_tracing.typ, branch-selection section.
 fn cos_theta_t(n1: Complex<f32>, n2: Complex<f32>, theta_i: f32) -> Complex<f32> {
     let sti = theta_i.sin();
     let ratio = n1 / n2;
     let sin_sq_tt = ratio * ratio * Complex::from(sti * sti);
     let cos_sq_tt = Complex::from(1.0) - sin_sq_tt;
-    cos_sq_tt.sqrt()
+    let ctt = cos_sq_tt.sqrt();
+    if ctt.re + ctt.im < 0.0 { -ctt } else { ctt }
 }
 
 #[cfg(test)]
@@ -84,6 +96,28 @@ mod tests {
             "s/p phase difference too small: {}",
             delta
         );
+    }
+
+    #[test]
+    fn tir_phase_continuous_in_absorption() {
+        // The TIR phase must be continuous as n' -> 0: an
+        // infinitesimally absorbing particle cannot scatter differently
+        // from a lossless one. The principal square-root branch
+        // violates this (it conjugates r above the critical angle for
+        // any n' > 0, flipping the sign of S34-driving phases); the
+        // continuation-rule branch in cos_theta_t restores it.
+        let n2 = Complex::new(1.0, 0.0);
+        let theta_i = 60f32.to_radians();
+        let r0 = refl(Complex::new(1.31, 0.0), n2, theta_i);
+        let r1 = refl(Complex::new(1.31, 1e-6), n2, theta_i);
+        for idx in [(0, 0), (1, 1)] {
+            let d = (r0[idx] - r1[idx]).norm();
+            assert!(
+                d < 1e-4,
+                "TIR r discontinuous at n' -> 0: |dr| = {d} at {idx:?} \
+                 (the wrong branch gives |dr| = 2|Im r| ~ O(1))"
+            );
+        }
     }
 
     #[test]
