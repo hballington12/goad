@@ -23,6 +23,17 @@ fn next_beam_id() -> BeamId {
     BEAM_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
+/// Regression switch (gate G2 of the lossy-media rework): when the
+/// environment variable `GOAD_LEGACY_INTERFACE` is set, interfaces use
+/// the pre-rework path (Macke `get_theta_t`, angle-test TIR, and
+/// `cos_theta_t`-form Fresnel), which must reproduce pre-rework output
+/// byte-identically. Removed at stage 6; see
+/// docs/theory/lossy_media_implementation.md.
+fn legacy_interface() -> bool {
+    static LEGACY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *LEGACY.get_or_init(|| std::env::var("GOAD_LEGACY_INTERFACE").is_ok_and(|v| v != "0"))
+}
+
 /// Where an output beam goes after a propagation event. Shared by the
 /// production batch path (via `categorise_outputs`) and the recording path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,7 +100,8 @@ impl Beam {
         e_perp: Vector3<f32>,
         wavelength: f32,
     ) -> Result<Self> {
-        let field = Field::new_identity(e_perp, prop)?;
+        let mut field = Field::new_identity(e_perp, prop)?;
+        field.sync_wave_homogeneous(refr_index);
         let rec = 0;
         let tir = 0;
         Ok(Beam::new(
@@ -106,9 +118,10 @@ impl Beam {
     pub fn new_from_field(
         face: Face,
         refr_index: Complex<f32>,
-        field: Field,
+        mut field: Field,
         wavelength: f32,
     ) -> Self {
+        field.sync_wave_homogeneous(refr_index);
         let rec = 0;
         let tir = 0;
         Beam::new(
@@ -201,12 +214,31 @@ impl Beam {
             }
 
             // untracked energy leaks can occur here if the amplitude matrix contains NaN values
-            let refracted = self
-                .create_refracted(face, theta_i, n1, n2, &field)
-                .unwrap_or(None);
-            let reflected = self
-                .create_reflected(face, theta_i, n1, n2, &field)
-                .unwrap_or(None);
+            let (refracted, reflected) = if legacy_interface() {
+                (
+                    self.create_refracted(face, theta_i, n1, n2, &field)
+                        .unwrap_or(None),
+                    self.create_reflected(face, theta_i, n1, n2, &field)
+                        .unwrap_or(None),
+                )
+            } else {
+                // Orient the normal from the incident medium into medium 2.
+                let normal_t = if normal.dot(&self.field.prop()) > 0.0 {
+                    normal
+                } else {
+                    -normal
+                };
+                let tr = crate::snell::transfer(
+                    field.n_app() * field.prop(),
+                    field.absorption(),
+                    normal_t,
+                    n2,
+                );
+                (
+                    self.create_refracted_general(face, &tr, n1, n2, &field),
+                    self.create_reflected_general(face, &tr, normal_t, n1, n2, &field),
+                )
+            };
 
             if refracted.is_some() {
                 outputs.push(refracted.unwrap());
@@ -412,6 +444,102 @@ impl Beam {
         }
     }
 
+    /// Creates the reflected beam from the reduced-wave-vector transfer.
+    ///
+    /// The propagation mirror is unchanged from the legacy path; what
+    /// generalises is the wave state (the absorption vector mirrors
+    /// with the frame) and the Fresnel coefficients, which take the
+    /// complex normal components. TIR is no longer an angle test:
+    /// a bounce counts as TIR when the transmitted normal flux
+    /// `Re(kappa_t)` is negligible, which reduces exactly to the
+    /// classical condition for lossless media and remains continuous
+    /// as `n' -> 0`.
+    fn create_reflected_general(
+        &self,
+        face: &Face,
+        tr: &crate::snell::Transfer,
+        normal_t: Vector3<f32>,
+        n1: Complex<f32>,
+        n2: Complex<f32>,
+        field_in: &Field,
+    ) -> Option<Beam> {
+        let normal = face.data().normal;
+        let prop = self.get_reflection_vector(&normal);
+        let mut field = field_in.clone();
+        field.set_prop(prop);
+
+        // Mirror the absorption vector about the interface plane.
+        let a = field.absorption();
+        let a_n = a.dot(&normal_t);
+        field.set_wave(field.n_app(), a - 2.0 * a_n * normal_t);
+
+        let fresnel = fresnel::refl_general(tr.kappa_i, tr.kappa_t, n1, n2);
+        field.matmul(&fresnel);
+        debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
+
+        let is_tir = tr.kappa_t.re <= settings::TIR_FLUX_EPS * tr.kappa_t.norm();
+        let (rec, tir, variant) = if is_tir {
+            (
+                self.rec_count,
+                self.tir_count + 1,
+                BeamVariant::Default(DefaultBeamVariant::Tir),
+            )
+        } else {
+            (
+                self.rec_count + 1,
+                self.tir_count,
+                BeamVariant::Default(DefaultBeamVariant::Refl),
+            )
+        };
+        Some(Beam::new(
+            face.clone(),
+            n1,
+            rec,
+            tir,
+            field,
+            variant,
+            self.wavelength,
+        ))
+    }
+
+    /// Creates the transmitted beam from the reduced-wave-vector
+    /// transfer, or `None` when the transmitted wave carries no normal
+    /// flux (the TIR limit). Direction, apparent index, and absorption
+    /// vector all come from the transmitted `w2`; the Fresnel
+    /// coefficients take the complex normal components.
+    fn create_refracted_general(
+        &self,
+        face: &Face,
+        tr: &crate::snell::Transfer,
+        n1: Complex<f32>,
+        n2: Complex<f32>,
+        field_in: &Field,
+    ) -> Option<Beam> {
+        if tr.kappa_t.re <= settings::TIR_FLUX_EPS * tr.kappa_t.norm() {
+            return None;
+        }
+        let n_app = tr.w_re.norm();
+        let prop = tr.w_re / n_app;
+
+        let mut field = field_in.clone();
+        field.set_prop(prop);
+        field.set_wave(n_app, tr.w_im);
+
+        let fresnel = fresnel::refr_general(tr.kappa_i, tr.kappa_t, n1, n2);
+        field.matmul(&fresnel);
+        debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
+
+        Some(Beam::new(
+            face.clone(),
+            n2,
+            self.rec_count + 1,
+            self.tir_count,
+            field,
+            BeamVariant::Default(DefaultBeamVariant::Refr),
+            self.wavelength,
+        ))
+    }
+
     fn remainders_to_beams(
         &self,
         remainders: Vec<Face>,
@@ -494,16 +622,19 @@ impl Beam {
         refr_index: Complex<f32>,
         rec_count: i32,
         tir_count: i32,
-        mut field: Field,
+        field: Field,
         variant: BeamVariant,
         wavelength: f32,
     ) -> Self {
-        // Every beam construction passes through here, so this is the
-        // single place the field's wave state is tied to the beam's
-        // medium. Homogeneous for now; the lossy-media interface
-        // transfer will set the inhomogeneous state before construction
-        // and this sync will become conditional.
-        field.sync_wave_homogeneous(refr_index);
+        // The field's wave state is the caller's responsibility: fresh
+        // fields are synced homogeneous at the true creation sites
+        // (new_initial, new_from_field), transferred fields carry the
+        // state set by create_{refracted,reflected}_general, and clones
+        // (earcut, remainders, external diffraction) inherit it.
+        debug_assert!(
+            legacy_interface() || field.dispersion_residual(refr_index) < 1e-3,
+            "beam field wave state inconsistent with its medium"
+        );
         Self {
             id: next_beam_id(),
             face,

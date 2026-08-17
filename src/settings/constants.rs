@@ -14,6 +14,17 @@ pub const VERTEX_MERGE_DISTANCE: f32 = 0.001;
 pub const CLIP_TOLERANCE: f32 = 1e16;
 /// Minimum absolute value of the dot product of two vectors to be considered colinear.
 pub const COLINEAR_THRESHOLD: f32 = 0.0001;
+
+/// A bounce counts as total internal reflection when the transmitted
+/// normal flux fraction `Re(kappa_t) / |kappa_t|` is below this value,
+/// and no transmitted beam is spawned. For lossless media the fraction
+/// is exactly zero above the critical angle (up to the ~3e-8 rounding
+/// of the complex square root), so this reproduces the classical
+/// angle-test TIR; for weakly absorbing media it keeps the behaviour
+/// continuous as `n' -> 0` while admitting the genuine transmission
+/// that exists for any `n' > 0` (no TIR in lossy media; see
+/// docs/theory/lossy_media_beam_tracing.typ).
+pub const TIR_FLUX_EPS: f32 = 1e-6;
 /// Minimum vector length (in geometry units) to be considered non-degenerate.
 pub const VEC_LENGTH_THRESHOLD: f32 = 0.001;
 /// Minimum distance traversed by ray to intersection. Intersections closer than this are ignored.

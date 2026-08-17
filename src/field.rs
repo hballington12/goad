@@ -293,6 +293,13 @@ impl Field {
         self.absorption
     }
 
+    /// Sets the wave state explicitly (used by the interface transfer,
+    /// which produces inhomogeneous waves in absorbing media).
+    pub fn set_wave(&mut self, n_app: f32, absorption: Vector3<f32>) {
+        self.n_app = n_app;
+        self.absorption = absorption;
+    }
+
     /// Sets the wave state to the homogeneous wave of the given medium:
     /// `N = n.re`, `A = n.im * prop`. This is exact for every beam the
     /// tracer currently produces; the lossy-media interface transfer
