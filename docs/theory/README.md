@@ -7,5 +7,15 @@
   - the analytic small-(kxx, kyy) limit (signed area plus first moments)
   - branch selection, error budget, and f32 validation results
   - outlook: generalised incident fields (polynomial amplitude, linear phase, sinusoidal modulation via Jacobi-Anger, phase noise, and the quadratic-phase limit of the method)
-- Compile with `typst compile stable_fraunhofer_edge_sum.typ`.
-- Validation script: `fraunhofer_limit_check.py` in this directory (needs numpy; e.g. run with the venv in `examples/bullet_rosette_aggregate/.venv`).
+- `lossy_media_beam_tracing.typ` — inhomogeneous-wave beam tracing for absorbing media. Covers:
+  - the reduced wave vector `w = N e + i A` as the single piece of per-beam state, with dispersion `w · w = n_tilde^2`
+  - interface transfer as tangential continuity plus one complex square root, with the continuation-rule branch (`Re + Im > 0`) validated against a branch-free spectral decomposition
+  - generalised Fresnel coefficients; proof that `fresnel.rs` is exact for homogeneous incidence below critical, and the TIR branch fix above it
+  - no TIR in lossy media; classical TIR recovered continuously as the lossless evanescent limit
+  - per-beam amplitude ramp with no per-vertex state; effective cross-section and far-field ramp via one complex-argument edge sum; Dupertuis II energy bookkeeping (`R + T = 1 + M`)
+  - symbolic collapse to the current implementation at `n' = 0`, error budget in `x = n'/n`, and validity bounds of the single-wave model
+- `lossy_media_plan.md` — the phased plan for the lossy-media rework: notation, scope, fallback requirement, validation ladder (Phase B harness, lossy wedge, ADDA and PGOM cross-checks with status), and the implementation sketch.
+- `chang2005_absorbing_ray_tracing.md` — transcription of Chang, Walker, Hopcraft (2005), "Ray tracing in absorbing media", JQSRT 96, with original equation numbers.
+- `dupertuis_snell_fresnel.md` / `dupertuis_energy_balance.md` — transcriptions of Dupertuis, Proctor, Acklin (1994) papers I and II (generalized Snell-Fresnel; energy balance and reciprocity), with original equation numbers.
+- Compile with `typst compile <file>.typ`.
+- Validation scripts: `fraunhofer_limit_check.py` in this directory (needs numpy; e.g. run with the venv in `examples/bullet_rosette_aggregate/.venv`); the lossy-media Phase B harness lives in `examples/lossy_media_validation/` (uv project).

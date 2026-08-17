@@ -29,3 +29,6 @@ examples/backscattering/*_results.json
 examples/backscattering/*.png
 sideplanes_rough_*/
 .claude
+examples/lossy_media_validation/.venv/
+examples/lossy_media_validation/__pycache__/
+examples/lossy_media_validation/figs/

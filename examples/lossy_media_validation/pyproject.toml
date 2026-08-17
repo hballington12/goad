@@ -1,0 +1,9 @@
+[project]
+name = "lossy-media-validation"
+version = "0.1.0"
+description = "Phase B validation harness for the lossy-media beam tracing rework"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+]
