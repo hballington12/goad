@@ -8,6 +8,12 @@ pub struct Powers {
     pub input: f32,       // near-field input power
     pub output: f32,      // near-field output power
     pub absorbed: f32,    // near-field absorbed power
+    /// Interface energy imbalance of inhomogeneous-wave Fresnel
+    /// splitting: per interface, R + T = 1 + M (Dupertuis II eq. 60),
+    /// and this books the summed mixed term M so it stays visible
+    /// instead of polluting the truncation counters. Zero for lossless
+    /// media and at first entry from a lossless host.
+    pub interface_mixed: f32,
     pub trnc_ref: f32,    // truncated power due to max reflections
     pub trnc_rec: f32,    // truncated power due to max recursions
     pub trnc_clip: f32,   // truncated power due to clipping
@@ -23,6 +29,7 @@ impl DivAssign<f32> for Powers {
         self.input /= rhs;
         self.output /= rhs;
         self.absorbed /= rhs;
+        self.interface_mixed /= rhs;
         self.trnc_ref /= rhs;
         self.trnc_rec /= rhs;
         self.trnc_clip /= rhs;
@@ -42,6 +49,7 @@ impl Div<f32> for Powers {
             input: self.input / rhs,
             output: self.output / rhs,
             absorbed: self.absorbed / rhs,
+            interface_mixed: self.interface_mixed / rhs,
             trnc_ref: self.trnc_ref / rhs,
             trnc_rec: self.trnc_rec / rhs,
             trnc_clip: self.trnc_clip / rhs,
@@ -62,6 +70,7 @@ impl Pow<f32> for Powers {
             input: self.input.pow(rhs),
             output: self.output.pow(rhs),
             absorbed: self.absorbed.pow(rhs),
+            interface_mixed: self.interface_mixed.pow(rhs),
             trnc_ref: self.trnc_ref.pow(rhs),
             trnc_rec: self.trnc_rec.pow(rhs),
             trnc_clip: self.trnc_clip.pow(rhs),
@@ -82,6 +91,7 @@ impl Mul<f32> for Powers {
             input: self.input * rhs,
             output: self.output * rhs,
             absorbed: self.absorbed * rhs,
+            interface_mixed: self.interface_mixed * rhs,
             trnc_ref: self.trnc_ref * rhs,
             trnc_rec: self.trnc_rec * rhs,
             trnc_clip: self.trnc_clip * rhs,
@@ -102,6 +112,7 @@ impl Mul for Powers {
             input: self.input * other.input,
             output: self.output * other.output,
             absorbed: self.absorbed * other.absorbed,
+            interface_mixed: self.interface_mixed * other.interface_mixed,
             trnc_ref: self.trnc_ref * other.trnc_ref,
             trnc_rec: self.trnc_rec * other.trnc_rec,
             trnc_clip: self.trnc_clip * other.trnc_clip,
@@ -122,6 +133,7 @@ impl Add for Powers {
             input: self.input + other.input,
             output: self.output + other.output,
             absorbed: self.absorbed + other.absorbed,
+            interface_mixed: self.interface_mixed + other.interface_mixed,
             trnc_ref: self.trnc_ref + other.trnc_ref,
             trnc_rec: self.trnc_rec + other.trnc_rec,
             trnc_clip: self.trnc_clip + other.trnc_clip,
@@ -142,6 +154,7 @@ impl Sub for Powers {
             input: self.input - other.input,
             output: self.output - other.output,
             absorbed: self.absorbed - other.absorbed,
+            interface_mixed: self.interface_mixed - other.interface_mixed,
             trnc_ref: self.trnc_ref - other.trnc_ref,
             trnc_rec: self.trnc_rec - other.trnc_rec,
             trnc_clip: self.trnc_clip - other.trnc_clip,
@@ -160,6 +173,7 @@ impl AddAssign for Powers {
             input: self.input + other.input,
             output: self.output + other.output,
             absorbed: self.absorbed + other.absorbed,
+            interface_mixed: self.interface_mixed + other.interface_mixed,
             trnc_ref: self.trnc_ref + other.trnc_ref,
             trnc_rec: self.trnc_rec + other.trnc_rec,
             trnc_clip: self.trnc_clip + other.trnc_clip,
@@ -178,6 +192,7 @@ impl Powers {
             input: 0.0,
             output: 0.0,
             absorbed: 0.0,
+            interface_mixed: 0.0,
             trnc_ref: 0.0,
             trnc_rec: 0.0,
             trnc_clip: 0.0,
@@ -195,6 +210,7 @@ impl Powers {
             input: 1.0,
             output: 1.0,
             absorbed: 1.0,
+            interface_mixed: 1.0,
             trnc_ref: 1.0,
             trnc_rec: 1.0,
             trnc_clip: 1.0,
@@ -259,6 +275,7 @@ impl Convergeable for Powers {
             input: self.input / other.input,
             output: self.output / other.output,
             absorbed: self.absorbed / other.absorbed,
+            interface_mixed: self.interface_mixed / other.interface_mixed,
             trnc_ref: self.trnc_ref / other.trnc_ref,
             trnc_rec: self.trnc_rec / other.trnc_rec,
             trnc_clip: self.trnc_clip / other.trnc_clip,

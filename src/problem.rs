@@ -646,6 +646,7 @@ impl Problem {
             Self::propagate_with_checks(beam, geom, settings, area_threshold, &mut powers)?;
 
         powers.absorbed += beam.absorbed_power / scale2;
+        powers.interface_mixed += beam.interface_mixed / scale2;
         let trnc_clip_contribution = Self::trnc_clip_power(beam, scale2);
         Self::check_trnc_clip_bound(beam, trnc_clip_contribution, scale2);
         powers.trnc_clip += trnc_clip_contribution;
@@ -828,6 +829,7 @@ impl Problem {
                 &mut powers,
             )?;
             powers.absorbed += beam.absorbed_power / scale2;
+            powers.interface_mixed += beam.interface_mixed / scale2;
             let trnc_clip_contribution = Self::trnc_clip_power(&beam, scale2);
             Self::check_trnc_clip_bound(&beam, trnc_clip_contribution, scale2);
             powers.trnc_clip += trnc_clip_contribution;

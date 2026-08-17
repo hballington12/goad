@@ -34,6 +34,53 @@ fn legacy_interface() -> bool {
     *LEGACY.get_or_init(|| std::env::var("GOAD_LEGACY_INTERFACE").is_ok_and(|v| v != "0"))
 }
 
+/// Exact integral of `exp(g . (r - c))` over a planar polygon face with
+/// centroid `c`: the ramp-weighted area `D_eff / cos(theta)` of the
+/// theory note, reducing to the plain area as `g -> 0`. Evaluated by
+/// the real-argument analogue of the stable Fraunhofer edge sum: with
+/// the in-plane axis `u` chosen along `g`, Green's theorem gives
+/// `(1/|g|) * sum_j dy_j exp(|g| x_j) phi(|g| dx_j)` with
+/// `phi(t) = (e^t - 1)/t`, singularity-free (PGOM computes the same
+/// quantity as its `PYEXP` contour form).
+fn ramp_weighted_area(face: &Face, g: Vector3<f32>) -> f32 {
+    let data = face.data();
+    let area = data.area.unwrap();
+    let normal = data.normal;
+    // in-plane component of g
+    let g_t = g - g.dot(&normal) * normal;
+    let gm = g_t.norm();
+    let verts = &data.exterior;
+    let r_max = verts
+        .iter()
+        .map(|p| (p - data.midpoint).norm())
+        .fold(0.0_f32, f32::max);
+    if gm * r_max < 1e-4 {
+        // relative error O((g R)^2) below the f32 budget
+        return area;
+    }
+    let u = g_t / gm;
+    let v = normal.cross(&u);
+
+    let n = verts.len();
+    let mut sum = 0.0_f32;
+    for j in 0..n {
+        let a = verts[j] - data.midpoint;
+        let b = verts[(j + 1) % n] - data.midpoint;
+        let x0 = a.dot(&u);
+        let dy = (b - a).dot(&v);
+        let t = gm * (b.dot(&u) - x0);
+        let phi = if t.abs() < 1e-3 {
+            1.0 + t * (0.5 + t / 6.0)
+        } else {
+            (t.exp() - 1.0) / t
+        };
+        sum += dy * (gm * x0).exp() * phi;
+    }
+    // Winding relative to the normal decides the sign of the contour
+    // sum; the integral of a positive function is positive.
+    (sum / gm).abs()
+}
+
 /// Where an output beam goes after a propagation event. Shared by the
 /// production batch path (via `categorise_outputs`) and the recording path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -200,7 +247,7 @@ impl Beam {
         output_beams.extend(intersection_beams);
         output_beams.extend(remainder_beams);
         let output_power = output_beams.iter().fold(0.0, |acc, x| acc + x.power());
-        let power_loss = self.power() - self.absorbed_power - output_power;
+        let power_loss = self.power() - self.absorbed_power - self.interface_mixed - output_power;
 
         Ok((output_beams, power_loss))
     }
@@ -229,22 +276,64 @@ impl Beam {
             // Compute absorbed_intensity before applying the attenuation:
             // intensity is invariant under phase winding, and the
             // amplitude factor is known ahead of the propagation.
+            let intensity_before = field.intensity();
             let absorbed_intensity;
             if legacy_interface() {
                 let dist = (face.midpoint() - self.face.data().midpoint)
                     .dot(&self.field.prop())
                     .abs(); // z-distance
                 absorbed_intensity =
-                    field.intensity() * (1.0 - (-wavenumber * n1.im * dist).exp().powi(2));
+                    intensity_before * (1.0 - (-wavenumber * n1.im * dist).exp().powi(2));
                 field.propagate(dist, wavenumber, n1);
             } else {
                 let d = face.midpoint() - self.face.data().midpoint;
-                let intensity_before = field.intensity();
-                let factor = field.propagate_displacement(&d, wavenumber);
-                absorbed_intensity = intensity_before * (1.0 - factor * factor);
+                field.propagate_displacement(&d, wavenumber);
+                // The absorbed power is booked from the exact tube
+                // ledger below, not from a centroid intensity change,
+                // which would conflate dissipation with transverse
+                // ramp re-referencing.
+                absorbed_intensity = 0.0;
             }
-            self.absorbed_power +=
-                absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
+            if legacy_interface() {
+                self.absorbed_power +=
+                    absorbed_intensity * face.data().area.unwrap() * theta_i.cos() * n1.re;
+            } else if field.absorption() != Vector3::zeros() {
+                // Exact tube ledger (theory note, power section): the
+                // absorbed power on this leg is the difference between
+                // the power entering the flux tube at the parent face
+                // and the power arriving at this face. Both are ramp
+                // integrals over this face: the arriving intensity
+                // carries the wave's full ramp `-2kA`, while the
+                // no-dissipation transport of the parent's own face
+                // ramp has `-2k(A - (A.e) grad_l)` with
+                // `grad_l = n_p / (e . n_p)` the path-length gradient,
+                // and the centroid prefactors differ by the transverse
+                // (non-dissipative) part of the re-referencing only,
+                // so nothing here overflows for strong absorption.
+                let a = field.absorption();
+                let e = self.field.prop();
+                let n_p = self.face.data().normal;
+                let d = face.midpoint() - self.face.data().midpoint;
+                let a_e = a.dot(&e);
+                let e_np = e.dot(&n_p);
+                let l_c = d.dot(&n_p) / e_np; // centroid path length
+                let grad_l = n_p / e_np;
+                let cos_c = theta_i.cos();
+                let n_app = field.n_app();
+
+                let p_arr = field.intensity()
+                    * n_app
+                    * cos_c
+                    * ramp_weighted_area(face, -2.0 * wavenumber * a);
+                // transverse-only re-referencing factor: exp(-2k (A.d - (A.e) l_c))
+                let trans = (-2.0 * wavenumber * (a.dot(&d) - a_e * l_c)).exp();
+                let p_in = intensity_before
+                    * trans
+                    * n_app
+                    * cos_c
+                    * ramp_weighted_area(face, -2.0 * wavenumber * (a - a_e * grad_l));
+                self.absorbed_power += p_in - p_arr;
+            }
 
             if self.variant == BeamVariant::Initial {
                 if let Ok(flipped_face) = face.flipped() {
@@ -287,6 +376,23 @@ impl Beam {
                     self.create_reflected_general(face, &tr, normal_t, n1, n2, &field),
                 )
             };
+
+            // Book the interface mixed term: for inhomogeneous incidence
+            // R + T = 1 + M (Dupertuis II eq. 60), so the children's
+            // powers need not sum to the arriving power; the imbalance
+            // is interference flux at the interface, tracked in its own
+            // ledger entry rather than polluting truncation counters.
+            // Skipped for the initial beam (homogeneous incidence from
+            // the lossless host has M = 0 exactly, and its outputs
+            // include the Babinet external-diffraction duplicates).
+            if !legacy_interface() && self.variant != BeamVariant::Initial {
+                let deff =
+                    ramp_weighted_area(face, -2.0 * wavenumber * field.absorption());
+                let p_in = field.intensity() * field.n_app() * theta_i.cos() * deff;
+                let p_out = refracted.as_ref().map_or(0.0, |b| b.power())
+                    + reflected.as_ref().map_or(0.0, |b| b.power());
+                self.interface_mixed += p_in - p_out;
+            }
 
             if refracted.is_some() {
                 outputs.push(refracted.unwrap());
@@ -648,6 +754,11 @@ pub struct Beam {
     pub tir_count: i32,
     pub field: Field,
     pub absorbed_power: f32,  // power absorbed by the medium
+    /// Interface energy imbalance accumulated by this beam's Fresnel
+    /// splittings: per interface, R + T = 1 + M for inhomogeneous
+    /// incidence (Dupertuis II eq. 60). Booked to the powers ledger
+    /// as `interface_mixed`. Zero for homogeneous incidence.
+    pub interface_mixed: f32,
     /// Total area accounted for by intersections and remainders.
     /// `None` until a clip has successfully completed, so a failed or
     /// never-run clip cannot masquerade as a real zero-area result.
@@ -667,6 +778,7 @@ impl PartialEq for Beam {
             && self.tir_count == other.tir_count
             && self.field == other.field
             && self.absorbed_power == other.absorbed_power
+            && self.interface_mixed == other.interface_mixed
             && self.clipping_area == other.clipping_area
             && self.variant == other.variant
             && self.wavelength == other.wavelength
@@ -701,6 +813,7 @@ impl Beam {
             tir_count,
             field,
             absorbed_power: 0.0,
+            interface_mixed: 0.0,
             clipping_area: None,
             variant,
             wavelength,
@@ -716,9 +829,24 @@ impl Beam {
         area * cosine
     }
 
-    /// Returns the power of a beam.
+    /// Returns the power of a beam: the normal Poynting flux integrated
+    /// over the beam cross-section. For an inhomogeneous wave the flux
+    /// factor is the apparent index `N` and the cross-section carries
+    /// the amplitude ramp, `D_eff = cos(theta) * integral of
+    /// exp(-2 k A_t . (r - c)) dA` (theory note, power section); both
+    /// reduce exactly to the legacy `n.re * area * cos(theta)` when the
+    /// absorption vector vanishes.
     pub fn power(&self) -> f32 {
-        self.field.intensity() * self.refr_index.re * self.csa()
+        if legacy_interface() {
+            return self.field.intensity() * self.refr_index.re * self.csa();
+        }
+        let a = self.field.absorption();
+        if a == Vector3::zeros() {
+            return self.field.intensity() * self.field.n_app() * self.csa();
+        }
+        let g = -2.0 * self.wavenumber() * a;
+        let cosine = self.field.prop().dot(&self.face.data().normal).abs();
+        self.field.intensity() * self.field.n_app() * cosine * ramp_weighted_area(&self.face, g)
     }
 
     pub fn wavenumber(&self) -> f32 {
@@ -747,12 +875,59 @@ impl Beam {
             tir_count: self.tir_count,
             field: new_field,
             absorbed_power: self.absorbed_power,
+            interface_mixed: self.interface_mixed,
             clipping_area: self.clipping_area,
             variant: self.variant.clone(),
             wavelength: self.wavelength,
         })
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nalgebra::Point3;
+
+    /// The ramp-weighted area must match the closed form on a unit
+    /// square, be invariant under rigid rotation, ignore the
+    /// out-of-plane component of `g`, and reduce to the area at `g = 0`.
+    #[test]
+    fn ramp_weighted_area_matches_analytic() {
+        let verts = vec![
+            Point3::new(0.0_f32, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(1.0, 1.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+        ];
+        let face = Face::new_simple(verts, None, None).unwrap();
+
+        assert!((ramp_weighted_area(&face, Vector3::zeros()) - 1.0).abs() < 1e-6);
+
+        // g along x, centroid at x = 1/2:
+        // integral = 2 sinh(g/2) / g
+        let g = 1.7_f32;
+        let expected = 2.0 * (g / 2.0).sinh() / g;
+        let got = ramp_weighted_area(&face, Vector3::new(g, 0.0, 0.0));
+        assert!((got - expected).abs() < 1e-5, "{got} vs {expected}");
+
+        // out-of-plane component must not contribute
+        let got_z = ramp_weighted_area(&face, Vector3::new(g, 0.0, 3.0));
+        assert!((got_z - expected).abs() < 1e-5);
+
+        // rigid rotation invariance
+        let rot = nalgebra::Rotation3::from_euler_angles(0.4_f32, -0.9, 1.3);
+        let rverts: Vec<Point3<f32>> = face
+            .data()
+            .exterior
+            .iter()
+            .map(|p| rot * p)
+            .collect();
+        let rface = Face::new_simple(rverts, None, None).unwrap();
+        let rg = rot * Vector3::new(g, 0.0, 0.0);
+        let got_r = ramp_weighted_area(&rface, rg);
+        assert!((got_r - expected).abs() < 1e-4, "{got_r} vs {expected}");
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
