@@ -38,3 +38,18 @@ mueller_case! {
     },
     refr_index: vec![Complex32::new(1.3117, 0.1)],
 }
+
+mueller_case! {
+    name: fixed_hex_30_20_20_ri001_mueller_scatgrid,
+    settings: |s| {
+        s.zones = vec![ZoneConfig::new(bins::Scheme::new_simple(19, 19))];
+        s.orientation = Orientation {
+            scheme: Scheme::Discrete { eulers: vec![Euler::new(30.0, 20.0, 20.0)] },
+            euler_convention: EulerConvention::ZYZ,
+        };
+    },
+    // Moderate absorption: unlike n' = 0.1 (optically dead interior),
+    // this exercises multiply-reflected interior beams and the ramped
+    // exit apertures of the lossy-media rework end to end.
+    refr_index: vec![Complex32::new(1.3117, 0.01)],
+}

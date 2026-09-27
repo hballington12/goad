@@ -26,8 +26,11 @@ fn next_beam_id() -> BeamId {
 /// Regression switch (gate G2 of the lossy-media rework): when the
 /// environment variable `GOAD_LEGACY_INTERFACE` is set, interfaces use
 /// the pre-rework path (Macke `get_theta_t`, angle-test TIR, and
-/// `cos_theta_t`-form Fresnel), which must reproduce pre-rework output
-/// byte-identically. Removed at stage 6; see
+/// `cos_theta_t`-form Fresnel). Its baseline is the code AFTER the
+/// deliberate TIR branch fix (774bc88) and before the rework: verified
+/// byte-identical to that baseline for lossless media and to 2e-6 (f32,
+/// cross-build) for absorbing ones; it deliberately does NOT reproduce
+/// the pre-fix branch. Removed at stage 6; see
 /// docs/theory/lossy_media_implementation.md.
 fn legacy_interface() -> bool {
     static LEGACY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
