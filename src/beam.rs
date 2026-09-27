@@ -156,20 +156,16 @@ impl Beam {
         if dot.abs() > 1.0 - settings::COLINEAR_THRESHOLD {
             return (-self.field.e_perp(), -self.field.e_perp_im());
         }
-        let c_re = normal.cross(&(self.field.n_app() * self.field.prop()));
-        let c_im = normal.cross(&self.field.absorption());
-        // bilinear normalisation: h = c / sqrt(c . c)
-        let cc = Complex::new(
-            c_re.dot(&c_re) - c_im.dot(&c_im),
-            2.0 * c_re.dot(&c_im),
+        let c = (
+            normal.cross(&(self.field.n_app() * self.field.prop())),
+            normal.cross(&self.field.absorption()),
         );
-        let inv = cc.sqrt().inv();
-        let h_re = inv.re * c_re - inv.im * c_im;
-        let h_im = inv.re * c_im + inv.im * c_re;
+        // bilinear normalisation: h = c / sqrt(c . c)
+        let h = Field::cscale(Field::cdot(&c, &c).sqrt().inv(), &c);
         if dot > 0.0 {
-            (-h_re, -h_im)
+            (-h.0, -h.1)
         } else {
-            (h_re, h_im)
+            h
         }
     }
 
@@ -637,8 +633,7 @@ impl Beam {
         field.matmul(&fresnel);
         debug_assert!(!Field::ampl_intensity(&field.ampl()).is_nan());
 
-        let is_tir = tr.kappa_t.re <= settings::TIR_FLUX_EPS * tr.kappa_t.norm();
-        let (rec, tir, variant) = if is_tir {
+        let (rec, tir, variant) = if tr.is_tir() {
             (
                 self.rec_count,
                 self.tir_count + 1,
@@ -675,7 +670,7 @@ impl Beam {
         n2: Complex<f32>,
         field_in: &Field,
     ) -> Option<Beam> {
-        if tr.kappa_t.re <= settings::TIR_FLUX_EPS * tr.kappa_t.norm() {
+        if tr.is_tir() {
             return None;
         }
         let n_app = tr.w_re.norm();

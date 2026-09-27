@@ -338,6 +338,11 @@ impl PartialEq for Field {
             && (self.prop.z - other.prop.z).abs() < TOLERANCE
             // Check phase with tolerance
             && (self.phase - other.phase).abs() < TOLERANCE
+            // Wave state (lossy-media rework): two fields with the same
+            // amplitude but different ramps are physically different.
+            && (self.n_app - other.n_app).abs() < TOLERANCE
+            && (self.absorption - other.absorption).norm() < TOLERANCE
+            && (self.e_perp_im - other.e_perp_im).norm() < TOLERANCE
     }
 }
 
@@ -532,7 +537,7 @@ impl Field {
     }
 
     /// Bilinear (unconjugated) dot product of two bivectors.
-    fn cdot(
+    pub(crate) fn cdot(
         a: &(Vector3<f32>, Vector3<f32>),
         b: &(Vector3<f32>, Vector3<f32>),
     ) -> Complex<f32> {
@@ -554,7 +559,7 @@ impl Field {
     }
 
     /// Scales a bivector by a complex scalar.
-    fn cscale(s: Complex<f32>, v: &(Vector3<f32>, Vector3<f32>)) -> (Vector3<f32>, Vector3<f32>) {
+    pub(crate) fn cscale(s: Complex<f32>, v: &(Vector3<f32>, Vector3<f32>)) -> (Vector3<f32>, Vector3<f32>) {
         (s.re * v.0 - s.im * v.1, s.re * v.1 + s.im * v.0)
     }
 

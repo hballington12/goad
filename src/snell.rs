@@ -20,6 +20,16 @@ pub struct Transfer {
     pub kappa_i: Complex<f32>,
 }
 
+impl Transfer {
+    /// Whether this transfer is total internal reflection: the
+    /// transmitted normal flux `Re(kappa_t)` is negligible. Reduces
+    /// exactly to the classical angle test for lossless media and
+    /// remains continuous as `n' -> 0`.
+    pub fn is_tir(&self) -> bool {
+        self.kappa_t.re <= crate::settings::TIR_FLUX_EPS * self.kappa_t.norm()
+    }
+}
+
 /// Interface transfer of the reduced wave vector `w = N e + iA`:
 /// tangential continuity plus one complex square root,
 /// `gamma = sqrt(n2^2 - w_t . w_t)`, taking the continuation-rule
