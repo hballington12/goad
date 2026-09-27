@@ -274,6 +274,59 @@ fn polygon_ft(edges: &EdgeData, p: f32, q: f32) -> Complex<f32> {
     }
 }
 
+/// `e^{iz}` for complex `z`: a real rotation times the real amplitude
+/// factor `e^{-Im z}`.
+#[inline]
+fn cis_c(z: Complex<f32>) -> Complex<f32> {
+    Complex::cis(z.re) * (-z.im).exp()
+}
+
+/// [`phi`] continued to complex argument, same retained series orders
+/// (through `omega^3`; truncation `|omega|^4 / 120` at the threshold).
+#[inline]
+fn phi_c(omega: Complex<f32>) -> Complex<f32> {
+    const SERIES_THRESHOLD: f32 = 1e-2;
+    if omega.norm() < SERIES_THRESHOLD {
+        let i = Complex::new(0.0, 1.0);
+        let w = omega;
+        Complex::new(1.0, 0.0) + i * w / 2.0 - w * w / 6.0 - i * w * w * w / 24.0
+    } else {
+        let iw = Complex::new(-omega.im, omega.re); // i * omega
+        (cis_c(omega) - Complex::new(1.0, 0.0)) / iw
+    }
+}
+
+/// [`polygon_ft`] continued to complex `(p, q)`: the exact Fraunhofer
+/// factor for an aperture carrying a linear-exponential amplitude ramp,
+/// `A_U(p_r, q_r) = A(p_r + i mu, q_r + i nu)` with `(mu, nu)` the
+/// in-plane components of `k A` (theory note, far-field section; the
+/// identity is an analytic continuation, so the edge-sum structure and
+/// branch selection carry over with moduli in place of absolute
+/// values). Only called for ramped beams; unramped beams keep the real
+/// path bit-for-bit.
+fn polygon_ft_c(edges: &EdgeData, p: Complex<f32>, q: Complex<f32>) -> Complex<f32> {
+    let kappa = p.norm().max(q.norm());
+    if kappa * edges.r_max < settings::POLYGON_FT_SMALL_ARG {
+        let i = Complex::new(0.0, 1.0);
+        return Complex::new(edges.signed_area, 0.0) + i * (p * edges.mx + q * edges.my);
+    }
+
+    let nv = edges.x.len();
+    let mut sum = Complex::new(0.0, 0.0);
+    let use_p = p.norm() >= q.norm();
+    for j in 0..nv {
+        let delta = p * edges.x[j] + q * edges.y[j];
+        let omega = p * edges.dx[j] + q * edges.dy[j];
+        let weight = if use_p { edges.dy[j] } else { edges.dx[j] };
+        sum += cis_c(delta) * phi_c(omega) * weight;
+    }
+    if use_p {
+        sum / Complex::new(-p.im, p.re) // sum / (i p)
+    } else {
+        -sum / Complex::new(-q.im, q.re) // -sum / (i q)
+    }
+}
+
 // =============================================================================
 // Karczewski polarisation matrix
 // =============================================================================
@@ -396,6 +449,11 @@ pub struct DiffractionContext {
     /// FOV cosine threshold; `None` disables filtering.
     cos_fov: Option<f32>,
     kinc_xy: [f32; 2],
+    /// Imaginary part of the in-plane incident wave vector, `k A` in
+    /// the aperture frame: the amplitude ramp of an inhomogeneous
+    /// exiting beam. `None` for unramped beams, which keep the real
+    /// edge-sum path bit-for-bit.
+    kinc_xy_im: Option<[f32; 2]>,
     inv_denom: Complex<f32>,
     ampl: Ampl,
     prop_aperture: Vector3<f32>,
@@ -498,14 +556,27 @@ impl DiffractionContext {
         let cos_fov =
             fov_factor.map(|_| calculate_fov_cosine(aperture_verts, wavenumber, fov_factor));
 
-        // Incident wave vector in aperture frame
-        let kinc = prop_aperture * wavenumber;
+        // Incident wave vector in aperture frame: k times the reduced
+        // wave vector w = N e + iA. The real part carries the apparent
+        // index (which exceeds the host index for inhomogeneous exiting
+        // waves); the imaginary part is the aperture amplitude ramp.
+        let kinc = beam_aperture.field.n_app() * prop_aperture * wavenumber;
+        let absorption_aperture = beam_aperture.field.absorption();
+        let kinc_xy_im = if absorption_aperture == Vector3::zeros() {
+            None
+        } else {
+            Some([
+                wavenumber * absorption_aperture.x,
+                wavenumber * absorption_aperture.y,
+            ])
+        };
 
         Ok(Self {
             rot3,
             edge_data,
             cos_fov,
             kinc_xy: [kinc.x, kinc.y],
+            kinc_xy_im,
             inv_denom: Complex::new(wavenumber / (2.0 * PI), 0.0),
             ampl,
             prop_aperture,
@@ -574,7 +645,14 @@ impl DiffractionContext {
         let kxx = self.kinc_xy[0] - self.wavenumber * k.x;
         let kyy = self.kinc_xy[1] - self.wavenumber * k.y;
 
-        let a_pq = polygon_ft(&self.edge_data, kxx, kyy);
+        let a_pq = match self.kinc_xy_im {
+            None => polygon_ft(&self.edge_data, kxx, kyy),
+            Some([mu, nu]) => polygon_ft_c(
+                &self.edge_data,
+                Complex::new(kxx, mu),
+                Complex::new(kyy, nu),
+            ),
+        };
         let fraunhofer_sum =
             Complex::new(0.0, -1.0) * a_pq * Complex::cis(bvsk) * self.inv_denom;
 
@@ -645,6 +723,49 @@ mod tests {
             BeamVariant::Default(DefaultBeamVariant::Refr),
             0.532, // wavelength
         )
+    }
+
+    #[test]
+    fn polygon_ft_c_matches_harness_golden_values() {
+        // Golden values from the f64 validation harness
+        // (examples/lossy_media_validation/lossy.py polygon_ft) on the
+        // standard hexagon (radius 3, rotation 0.3).
+        let radius = 3.0_f32;
+        let rot = 0.3_f32;
+        let verts: Vec<Point3<f32>> = (0..6)
+            .map(|i| {
+                let ang = rot + i as f32 * std::f32::consts::PI / 3.0;
+                Point3::new(radius * ang.cos(), radius * ang.sin(), 0.0)
+            })
+            .collect();
+        let edges = EdgeData::from_vertices(&verts);
+
+        let cases = [
+            (
+                Complex::new(1.3, 0.21),
+                Complex::new(0.7, -0.13),
+                Complex::new(-0.965091, -1.596437),
+            ),
+            (
+                Complex::new(0.0002, 0.15),
+                Complex::new(-0.0001, 0.09),
+                Complex::new(24.059973, -0.000939),
+            ),
+        ];
+        for (p, q, expect) in cases {
+            let got = polygon_ft_c(&edges, p, q);
+            assert!(
+                (got - expect).norm() < 1e-3 * expect.norm().max(1.0),
+                "A({p}, {q}) = {got}, expected {expect}"
+            );
+        }
+
+        // Real arguments: the continuation must agree with the real path.
+        for (p, q) in [(1.3_f32, 0.7_f32), (0.001, 2.4), (0.0, 0.0)] {
+            let a = polygon_ft(&edges, p, q);
+            let b = polygon_ft_c(&edges, Complex::new(p, 0.0), Complex::new(q, 0.0));
+            assert!((a - b).norm() < 1e-5 * (a.norm() + 1e-3), "{a} vs {b}");
+        }
     }
 
     #[test]
