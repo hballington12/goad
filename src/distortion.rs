@@ -16,6 +16,15 @@ impl Geom {
             return Ok(());
         }
 
+        // One RNG for the whole distortion, seeded once: every face and every
+        // retry then gets an independent draw. Constructing the RNG per face
+        // (as previously) collapses a seeded distortion to a single shared
+        // (tilt, azimuth) draw on every facet, i.e. a near-rigid perturbation.
+        let mut rng = match seed {
+            Some(s) => rand::rngs::StdRng::seed_from_u64(s),
+            None => rand::rngs::StdRng::from_rng(&mut rand::rng()),
+        };
+
         // For each shape in geometry:
         for shape in self.shapes.iter_mut() {
             // Use the shape aabb to get the bounding box
@@ -56,7 +65,7 @@ impl Geom {
                 attempt += 1;
 
                 // Perturb the normals of the faces
-                let perturbed_normals = perturb_normals(sigma, shape, seed);
+                let perturbed_normals = perturb_normals(sigma, shape, &mut rng);
 
                 // Solve the linear system to get the new vertex positions
                 solve_vertices(shape, &vertex_to_faces, &perturbed_normals);
@@ -218,21 +227,15 @@ fn fetch_face_data(
 fn perturb_normals(
     sigma: f32,
     shape: &mut crate::geom::Shape,
-    seed: Option<u64>,
+    rng: &mut rand::rngs::StdRng,
 ) -> Vec<Vector3<f32>> {
     let mut perturbed_normals = Vec::new();
+    let norm_dist = Normal::new(0.0, sigma).unwrap();
 
     for face in shape.faces.iter_mut() {
         let normal = face.data().normal;
 
-        // Sample distributions
-        let mut rng = if let Some(seed) = seed {
-            rand::rngs::StdRng::seed_from_u64(seed)
-        } else {
-            rand::rngs::StdRng::from_rng(&mut rand::rng())
-        };
-        let norm_dist = Normal::new(0.0, sigma).unwrap();
-        let tan_dtheta = norm_dist.sample(&mut rng); // Normal distribution for tan(polar angle)
+        let tan_dtheta = norm_dist.sample(rng); // Normal distribution for tan(polar angle)
         let dtheta = tan_dtheta.atan();
         let dphi = rng.random_range(0.0..std::f32::consts::PI * 2.0); // Uniform for azimuth
 
@@ -317,4 +320,52 @@ fn build_vertex_to_face_map(shape: &mut crate::geom::Shape) -> HashMap<usize, Ve
         }
     }
     vertex_to_faces
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::geom::Geom;
+    use nalgebra::Complex;
+
+    fn hex() -> Geom {
+        let mut g = Geom::load("./examples/data/hex.obj", vec![Complex::new(1.31, 0.0)])
+            .expect("load hex");
+        g.remove(0)
+    }
+
+    /// A seeded distortion must give every facet an independent draw: the
+    /// per-face normal tilts must not all be equal (the pre-fix behaviour,
+    /// where the RNG was re-seeded per face, made them identical).
+    #[test]
+    fn seeded_distortion_draws_differ_across_faces() {
+        let mut g = hex();
+        let before: Vec<_> = g.shapes[0].faces.iter().map(|f| f.data().normal).collect();
+        g.distort(0.1, Some(42)).unwrap();
+        let after: Vec<_> = g.shapes[0].faces.iter().map(|f| f.data().normal).collect();
+        let tilts: Vec<f32> = before
+            .iter()
+            .zip(&after)
+            .map(|(a, b)| a.dot(b).clamp(-1.0, 1.0).acos())
+            .collect();
+        let max = tilts.iter().cloned().fold(0.0_f32, f32::max);
+        let min = tilts.iter().cloned().fold(f32::MAX, f32::min);
+        assert!(max > 1e-3, "distortion did nothing: max tilt {max}");
+        assert!(
+            (max - min) > 1e-3,
+            "all face tilts identical ({min}..{max}): per-face reseeding bug"
+        );
+    }
+
+    /// Same seed, same result: the fix must not break determinism.
+    #[test]
+    fn seeded_distortion_is_deterministic() {
+        let mut a = hex();
+        let mut b = hex();
+        a.distort(0.1, Some(7)).unwrap();
+        b.distort(0.1, Some(7)).unwrap();
+        for (va, vb) in a.shapes[0].vertices.iter().zip(&b.shapes[0].vertices) {
+            assert!((va - vb).norm() < 1e-12);
+        }
+    }
 }
