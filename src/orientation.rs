@@ -353,8 +353,9 @@ pub enum OrientationSampler {
     },
     /// Iterates over a discrete set of orientations.
     Discrete { eulers: Vec<Euler>, index: usize },
-    /// Generates orientations using Sobol quasi-random sequence (never exhausts).
-    Sobol { seed: u32, index: u32 },
+    /// Generates orientations using an Owen-scrambled Sobol sequence (never exhausts;
+    /// 2^32 distinct points per seed, see `crate::sobol`).
+    Sobol { seed: u64, index: u64 },
     /// Generates orientations using Halton quasi-random sequence (never exhausts).
     Halton { index: u32 },
 }
@@ -378,7 +379,7 @@ impl OrientationSampler {
     /// Create a Sobol quasi-random sampler.
     pub fn sobol(seed: Option<u64>) -> Self {
         Self::Sobol {
-            seed: seed.unwrap_or(0) as u32,
+            seed: seed.unwrap_or(0),
             index: 0,
         }
     }
@@ -407,14 +408,8 @@ impl OrientationSampler {
                 }
             }
             Self::Sobol { seed, index } => {
-                let u1 = sobol_burley::sample(*index, 0, *seed);
-                let u2 = sobol_burley::sample(*index, 1, *seed);
-                let u3 = sobol_burley::sample(*index, 2, *seed);
+                let (alpha, beta, gamma) = crate::sobol::euler_angles(*index, *seed);
                 *index += 1;
-
-                let alpha = u1 * 360.0;
-                let beta = (1.0_f32 - u2 * 2.0).acos() * 180.0 / PI;
-                let gamma = u3 * 360.0;
                 Some(Euler::new(alpha, beta, gamma))
             }
             Self::Halton { index } => {
@@ -445,7 +440,10 @@ impl OrientationSampler {
             Self::Discrete { index, .. } => {
                 *index = 0;
             }
-            Self::Sobol { index, .. } | Self::Halton { index } => {
+            Self::Sobol { index, .. } => {
+                *index = 0;
+            }
+            Self::Halton { index } => {
                 *index = 0;
             }
         }
@@ -479,17 +477,9 @@ impl Orientations {
 
     /// Generate orientations using Sobol quasi-random sequence.
     pub fn sobol(num_orient: usize, seed: Option<u64>) -> Orientations {
-        let seed = seed.unwrap_or(0) as u32;
-        let eulers: Vec<(f32, f32, f32)> = (0..num_orient as u32)
-            .map(|i| {
-                let u1 = sobol_burley::sample(i, 0, seed);
-                let u2 = sobol_burley::sample(i, 1, seed);
-                let u3 = sobol_burley::sample(i, 2, seed);
-                let alpha = u1 * 360.0;
-                let beta = (1.0_f32 - u2 * 2.0).acos() * 180.0 / PI;
-                let gamma = u3 * 360.0;
-                (alpha, beta, gamma)
-            })
+        let seed = seed.unwrap_or(0);
+        let eulers: Vec<(f32, f32, f32)> = (0..num_orient as u64)
+            .map(|i| crate::sobol::euler_angles(i, seed))
             .collect();
         Orientations {
             num_orientations: num_orient,
