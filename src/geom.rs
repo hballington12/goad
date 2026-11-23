@@ -394,66 +394,35 @@ impl FaceData {
     }
 
     /// Compute the normal vector for the face.
+    ///
+    /// Newell's method: the sum of v_i x v_(i+1) over all edges is twice the
+    /// vector area of the polygon, so its direction follows the winding for any
+    /// simple planar polygon, convex or not.
     pub fn set_normal(&mut self) -> Result<()> {
         let vertices = &self.exterior;
 
-        if vertices.len() < 2 {
+        if vertices.len() < 3 {
             return Err(anyhow::anyhow!(
                 "Not enough vertices to compute the normal."
             ));
         }
 
-        // Find a pair of vertices with a distance greater than the threshold
-        let mut v1 = None;
-        let mut v2 = None;
-        for i in 0..vertices.len() {
-            for j in (i + 1)..vertices.len() {
-                if (vertices[j] - vertices[i]).magnitude() > settings::VEC_LENGTH_THRESHOLD {
-                    v1 = Some(&vertices[i]);
-                    v2 = Some(&vertices[j]);
-                    break;
-                }
-            }
-            if v1.is_some() && v2.is_some() {
-                break;
-            }
+        // centre on a vertex to keep the sum well conditioned
+        let origin = vertices[0];
+        let mut normal = Vector3::zeros();
+        for (a, b) in vertices.iter().zip(vertices.iter().cycle().skip(1)) {
+            normal += (a - origin).cross(&(b - origin));
         }
-
-        // Return an error if no suitable pair is found
-        let v1 = v1.ok_or_else(|| {
-            anyhow::anyhow!("No vertex pair found with a distance greater than the threshold.")
-        })?;
-        let v2 = v2.ok_or_else(|| {
-            anyhow::anyhow!("No vertex pair found with a distance greater than the threshold.")
-        })?;
-
-        let v3 = self.midpoint;
-
-        // Compute edge vectors
-        let u = v2 - v1;
-        let v = v3 - v1;
-
-        // Compute the cross product
-        let mut normal = u.cross(&v);
 
         if normal.magnitude() == 0.0 {
             return Err(anyhow::anyhow!(
-                "Degenerate face detected; the cross product is zero. u: {u}, v: {v}"
+                "Degenerate face detected; the polygon has zero vector area: {:?}",
+                self
             ));
         }
 
-        normal.normalize_mut();
-
-        // Verify the normal
-        if u.dot(&normal).abs() < 0.01 && v.dot(&normal).abs() < 0.01 {
-            self.normal = normal;
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Normal could not be computed correctly. u: {u}, v: {v}, face: {:?}",
-                self
-            ))
-        }
+        self.normal = normal.normalize();
+        Ok(())
     }
 
     /// Compute the midpoint of the facet.
