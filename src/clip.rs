@@ -781,6 +781,17 @@ impl<'a> Clipping<'a> {
             false
         };
 
+        // Innermost shape that contains the beam: the clip shape for a beam
+        // inside it, otherwise the clip shape's parent (None: outside everything).
+        let beam_region = if internal {
+            clip_shape_id
+        } else {
+            clip_shape_id.and_then(|id| self.geom.containment_graph.get_parent(id))
+        };
+        let beam_shape = beam_region.and_then(|id| self.geom.shapes.iter().find(|s| s.id == Some(id)));
+        // Propagation direction in the clipping frame.
+        let prop = (self.transform.fixed_view::<3, 3>(0, 0) * *self.proj).normalize();
+
         // create a mapping where each element links a subject to its shape and
         // face in the geometry
         for shape in self.geom.shapes.iter() {
@@ -788,9 +799,18 @@ impl<'a> Clipping<'a> {
                 continue;
             }
 
+            // A beam inside this shape can only meet its faces from inside
+            // (n . prop > 0), a beam outside it only from outside (n . prop < 0).
+            // On a closed, outward-wound shape the other faces are hidden.
+            let beam_inside = beam_shape.is_some_and(|b| b.is_within(&self.geom, shape.id));
+
             for face in shape.faces.iter() {
                 if face == self.clip {
                     // don't include the clip in the subjects
+                    continue;
+                }
+                let facing = face.data().normal.dot(&prop);
+                if (beam_inside && facing < 0.0) || (!beam_inside && facing > 0.0) {
                     continue;
                 }
                 subjects.push(face);
