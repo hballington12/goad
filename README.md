@@ -5,6 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/v/goad)](https://crates.io/crates/goad)
 [![docs.rs](https://img.shields.io/docsrs/goad)](https://docs.rs/goad)
 [![PyPI](https://img.shields.io/pypi/v/goad-py)](https://pypi.org/project/goad-py/)
+[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.jqsrt.2026.110177-blue)](https://doi.org/10.1016/j.jqsrt.2026.110177)
 <!-- badges: end -->
 
 </div>
@@ -17,9 +18,9 @@ GOAD is a Rust-based physical-optics hybrid light scattering model based on geom
 
 > **📖 Reference Paper**
 > If you use this code in your work, please cite:
-> [A Light Scattering Model for Large Particles with Surface Roughness](https://doi.org/10.1016/j.jqsrt.2024.109054)
-> *H. Ballington, E. Hesse*
-> [JQSRT, 2024](https://www.journals.elsevier.com/journal-of-quantitative-spectroscopy-and-radiative-transfer)
+> [Geometric Optics with Aperture Diffraction](https://doi.org/10.1016/j.jqsrt.2026.110177)
+> *H. Ballington*
+> [JQSRT 367, 110177 (2027)](https://doi.org/10.1016/j.jqsrt.2026.110177)
 
 </div>
 
