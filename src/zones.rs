@@ -20,7 +20,7 @@ use crate::bins::{BinningScheme, Scheme, SolidAngleBin};
 use crate::convergence::Convergeable;
 use crate::params::{Param, Params};
 use crate::result::{
-    integrate_theta_weighted_component, GOComponent, ScattResult1D, ScattResult2D,
+    integrate_theta_weighted_component, Ampl, GOComponent, ScattResult1D, ScattResult2D,
 };
 use crate::settings::constants::ZONE_THETA_OFFSET;
 
@@ -352,8 +352,7 @@ impl Zone {
             return;
         };
 
-        let s2 = field_fs.ampl_total[(0, 0)];
-        let ext_cross = -s2.im * 4.0 * PI / k.powi(2);
+        let ext_cross = ext_cross_optical_theorem(&field_fs.ampl_total, k);
         self.params
             .set_param(Param::ExtCrossOpticalTheorem, GOComponent::Total, ext_cross);
     }
@@ -1183,4 +1182,17 @@ impl Convergeable for Zones {
             zones: self.zones.iter().map(|z| z.weights()).collect(),
         }
     }
+}
+
+/// Unpolarised extinction cross section from the forward amplitude matrix (optical theorem).
+///
+/// At theta = 0 the scattering plane is undefined, so the basis of `ampl` is set by the
+/// forward bin's phi and the diagonal elements change with it. Only the trace is
+/// basis independent: C_ext = 4 pi / k^2 * Im[-(S_11 + S_22) / 2]. Element (0, 0)
+/// alone is the extinction for one linear polarisation, which differs from the
+/// unpolarised value whenever the forward amplitude depends on polarisation
+/// (oblique transmission through parallel faces, TIR).
+pub fn ext_cross_optical_theorem(ampl: &Ampl, k: f32) -> f32 {
+    let mean_diag = (ampl[(0, 0)] + ampl[(1, 1)]) * 0.5;
+    -mean_diag.im * 4.0 * PI / k.powi(2)
 }

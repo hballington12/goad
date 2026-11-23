@@ -315,3 +315,54 @@ fn test_forward_amplitude_matrix_properties() {
     check_diagonal(&ampl_concave2, "concave2");
     check_phase_90(&ampl_concave2, "concave2");
 }
+
+/// Rotate an amplitude matrix to a transverse basis turned by `phi` (radians).
+fn rotate_basis(ampl: &Matrix2<Complex<f32>>, phi: f32) -> Matrix2<Complex<f32>> {
+    let (s, c) = phi.sin_cos();
+    let r = Matrix2::new(c, s, -s, c).map(|x| Complex::new(x, 0.0));
+    r * ampl * r.transpose()
+}
+
+#[test]
+fn test_optical_theorem_uses_unpolarised_forward_amplitude() {
+    let k = 2.0 * PI / 0.532;
+    let scale = 4.0 * PI / k.powi(2);
+
+    // Polarisation-dependent forward amplitude (e.g. oblique transmission through a slab):
+    // the unpolarised extinction uses the mean of the diagonal, not element (0, 0).
+    let a = Complex::new(1.0, -3.0);
+    let b = Complex::new(-0.5, -1.0);
+    let diag = Matrix2::new(a, Complex::new(0.0, 0.0), Complex::new(0.0, 0.0), b);
+    let expected = -(a.im + b.im) / 2.0 * scale;
+    let got = goad::zones::ext_cross_optical_theorem(&diag, k);
+    assert!((got - expected).abs() < 1e-5 * expected.abs(), "got {got}, expected {expected}");
+
+    // Polarisation-independent forward amplitude: same value as element (0, 0) alone.
+    let iso = Matrix2::identity().map(|x: f32| Complex::new(0.0, -2.0 * x));
+    let from_00 = -iso[(0, 0)].im * scale;
+    assert!((goad::zones::ext_cross_optical_theorem(&iso, k) - from_00).abs() < 1e-6 * from_00);
+}
+
+#[test]
+fn test_optical_theorem_independent_of_forward_basis() {
+    // At theta = 0 the scattering plane, and so the basis of the forward amplitude
+    // matrix, is set only by the forward bin's phi. The extinction must not depend on it.
+    let k = 2.0 * PI / 0.532;
+    let ampl = Matrix2::new(
+        Complex::new(1.0, -3.0),
+        Complex::new(0.2, 0.4),
+        Complex::new(-0.3, 0.1),
+        Complex::new(-0.5, -1.0),
+    );
+    let reference = goad::zones::ext_cross_optical_theorem(&ampl, k);
+    for deg in [10.0f32, 33.0, 45.0, 90.0, 137.0, 250.0] {
+        let rotated = rotate_basis(&ampl, deg.to_radians());
+        let got = goad::zones::ext_cross_optical_theorem(&rotated, k);
+        assert!(
+            (got - reference).abs() < 1e-4 * reference.abs(),
+            "phi = {deg} deg: {got} vs {reference}"
+        );
+        // Element (0, 0) alone does depend on the basis for this matrix.
+        assert!((rotated[(0, 0)] - ampl[(0, 0)]).norm() > 1e-3);
+    }
+}
