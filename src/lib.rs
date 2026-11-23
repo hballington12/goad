@@ -30,6 +30,7 @@ pub mod filelog;
 pub mod fresnel;
 pub mod geom;
 pub mod multiproblem;
+pub mod orient;
 pub mod orientation;
 pub mod output;
 pub mod params;
