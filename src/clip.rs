@@ -848,6 +848,19 @@ impl<'a> Clipping<'a> {
     }
 }
 
+/// Return `face` with its vertex order reversed if its normal points against
+/// the normal of `reference` (the face it was cut from).
+fn oriented_like(face: Face, reference: &Face) -> Result<Face> {
+    if face.data().normal.dot(&reference.data().normal) >= 0.0 {
+        return Ok(face);
+    }
+    let mut exterior = face.data().exterior.clone();
+    exterior.reverse();
+    let mut reversed = Face::new_simple(exterior, face.data().shape_id, None)?;
+    reversed.data_mut().shape_id = face.data().shape_id;
+    Ok(reversed)
+}
+
 /// Determines if a subject face can possibly intersect the clip face.
 /// Returns false if:
 /// - The subject is entirely behind the clip (in z-coordinate)
@@ -949,6 +962,13 @@ pub fn clip_faces<'a>(
                     Ok(face) => face,
                     Err(_) => continue, // skip face if poly project failed
                 };
+                // the boolean ops do not fix the ring orientation, so give the
+                // fragment the orientation (and normal) of the face it lies on
+                if let Ok(oriented) = oriented_like(face, subject) {
+                    face = oriented;
+                } else {
+                    continue;
+                }
 
                 // cast a ray to determine if the intersection was in front
                 if face.data().midpoint.ray_cast_z(&clip_in.plane())
@@ -976,7 +996,7 @@ pub fn clip_faces<'a>(
     // mirroring how failed intersection projections are skipped above.
     let remaining: Vec<_> = remaining_clips
         .into_iter()
-        .filter_map(|poly| match poly.project(&clip_in.plane()) {
+        .filter_map(|poly| match poly.project(&clip_in.plane()).and_then(|f| oriented_like(f, clip_in)) {
             Ok(face) => Some(face),
             Err(e) => {
                 trace!("skipping degenerate remainder in clip: {e:?}");
