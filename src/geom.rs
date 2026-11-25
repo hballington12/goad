@@ -1029,30 +1029,20 @@ impl Shape {
         };
 
         let mut next_face = 0;
-        let mut face_index_lists: Vec<Vec<usize>> = Vec::with_capacity(face_arities.len());
         for arity in face_arities {
             let end = next_face + arity as usize;
-            face_index_lists.push(mesh.indices[next_face..end].iter().map(|&i| i as usize).collect());
-            next_face = end;
-        }
+            let face_indices = &mesh.indices[next_face..end];
 
-        // Normals follow the winding, so make it consistent and outward first.
-        let reoriented = crate::orient::orient_outward(&shape.vertices, &mut face_index_lists);
-        if reoriented > 0 {
-            log::warn!(
-                "shape '{}': reversed the winding of {} of {} faces to make it consistent and outward",
-                model.name,
-                reoriented,
-                face_index_lists.len()
-            );
-        }
+            // Convert face indices to usize
+            let usize_indices: Vec<usize> = face_indices.iter().map(|&i| i as usize).collect();
 
-        for usize_indices in face_index_lists {
             let face_vertices: Vec<_> = usize_indices.iter().map(|&i| shape.vertices[i]).collect();
             match Face::new_simple(face_vertices, id, Some(usize_indices)) {
                 Ok(face) => shape.add_face(face),
                 Err(err) => log::warn!("skipping face (possibly degenerate) with error: {}", err),
             }
+
+            next_face = end;
         }
 
         shape.set_aabb();
